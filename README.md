@@ -49,11 +49,7 @@ php artisan test  # run tests
 
 Handled via Ansible in [solyto/deployment](https://codeberg.org/solyto/deployment).
 
-
-
 ---
-
-
 
 ## Licensing
 
