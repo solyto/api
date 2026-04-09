@@ -23,7 +23,7 @@ Built with Laravel 12 and PHP 8.4, also utilizing SabreDAV for DAV synchronizati
 - PostgreSQL (for DAV)
 - Redis
 
-The easiest way to get everything running locally is via the [solyto workspace](https://codeberg.org/solyto/solyto), which sets up all services with Docker Compose.
+The easiest way to get everything running locally is via the [solyto workspace](https://github.com/solyto/solyto), which sets up all services with Docker Compose.
 
 ## Setup
 
@@ -47,7 +47,7 @@ php artisan test  # run tests
 
 ## Deployment
 
-Handled via Ansible in [solyto/deployment](https://codeberg.org/solyto/deployment).
+Handled via Ansible in [solyto/deployment](https://github.com/solyto/deployment).
 
 ---
 
