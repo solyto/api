@@ -106,6 +106,11 @@ class LibraryRecommender
     }
 
     private function getBooksMessage($favorites): string {
+        $items = $favorites->map(fn($book) => $book->title . ' by ' . $book->author)->toArray();
+        return sprintf(self::BOOKS_MESSAGE, implode(', ', $items));
+    }
+
+    private function getMusicMessage($favorites): string {
         $genres = [];
         $artists = [];
 
@@ -119,10 +124,5 @@ class LibraryRecommender
         }
 
         return sprintf(self::MUSIC_MESSAGE, implode(', ', $genres), implode(', ', $artists));
-    }
-
-    private function getMusicMessage($favorites): string {
-        $items = $favorites->map(fn($book) => $book->title . ' by ' . $book->author)->toArray();
-        return sprintf(self::BOOKS_MESSAGE, implode(', ', $items));
     }
 }
