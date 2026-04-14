@@ -38,7 +38,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class DailyWeatherForecastResource extends JsonResource
 {
-    public function __construct($resource, private readonly ?string $city = null)
+    public function __construct($resource, private readonly ?string $city = null, private readonly ?string $temperatureUnit = 'c')
     {
         parent::__construct($resource);
     }
@@ -47,6 +47,7 @@ class DailyWeatherForecastResource extends JsonResource
     {
         return [
             'city' => $this->city,
+            'temperature_unit' => $this->temperatureUnit,
             'configured' => true,
             'today' => [
                 'code' => $this['daily']['weather_code'][0],
