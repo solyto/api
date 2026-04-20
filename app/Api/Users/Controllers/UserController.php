@@ -53,7 +53,7 @@ class UserController
     {
         $this->authorize('viewAny', User::class);
 
-        $users = $this->userService->list($request->get('per_page', 15));
+        $users = $this->userService->list(1000);
 
         return ApiResponse::success(UserResource::collection($users), 'Users retrieved successfully.');
     }
