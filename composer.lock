@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "71107b31d641d898a3eb37c2ccfdf1b2",
+    "content-hash": "905bb5a1a168736791f43435a5889208",
     "packages": [
         {
             "name": "brick/math",
@@ -68,16 +68,16 @@
         },
         {
             "name": "calliostro/php-discogs-api",
-            "version": "v3.0.1",
+            "version": "v4.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/calliostro/php-discogs-api.git",
-                "reference": "236a9c23e72fbb90607d1c0aea58c5aeb820f09f"
+                "reference": "726ace903e40a208d10d11fe8ebc771754b941f4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/calliostro/php-discogs-api/zipball/236a9c23e72fbb90607d1c0aea58c5aeb820f09f",
-                "reference": "236a9c23e72fbb90607d1c0aea58c5aeb820f09f",
+                "url": "https://api.github.com/repos/calliostro/php-discogs-api/zipball/726ace903e40a208d10d11fe8ebc771754b941f4",
+                "reference": "726ace903e40a208d10d11fe8ebc771754b941f4",
                 "shasum": ""
             },
             "require": {
@@ -109,15 +109,18 @@
                     "email": "calliostro@gmail.com"
                 }
             ],
-            "description": "Ultra-lightweight Discogs API client for PHP 8.1+ with modern Guzzle-based implementation — Only two classes, service descriptions, zero bloat",
+            "description": "Lightweight Discogs API client for PHP 8.1+ with modern developer comfort — Clean parameter API and minimal dependencies",
             "keywords": [
                 "API-Client",
                 "Guzzle",
                 "audio",
+                "clean-api",
                 "discogs",
                 "discogs-api",
                 "library",
                 "lightweight",
+                "minimal-dependencies",
+                "modern-php",
                 "music",
                 "php",
                 "php8",
@@ -126,9 +129,9 @@
             ],
             "support": {
                 "issues": "https://github.com/calliostro/php-discogs-api/issues",
-                "source": "https://github.com/calliostro/php-discogs-api/tree/v3.0.1"
+                "source": "https://github.com/calliostro/php-discogs-api/tree/v4.0.0"
             },
-            "time": "2025-09-09T05:54:20+00:00"
+            "time": "2025-12-01T15:46:37+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -1128,16 +1131,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.8.0",
+            "version": "2.9.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "21dc724a0583619cd1652f673303492272778051"
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/21dc724a0583619cd1652f673303492272778051",
-                "reference": "21dc724a0583619cd1652f673303492272778051",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/7d0ed42f28e42d61352a7a79de682e5e67fec884",
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884",
                 "shasum": ""
             },
             "require": {
@@ -1153,6 +1156,7 @@
             "require-dev": {
                 "bamarni/composer-bin-plugin": "^1.8.2",
                 "http-interop/http-factory-tests": "0.9.0",
+                "jshttp/mime-db": "1.54.0.1",
                 "phpunit/phpunit": "^8.5.44 || ^9.6.25"
             },
             "suggest": {
@@ -1224,7 +1228,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.8.0"
+                "source": "https://github.com/guzzle/psr7/tree/2.9.0"
             },
             "funding": [
                 {
@@ -1240,7 +1244,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-23T21:21:41+00:00"
+            "time": "2026-03-10T16:41:02+00:00"
         },
         {
             "name": "guzzlehttp/uri-template",
@@ -6765,7 +6769,7 @@
         },
         {
             "name": "symfony/polyfill-intl-idn",
-            "version": "v1.33.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-idn.git",
@@ -6828,7 +6832,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-idn/tree/v1.33.0"
+                "source": "https://github.com/symfony/polyfill-intl-idn/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -6852,7 +6856,7 @@
         },
         {
             "name": "symfony/polyfill-intl-normalizer",
-            "version": "v1.33.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-normalizer.git",
@@ -6913,7 +6917,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.33.0"
+                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -6937,16 +6941,16 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.33.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
-                "reference": "6d857f4d76bd4b343eac26d6b539585d2bc56493"
+                "reference": "6a21eb99c6973357967f6ce3708cd55a6bec6315"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/6d857f4d76bd4b343eac26d6b539585d2bc56493",
-                "reference": "6d857f4d76bd4b343eac26d6b539585d2bc56493",
+                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/6a21eb99c6973357967f6ce3708cd55a6bec6315",
+                "reference": "6a21eb99c6973357967f6ce3708cd55a6bec6315",
                 "shasum": ""
             },
             "require": {
@@ -6998,7 +7002,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.33.0"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -7018,7 +7022,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-12-23T08:48:59+00:00"
+            "time": "2026-04-10T17:25:58+00:00"
         },
         {
             "name": "symfony/polyfill-php80",
@@ -11814,8 +11818,9 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.4"
+        "php": "^8.4",
+        "ext-zip": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
