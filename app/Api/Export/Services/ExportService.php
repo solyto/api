@@ -1,10 +1,8 @@
 <?php
 
-namespace App\Shared\Services;
+namespace App\Api\Export\Services;
 
-use App\Api\Calendars\Models\CalendarEntry;
 use App\Api\CheckIn\Models\CheckIn;
-use App\Api\Contacts\Models\Contact;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\WealthField;
@@ -19,14 +17,15 @@ use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\Todos\Models\Todo;
-use App\Models\User;
+use App\Api\Users\Models\User;
+use App\Dav\Services\DavService;
 use App\Shared\Models\ExportJob;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class ExportService
 {
-    private const FEATURES = [
+    public const FEATURES = [
         'todos',
         'notes',
         'calendars',
@@ -47,6 +46,7 @@ class ExportService
     public function __construct(
         private readonly User $user,
         private readonly ExportJob $job,
+        private readonly DavService $davService,
     ) {}
 
     public function export(): string
@@ -68,51 +68,7 @@ class ExportService
         return $zipPath;
     }
 
-    private function create_zip(string $sourceDir): string
-    {
-        $zipFilename = 'export_'.$this->job->id.'.zip';
-        $zipPath = Storage::disk('user_data')->path($this->user->id.'/'.$zipFilename);
-
-        $zip = new ZipArchive;
-        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($sourceDir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::LEAVES_ONLY,
-        );
-
-        $folderName = 'export_'.$this->job->id;
-
-        foreach ($files as $file) {
-            $filePath = $file->getRealPath();
-            $relativePath = substr($filePath, strlen($sourceDir) + 1);
-            $zip->addFile($filePath, $folderName.'/'.$relativePath);
-        }
-
-        $zip->close();
-
-        return $zipPath;
-    }
-
-    private function delete_directory(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-
-        foreach ($files as $file) {
-            $file->isDir() ? rmdir($file->getRealPath()) : unlink($file->getRealPath());
-        }
-
-        rmdir($dir);
-    }
-
-    public function todos()
+    public function todos(): bool
     {
         $todos = Todo::forUser($this->user->id)->with(['tags', 'subtasks', 'category'])->get();
         $path = $this->get_storage_path().'/todos.csv';
@@ -145,9 +101,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function notes()
+    public function notes(): bool
     {
         $tmpPath = $this->get_storage_path().'/notes';
         $notes = Note::forUser($this->user->id)->with(['category', 'tags'])->get();
@@ -183,104 +141,68 @@ class ExportService
 
             file_put_contents($path, $content);
         }
+
+        return true;
     }
 
-    public function calendars()
+    public function calendars(): bool
     {
-        $entries = CalendarEntry::forUser($this->user->id)->with('calendar')->get();
         $path = $this->get_storage_path().'/calendar.ics';
 
-        $lines = [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//Solyto//Export//EN',
-            'CALSCALE:GREGORIAN',
-        ];
+        $calendars = $this->davService->calendars()->list($this->user);
 
-        foreach ($entries as $entry) {
-            $lines[] = 'BEGIN:VEVENT';
-            $lines[] = 'UID:'.$entry->id.'@solyto';
-            $lines[] = 'SUMMARY:'.$this->escape_ics($entry->title);
-            $lines[] = 'DTSTART:'.$this->format_ics_date($entry->start_date, $entry->is_all_day);
-            $lines[] = 'DTEND:'.$this->format_ics_date($entry->end_date, $entry->is_all_day);
+        $header = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Solyto//Export//EN\r\nCALSCALE:GREGORIAN\r\n";
+        $timezones = '';
+        $events = '';
+        $addedTimezones = [];
 
-            if ($entry->description) {
-                $lines[] = 'DESCRIPTION:'.$this->escape_ics($entry->description);
+        foreach ($calendars as $calendar) {
+            foreach ($this->davService->calendars()->events()->list($calendar) as $event) {
+                $vcal = $event->toVCal();
+
+                if (preg_match_all('/BEGIN:VTIMEZONE.*?END:VTIMEZONE/s', $vcal, $tzMatches)) {
+                    foreach ($tzMatches[0] as $tzBlock) {
+                        if (preg_match('/TZID:(.+)/', $tzBlock, $m)) {
+                            $tzId = trim($m[1]);
+                            if (!isset($addedTimezones[$tzId])) {
+                                $addedTimezones[$tzId] = true;
+                                $timezones .= $tzBlock."\r\n";
+                            }
+                        }
+                    }
+                }
+
+                if (preg_match('/BEGIN:VEVENT.*?END:VEVENT/s', $vcal, $veventMatch)) {
+                    $events .= $veventMatch[0]."\r\n";
+                }
             }
-
-            if ($entry->location) {
-                $lines[] = 'LOCATION:'.$this->escape_ics($entry->location);
-            }
-
-            if ($entry->recurrence_rule) {
-                $lines[] = 'RRULE:'.$entry->recurrence_rule;
-            }
-
-            if ($entry->calendar) {
-                $lines[] = 'X-WR-CALNAME:'.$this->escape_ics($entry->calendar->title);
-            }
-
-            $lines[] = 'END:VEVENT';
         }
 
-        $lines[] = 'END:VCALENDAR';
+        file_put_contents($path, $header.$timezones.$events."END:VCALENDAR\r\n");
 
-        file_put_contents($path, implode("\r\n", $lines));
+        return true;
     }
 
-    public function contacts()
+    public function contacts(): bool
     {
-        $contacts = Contact::forUser($this->user->id)->get();
         $path = $this->get_storage_path().'/contacts.vcf';
 
-        $lines = [];
+        $addressBooks = $this->davService->addressBooks()->list($this->user);
 
-        foreach ($contacts as $contact) {
-            $lines[] = 'BEGIN:VCARD';
-            $lines[] = 'VERSION:3.0';
-            $lines[] = 'FN:'.trim(($contact->first_name ?? '').' '.($contact->last_name ?? ''));
+        $vcards = [];
 
-            if ($contact->last_name || $contact->first_name) {
-                $lines[] = 'N:'.($contact->last_name ?? '').';'.($contact->first_name ?? '').';'.($contact->middle_name ?? '').';;';
+        foreach ($addressBooks as $book) {
+            foreach ($this->davService->addressBooks()->contacts()->list($book) as $contact) {
+                $vcards[] = $contact->toVCard();
             }
-
-            if ($contact->email) {
-                $emails = is_array($contact->email) ? $contact->email : [$contact->email];
-                foreach ($emails as $email) {
-                    $lines[] = 'EMAIL:'.$email;
-                }
-            }
-
-            if ($contact->phone) {
-                $phones = is_array($contact->phone) ? $contact->phone : [$contact->phone];
-                foreach ($phones as $phone) {
-                    $lines[] = 'TEL:'.$phone;
-                }
-            }
-
-            if ($contact->organization) {
-                $lines[] = 'ORG:'.$this->escape_vcard($contact->organization);
-            }
-
-            if ($contact->address || $contact->city || $contact->country) {
-                $lines[] = 'ADR;TYPE=HOME:;;'
-                    .($contact->address ?? '').';'
-                    .($contact->city ?? '').';;'
-                    .($contact->postal_code ?? '').';'
-                    .($contact->country ?? '');
-            }
-
-            if ($contact->note) {
-                $lines[] = 'NOTE:'.$this->escape_vcard($contact->note);
-            }
-
-            $lines[] = 'END:VCARD';
         }
 
-        file_put_contents($path, implode("\r\n", $lines));
+        file_put_contents($path, implode("\r\n", $vcards));
+
+        return true;
     }
 
-    public function music()
+    public function music(): bool
     {
         $items = LibraryMusic::forUser($this->user->id)->with('genres')->get();
         $path = $this->get_storage_path().'/music.csv';
@@ -308,9 +230,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function books()
+    public function books(): bool
     {
         $books = LibraryBook::forUser($this->user->id)->with(['tags', 'genres'])->get();
         $path = $this->get_storage_path().'/books.csv';
@@ -338,9 +262,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function games()
+    public function games(): bool
     {
         $games = LibraryGame::forUser($this->user->id)->with(['tags', 'genres'])->get();
         $path = $this->get_storage_path().'/games.csv';
@@ -371,9 +297,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function recipes()
+    public function recipes(): bool
     {
         $recipes = LibraryRecipe::forUser($this->user->id)->get();
         $path = $this->get_storage_path().'/recipes.csv';
@@ -396,9 +324,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function quotes()
+    public function quotes(): bool
     {
         $quotes = LibraryQuote::forUser($this->user->id)->with('tags')->get();
         $path = $this->get_storage_path().'/quotes.csv';
@@ -416,9 +346,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function links()
+    public function links(): bool
     {
         $links = LibraryLink::forUser($this->user->id)->with(['tags', 'category'])->get();
         $categories = LibraryLinkCategory::forUser($this->user->id)->get();
@@ -464,9 +396,11 @@ class ExportService
         $html .= '</DL><p>'."\n";
 
         file_put_contents($path, $html);
+
+        return true;
     }
 
-    public function checkIn()
+    public function checkIn(): bool
     {
         $checkIns = CheckIn::forUser($this->user->id)->orderBy('date')->get();
         $path = $this->get_storage_path().'/check_ins.csv';
@@ -495,9 +429,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function timeTracking()
+    public function timeTracking(): bool
     {
         $entries = TimeTrackingEntry::forUser($this->user->id)->with('project')->get();
         $path = $this->get_storage_path().'/time_tracking.csv';
@@ -520,9 +456,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function feeds()
+    public function feeds(): bool
     {
         $subscriptions = FeedSubscription::where('user_id', $this->user->id)->with('feed')->get();
         $path = $this->get_storage_path().'/feeds.opml';
@@ -544,9 +482,11 @@ class ExportService
             .'</opml>';
 
         file_put_contents($path, $xml);
+
+        return true;
     }
 
-    public function financesIncome()
+    public function financesIncome(): bool
     {
         $incomes = Budget::forUser($this->user->id)->where('type', 'income')->get();
         $path = $this->get_storage_path().'/finances_income.csv';
@@ -562,9 +502,11 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
-    public function financesWealth()
+    public function financesWealth(): bool
     {
         $fields = WealthField::forUser($this->user->id)->with('values')->get();
         $path = $this->get_storage_path().'/finances_wealth.csv';
@@ -583,6 +525,8 @@ class ExportService
         }
 
         fclose($handle);
+
+        return true;
     }
 
     private function resolve_category_path(int $categoryId, $allCategories, array &$cache): string
@@ -624,27 +568,53 @@ class ExportService
         return $baseName.' ('.$usedNames[$key].')';
     }
 
-    private function escape_ics(string $text): string
-    {
-        return str_replace(['\\', ';', ',', "\n"], ['\\\\', '\\;', '\\,', '\\n'], $text);
-    }
-
-    private function format_ics_date(int $timestamp, bool $isAllDay): string
-    {
-        if ($isAllDay) {
-            return 'VALUE=DATE:'.gmdate('Ymd', $timestamp);
-        }
-
-        return gmdate('Ymd\THis\Z', $timestamp);
-    }
-
-    private function escape_vcard(string $text): string
-    {
-        return str_replace(['\\', ';', ',', "\n"], ['\\\\', '\\;', '\\,', '\\n'], $text);
-    }
-
     private function get_storage_path(): string
     {
         return Storage::disk('user_data')->path($this->user->id.'/exports/'.$this->job->id);
+    }
+
+    private function create_zip(string $sourceDir): string
+    {
+        $zipFilename = 'export_'.$this->job->id.'.zip';
+        $relativePath = $this->user->id.'/'.$zipFilename;
+        $zipPath = Storage::disk('user_data')->path($relativePath);
+
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($sourceDir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY,
+        );
+
+        $folderName = 'export_'.$this->job->id;
+
+        foreach ($files as $file) {
+            $filePath = $file->getRealPath();
+            $relativePath = substr($filePath, strlen($sourceDir) + 1);
+            $zip->addFile($filePath, $folderName.'/'.$relativePath);
+        }
+
+        $zip->close();
+
+        return $relativePath;
+    }
+
+    private function delete_directory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($files as $file) {
+            $file->isDir() ? rmdir($file->getRealPath()) : unlink($file->getRealPath());
+        }
+
+        rmdir($dir);
     }
 }

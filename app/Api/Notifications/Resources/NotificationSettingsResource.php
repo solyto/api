@@ -71,6 +71,10 @@ class NotificationSettingsResource extends JsonResource
             'dev_request_comment_email' => (bool) $this->dev_request_comment_email,
             'dev_request_comment_push' => (bool) $this->dev_request_comment_push,
             'dev_request_comment_telegram' => (bool) $this->dev_request_comment_telegram,
+            'export_ready_ui' => (bool) $this->export_ready_ui,
+            'export_ready_email' => (bool) $this->export_ready_email,
+            'export_ready_push' => (bool) $this->export_ready_push,
+            'export_ready_telegram' => (bool) $this->export_ready_telegram,
         ];
     }
 }

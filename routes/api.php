@@ -9,6 +9,7 @@ use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
 use App\Api\DevRequests\Controllers\DevRequestController;
+use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
@@ -353,5 +354,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
             Route::apiResource('/', TimeTrackingEntryController::class)->parameters(['' => 'entry']);
         });
+    });
+
+    Route::prefix('export')->group(function () {
+        Route::post('', [ExportController::class, 'store']);
+        Route::get('status', [ExportController::class, 'status']);
+        Route::get('{id}/download', [ExportController::class, 'download']);
     });
 });

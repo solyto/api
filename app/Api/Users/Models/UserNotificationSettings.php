@@ -48,6 +48,10 @@ class UserNotificationSettings extends Model
         'dev_request_comment_email',
         'dev_request_comment_push',
         'dev_request_comment_telegram',
+        'export_ready_ui',
+        'export_ready_email',
+        'export_ready_push',
+        'export_ready_telegram',
     ];
 
     protected $casts = [
@@ -79,6 +83,10 @@ class UserNotificationSettings extends Model
         'dev_request_comment_email' => 'boolean',
         'dev_request_comment_push' => 'boolean',
         'dev_request_comment_telegram' => 'boolean',
+        'export_ready_ui' => 'boolean',
+        'export_ready_email' => 'boolean',
+        'export_ready_push' => 'boolean',
+        'export_ready_telegram' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
