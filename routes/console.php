@@ -35,3 +35,8 @@ Schedule::job(\App\Api\Clipboard\Jobs\DeleteOverdueClipboardEntries::class)->dai
  */
 Schedule::command(\App\Api\Users\Commands\SendDailyDayRemindersCommand::class)->hourly();
 Schedule::command(\App\Api\Users\Commands\SendDailyCheckInRemindersCommand::class)->hourly();
+
+/*
+ * Export
+ */
+Schedule::job(\App\Api\Export\Jobs\DeleteExpiredExports::class)->dailyAt(3);
