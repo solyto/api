@@ -153,11 +153,13 @@ class ContactDTO
         $extension = strtoupper($file->extension() ?: 'JPEG');
         $base64Photo = base64_encode(file_get_contents($file->getRealPath()));
 
-        $lines = str_split($base64Photo, 76);
+        $prefix = "PHOTO;ENCODING=b;TYPE={$extension}:";
+        $firstChunk = substr($base64Photo, 0, 75 - strlen($prefix));
+        $rest = substr($base64Photo, strlen($firstChunk));
 
-        $photoLine = "PHOTO;ENCODING=BASE64;TYPE={$extension}:" . array_shift($lines);
-        foreach ($lines as $line) {
-            $photoLine .= "\r\n " . $line;
+        $photoLine = $prefix . $firstChunk;
+        foreach (str_split($rest, 74) as $chunk) {
+            $photoLine .= "\r\n " . $chunk;
         }
 
         $this->photo = $photoLine;
