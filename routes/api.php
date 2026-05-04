@@ -24,6 +24,7 @@ use App\Api\Libraries\Controllers\LibraryMovieController;
 use App\Api\Libraries\Controllers\LibraryMovieGenreController;
 use App\Api\Libraries\Controllers\LibraryMusicController;
 use App\Api\Libraries\Controllers\LibraryMusicGenreController;
+use App\Api\Libraries\Controllers\LibraryPlantController;
 use App\Api\Libraries\Controllers\LibraryQuoteController;
 use App\Api\Libraries\Controllers\LibraryRecipeController;
 use App\Api\Notes\Controllers\NoteCategoryController;
@@ -256,6 +257,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::post('import/bgg', [LibraryGameController::class, 'importGameFromBgg']);
 
             Route::apiResource('/', LibraryGameController::class)->parameters(['' => 'game']);
+        });
+
+        Route::prefix('plants')->name('plants.')->group(function () {
+            Route::apiResource('/', LibraryPlantController::class)->parameters(['' => 'plant']);
         });
     });
 
