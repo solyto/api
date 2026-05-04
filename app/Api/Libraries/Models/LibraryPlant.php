@@ -32,7 +32,6 @@ class LibraryPlant extends Model
         'instructions',
         'cover_path',
         'link',
-        'wishlist',
         'user_id',
     ];
 
