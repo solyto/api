@@ -30,7 +30,6 @@ class LibraryPlantFactory extends Factory
             'rating' => $this->faker->optional(0.5)->numberBetween(1, 5),
             'cover_path' => null,
             'link' => $this->faker->optional(0.2)->url(),
-            'wishlist' => $this->faker->boolean(10),
             'user_id' => User::factory(),
         ];
     }

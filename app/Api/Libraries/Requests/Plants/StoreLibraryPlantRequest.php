@@ -20,7 +20,6 @@ class StoreLibraryPlantRequest extends FormRequest
             'instructions' => 'nullable|string',
             'cover_path' => 'nullable|url|max:255',
             'link' => 'nullable|url|max:255',
-            'wishlist' => 'nullable|boolean',
         ];
     }
 }

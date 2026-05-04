@@ -20,7 +20,6 @@ class UpdateLibraryPlantRequest extends FormRequest
             'instructions' => 'sometimes|nullable|string',
             'cover_path' => 'sometimes|nullable|url|max:255',
             'link' => 'sometimes|nullable|url|max:255',
-            'wishlist' => 'sometimes|nullable|boolean',
         ];
     }
 }

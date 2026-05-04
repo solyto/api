@@ -21,7 +21,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="instructions", type="string", nullable=true),
  *     @OA\Property(property="cover", type="string", nullable=true),
  *     @OA\Property(property="link", type="string", format="uri", nullable=true),
- *     @OA\Property(property="wishlist", type="boolean"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
@@ -43,7 +42,6 @@ class LibraryPlantResource extends JsonResource
             'instructions' => $this->instructions,
             'cover' => $this->cover_path,
             'link' => $this->link,
-            'wishlist' => $this->wishlist,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

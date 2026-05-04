@@ -113,8 +113,7 @@ class LibraryPlantController
      *             @OA\Property(property="winter_hardy", type="boolean", nullable=true),
      *             @OA\Property(property="instructions", type="string", nullable=true),
      *             @OA\Property(property="cover_path", type="string", format="uri", maxLength=255, nullable=true),
-     *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true),
-     *             @OA\Property(property="wishlist", type="boolean", nullable=true)
+     *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true)
      *         )
      *     ),
      *
@@ -171,8 +170,7 @@ class LibraryPlantController
      *             @OA\Property(property="winter_hardy", type="boolean", nullable=true),
      *             @OA\Property(property="instructions", type="string", nullable=true),
      *             @OA\Property(property="cover_path", type="string", format="uri", maxLength=255, nullable=true),
-     *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true),
-     *             @OA\Property(property="wishlist", type="boolean", nullable=true)
+     *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true)
      *         )
      *     ),
      *
