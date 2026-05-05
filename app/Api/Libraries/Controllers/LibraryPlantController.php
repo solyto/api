@@ -7,6 +7,7 @@ use App\Api\HandlesApiAuth;
 use App\Api\Libraries\Models\LibraryPlant;
 use App\Api\Libraries\Requests\Plants\StoreLibraryPlantRequest;
 use App\Api\Libraries\Requests\Plants\UpdateLibraryPlantRequest;
+use App\Api\Libraries\Requests\Plants\UploadLibraryPlantCoverRequest;
 use App\Api\Libraries\Resources\LibraryPlantResource;
 use App\Api\Libraries\Services\LibraryPlantService;
 use Illuminate\Http\JsonResponse;
@@ -231,6 +232,19 @@ class LibraryPlantController
      *     @OA\Response(response=403, description="Unauthorized", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
+    public function uploadCover(UploadLibraryPlantCoverRequest $request, LibraryPlant $plant): JsonResponse
+    {
+        abort_unless($this->isResourceOwner($request, $plant), 403);
+
+        $plant = $this->libraryPlantService->uploadCover($plant, $request->file('file'));
+
+        if (!$plant) {
+            return ApiResponse::error('Failed to upload cover.', 422);
+        }
+
+        return ApiResponse::success(new LibraryPlantResource($plant), 'Cover uploaded successfully.');
+    }
+
     public function destroy(Request $request, LibraryPlant $plant): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $plant), 403);

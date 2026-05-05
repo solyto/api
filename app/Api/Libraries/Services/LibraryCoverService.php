@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -37,6 +38,37 @@ class LibraryCoverService
              Str::replace($userId . '/' . $type->value . '/', '', $store) :
              false;
      }
+
+    public function uploadCover(string $userId, UploadedFile $file, LibraryTypeEnum $type): string | false
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($file->getRealPath());
+
+        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($mime, $allowed, true)) {
+            return false;
+        }
+
+        if (!$this->createDir($userId, $type)) {
+            return false;
+        }
+
+        $content = file_get_contents($file->getRealPath());
+        $extension = $this->extensionFromMime($mime);
+        $store = $this->storeFile($userId, $type->value, $content, $extension);
+
+        return $store ?
+            Str::replace($userId . '/' . $type->value . '/', '', $store) :
+            false;
+    }
+
+    public function deleteCover(string $userId, LibraryTypeEnum $type, string $filename): void
+    {
+        $path = $userId . '/' . $type->value . '/' . $filename;
+        if (Storage::disk('user_data')->exists($path)) {
+            Storage::disk('user_data')->delete($path);
+        }
+    }
 
     private function getContents(string $url): string | false
     {
@@ -80,6 +112,16 @@ class LibraryCoverService
         $path      = parse_url($url, PHP_URL_PATH);
         $extension = pathinfo($path, PATHINFO_EXTENSION);
         return $extension ? : 'jpg';
+    }
+
+    private function extensionFromMime(string $mime): string
+    {
+        return match ($mime) {
+            'image/png'  => 'png',
+            'image/gif'  => 'gif',
+            'image/webp' => 'webp',
+            default      => 'jpg',
+        };
     }
 
     private function storeFile(string $userId, string $type, string $content, string $extension): string | false

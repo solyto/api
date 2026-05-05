@@ -6,6 +6,7 @@ use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryPlant;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 
 class LibraryPlantService
@@ -52,16 +53,45 @@ class LibraryPlantService
         return $plant;
     }
 
+    public function uploadCover(LibraryPlant $plant, UploadedFile $file): LibraryPlant | false
+    {
+        $filename = $this->coverService->uploadCover($plant->user_id, $file, LibraryTypeEnum::PLANT);
+        if (!$filename) {
+            return false;
+        }
+
+        $oldCoverPath = $plant->cover_path;
+        $plant->update(['cover_path' => $filename]);
+
+        if (!empty($oldCoverPath)) {
+            $this->coverService->deleteCover($plant->user_id, LibraryTypeEnum::PLANT, $oldCoverPath);
+        }
+
+        $plant->load(['user']);
+        $this->cache->forget([self::CACHE_KEY, $plant->user_id]);
+
+        return $plant;
+    }
+
     public function update(LibraryPlant $plant, array $data): LibraryPlant
     {
-        if (!empty($data['cover_path'])) {
+        $oldCoverPath = null;
+
+        if (array_key_exists('cover_path', $data) && is_null($data['cover_path'])) {
+            $oldCoverPath = $plant->cover_path;
+        } elseif (!empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($plant->user_id, $data['cover_path'], LibraryTypeEnum::PLANT);
             if ($save) {
+                $oldCoverPath = $plant->cover_path;
                 $data['cover_path'] = $save;
             }
         }
 
         $plant->update($data);
+
+        if (!empty($oldCoverPath)) {
+            $this->coverService->deleteCover($plant->user_id, LibraryTypeEnum::PLANT, $oldCoverPath);
+        }
 
         $plant->load(['user']);
 
