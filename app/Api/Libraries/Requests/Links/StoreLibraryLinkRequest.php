@@ -9,10 +9,10 @@ class StoreLibraryLinkRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'required|string|max:255',
-            'url' => 'required|url|max:255',
+            'title' => 'required|string',
+            'url' => 'required|url',
             'is_favorite' => 'boolean',
-            'cover_path' => 'nullable|string|max:255',
+            'cover_path' => 'nullable|string',
             'tags' => 'nullable|array',
             'tags.*' => 'exists:tags,id',
         ];

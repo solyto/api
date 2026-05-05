@@ -9,10 +9,10 @@ class UpdateLibraryMovieRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'sometimes|required|string|max:255',
+            'title' => 'sometimes|required|string',
             'rating' => 'sometimes|nullable|integer|min:1|max:5',
-            'cover_path' => 'sometimes|nullable|url|max:255',
-            'link' => 'sometimes|nullable|url|max:255',
+            'cover_path' => 'sometimes|nullable|url',
+            'link' => 'sometimes|nullable|url',
             'started_at' => 'sometimes|nullable|date',
             'finished_at' => 'sometimes|nullable|date',
             'publication_year' => 'sometimes|nullable|integer',

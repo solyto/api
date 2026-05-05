@@ -261,6 +261,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('plants')->name('plants.')->group(function () {
             Route::apiResource('/', LibraryPlantController::class)->parameters(['' => 'plant']);
+            Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover'])->name('uploadCover');
         });
     });
 
