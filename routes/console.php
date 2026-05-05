@@ -11,7 +11,7 @@ Schedule::job(\App\Api\Feeds\Jobs\DeleteOldFeedItems::class)->dailyAt(2);
 /*
  * Dev Requests
  */
-Schedule::job(\App\Api\Dev\Jobs\DeleteOldDevRequests::class)->dailyAt(2);
+Schedule::job(\App\Api\DevRequests\Jobs\DeleteOldDevRequests::class)->dailyAt(2);
 
 /*
  * Libraries
