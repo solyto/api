@@ -9,7 +9,7 @@ class UpdateLibraryPlantRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'sometimes|required|string',
+            'name' => 'sometimes|nullable|string',
             'latin_name' => 'sometimes|nullable|string',
             'location' => 'sometimes|nullable|string|in:indoor,outdoor,both',
             'sunlight' => 'sometimes|nullable|string|in:full_sun,partial_sun,indirect,shade',
