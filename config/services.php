@@ -58,5 +58,11 @@ return [
 
     'bgg' => [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('BGG_API_KEY'),
-    ]
+    ],
+
+    'imgproxy' => [
+        'url'  => env('IMGPROXY_URL', 'http://imgproxy:8080'),
+        'key'  => env('IMGPROXY_KEY'),
+        'salt' => env('IMGPROXY_SALT'),
+    ],
 ];
