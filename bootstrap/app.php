@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
           ->withCommands([
               __DIR__.'/../app/Api/Export/Commands',
               __DIR__.'/../app/Api/Feeds/Commands',
+              __DIR__.'/../app/Api/Libraries/Commands',
               __DIR__.'/../app/Api/Notifications/Commands',
               __DIR__.'/../app/Api/Users/Commands',
               __DIR__.'/../app/Bots/Commands',

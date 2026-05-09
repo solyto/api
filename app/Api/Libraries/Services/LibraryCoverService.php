@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Jobs\GenerateCoverPreview;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -34,9 +35,13 @@ class LibraryCoverService
          $extension = $this->getFileExtension($url);
          $store = $this->storeFile($userId, $type->value, $content, $extension);
 
-         return $store ?
-             Str::replace($userId . '/' . $type->value . '/', '', $store) :
-             false;
+         if (!$store) {
+             return false;
+         }
+
+         GenerateCoverPreview::dispatch('user_data', $store);
+
+         return Str::replace($userId . '/' . $type->value . '/', '', $store);
      }
 
     public function uploadCover(string $userId, UploadedFile $file, LibraryTypeEnum $type): string | false
@@ -57,9 +62,13 @@ class LibraryCoverService
         $extension = $this->extensionFromMime($mime);
         $store = $this->storeFile($userId, $type->value, $content, $extension);
 
-        return $store ?
-            Str::replace($userId . '/' . $type->value . '/', '', $store) :
-            false;
+        if (!$store) {
+            return false;
+        }
+
+        GenerateCoverPreview::dispatch('user_data', $store);
+
+        return Str::replace($userId . '/' . $type->value . '/', '', $store);
     }
 
     public function deleteCover(string $userId, LibraryTypeEnum $type, string $filename): void
