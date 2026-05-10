@@ -6,6 +6,7 @@ use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryLink;
 use App\Api\Libraries\Models\LibraryLinkCategory;
 use App\Api\Users\Models\User;
+use App\Shared\Services\UrlCrawlerService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
 
@@ -17,6 +18,7 @@ class LibraryLinkService
     public function __construct(
         private readonly LibraryCoverService $coverService,
         private readonly UserCacheService $cache,
+        private readonly UrlCrawlerService $urlCrawlerService,
     ) {}
 
     public function list(User $user): Collection
@@ -43,6 +45,10 @@ class LibraryLinkService
     public function create(User $user, array $data): LibraryLink
     {
         $data['user_id'] = $user->id;
+
+        if (empty($data['title'])) {
+            $data['title'] = $this->urlCrawlerService->fetchTitle($data['url']);
+        }
 
         if (!empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($data['user_id'], $data['cover_path'], LibraryTypeEnum::BOOK);
