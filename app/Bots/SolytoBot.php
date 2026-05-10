@@ -10,8 +10,8 @@ use App\Bots\Events\SolytoBotEvent;
 use App\Bots\Messages\SolytoMessage;
 use App\Bots\Traits\IsTelegramBot;
 use App\Models\NextcloudCalendarEntry;
+use App\Shared\Services\UrlCrawlerService;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class SolytoBot
@@ -20,7 +20,10 @@ class SolytoBot
 
     private const string CACHE_KEY_LINKS = 'links';
 
-    public function __construct(private readonly UserCacheService $cache) {}
+    public function __construct(
+        private readonly UserCacheService $cache,
+        private readonly UrlCrawlerService $urlCrawlerService,
+    ) {}
 
     public string $identifier = 'solyto';
     public array $commands = [
@@ -159,25 +162,11 @@ class SolytoBot
     {
         preg_match('/https?:\/\/[^\s<>]+/i', $message, $matches);
         $link = $matches[0];
-        $title = $link;
+        $textWithoutLink = trim(Str::replace($link, '', $message));
 
-        if (Str::length(Str::replace($link, '', $message)) > 0) {
-            $title = Str::replace($link, '', $message);
-        } else {
-            try {
-                $response = Http::timeout(15)->get($link);
-
-                if ($response->successful()) {
-                    $content = $response->body();
-
-                    if (preg_match('/<title[^>]*>([^<]+)<\/title>/i', $content, $matches)) {
-                        $title = trim($matches[1]);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Ignore all errors, use link as title
-            }
-        }
+        $title = Str::length($textWithoutLink) > 0
+            ? $textWithoutLink
+            : $this->urlCrawlerService->fetchTitle($link);
 
         LibraryLink::create([
             'user_id' => $this->connection->user_id,

@@ -9,7 +9,7 @@ class StoreLibraryLinkRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'required|string',
+            'title' => 'nullable|string',
             'url' => 'required|url',
             'is_favorite' => 'boolean',
             'cover_path' => 'nullable|string',
