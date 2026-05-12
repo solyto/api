@@ -18,7 +18,7 @@ readonly class DiscogsReleaseDTO
         private ?string $recordType = null,
     ) {}
 
-    public function getRecordType(): string
+    public function getRecordType(): ?string
     {
         return $this->recordType;
     }
