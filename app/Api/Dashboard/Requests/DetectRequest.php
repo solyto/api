@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Api\QuickAdd\Requests;
+namespace App\Api\Dashboard\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -9,7 +9,7 @@ class DetectRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'url' => 'required|url|max:2048',
+            'url' => 'required|string|max:2048',
         ];
     }
 }

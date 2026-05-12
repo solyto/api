@@ -6,8 +6,8 @@ use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\Clipboard\Controllers\ClipboardController;
-use App\Api\QuickAdd\Controllers\QuickAddController;
 use App\Api\Contacts\Controllers\ContactController;
+use App\Api\Dashboard\Controllers\QuickAddController as DashboardQuickAddController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
 use App\Api\DevRequests\Controllers\DevRequestController;
 use App\Api\Export\Controllers\ExportController;
@@ -369,7 +369,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('{id}/download', [ExportController::class, 'download']);
     });
 
-    Route::prefix('quick-add')->group(function () {
-        Route::post('detect', [QuickAddController::class, 'detect']);
+    Route::prefix('dashboard')->group(function () {
+        Route::prefix('quick-add')->group(function () {
+            Route::post('detect', [DashboardQuickAddController::class, 'detect']);
+            Route::post('commit', [DashboardQuickAddController::class, 'commit']);
+        });
     });
 });

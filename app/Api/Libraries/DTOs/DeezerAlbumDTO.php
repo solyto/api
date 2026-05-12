@@ -18,7 +18,7 @@ readonly class DeezerAlbumDTO
         private ?string $recordType = null,
     ) {}
 
-    public function getRecordType(): string
+    public function getRecordType(): ?string
     {
         return $this->recordType;
     }
