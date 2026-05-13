@@ -41,90 +41,35 @@ class QuickAddService
         }
 
         if (Str::contains($content, ['due', 'repeat'])) {
-            return $this->todo($content, 0.70);
+            return new DetectionResult($content, QuickAddContentType::Todo, 0.70);
         }
 
         if (Str::contains($content, ['/', '#'])) {
-            return $this->todo($content, 0.50);
+            return new DetectionResult($content, QuickAddContentType::Todo, 0.50);
         }
 
-        return $this->note($content, 0.50);
+        return new DetectionResult($content, QuickAddContentType::Note, 0.50);
     }
 
-    private function detectBasedOnUrl(string $url): ?DetectionResult
+    private function detectBasedOnUrl(string $url): DetectionResult
     {
         if (Str::contains($url, ['deezer.com', 'discogs.com'])) {
-            return $this->music($url, 0.95);
+            return new DetectionResult($url, QuickAddContentType::Music, 0.95);
         }
 
         if (Str::contains($url, ['hardcover.app', 'goodreads.com'])) {
-            return $this->books($url, 0.95);
+            return new DetectionResult($url, QuickAddContentType::Books, 0.95);
         }
 
         if (Str::contains($url, 'imdb.com')) {
-            return $this->movies($url, 0.95);
+            return new DetectionResult($url, QuickAddContentType::Movies, 0.95);
         }
 
         if (Str::contains($url, ['store.steampowered.com', 'boardgamegeek.com'])) {
-            return $this->games($url, 0.95);
+            return new DetectionResult($url, QuickAddContentType::Games, 0.95);
         }
 
-        return $this->links($url, 0.95);
-    }
-
-    private function music(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Music, $confidenceScore, $metadata);
-    }
-
-    private function books(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Books, $confidenceScore, $metadata);
-    }
-
-    private function movies(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Movies, $confidenceScore, $metadata);
-    }
-
-    private function games(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Games, $confidenceScore, $metadata);
-    }
-
-    private function links(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Links, $confidenceScore, $metadata);
-    }
-
-    private function recipes(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Recipes, $confidenceScore, $metadata);
-    }
-
-    private function plants(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Plants, $confidenceScore, $metadata);
-    }
-
-    private function quotes(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Quotes, $confidenceScore, $metadata);
-    }
-
-    private function todo(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Todo, $confidenceScore, $metadata);
-    }
-
-    private function note(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Note, $confidenceScore, $metadata);
-    }
-
-    private function feed(string $url, float $confidenceScore, ?array $metadata = null): DetectionResult
-    {
-        return new DetectionResult($url, QuickAddContentType::Feed, $confidenceScore, $metadata);
+        return new DetectionResult($url, QuickAddContentType::Links, 0.95);
     }
 
     public function commit(User $user, string $url, QuickAddContentType $contentType, ?array $metadata): mixed
