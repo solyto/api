@@ -86,8 +86,6 @@ class LibraryPlantController
     {
         abort_unless($this->isResourceOwner($request, $plant), 403);
 
-        $plant = $this->libraryPlantService->find($plant);
-
         return ApiResponse::success(new LibraryPlantResource($plant), 'Plant retrieved successfully.');
     }
 

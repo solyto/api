@@ -28,11 +28,6 @@ class LibraryPlantService
         );
     }
 
-    public function find(LibraryPlant $plant): LibraryPlant
-    {
-        return $plant;
-    }
-
     public function create(User $user, array $data): LibraryPlant
     {
         $data['user_id'] = $user->id;
