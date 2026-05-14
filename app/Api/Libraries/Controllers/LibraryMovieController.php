@@ -8,6 +8,7 @@ use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Requests\Movies\StoreLibraryMovieRequest;
 use App\Api\Libraries\Requests\Movies\UpdateLibraryMovieRequest;
 use App\Api\Libraries\Resources\ImdbMovieImportResource;
+use App\Api\Libraries\Resources\LibraryMovieReleaseResource;
 use App\Api\Libraries\Resources\LibraryMovieResource;
 use App\Api\Libraries\Services\LibraryMovieService;
 use Illuminate\Http\JsonResponse;
@@ -277,6 +278,85 @@ class LibraryMovieController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
+    /**
+     * @OA\Get(
+     *     path="/api/libraries/movies/releases",
+     *     operationId="listLibraryMovieReleases",
+     *     tags={"Libraries - Movies"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Releases retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Releases retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMovieRelease"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function releases(Request $request): JsonResponse
+    {
+        $releases = $this->libraryMovieService->releases($request->user());
+
+        return ApiResponse::success(
+            LibraryMovieReleaseResource::collection($releases),
+            'Releases retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/libraries/movies/{movie}/trailers",
+     *     operationId="listLibraryMovieTrailers",
+     *     tags={"Libraries - Movies"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="movie",
+     *         in="path",
+     *         required=true,
+     *         description="Movie ID",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Trailers retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Trailers retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 @OA\Property(property="key", type="string"),
+     *                 @OA\Property(property="name", type="string")
+     *             ))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="Unauthorized", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function trailers(Request $request, LibraryMovie $movie): JsonResponse
+    {
+        abort_unless($this->isResourceOwner($request, $movie), 403);
+
+        $trailers = $this->libraryMovieService->trailers($movie);
+
+        return ApiResponse::success(
+            collect($trailers)->map(fn($t) => ['key' => $t['key'], 'name' => $t['name']])->values(),
+            'Trailers retrieved successfully.'
+        );
+    }
+
     public function importMovieFromImdb(Request $request): JsonResponse
     {
         $data = $request->validate(['url' => 'required|string|url']);

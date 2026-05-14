@@ -35,7 +35,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="dev_request_comment_ui", type="boolean"),
  *     @OA\Property(property="dev_request_comment_email", type="boolean"),
  *     @OA\Property(property="dev_request_comment_push", type="boolean"),
- *     @OA\Property(property="dev_request_comment_telegram", type="boolean")
+ *     @OA\Property(property="dev_request_comment_telegram", type="boolean"),
+ *     @OA\Property(property="movie_release_ui", type="boolean"),
+ *     @OA\Property(property="movie_release_email", type="boolean"),
+ *     @OA\Property(property="movie_release_push", type="boolean"),
+ *     @OA\Property(property="movie_release_telegram", type="boolean")
  * )
  */
 class NotificationSettingsResource extends JsonResource
@@ -75,6 +79,10 @@ class NotificationSettingsResource extends JsonResource
             'export_ready_email' => (bool) $this->export_ready_email,
             'export_ready_push' => (bool) $this->export_ready_push,
             'export_ready_telegram' => (bool) $this->export_ready_telegram,
+            'movie_release_ui' => (bool) $this->movie_release_ui,
+            'movie_release_email' => (bool) $this->movie_release_email,
+            'movie_release_push' => (bool) $this->movie_release_push,
+            'movie_release_telegram' => (bool) $this->movie_release_telegram,
         ];
     }
 }

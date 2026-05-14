@@ -52,6 +52,10 @@ class UserNotificationSettings extends Model
         'export_ready_email',
         'export_ready_push',
         'export_ready_telegram',
+        'movie_release_ui',
+        'movie_release_email',
+        'movie_release_push',
+        'movie_release_telegram',
     ];
 
     protected $casts = [
@@ -87,6 +91,10 @@ class UserNotificationSettings extends Model
         'export_ready_email' => 'boolean',
         'export_ready_push' => 'boolean',
         'export_ready_telegram' => 'boolean',
+        'movie_release_ui' => 'boolean',
+        'movie_release_email' => 'boolean',
+        'movie_release_push' => 'boolean',
+        'movie_release_telegram' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

@@ -18,6 +18,7 @@ Schedule::job(\App\Api\DevRequests\Jobs\DeleteOldDevRequests::class)->dailyAt(2)
  */
 Schedule::job(\App\Api\Libraries\Jobs\GrabMusicReleases::class)->dailyAt(5);
 Schedule::job(\App\Api\Libraries\Jobs\GrabBookReleases::class)->weekly();
+Schedule::job(\App\Api\Libraries\Jobs\GrabMovieReleases::class)->weekly();
 Schedule::job(\App\Api\Libraries\Jobs\ScaleCovers::class)->dailyAt(3);
 
 /*

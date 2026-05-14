@@ -39,6 +39,10 @@ return [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('HARDCOVER_API_KEY'),
     ],
 
+    'tmdb' => [
+        'access_token' => \App\Shared\Helpers\DockerSecretHelper::get('TMDB_ACCESS_TOKEN'),
+    ],
+
     'ai' => [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('AI_API_KEY'),
         'base_url' => env('AI_BASE_URL'),
