@@ -2,7 +2,7 @@
 
 namespace App\Api\Libraries\Jobs;
 
-use App\Shared\Services\ImageTransformationService;
+use App\Shared\Services\Images\ImageTransformationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;

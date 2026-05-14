@@ -3,7 +3,7 @@
 namespace App\Api\Libraries\Commands;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
-use App\Shared\Services\ImageTransformationService;
+use App\Shared\Services\Images\ImageTransformationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 

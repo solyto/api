@@ -5,6 +5,9 @@ namespace App\Shared\Providers;
 use App\Api\Users\Models\User;
 use App\Api\Users\Observers\UserObserver;
 use App\Api\Users\Policies\UserPolicy;
+use App\Shared\Services\Images\ImgproxyDriver;
+use App\Shared\Services\Images\InterventionDriver;
+use App\Shared\Services\Images\ImageTransformationService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -20,6 +23,14 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('local') && class_exists(TelescopeServiceProvider::class)) {
             $this->app->register(TelescopeServiceProvider::class);
         }
+
+        $this->app->singleton(ImageTransformationService::class, function () {
+            $driver = config('services.image.driver', 'imgproxy') === 'intervention'
+                ? new InterventionDriver()
+                : new ImgproxyDriver();
+
+            return new ImageTransformationService($driver);
+        });
     }
 
     public function boot(): void
