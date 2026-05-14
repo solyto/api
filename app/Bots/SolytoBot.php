@@ -11,7 +11,8 @@ use App\Api\Users\Models\User;
 use App\Bots\Events\SolytoBotEvent;
 use App\Bots\Messages\SolytoMessage;
 use App\Bots\Traits\IsTelegramBot;
-use App\Models\NextcloudCalendarEntry;
+use App\Api\Calendars\Models\CalendarEntry;
+use Carbon\Carbon;
 
 class SolytoBot implements BotInterface
 {
@@ -97,7 +98,9 @@ class SolytoBot implements BotInterface
         $this->auth();
 
         $todos = Todo::forUser($this->connection->user_id)->where('is_completed', false)->where('due_at', '<=', today())->get();
-        $appointments = NextcloudCalendarEntry::forUser($this->connection->user_id)->where('start_date', 'LIKE', date('Y-m-d') . '%')->get();
+        $appointments = CalendarEntry::forUser($this->connection->user_id)
+            ->whereBetween('start_date', [Carbon::today()->startOfDay()->timestamp, Carbon::today()->endOfDay()->timestamp])
+            ->get();
 
         if (count($todos) === 0 && count($appointments) === 0) {
             $this->replyWithText(SolytoMessage::EMPTY_DAY->value);
@@ -111,7 +114,7 @@ class SolytoBot implements BotInterface
                 if ($appointment->is_all_day) {
                     $dayMessage .= '- ' . $appointment->title . "\n";
                 } else {
-                    $dayMessage .= '- ' . $appointment->start_date->format('H:i') . ' ' . $appointment->title . "\n";
+                    $dayMessage .= '- ' . Carbon::createFromTimestamp($appointment->start_date)->format('H:i') . ' ' . $appointment->title . "\n";
                 }
             }
         }
