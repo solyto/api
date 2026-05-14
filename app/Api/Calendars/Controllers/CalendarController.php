@@ -72,7 +72,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(
-     *         response=200,
+     *         response=201,
      *         description="Calendar created successfully",
      *
      *         @OA\JsonContent(
@@ -99,10 +99,11 @@ class CalendarController
         try {
             $calendar = $this->calendarService->create($request->user(), $data);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error creating calendar', 500);
         }
 
-        return ApiResponse::success(new CalendarResource($calendar), 'Calendar created successfully.');
+        return ApiResponse::success(new CalendarResource($calendar), 'Calendar created successfully.', 201);
     }
 
     /**
@@ -160,6 +161,7 @@ class CalendarController
         try {
             $this->calendarService->update($request->user(), $instanceId, $calendar);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error updating calendar', 500);
         }
 
@@ -315,7 +317,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(
-     *         response=200,
+     *         response=201,
      *         description="Event created successfully",
      *
      *         @OA\JsonContent(
@@ -343,10 +345,11 @@ class CalendarController
             $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
             $event = $this->calendarService->createEvent($request->user(), $calendar, $dto);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error creating event', 500);
         }
 
-        return ApiResponse::success(new EventResource($event), 'Event created successfully.');
+        return ApiResponse::success(new EventResource($event), 'Event created successfully.', 201);
     }
 
     /**
@@ -439,8 +442,9 @@ class CalendarController
 
             try {
                 $newEvent = $this->calendarService->moveEvent($request->user(), $calendar, $targetCalendar, $event);
-            } catch (\Exception $e) {
-                return ApiResponse::error('Error moving event', 500);
+        } catch (\Exception $e) {
+            report($e);
+            return ApiResponse::error('Error moving event', 500);
             }
 
             if ($newEvent === null) {
@@ -455,6 +459,7 @@ class CalendarController
         try {
             $event = $this->calendarService->updateEvent($request->user(), $calendar, $event);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error updating event', 500);
         }
 
@@ -767,6 +772,7 @@ class CalendarController
             $this->calendarService->share($calendar, $request->user(), $recipient);
             $recipient->notify(new CalendarShareNotification($calendar->displayName, $request->user()->name));
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error sharing calendar', 500);
         }
 
@@ -835,6 +841,7 @@ class CalendarController
         try {
             $this->calendarService->revokeShare($calendar, $recipient);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error revoking share', 500);
         }
 
@@ -888,6 +895,7 @@ class CalendarController
         try {
             $this->calendarService->unsubscribe($request->user(), $calendar);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error unsubscribing from calendar', 500);
         }
 
@@ -960,6 +968,7 @@ class CalendarController
         try {
             $this->calendarService->acceptInvite($request->user(), $token);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error accepting invite', 500);
         }
 
@@ -1002,6 +1011,7 @@ class CalendarController
         try {
             $this->calendarService->declineInvite($request->user(), $token);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error declining invite', 500);
         }
 

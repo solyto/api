@@ -591,8 +591,8 @@ class ExportService
 
         foreach ($files as $file) {
             $filePath = $file->getRealPath();
-            $relativePath = substr($filePath, strlen($sourceDir) + 1);
-            $zip->addFile($filePath, $folderName.'/'.$relativePath);
+            $fileRelativePath = substr($filePath, strlen($sourceDir) + 1);
+            $zip->addFile($filePath, $folderName.'/'.$fileRelativePath);
         }
 
         $zip->close();

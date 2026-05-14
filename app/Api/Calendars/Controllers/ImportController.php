@@ -66,6 +66,7 @@ class ImportController
             $validatedData = $request->validated();
             $this->dav->import()->calendars()->start($request->user(), $validatedData['url'], $validatedData['username'], $validatedData['secret']);
         } catch (ImportException $e) {
+            report($e);
             return ApiResponse::error('Could not grab calendars', 404);
         }
 

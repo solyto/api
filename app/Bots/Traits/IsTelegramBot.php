@@ -124,10 +124,18 @@ trait IsTelegramBot
         }
 
         foreach ($this->commands as $command) {
-            if ($this->hasCommand($command[0])) {
-                $this->{Str::replace('/', '', $command[0]) . 'Command'}();
-                return true;
+            if (!$this->hasCommand($command[0])) {
+                continue;
             }
+
+            $method = Str::replace('/', '', $command[0]) . 'Command';
+
+            if (!method_exists($this, $method)) {
+                continue;
+            }
+
+            $this->{$method}();
+            return true;
         }
 
         return false;
