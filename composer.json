@@ -21,7 +21,7 @@
         "laravel/pulse": "^1.4",
         "laravel/sanctum": "^4.0",
         "laravel/telescope": "^5.11",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0.0",
         "openai-php/client": "^0.17.1",
         "sabre/dav": "^4.7",
         "simplepie/simplepie": "^1.9",
