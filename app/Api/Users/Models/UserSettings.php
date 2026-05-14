@@ -32,6 +32,7 @@ class UserSettings extends Model
         'weather_city',
         'weather_latitude',
         'weather_longitude',
+        'temperature_unit',
     ];
 
     protected $casts = [

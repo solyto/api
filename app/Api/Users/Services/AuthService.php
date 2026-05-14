@@ -91,7 +91,7 @@ class AuthService
             return false;
         }
 
-        if ($verificationToken->token !== $data['token']) {
+        if (!hash_equals($verificationToken->token, $data['token'])) {
             throw new \RuntimeException('token_mismatch');
         }
 

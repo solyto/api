@@ -41,6 +41,13 @@ class UserSettingsService
         ]);
     }
 
+    public function updateWeatherTemperatureUnit(User $user, array $data): void
+    {
+        $user->settings()->update([
+            'temperature_unit'   => $data['temperature_unit'] ?? 'c'
+        ]);
+    }
+
     public function updateOpenaiApiKey(User $user, ?string $key): void
     {
         $user->settings()->update([

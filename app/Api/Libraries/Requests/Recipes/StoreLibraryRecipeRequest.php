@@ -9,13 +9,13 @@ class StoreLibraryRecipeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'required|string|max:255',
+            'title' => 'required|string',
             'rating' => 'nullable|integer|min:1|max:5',
             'time_to_make' => 'nullable|integer',
-            'cover_path' => 'nullable|string|max:255',
-            'link' => 'nullable|url|max:255',
+            'cover_path' => 'nullable|string',
+            'link' => 'nullable|url',
             'description' => 'nullable|string',
-            'ingredients' => 'nullable|string|max:255',
+            'ingredients' => 'nullable|string',
             'type' => 'nullable|in:breakfast,lunch,dinner,snack,dessert,drink,other',
         ];
     }

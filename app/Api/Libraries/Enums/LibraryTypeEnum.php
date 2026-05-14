@@ -11,6 +11,7 @@ enum LibraryTypeEnum: string
     case QUOTE = 'quotes';
     case RECIPE = 'recipes';
     case LINK = 'links';
+    case PLANT = 'plants';
 
     public function storageFolderName(): string
     {
@@ -22,14 +23,15 @@ enum LibraryTypeEnum: string
             self::QUOTE => 'quotes',
             self::RECIPE => 'recipes',
             self::LINK => 'links',
+            self::PLANT => 'plants',
         };
     }
 
     public function hasRecommender(): bool
     {
         return match($this) {
-            self::MUSIC, self::BOOK                                    => true,
-            self::MOVIE, self::GAME, self::QUOTE, self::RECIPE, self::LINK => false,
+            self::MUSIC, self::BOOK                                              => true,
+            self::MOVIE, self::GAME, self::QUOTE, self::RECIPE, self::LINK, self::PLANT => false,
         };
     }
 
@@ -43,6 +45,7 @@ enum LibraryTypeEnum: string
             self::QUOTE => \App\Api\Libraries\Models\LibraryQuote::class,
             self::RECIPE => \App\Api\Libraries\Models\LibraryRecipe::class,
             self::LINK => \App\Api\Libraries\Models\LibraryLink::class,
+            self::PLANT => \App\Api\Libraries\Models\LibraryPlant::class,
         };
     }
 }

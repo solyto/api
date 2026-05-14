@@ -87,9 +87,9 @@ class TimeTrackingEntryController
     public function store(StoreTimeTrackingEntryRequest $request): JsonResponse
     {
         $data = $request->validated();
-
         $project = TimeTrackingProject::find($data['project_id']);
-        abort_unless($project && $project->user_id === $request->user()->id, 403);
+
+        abort_unless($project && $this->isResourceOwner($request, $project), 403);
 
         $entry = $this->timeTrackingService->createEntry($request->user(), $data);
 
@@ -163,7 +163,7 @@ class TimeTrackingEntryController
 
         if (isset($validated['project_id'])) {
             $project = TimeTrackingProject::find($validated['project_id']);
-            abort_unless($project && $project->user_id === $request->user()->id, 403);
+            abort_unless($project && $this->isResourceOwner($request, $project), 403);
         }
 
         $entry = $this->timeTrackingService->updateEntry($entry, $validated);
@@ -266,7 +266,8 @@ class TimeTrackingEntryController
         ]);
 
         $project = TimeTrackingProject::find($validated['project_id']);
-        abort_unless($project && $project->user_id === $request->user()->id, 403);
+
+        abort_unless($project && $this->isResourceOwner($request, $project), 403);
 
         if ($this->timeTrackingService->hasRunningTimer($request->user())) {
             return ApiResponse::error('A timer is already running. Stop it first.', 409);

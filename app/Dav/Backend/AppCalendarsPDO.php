@@ -164,7 +164,7 @@ SQL
 
     public function getCalendarInvitesCustom(string $principalUri): array
     {
-        $invites = parent::getInvites($principalUri);
+        return parent::getInvites($principalUri);
     }
 
     public function getEventsCustom(CalendarDTO $calendar): array

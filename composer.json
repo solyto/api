@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "ext-zip": "*",
         "calliostro/php-discogs-api": "^3.0",
         "darkaonline/l5-swagger": "^10.1",
         "doctrine/annotations": "^2.0",

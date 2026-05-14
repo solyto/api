@@ -370,6 +370,7 @@ class TodoController
     public function updateSubtask(Request $request, Todo $todo, TodoSubtask $subtask): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $todo), 403);
+        abort_unless($subtask->todo_id === $todo->id, 403);
 
         $validatedData = $request->validate([
             'title' => 'sometimes|string',
@@ -424,6 +425,7 @@ class TodoController
     public function destroySubtask(Request $request, Todo $todo, TodoSubtask $subtask): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $todo), 403);
+        abort_unless($subtask->todo_id === $todo->id, 403);
 
         $this->todoService->destroySubtask($subtask);
 

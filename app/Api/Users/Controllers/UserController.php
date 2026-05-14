@@ -5,6 +5,7 @@ namespace App\Api\Users\Controllers;
 use App\Api\ApiResponse;
 use App\Api\Users\Models\User;
 use App\Api\Users\Requests\UpdateProfileImageRequest;
+use App\Api\Users\Requests\UpdateUserRequest;
 use App\Api\Users\Resources\UserPublicProfileResource;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\UserService;
@@ -53,7 +54,7 @@ class UserController
     {
         $this->authorize('viewAny', User::class);
 
-        $users = $this->userService->list($request->get('per_page', 15));
+        $users = $this->userService->list(1000);
 
         return ApiResponse::success(UserResource::collection($users), 'Users retrieved successfully.');
     }
@@ -95,6 +96,15 @@ class UserController
         $user = $this->userService->me($request->user());
 
         return ApiResponse::success(new UserResource($user), 'User retrieved successfully.');
+    }
+
+    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    {
+        $this->authorize('update', $user);
+
+        $this->userService->update($user, $request->validated());
+
+        return ApiResponse::success(new UserResource($user), 'User updated successfully.');
     }
 
     /**

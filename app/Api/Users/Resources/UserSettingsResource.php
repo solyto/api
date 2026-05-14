@@ -37,6 +37,7 @@ class UserSettingsResource extends JsonResource
             'ai_enabled' => $this->ai_enabled,
             'openai_api_key' => $this->openai_api_key,
             'first_visit' => $this->first_visit,
+            'temperature_unit' => $this->temperature_unit ?? 'c'
         ];
     }
 }
