@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('check_in', function (Blueprint $table) {
-            $table->dropIndex('user_date_index');
             $table->unique(['user_id', 'date'], 'check_in_user_date_unique');
+            $table->dropIndex('user_date_index');
         });
     }
 
