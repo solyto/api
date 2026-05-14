@@ -20,20 +20,6 @@ use Illuminate\Support\Str;
 
 class QuickAddService
 {
-    public function __construct(
-        private readonly LibraryLinkService $linkService,
-        private readonly LibraryMusicService $musicService,
-        private readonly LibraryBookService $bookService,
-        private readonly LibraryMovieService $movieService,
-        private readonly LibraryGameService $gameService,
-        private readonly LibraryRecipeService $recipeService,
-        private readonly LibraryPlantService $plantService,
-        private readonly LibraryQuoteService $quoteService,
-        private readonly TodoService $todoService,
-        private readonly NoteService $noteService,
-        private readonly FeedService $feedService,
-    ) {}
-
     public function detect(string $content): DetectionResult
     {
         if (Str::contains($content, 'https://') || Str::contains($content, 'http://')) {
@@ -77,60 +63,62 @@ class QuickAddService
         $metadata ??= [];
 
         return match ($contentType) {
-            QuickAddContentType::Links   => $this->linkService->create($user, [
+            QuickAddContentType::Links => app(LibraryLinkService::class)->create($user, [
                 'url' => $url,
                 'title' => $metadata['title'] ?? null,
             ]),
 
-            QuickAddContentType::Todo    => $this->todoService->create($user, [
+            QuickAddContentType::Todo => app(TodoService::class)->create($user, [
                 'title' => $metadata['title'] ?? $url,
             ]),
 
-            QuickAddContentType::Note    => $this->noteService->create($user, [
+            QuickAddContentType::Note => app(NoteService::class)->create($user, [
                 'title' => $metadata['title'] ?? $url,
             ]),
 
-            QuickAddContentType::Quotes  => $this->quoteService->create($user, [
+            QuickAddContentType::Quotes => app(LibraryQuoteService::class)->create($user, [
                 'quote'  => $metadata['quote'] ?? $url,
                 'author' => $metadata['author'] ?? null,
                 'source' => $metadata['source'] ?? null,
             ]),
 
-            QuickAddContentType::Recipes => $this->recipeService->create($user, [
+            QuickAddContentType::Recipes => app(LibraryRecipeService::class)->create($user, [
                 'title' => $metadata['title'] ?? $url,
                 'link'  => $url,
             ]),
 
-            QuickAddContentType::Plants  => $this->plantService->create($user, [
+            QuickAddContentType::Plants => app(LibraryPlantService::class)->create($user, [
                 'name' => $metadata['name'] ?? $url,
             ]),
 
-            QuickAddContentType::Feed    => $this->feedService->createSubscription(
-                $user->id,
+            QuickAddContentType::Feed => app(FeedService::class)->createSubscription(
+                $user,
                 $metadata['title'] ?? $url,
                 $url,
                 null,
                 null,
             ),
 
-            QuickAddContentType::Music   => $this->commitMusic($user, $url),
-            QuickAddContentType::Books   => $this->commitBook($user, $url),
-            QuickAddContentType::Movies  => $this->commitMovie($user, $url),
-            QuickAddContentType::Games   => $this->commitGame($user, $url),
+            QuickAddContentType::Music => $this->commitMusic($user, $url),
+            QuickAddContentType::Books => $this->commitBook($user, $url),
+            QuickAddContentType::Movies => $this->commitMovie($user, $url),
+            QuickAddContentType::Games => $this->commitGame($user, $url),
         };
     }
 
     private function commitMusic(User $user, string $url): mixed
     {
+        $service = app(LibraryMusicService::class);
+
         $dto = Str::contains($url, 'discogs.com')
-            ? $this->musicService->importFromDiscogs($url)
-            : $this->musicService->importFromDeezer($url);
+            ? $service->importFromDiscogs($url)
+            : $service->importFromDeezer($url);
 
         if ($dto === null) {
             return null;
         }
 
-        return $this->musicService->create($user, [
+        return $service->create($user, [
             'title' => $dto->getTitle(),
             'artist' => $dto->getArtist(),
             'type' => $dto->getRecordType(),
@@ -142,9 +130,11 @@ class QuickAddService
 
     private function commitBook(User $user, string $url): mixed
     {
+        $service = app(LibraryBookService::class);
+
         $dto = Str::contains($url, 'goodreads.com')
-            ? $this->bookService->importFromGoodreads($url)
-            : $this->bookService->importFromHardcover($url);
+            ? $service->importFromGoodreads($url)
+            : $service->importFromHardcover($url);
 
         if ($dto === null) {
             return null;
@@ -163,18 +153,20 @@ class QuickAddService
             $data['summary'] = $dto->getDescription();
         }
 
-        return $this->bookService->create($user, $data);
+        return $service->create($user, $data);
     }
 
     private function commitMovie(User $user, string $url): mixed
     {
-        $dto = $this->movieService->importFromImdb($url);
+        $service = app(LibraryMovieService::class);
+
+        $dto = $service->importFromImdb($url);
 
         if ($dto === null) {
             return null;
         }
 
-        return $this->movieService->create($user, [
+        return $service->create($user, [
             'title' => $dto->getTitle(),
             'category' => $dto->getType() === 'series' ? 'series' : 'movie',
             'publication_year' => $dto->getReleaseYear(),
@@ -185,16 +177,18 @@ class QuickAddService
 
     private function commitGame(User $user, string $url): mixed
     {
+        $service = app(LibraryGameService::class);
+
         $isBgg = Str::contains($url, 'boardgamegeek.com');
         $dto = $isBgg
-            ? $this->gameService->importFromBgg($url)
-            : $this->gameService->importFromSteam($url);
+            ? $service->importFromBgg($url)
+            : $service->importFromSteam($url);
 
         if ($dto === null) {
             return null;
         }
 
-        return $this->gameService->create($user, [
+        return $service->create($user, [
             'title' => $dto->getTitle(),
             'platform' => $isBgg ? 'boardgame' : 'pc',
             'cover_path' => $dto->getCover(),

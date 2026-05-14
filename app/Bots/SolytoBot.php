@@ -13,7 +13,7 @@ use App\Bots\Messages\SolytoMessage;
 use App\Bots\Traits\IsTelegramBot;
 use App\Models\NextcloudCalendarEntry;
 
-class SolytoBot
+class SolytoBot implements BotInterface
 {
     use IsTelegramBot;
 

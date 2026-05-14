@@ -69,7 +69,7 @@ class ContactController
      *     ),
      *
      *     @OA\Response(
-     *         response=200,
+     *         response=201,
      *         description="Address Book created successfully",
      *
      *         @OA\JsonContent(
@@ -96,10 +96,11 @@ class ContactController
         try {
             $addressBook = $this->contactService->createAddressBook($request->user(), $data);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error creating Address Book', 500);
         }
 
-        return ApiResponse::success(new AddressBookResource($addressBook), 'Address Book created successfully.');
+        return ApiResponse::success(new AddressBookResource($addressBook), 'Address Book created successfully.', 201);
     }
 
     /**
@@ -327,7 +328,7 @@ class ContactController
      *     ),
      *
      *     @OA\Response(
-     *         response=200,
+     *         response=201,
      *         description="Contact created successfully",
      *
      *         @OA\JsonContent(
@@ -354,10 +355,11 @@ class ContactController
         try {
             $contact = $this->contactService->createContact($request->user(), $addressBook, $request->validated());
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error creating contact', 500);
         }
 
-        return ApiResponse::success(new ContactResource($contact), 'Contact created successfully.');
+        return ApiResponse::success(new ContactResource($contact), 'Contact created successfully.', 201);
     }
 
     /**
@@ -447,6 +449,7 @@ class ContactController
         try {
             $contact = $this->contactService->updateContact($request->user(), $addressBook, $contact, $request->validated());
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error updating contact', 500);
         }
 
@@ -516,6 +519,7 @@ class ContactController
                 return ApiResponse::error('Error deleting contact', 500);
             }
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error deleting contact', 500);
         }
 
@@ -599,6 +603,7 @@ class ContactController
         try {
             $contact = $this->contactService->updateContactPhoto($request->user(), $addressBook, $contact, $request->file('photo'));
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error updating contact', 500);
         }
 
@@ -667,6 +672,7 @@ class ContactController
         try {
             $contact = $this->contactService->removeContactPhoto($request->user(), $addressBook, $contact);
         } catch (\Exception $e) {
+            report($e);
             return ApiResponse::error('Error updating contact', 500);
         }
 

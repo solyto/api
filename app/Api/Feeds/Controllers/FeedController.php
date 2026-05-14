@@ -77,17 +77,7 @@ class FeedController
      */
     public function listItems(Request $request): JsonResponse
     {
-        $feeds = $this->feedService->getUserFeeds($request->user()->id);
-
-        $items = collect();
-
-        foreach ($feeds as $subscription) {
-            $feedItems = $this->feedService->getFeedItems($subscription->feed_id);
-
-            $items = $items->merge(
-                $this->feedService->filterFeedItems($feedItems, $subscription)
-            );
-        }
+        $items = $this->feedService->getAggregatedItems($request->user()->id);
 
         return ApiResponse::success(
             FeedItemResource::collection($items),
@@ -346,15 +336,17 @@ class FeedController
         $data = $request->validated();
         try {
             $subscription = $this->feedService->createSubscription(
-                $request->user()->id,
+                $request->user(),
                 $data['title'],
                 $data['url'],
                 $data['whitelist'] ?? null,
                 $data['blacklist'] ?? null
             );
         } catch (\App\Api\Feeds\Exceptions\FeedAlreadySubscribedException $e) {
+            report($e);
             return ApiResponse::error('Already subscribed to this feed.', 409);
         } catch (FeedException $e) {
+            report($e);
             return ApiResponse::error('Feed URL doesn\'t seem valid.', 422);
         }
 

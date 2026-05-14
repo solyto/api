@@ -74,10 +74,10 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::post('logoutAll', [AuthController::class, 'logoutAll']);
+        Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('tokens', [AuthController::class, 'tokens']);
-        Route::post('revokeToken', [AuthController::class, 'revokeToken']);
+        Route::post('revoke-token', [AuthController::class, 'revokeToken']);
     });
 
     Route::prefix('users')->group(function () {
@@ -100,7 +100,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::put('check-in', [UserSettingsController::class, 'updateCheckIn']);
         });
     });
-    Route::apiResource('users', UserController::class);
+    Route::apiResource('users', UserController::class)->only(['index', 'update']);
 
     Route::prefix('todos')->name('todos.')->group(function () {
         Route::apiResource('categories', TodoCategoryController::class);
