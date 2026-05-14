@@ -21,7 +21,7 @@ class ConversationState
         $fromCache = Cache::store('conversation_state')->get($identifier);
 
         if ($fromCache) {
-            return unserialize($fromCache);
+            return $fromCache;
         }
 
         return new ConversationState($identifier);
@@ -29,7 +29,7 @@ class ConversationState
 
     public function store(): bool
     {
-        return Cache::store('conversation_state')->put($this->identifier, serialize($this), 600);
+        return Cache::store('conversation_state')->put($this->identifier, $this, 600);
     }
 
     public function destroy(): bool
