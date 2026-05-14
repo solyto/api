@@ -9,10 +9,10 @@ class UpdateLibraryLinkRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'sometimes|string|max:255',
-            'url' => 'sometimes|url|max:255',
+            'title' => 'sometimes|string',
+            'url' => 'sometimes|url',
             'is_favorite' => 'sometimes|boolean',
-            'cover_path' => 'nullable|string|max:255',
+            'cover_path' => 'nullable|string',
             'tags' => 'sometimes|nullable|array',
             'tags.*' => 'exists:tags,id',
             'category_id' => 'sometimes|nullable|exists:library_links_categories,id',

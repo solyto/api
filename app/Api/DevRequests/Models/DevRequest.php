@@ -16,6 +16,22 @@ class DevRequest extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'type',
+        'status',
+        'title',
+        'description',
+        'screenshot',
+        'url',
+        'priority',
+        'created_by_user_id',
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
     protected static function newFactory(): DevRequestFactory
     {
         return DevRequestFactory::new();
@@ -35,20 +51,4 @@ class DevRequest extends Model
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
-
-    protected $fillable = [
-        'type',
-        'status',
-        'title',
-        'description',
-        'screenshot',
-        'url',
-        'priority',
-        'created_by_user_id',
-    ];
-
-    protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
 }

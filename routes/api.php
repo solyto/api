@@ -7,8 +7,10 @@ use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
+use App\Api\Dashboard\Controllers\QuickAddController as DashboardQuickAddController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
 use App\Api\DevRequests\Controllers\DevRequestController;
+use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
@@ -23,6 +25,7 @@ use App\Api\Libraries\Controllers\LibraryMovieController;
 use App\Api\Libraries\Controllers\LibraryMovieGenreController;
 use App\Api\Libraries\Controllers\LibraryMusicController;
 use App\Api\Libraries\Controllers\LibraryMusicGenreController;
+use App\Api\Libraries\Controllers\LibraryPlantController;
 use App\Api\Libraries\Controllers\LibraryQuoteController;
 use App\Api\Libraries\Controllers\LibraryRecipeController;
 use App\Api\Notes\Controllers\NoteCategoryController;
@@ -71,10 +74,10 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::post('logoutAll', [AuthController::class, 'logoutAll']);
+        Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('tokens', [AuthController::class, 'tokens']);
-        Route::post('revokeToken', [AuthController::class, 'revokeToken']);
+        Route::post('revoke-token', [AuthController::class, 'revokeToken']);
     });
 
     Route::prefix('users')->group(function () {
@@ -90,13 +93,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::put('date-format', [UserSettingsController::class, 'updateDateFormat']);
             Route::put('time-format', [UserSettingsController::class, 'updateTimeFormat']);
             Route::put('weather-city', [UserSettingsController::class, 'updateWeatherCity']);
+            Route::put('weather-temperature-unit', [UserSettingsController::class, 'updateWeatherTemperatureUnit']);
             Route::put('openai-api-key', [UserSettingsController::class, 'updateOpenaiApiKey']);
             Route::put('complete-onboarding', [UserSettingsController::class, 'completeOnboarding']);
             Route::get('check-in', [UserSettingsController::class, 'showCheckIn']);
             Route::put('check-in', [UserSettingsController::class, 'updateCheckIn']);
         });
     });
-    Route::apiResource('users', UserController::class);
+    Route::apiResource('users', UserController::class)->only(['index', 'update']);
 
     Route::prefix('todos')->name('todos.')->group(function () {
         Route::apiResource('categories', TodoCategoryController::class);
@@ -255,6 +259,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
             Route::apiResource('/', LibraryGameController::class)->parameters(['' => 'game']);
         });
+
+        Route::prefix('plants')->name('plants.')->group(function () {
+            Route::apiResource('/', LibraryPlantController::class)->parameters(['' => 'plant']);
+            Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover'])->name('uploadCover');
+        });
     });
 
     Route::prefix('dev-requests')->group(function () {
@@ -351,6 +360,19 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('statistics', [TimeTrackingEntryController::class, 'statistics']);
 
             Route::apiResource('/', TimeTrackingEntryController::class)->parameters(['' => 'entry']);
+        });
+    });
+
+    Route::prefix('export')->group(function () {
+        Route::post('', [ExportController::class, 'store']);
+        Route::get('status', [ExportController::class, 'status']);
+        Route::get('{id}/download', [ExportController::class, 'download']);
+    });
+
+    Route::prefix('dashboard')->group(function () {
+        Route::prefix('quick-add')->group(function () {
+            Route::post('detect', [DashboardQuickAddController::class, 'detect']);
+            Route::post('commit', [DashboardQuickAddController::class, 'commit']);
         });
     });
 });

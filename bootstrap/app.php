@@ -22,12 +22,17 @@ return Application::configure(basePath: dirname(__DIR__))
               health: '/up',
           )
           ->withMiddleware(function (Middleware $middleware) {
+              if ($proxies = env('TRUSTED_PROXIES')) {
+                  $middleware->trustProxies(at: $proxies);
+              }
               $middleware->validateCsrfTokens(except: [
                   'webhooks/*',
               ]);
           })
           ->withCommands([
+              __DIR__.'/../app/Api/Export/Commands',
               __DIR__.'/../app/Api/Feeds/Commands',
+              __DIR__.'/../app/Api/Libraries/Commands',
               __DIR__.'/../app/Api/Notifications/Commands',
               __DIR__.'/../app/Api/Users/Commands',
               __DIR__.'/../app/Bots/Commands',

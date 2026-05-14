@@ -8,6 +8,7 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\Friend;
+use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -72,8 +73,9 @@ class FeedService
     /**
      * @throws FeedException
      */
-    public function createSubscription(string $userId, string $title, string $url, ?string $whitelist, ?string $blacklist): FeedSubscription
+    public function createSubscription(User $user, string $title, string $url, ?string $whitelist, ?string $blacklist): FeedSubscription
     {
+        $userId = $user->id;
         $feed = Feed::where('url', $url)->first();
 
         if ($feed && FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
@@ -107,6 +109,23 @@ class FeedService
         SyncFeed::dispatch($feed->id);
 
         return $subscription;
+    }
+
+    public function getAggregatedItems(string $userId): Collection
+    {
+        $subscriptions = $this->getUserFeeds($userId);
+
+        $items = collect();
+
+        foreach ($subscriptions as $subscription) {
+            $feedItems = $this->getFeedItems($subscription->feed_id);
+
+            $items = $items->merge(
+                $this->filterFeedItems($feedItems, $subscription)
+            );
+        }
+
+        return $items;
     }
 
     public function getUserFeeds(string $userId): Collection

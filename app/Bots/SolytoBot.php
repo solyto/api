@@ -2,25 +2,24 @@
 
 namespace App\Bots;
 
-use App\Api\Libraries\Models\LibraryLink;
+use App\Api\Dashboard\Enums\QuickAddContentType;
+use App\Api\Dashboard\Services\QuickAddService;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Todos\Models\Todo;
+use App\Api\Users\Models\User;
 use App\Bots\Events\SolytoBotEvent;
 use App\Bots\Messages\SolytoMessage;
 use App\Bots\Traits\IsTelegramBot;
 use App\Models\NextcloudCalendarEntry;
-use App\Shared\Services\UserCacheService;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
-class SolytoBot
+class SolytoBot implements BotInterface
 {
     use IsTelegramBot;
 
-    private const string CACHE_KEY_LINKS = 'links';
-
-    public function __construct(private readonly UserCacheService $cache) {}
+    public function __construct(
+        private readonly QuickAddService $quickAddService,
+    ) {}
 
     public string $identifier = 'solyto';
     public array $commands = [
@@ -46,12 +45,13 @@ class SolytoBot
                     ->addActionEvent(SolytoBotEvent::WELCOME->value)
                     ->store();
 
-        if ($this->isLink($this->getMessage())) {
-            $this->addLinkToLibrary($this->getMessage());
+        $message = trim((string) $this->getMessage());
+        if ($message === '') {
+            $this->replyWithText(SolytoMessage::WELCOME->value);
             return;
         }
 
-        $this->replyWithText(SolytoMessage::WELCOME->value);
+        $this->processQuickAdd($message);
     }
 
     public function connectCommand(): void
@@ -129,64 +129,85 @@ class SolytoBot
     {
         $this->auth();
 
-        if ($this->isLink($this->getMessage())) {
-            $this->addLinkToLibrary($this->getMessageWithoutCommand('/link'));
-        } else {
+        $input = trim((string) $this->getMessageWithoutCommand('/link'));
+        if ($input === '') {
             $this->replyWithText(SolytoMessage::NO_LINK->value);
+            return;
         }
+
+        $this->commitWithType($input, QuickAddContentType::Links);
     }
 
     private function todoCommand(): void
     {
         $this->auth();
 
-        $todo = $this->getMessageWithoutCommand('/todo');
-
-        if (empty($todo)) {
+        $input = trim((string) $this->getMessageWithoutCommand('/todo'));
+        if ($input === '') {
             $this->replyWithText(SolytoMessage::NO_TODO->value);
             return;
         }
 
-        Todo::create([
-            'user_id' => $this->connection->user_id,
-            'title' => $todo
-        ]);
-
-        $this->replyWithText(SolytoMessage::TODO->value);
+        $this->commitWithType($input, QuickAddContentType::Todo);
     }
 
-    private function addLinkToLibrary(string $message): void
+    private function processQuickAdd(string $message): void
     {
-        preg_match('/https?:\/\/[^\s<>]+/i', $message, $matches);
-        $link = $matches[0];
-        $title = $link;
-
-        if (Str::length(Str::replace($link, '', $message)) > 0) {
-            $title = Str::replace($link, '', $message);
-        } else {
-            try {
-                $response = Http::timeout(15)->get($link);
-
-                if ($response->successful()) {
-                    $content = $response->body();
-
-                    if (preg_match('/<title[^>]*>([^<]+)<\/title>/i', $content, $matches)) {
-                        $title = trim($matches[1]);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Ignore all errors, use link as title
-            }
+        $user = User::find($this->connection->user_id);
+        if ($user === null) {
+            $this->replyWithText(SolytoMessage::ERROR->value);
+            return;
         }
 
-        LibraryLink::create([
-            'user_id' => $this->connection->user_id,
-            'url' => $link,
-            'title' => $title,
-        ]);
+        $detection = $this->quickAddService->detect($message);
+        $result = $this->quickAddService->commit(
+            $user,
+            $detection->url,
+            $detection->contentType,
+            $detection->metadata,
+        );
 
-        $this->cache->forget([self::CACHE_KEY_LINKS, $this->connection->user_id]);
-        $this->replyWithText(SolytoMessage::LINK->value);
+        if ($result === null) {
+            $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+            return;
+        }
+
+        $this->replyWithText($this->messageForType($detection->contentType));
+    }
+
+    private function commitWithType(string $input, QuickAddContentType $type): void
+    {
+        $user = User::find($this->connection->user_id);
+        if ($user === null) {
+            $this->replyWithText(SolytoMessage::ERROR->value);
+            return;
+        }
+
+        $result = $this->quickAddService->commit($user, $input, $type, null);
+
+        if ($result === null) {
+            $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+            return;
+        }
+
+        $this->replyWithText($this->messageForType($type));
+    }
+
+    private function messageForType(QuickAddContentType $type): string
+    {
+        return match ($type) {
+            QuickAddContentType::Links => SolytoMessage::ADDED_LINK->value,
+            QuickAddContentType::Music => SolytoMessage::ADDED_MUSIC->value,
+            QuickAddContentType::Books => SolytoMessage::ADDED_BOOK->value,
+            QuickAddContentType::Movies => SolytoMessage::ADDED_MOVIE->value,
+            QuickAddContentType::Games => SolytoMessage::ADDED_GAME->value,
+            QuickAddContentType::Recipes => SolytoMessage::ADDED_RECIPE->value,
+            QuickAddContentType::Plants => SolytoMessage::ADDED_PLANT->value,
+            QuickAddContentType::Quotes => SolytoMessage::ADDED_QUOTE->value,
+            QuickAddContentType::Todo => SolytoMessage::ADDED_TODO->value,
+            QuickAddContentType::Note => SolytoMessage::ADDED_NOTE->value,
+            QuickAddContentType::Feed => SolytoMessage::ADDED_FEED->value,
+        };
     }
 
     private function auth(): void
@@ -201,10 +222,5 @@ class SolytoBot
             $this->replyWithText(SolytoMessage::WELCOME_UNREGISTERED->value);
             exit(1);
         }
-    }
-
-    private function isLink(string $message): bool
-    {
-        return (bool) preg_match('/https?:\/\/[^\s<>]+/i', $message);
     }
 }

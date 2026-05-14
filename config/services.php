@@ -39,9 +39,10 @@ return [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('HARDCOVER_API_KEY'),
     ],
 
-    'ionos' => [
-        'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('IONOS_API_KEY'),
-        'base_url' => 'https://openai.inference.de-txl.ionos.com/v1',
+    'ai' => [
+        'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('AI_API_KEY'),
+        'base_url' => env('AI_BASE_URL'),
+        'model' => env('AI_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
     ],
 
     'radicale' => [
@@ -57,5 +58,11 @@ return [
 
     'bgg' => [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('BGG_API_KEY'),
-    ]
+    ],
+
+    'imgproxy' => [
+        'url'  => env('IMGPROXY_URL', 'http://imgproxy:8080'),
+        'key'  => env('IMGPROXY_KEY'),
+        'salt' => env('IMGPROXY_SALT'),
+    ],
 ];

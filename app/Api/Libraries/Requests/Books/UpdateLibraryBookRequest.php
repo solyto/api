@@ -9,17 +9,17 @@ class UpdateLibraryBookRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'sometimes|required|string|max:255',
-            'author' => 'sometimes|required|string|max:255',
-            'series' => 'sometimes|nullable|string|max:255',
+            'title' => 'sometimes|required|string',
+            'author' => 'sometimes|required|string',
+            'series' => 'sometimes|nullable|string',
             'volume' => 'sometimes|nullable|integer',
             'pages' => 'sometimes|nullable|integer',
             'current_page' => 'sometimes|nullable|integer',
             'rating' => 'sometimes|nullable|integer|min:1|max:5',
-            'lent_to' => 'sometimes|nullable|string|max:255',
+            'lent_to' => 'sometimes|nullable|string',
             'is_where' => 'sometimes|nullable|string',
-            'cover_path' => 'sometimes|nullable|url|max:255',
-            'link' => 'sometimes|nullable|url|max:255',
+            'cover_path' => 'sometimes|nullable|url',
+            'link' => 'sometimes|nullable|url',
             'started_at' => 'sometimes|nullable|date',
             'finished_at' => 'sometimes|nullable|date',
             'publication_year' => 'nullable|integer',

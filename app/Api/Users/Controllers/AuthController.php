@@ -54,6 +54,7 @@ class AuthController
         try {
             $this->authService->register($request->validated());
         } catch (\RuntimeException $e) {
+            report($e);
             return ApiResponse::serverError($e->getMessage());
         }
 
@@ -101,6 +102,7 @@ class AuthController
         try {
             $user = $request->authenticate();
         } catch (ValidationException $e) {
+            report($e);
             return ApiResponse::unauthorized();
         }
 
@@ -234,6 +236,7 @@ class AuthController
         try {
             $result = $this->authService->verify($request->validated());
         } catch (\RuntimeException $e) {
+            report($e);
             return match ($e->getMessage()) {
                 'already_verified' => ApiResponse::error('Account already verified', 401, ['already_verified']),
                 'token_mismatch' => ApiResponse::error('No such verification token', 401, ['token_mismatch']),
@@ -318,6 +321,7 @@ class AuthController
         try {
             $result = $this->authService->revokeToken($request->user(), (int) $tokenId);
         } catch (\RuntimeException $e) {
+            report($e);
             return ApiResponse::error($e->getMessage(), 400);
         }
 

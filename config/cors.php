@@ -16,8 +16,10 @@ return [
     */
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'storage/*'],
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    'allowed_origins' => explode(',', env('CORS_ALLOWED_ORIGINS', 
-        'http://localhost:5173,http://localhost:8000')),
+    'allowed_origins' => array_filter(array_unique([
+        ...explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:8000')),
+        env('FRONTEND_URL'),
+    ])),
     'allowed_origins_patterns' => [
         '/^https:\/\/.*\.solyto\.de$/',
         '/^https:\/\/.*\.solyto\.app$/',

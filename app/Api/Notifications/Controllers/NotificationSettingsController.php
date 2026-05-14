@@ -133,6 +133,10 @@ class NotificationSettingsController
             'dev_request_comment_email' => 'sometimes|boolean',
             'dev_request_comment_push' => 'sometimes|boolean',
             'dev_request_comment_telegram' => 'sometimes|boolean',
+            'export_ready_ui' => 'sometimes|boolean',
+            'export_ready_email' => 'sometimes|boolean',
+            'export_ready_push' => 'sometimes|boolean',
+            'export_ready_telegram' => 'sometimes|boolean',
         ]);
 
         $settings = UserNotificationSettings::updateOrCreate(

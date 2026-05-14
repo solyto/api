@@ -10,8 +10,6 @@ use OpenAI\Client;
 
 class AiService
 {
-    private const MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
-
     private Client $client;
     private string $model;
     private int $inputTokens;
@@ -20,10 +18,16 @@ class AiService
 
     public function __construct()
     {
-        $this->client = OpenAI::factory()
-            ->withApiKey(config('services.ionos.api_key'))
-            ->withBaseUri(config('services.ionos.base_url'))
-            ->make();
+        $factory = OpenAI::factory()
+            ->withApiKey(config('services.ai.api_key'));
+
+        $baseUrl = config('services.ai.base_url');
+        if ($baseUrl) {
+            $factory = $factory->withBaseUri($baseUrl);
+        }
+
+        $this->client = $factory->make();
+        $this->model = config('services.ai.model');
     }
 
     public function respond(
@@ -44,7 +48,7 @@ class AiService
         }
 
         $response = $this->client->chat()->create([
-            'model' => self::MODEL,
+            'model' => $this->model,
             'messages' => $messages,
         ]);
 
@@ -63,7 +67,7 @@ class AiService
     ): array
     {
         $response = $this->client->chat()->create([
-            'model' => self::MODEL,
+            'model' => $this->model,
             'messages' => [
                 ['role' => 'system', 'content' => $prompt],
                 ['role' => 'user', 'content' => $input],

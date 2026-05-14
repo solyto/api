@@ -12,6 +12,7 @@ use App\Api\Users\Requests\UpdateOpenaiApiKey;
 use App\Api\Users\Requests\UpdateTimeFormatRequest;
 use App\Api\Users\Requests\UpdateTimezoneRequest;
 use App\Api\Users\Requests\UpdateWeatherCityRequest;
+use App\Api\Users\Requests\UpdateWeatherTemperatureUnitRequest;
 use App\Api\Users\Services\UserSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -240,6 +241,43 @@ class UserSettingsController
     public function updateWeatherCity(UpdateWeatherCityRequest $request): JsonResponse
     {
         $this->userSettingsService->updateWeatherCity($request->user(), $request->validated());
+
+        return ApiResponse::success(null, 'Weather city updated successfully.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/v1/user-settings/weather-temperature-unit",
+     *     operationId="userSettingsUpdateTemperatureUnit",
+     *     summary="Update temperature unit setting",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"temperature_unit"},
+     *
+     *             @OA\Property(property="temperature_unit", type="string", maxLength=1),
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Weather temperature unit updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateWeatherTemperatureUnit(UpdateWeatherTemperatureUnitRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateWeatherTemperatureUnit($request->user(), $request->validated());
 
         return ApiResponse::success(null, 'Weather city updated successfully.');
     }

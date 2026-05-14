@@ -44,7 +44,7 @@ class WeatherController
         $user = $request->user();
         $settings = $user->settings;
 
-        if (! $settings || ! $settings->weather_latitude || ! $settings->weather_longitude) {
+        if (!$settings || !$settings->weather_latitude || !$settings->weather_longitude) {
             return ApiResponse::success([
                 'city' => null,
                 'configured' => false,
@@ -62,7 +62,7 @@ class WeatherController
         }
 
         return ApiResponse::success(
-            new DailyWeatherForecastResource($forecast, $settings->weather_city),
+            new DailyWeatherForecastResource($forecast, $settings->weather_city, $settings->temperature_unit ?? 'c'),
             'Weather forecast retrieved successfully.'
         );
     }

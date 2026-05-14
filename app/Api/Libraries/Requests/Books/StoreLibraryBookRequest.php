@@ -9,17 +9,17 @@ class StoreLibraryBookRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'required|string|max:255',
-            'author' => 'required|string|max:255',
-            'series' => 'nullable|string|max:255',
+            'title' => 'required|string',
+            'author' => 'required|string',
+            'series' => 'nullable|string',
             'volume' => 'nullable|integer',
             'pages' => 'nullable|integer',
             'current_page' => 'nullable|integer',
             'rating' => 'nullable|integer|min:1|max:5',
-            'lent_to' => 'nullable|string|max:255',
+            'lent_to' => 'nullable|string',
             'is_where' => 'nullable|string',
-            'cover_path' => 'nullable|url|max:255',
-            'link' => 'nullable|url|max:255',
+            'cover_path' => 'nullable|url',
+            'link' => 'nullable|url',
             'started_at' => 'nullable|date',
             'finished_at' => 'nullable|date',
             'publication_year' => 'nullable|integer',
