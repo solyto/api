@@ -62,8 +62,8 @@ return [
 
     'imgproxy' => [
         'url'  => env('IMGPROXY_URL', 'http://imgproxy:8080'),
-        'key'  => env('IMGPROXY_KEY'),
-        'salt' => env('IMGPROXY_SALT'),
+        'key'  => \App\Shared\Helpers\DockerSecretHelper::get('IMGPROXY_KEY'),
+        'salt' => \App\Shared\Helpers\DockerSecretHelper::get('IMGPROXY_SALT'),
     ],
 
     'image' => [
