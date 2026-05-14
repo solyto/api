@@ -52,7 +52,7 @@ trait IsTelegramBot
 
         if (config('app.debug')) {
             $this->debug = true;
-            $this->debugChatId = 52220354;
+            $this->debugChatId = config('telegram.bots.' . $this->identifier . '.debug_chat_id');
         }
     }
 
