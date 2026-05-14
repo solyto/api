@@ -42,6 +42,10 @@ class UserNotificationSettingsFactory extends Factory
             'dev_request_comment_email' => false,
             'dev_request_comment_push' => true,
             'dev_request_comment_telegram' => false,
+            'movie_release_ui' => true,
+            'movie_release_email' => false,
+            'movie_release_push' => true,
+            'movie_release_telegram' => false,
         ];
     }
 

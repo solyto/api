@@ -3,8 +3,11 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMovieGenre;
+use App\Api\Libraries\Services\External\TmdbApiService;
+use App\Api\Libraries\Services\External\TmdbReleasesService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -12,11 +15,15 @@ use Illuminate\Support\Collection;
 class LibraryMovieService
 {
     private const string CACHE_KEY = 'movies';
+    private const string CACHE_KEY_RELEASES = 'movie_releases';
     private const int CACHE_TTL = 86400;
+    private const int CACHE_TTL_RELEASES = 604800;
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
         private readonly ImdbImportService $imdbImportService,
+        private readonly TmdbReleasesService $tmdbReleasesService,
+        private readonly TmdbApiService $tmdbApiService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -96,6 +103,36 @@ class LibraryMovieService
         $movie->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function releases(User $user): array
+    {
+        return $this->cache->remember(
+            [self::CACHE_KEY_RELEASES, $user->id],
+            self::CACHE_TTL_RELEASES,
+            function () use ($user) {
+                $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
+                return $service->getMovieReleases();
+            }
+        );
+    }
+
+    public function trailers(LibraryMovie $movie): array
+    {
+        if ($movie->category === 'series') {
+            $results = $this->tmdbApiService->searchTv($movie->title);
+            if (empty($results)) return [];
+            $videos = $this->tmdbApiService->getTvVideos($results[0]['id']);
+        } else {
+            $results = $this->tmdbApiService->searchMovie($movie->title, $movie->publication_year);
+            if (empty($results)) return [];
+            $videos = $this->tmdbApiService->getMovieVideos($results[0]['id']);
+        }
+
+        return collect($videos ?? [])
+            ->filter(fn($v) => $v['site'] === 'YouTube' && $v['type'] === 'Trailer')
+            ->values()
+            ->toArray();
     }
 
     public function importFromImdb(string $url): mixed

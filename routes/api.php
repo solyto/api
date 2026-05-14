@@ -248,6 +248,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::prefix('movies')->name('movies.')->group(function () {
             Route::apiResource('genres', LibraryMovieGenreController::class);
             Route::post('import/imdb', [LibraryMovieController::class, 'importMovieFromImdb']);
+            Route::get('releases', [LibraryMovieController::class, 'releases']);
+            Route::get('{movie}/trailers', [LibraryMovieController::class, 'trailers']);
 
             Route::apiResource('/', LibraryMovieController::class)->parameters(['' => 'movie']);
         });

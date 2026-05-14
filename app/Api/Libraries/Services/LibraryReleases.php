@@ -5,9 +5,11 @@ namespace App\Api\Libraries\Services;
 use App\Api\Libraries\DTOs\DeezerAlbumDTO;
 use App\Api\Libraries\DTOs\HardcoverBookDTO;
 use App\Api\Libraries\Models\LibraryBook;
+use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Services\External\DeezerApiService;
 use App\Api\Libraries\Services\External\HardcoverApiService;
+use App\Api\Libraries\Services\External\TmdbReleasesService;
 use App\Api\Users\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
@@ -17,6 +19,7 @@ class LibraryReleases
     public function __construct(
         private readonly DeezerApiService $deezerApiService,
         private readonly HardcoverApiService $hardcoverApiService,
+        private readonly TmdbReleasesService $tmdbReleasesService,
         private readonly User $user
     ) {}
 
@@ -103,5 +106,18 @@ class LibraryReleases
         usort($releases, fn ($a, $b) => $b->getReleaseDate()->timestamp <=> $a->getReleaseDate()->timestamp);
 
         return $releases;
+    }
+
+    public function getMovieReleases(): array
+    {
+        $favorites = LibraryMovie::forUser($this->user->id)->where('rating', '>=', 4)->with('genres')->get();
+
+        $genreNames = $favorites
+            ->flatMap(fn($m) => $m->genres->pluck('title'))
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return $this->tmdbReleasesService->getReleasesForGenres($genreNames);
     }
 }

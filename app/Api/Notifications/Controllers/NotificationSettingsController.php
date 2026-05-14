@@ -137,6 +137,10 @@ class NotificationSettingsController
             'export_ready_email' => 'sometimes|boolean',
             'export_ready_push' => 'sometimes|boolean',
             'export_ready_telegram' => 'sometimes|boolean',
+            'movie_release_ui' => 'sometimes|boolean',
+            'movie_release_email' => 'sometimes|boolean',
+            'movie_release_push' => 'sometimes|boolean',
+            'movie_release_telegram' => 'sometimes|boolean',
         ]);
 
         $settings = UserNotificationSettings::updateOrCreate(
