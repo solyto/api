@@ -2,10 +2,10 @@
 
 namespace App\Api\Users\Services;
 
+use App\Api\Users\Jobs\ScaleProfileImage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Intervention\Image\Facades\Image;
 
 class UserProfileImageService
 {
@@ -29,10 +29,16 @@ class UserProfileImageService
         }
 
         $sanitizedName = $this->sanitizeFileName($userId, $file);
-        $extension = $file->getClientOriginalExtension();
         $store = Storage::disk('user_data')->putFileAs($userId, $file, $sanitizedName);
 
-        return $store ? $userId . '/' . $sanitizedName : false;
+        if (!$store) {
+            return false;
+        }
+
+        $path = $userId . '/' . $sanitizedName;
+        ScaleProfileImage::dispatch($path);
+
+        return $path;
     }
 
     private function createDir(string $userId): bool

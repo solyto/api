@@ -10,11 +10,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
+use App\Shared\Services\Images\ImageTransformationService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Intervention\Image\Drivers\Imagick\Driver;
-use Intervention\Image\ImageManager;
 
 class ScaleCovers implements ShouldQueue
 {
@@ -23,13 +22,12 @@ class ScaleCovers implements ShouldQueue
     private const string CACHE_KEY_RELEASES = 'music_releases';
     private const int CACHE_TTL_RELEASES = 86400;
 
-    public function handle(UserCacheService $cache): void
+    public function handle(UserCacheService $cache, ImageTransformationService $imageTransformation): void
     {
         Log::channel('queue')->info('Looking for covers that are too big..');
 
         $folders = File::directories(storage_path('app/public/user'));
         $dirs = ['music', 'movies', 'books', 'recipes'];
-        $manager = new ImageManager(new Driver());
 
         foreach ($folders as $folder) {
             $folderName = Str::replace(storage_path('app/public/user/'), '', $folder);
@@ -57,9 +55,7 @@ class ScaleCovers implements ShouldQueue
 
                         File::copy($cover->getPathname(), $originalPath);
 
-                        $image = $manager->read($cover->getPathname());
-                        $image->scale(width: 400);
-                        $image->save($cover->getPathname(), quality: 85);
+                        $imageTransformation->scaleToWidth($cover->getPathname(), 400, 85);
 
                         Log::channel('queue')->info('Processed ' . $cover->getPathname());
                     }

@@ -65,4 +65,8 @@ return [
         'key'  => env('IMGPROXY_KEY'),
         'salt' => env('IMGPROXY_SALT'),
     ],
+
+    'image' => [
+        'driver' => env('IMAGE_DRIVER', 'intervention'),
+    ],
 ];
