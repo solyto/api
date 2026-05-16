@@ -26,6 +26,8 @@ trait IsTelegramBot
                 return;
             }
 
+            app()->setLocale($this->detectLocale());
+
             $this->initState($this->getChatId(), $this->identifier);
 
             if ($this->runCommands()) {
@@ -39,7 +41,7 @@ trait IsTelegramBot
             $this->entrypoint();
         } catch (\Exception $e) {
             Log::channel('bots')->error($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-            $this->replyWithText($this->defaultErrorMessage);
+            $this->replyWithText(__($this->defaultErrorMessage));
         }
     }
 
@@ -84,6 +86,13 @@ trait IsTelegramBot
     public function getFromChatId(): ?int
     {
         return $this->request->get('message')['from']['id'];
+    }
+
+    public function detectLocale(): string
+    {
+        $langCode = $this->request->get('message')['from']['language_code'] ?? 'en';
+        $lang = substr($langCode, 0, 2);
+        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
     }
 
     public function getMessageId(): ?int

@@ -41,7 +41,7 @@ class SolytoBot implements BotInterface
     public array $routes = [
         SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value => 'handleQuickAddTypeSelection',
     ];
-    public string $defaultErrorMessage = SolytoMessage::ERROR->value;
+    public string $defaultErrorMessage = SolytoMessage::ERROR->value; // translation key, resolved at send time
 
     private ?TelegramBotConnection $connection = null;
 
@@ -55,7 +55,7 @@ class SolytoBot implements BotInterface
 
         $message = trim((string) $this->getMessage());
         if ($message === '') {
-            $this->replyWithText(SolytoMessage::WELCOME->value);
+            $this->replyWithText(SolytoMessage::WELCOME->trans());
             return;
         }
 
@@ -69,12 +69,12 @@ class SolytoBot implements BotInterface
                                            ->first();
 
         if (!$connection) {
-            $this->replyWithText(SolytoMessage::INVALID_TOKEN->value);
+            $this->replyWithText(SolytoMessage::INVALID_TOKEN->trans());
             return;
         }
 
         if ($connection->is_confirmed) {
-            $this->replyWithText(SolytoMessage::TOKEN_ALREADY_REGISTERED->value);
+            $this->replyWithText(SolytoMessage::TOKEN_ALREADY_REGISTERED->trans());
             return;
         }
 
@@ -83,7 +83,7 @@ class SolytoBot implements BotInterface
             'chat_id' => (string) $this->getChatId(),
         ]);
 
-        $this->replyWithText(SolytoMessage::TOKEN_REGISTERED->value);
+        $this->replyWithText(SolytoMessage::TOKEN_REGISTERED->trans());
     }
 
     public function dayCommand(): void
@@ -94,11 +94,11 @@ class SolytoBot implements BotInterface
         $appointments = $this->gateway->todayAppointments();
 
         if ($todos->isEmpty() && $appointments->isEmpty()) {
-            $this->replyWithText(SolytoMessage::EMPTY_DAY->value);
+            $this->replyWithText(SolytoMessage::EMPTY_DAY->trans());
             return;
         }
 
-        $dayMessage = SolytoMessage::DAY->value;
+        $dayMessage = SolytoMessage::DAY->trans();
 
         foreach ($appointments as $appointment) {
             if ($appointment->is_all_day) {
@@ -122,7 +122,7 @@ class SolytoBot implements BotInterface
         $todos = $this->gateway->todos();
 
         if ($todos->isEmpty()) {
-            $this->replyWithText(SolytoMessage::NO_TODOS->value);
+            $this->replyWithText(SolytoMessage::NO_TODOS->trans());
             return;
         }
 
@@ -146,7 +146,7 @@ class SolytoBot implements BotInterface
             );
 
             if ($result === null) {
-                $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+                $this->replyWithText(SolytoMessage::ADD_FAILED->trans());
                 return;
             }
 
@@ -160,7 +160,7 @@ class SolytoBot implements BotInterface
             ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
             ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
 
-        $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->value, $keyboard);
+        $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->trans(), $keyboard);
     }
 
     public function handleQuickAddTypeSelection(): void
@@ -175,7 +175,7 @@ class SolytoBot implements BotInterface
             $keyboard = Keyboard::make()
                 ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
                 ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
-            $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->value, $keyboard);
+            $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->trans(), $keyboard);
             return;
         }
 
@@ -187,7 +187,7 @@ class SolytoBot implements BotInterface
         $result = $this->gateway->commit($content, $contentType, null);
 
         if ($result === null) {
-            $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+            $this->replyWithText(SolytoMessage::ADD_FAILED->trans());
             return;
         }
 
@@ -199,7 +199,7 @@ class SolytoBot implements BotInterface
         $result = $this->gateway->commit($input, $type, null);
 
         if ($result === null) {
-            $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+            $this->replyWithText(SolytoMessage::ADD_FAILED->trans());
             return;
         }
 
@@ -209,18 +209,18 @@ class SolytoBot implements BotInterface
     private function messageForType(QuickAddContentType $type): string
     {
         return match ($type) {
-            QuickAddContentType::Links => SolytoMessage::ADDED_LINK->value,
-            QuickAddContentType::Music => SolytoMessage::ADDED_MUSIC->value,
-            QuickAddContentType::Books => SolytoMessage::ADDED_BOOK->value,
-            QuickAddContentType::Movies => SolytoMessage::ADDED_MOVIE->value,
-            QuickAddContentType::Games => SolytoMessage::ADDED_GAME->value,
-            QuickAddContentType::Recipes => SolytoMessage::ADDED_RECIPE->value,
-            QuickAddContentType::Plants => SolytoMessage::ADDED_PLANT->value,
-            QuickAddContentType::Quotes => SolytoMessage::ADDED_QUOTE->value,
-            QuickAddContentType::Todo => SolytoMessage::ADDED_TODO->value,
-            QuickAddContentType::Note => SolytoMessage::ADDED_NOTE->value,
-            QuickAddContentType::Feed => SolytoMessage::ADDED_FEED->value,
-            QuickAddContentType::Clipboard => SolytoMessage::ADDED_CLIPBOARD->value,
+            QuickAddContentType::Links     => SolytoMessage::ADDED_LINK->trans(),
+            QuickAddContentType::Music     => SolytoMessage::ADDED_MUSIC->trans(),
+            QuickAddContentType::Books     => SolytoMessage::ADDED_BOOK->trans(),
+            QuickAddContentType::Movies    => SolytoMessage::ADDED_MOVIE->trans(),
+            QuickAddContentType::Games     => SolytoMessage::ADDED_GAME->trans(),
+            QuickAddContentType::Recipes   => SolytoMessage::ADDED_RECIPE->trans(),
+            QuickAddContentType::Plants    => SolytoMessage::ADDED_PLANT->trans(),
+            QuickAddContentType::Quotes    => SolytoMessage::ADDED_QUOTE->trans(),
+            QuickAddContentType::Todo      => SolytoMessage::ADDED_TODO->trans(),
+            QuickAddContentType::Note      => SolytoMessage::ADDED_NOTE->trans(),
+            QuickAddContentType::Feed      => SolytoMessage::ADDED_FEED->trans(),
+            QuickAddContentType::Clipboard => SolytoMessage::ADDED_CLIPBOARD->trans(),
         };
     }
 
@@ -233,15 +233,18 @@ class SolytoBot implements BotInterface
                         ->addActionEvent(SolytoBotEvent::WELCOME_UNREGISTERED->value)
                         ->store();
 
-            $this->replyWithText(SolytoMessage::WELCOME_UNREGISTERED->value);
+            $this->replyWithText(SolytoMessage::WELCOME_UNREGISTERED->trans());
             exit(1);
         }
 
         $user = User::find($this->connection->user_id);
         if ($user === null) {
-            $this->replyWithText(SolytoMessage::ERROR->value);
+            $this->replyWithText(SolytoMessage::ERROR->trans());
             exit(1);
         }
+
+        $lang = $user->settings?->language ?? 'en';
+        app()->setLocale(in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en');
 
         $this->gateway->setUser($user);
     }

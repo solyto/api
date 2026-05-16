@@ -30,32 +30,56 @@ class DailyCheckInReminderNotification extends BaseNotification
         ];
     }
 
+    private function resolveLocale(object $notifiable): string
+    {
+        $lang = $notifiable->settings?->language ?? 'en';
+        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
+    }
+
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        return (new WebPushMessage)
-            ->title('Daily Check-in Reminder')
-            ->body("Have you completed your daily check-in yet?")
+        $previous = app()->getLocale();
+        app()->setLocale($this->resolveLocale($notifiable));
+
+        $message = (new WebPushMessage)
+            ->title(__('bot.check_in_reminder_title'))
+            ->body(__('bot.check_in_reminder_body'))
             ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action('Check In', 'check_in')
+            ->action(__('bot.check_in_action'), 'check_in')
             ->data([
                 'url' => config('app.frontend_url') . "/check-in/date/{$this->date}",
             ]);
+
+        app()->setLocale($previous);
+        return $message;
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Daily Check-in Reminder')
+        $previous = app()->getLocale();
+        app()->setLocale($this->resolveLocale($notifiable));
+
+        $message = (new MailMessage)
+            ->subject(__('bot.check_in_reminder_title'))
             ->greeting('Good Evening!')
-            ->line('Have you completed your daily check-in yet?')
-            ->action('Check In', config('app.frontend_url') . "/check-in/date/{$this->date}");
+            ->line(__('bot.check_in_reminder_body'))
+            ->action(__('bot.check_in_action'), config('app.frontend_url') . "/check-in/date/{$this->date}");
+
+        app()->setLocale($previous);
+        return $message;
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        return TelegramMessage::create()
-            ->line("Daily Check-in Reminder")
-            ->line("Have you completed your daily check-in yet?")
-            ->url(config('app.frontend_url') . "/check-in/date/{$this->date}", 'Check In');
+        $previous = app()->getLocale();
+        app()->setLocale($this->resolveLocale($notifiable));
+
+        $message = TelegramMessage::create()
+            ->line(__('bot.check_in_reminder_title'))
+            ->line(__('bot.check_in_reminder_body'))
+            ->url(config('app.frontend_url') . "/check-in/date/{$this->date}", __('bot.check_in_action'));
+
+        app()->setLocale($previous);
+        return $message;
     }
 }
