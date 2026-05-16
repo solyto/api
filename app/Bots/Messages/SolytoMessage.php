@@ -30,5 +30,6 @@ enum SolytoMessage: string
     case NO_LINK = 'Sorry, I could not identify a link.';
     case NO_TODO = 'Could not identify a valid Todo, many sorries..';
     case EMPTY_DAY = 'There seem to be no todos or appointments up today!';
+    case NO_TODOS = 'You have no todos. Enjoy the free time!';
     case ERROR = 'Sorry, something unexpected happened. I\'m trying to fix it.';
 }

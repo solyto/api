@@ -7,7 +7,7 @@ use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Api\Dashboard\Requests\CommitRequest;
 use App\Api\Dashboard\Requests\DetectRequest;
 use App\Api\Dashboard\Resources\QuickAddResource;
-use App\Api\Dashboard\Services\QuickAddService;
+use App\Shared\Services\QuickAddService;
 use App\Api\HandlesApiAuth;
 use Illuminate\Http\JsonResponse;
 
@@ -75,7 +75,7 @@ class QuickAddController
      *             required={"url","content_type"},
      *
      *             @OA\Property(property="url", type="string", format="uri", maxLength=2048),
-     *             @OA\Property(property="content_type", type="string", enum={"music","books","movies","games","links","recipes","plants","quotes","todo","note","feed"}),
+     *             @OA\Property(property="content_type", type="string", enum={"music","books","movies","games","links","recipes","plants","quotes","todo","note","feed","clipboard"}),
      *             @OA\Property(property="metadata", type="object", nullable=true)
      *         )
      *     ),

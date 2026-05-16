@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Api\Dashboard\Services;
+namespace App\Shared\Services;
 
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
@@ -68,54 +68,54 @@ class QuickAddService
         return new DetectionResult($content, $type, $confidence, $confidence < self::CONFIRMATION_THRESHOLD);
     }
 
-    public function commit(User $user, string $url, QuickAddContentType $contentType, ?array $metadata): mixed
+    public function commit(User $user, string $content, QuickAddContentType $contentType, ?array $metadata): mixed
     {
         $metadata ??= [];
 
         return match ($contentType) {
             QuickAddContentType::Links => app(LibraryLinkService::class)->create($user, [
-                'url' => $url,
+                'url' => $content,
                 'title' => $metadata['title'] ?? null,
             ]),
 
-            QuickAddContentType::Todo => app(TodoService::class)->create($user, $this->parseTodoData($user, $url, $metadata)),
+            QuickAddContentType::Todo => app(TodoService::class)->create($user, $this->parseTodoData($user, $content, $metadata)),
 
             QuickAddContentType::Note => app(NoteService::class)->create($user, [
-                'title' => $metadata['title'] ?? $url,
+                'title' => $metadata['title'] ?? $content,
             ]),
 
             QuickAddContentType::Quotes => app(LibraryQuoteService::class)->create($user, [
-                'quote'  => $metadata['quote'] ?? $url,
+                'quote'  => $metadata['quote'] ?? $content,
                 'author' => $metadata['author'] ?? null,
                 'source' => $metadata['source'] ?? null,
             ]),
 
             QuickAddContentType::Recipes => app(LibraryRecipeService::class)->create($user, [
-                'title' => $metadata['title'] ?? $url,
-                'link'  => $url,
+                'title' => $metadata['title'] ?? $content,
+                'link'  => $content,
             ]),
 
             QuickAddContentType::Plants => app(LibraryPlantService::class)->create($user, [
-                'name' => $metadata['name'] ?? $url,
+                'name' => $metadata['name'] ?? $content,
             ]),
 
             QuickAddContentType::Feed => app(FeedService::class)->createSubscription(
                 $user,
-                $metadata['title'] ?? $url,
-                $url,
+                $metadata['title'] ?? $content,
+                $content,
                 null,
                 null,
             ),
 
             QuickAddContentType::Clipboard => app(ClipboardService::class)->store($user, [
-                'content' => $metadata['content'] ?? $url,
+                'content' => $metadata['content'] ?? $content,
                 'type' => 'text',
             ]),
 
-            QuickAddContentType::Music => $this->commitMusic($user, $url),
-            QuickAddContentType::Books => $this->commitBook($user, $url),
-            QuickAddContentType::Movies => $this->commitMovie($user, $url),
-            QuickAddContentType::Games => $this->commitGame($user, $url),
+            QuickAddContentType::Music => $this->commitMusic($user, $content),
+            QuickAddContentType::Books => $this->commitBook($user, $content),
+            QuickAddContentType::Movies => $this->commitMovie($user, $content),
+            QuickAddContentType::Games => $this->commitGame($user, $content),
         };
     }
 
