@@ -24,6 +24,8 @@ enum SolytoMessage: string
     case ADDED_TODO = 'Got it. Added to your todos.';
     case ADDED_NOTE = 'Got it. Saved as a note.';
     case ADDED_FEED = 'Got it. Feed subscription added.';
+    case ADDED_CLIPBOARD = 'Got it. Added to your clipboard.';
+    case CHOOSE_TYPE = "What should I add this as?\n\nPick one of the options below.";
     case ADD_FAILED = 'I couldn\'t add that. Try a different link or be more specific?';
     case NO_LINK = 'Sorry, I could not identify a link.';
     case NO_TODO = 'Could not identify a valid Todo, many sorries..';

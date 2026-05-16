@@ -8,6 +8,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
+use App\Bots\DTOs\Keyboard;
 use App\Bots\Events\SolytoBotEvent;
 use App\Bots\Messages\SolytoMessage;
 use App\Bots\Traits\IsTelegramBot;
@@ -32,7 +33,7 @@ class SolytoBot implements BotInterface
         ['/help', 'Show Help'],
     ];
     public array $routes = [
-
+        SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value => 'handleQuickAddTypeSelection',
     ];
     public string $defaultErrorMessage = SolytoMessage::ERROR->value;
 
@@ -154,6 +155,15 @@ class SolytoBot implements BotInterface
         $this->commitWithType($input, QuickAddContentType::Todo);
     }
 
+    private const array TYPE_KEYBOARD_MAP = [
+        'Todo'      => QuickAddContentType::Todo,
+        'Note'      => QuickAddContentType::Note,
+        'Quote'     => QuickAddContentType::Quotes,
+        'Clipboard' => QuickAddContentType::Clipboard,
+        'Link'      => QuickAddContentType::Links,
+        'Recipe'    => QuickAddContentType::Recipes,
+    ];
+
     private function processQuickAdd(string $message): void
     {
         $user = User::find($this->connection->user_id);
@@ -163,19 +173,68 @@ class SolytoBot implements BotInterface
         }
 
         $detection = $this->quickAddService->detect($message);
-        $result = $this->quickAddService->commit(
-            $user,
-            $detection->url,
-            $detection->contentType,
-            $detection->metadata,
-        );
+
+        if (!$detection->needsConfirmation) {
+            $result = $this->quickAddService->commit(
+                $user,
+                $detection->url,
+                $detection->contentType,
+                $detection->metadata,
+            );
+
+            if ($result === null) {
+                $this->replyWithText(SolytoMessage::ADD_FAILED->value);
+                return;
+            }
+
+            $this->replyWithText($this->messageForType($detection->contentType));
+            return;
+        }
+
+        $this->state->addActionEvent(SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value)->store();
+
+        $keyboard = Keyboard::make()
+            ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
+            ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
+
+        $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->value, $keyboard);
+    }
+
+    public function handleQuickAddTypeSelection(): void
+    {
+        $this->auth();
+
+        $user = User::find($this->connection->user_id);
+        if ($user === null) {
+            $this->replyWithText(SolytoMessage::ERROR->value);
+            return;
+        }
+
+        $selectedLabel = trim((string) $this->getMessage());
+        $contentType = self::TYPE_KEYBOARD_MAP[$selectedLabel] ?? null;
+
+        if ($contentType === null) {
+            $this->state->addActionEvent(SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value)->store();
+            $keyboard = Keyboard::make()
+                ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
+                ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
+            $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->value, $keyboard);
+            return;
+        }
+
+        $originalMessage = $this->state->getLastUserMessage();
+        $content = $originalMessage?->getText() ?? '';
+
+        $this->state->destroy();
+
+        $result = $this->quickAddService->commit($user, $content, $contentType, null);
 
         if ($result === null) {
             $this->replyWithText(SolytoMessage::ADD_FAILED->value);
             return;
         }
 
-        $this->replyWithText($this->messageForType($detection->contentType));
+        $this->replyWithText($this->messageForType($contentType));
     }
 
     private function commitWithType(string $input, QuickAddContentType $type): void
@@ -210,6 +269,7 @@ class SolytoBot implements BotInterface
             QuickAddContentType::Todo => SolytoMessage::ADDED_TODO->value,
             QuickAddContentType::Note => SolytoMessage::ADDED_NOTE->value,
             QuickAddContentType::Feed => SolytoMessage::ADDED_FEED->value,
+            QuickAddContentType::Clipboard => SolytoMessage::ADDED_CLIPBOARD->value,
         };
     }
 

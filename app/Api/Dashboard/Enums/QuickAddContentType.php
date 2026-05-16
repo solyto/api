@@ -15,4 +15,5 @@ enum QuickAddContentType: string
     case Todo = 'todo';
     case Note = 'note';
     case Feed = 'feed';
+    case Clipboard = 'clipboard';
 }

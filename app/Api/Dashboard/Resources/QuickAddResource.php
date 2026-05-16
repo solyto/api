@@ -23,6 +23,7 @@ class QuickAddResource extends JsonResource
             'url' => $this->resource->url,
             'content_type' => $this->resource->contentType->value,
             'confidence' => $this->resource->confidence,
+            'needs_confirmation' => $this->resource->needsConfirmation,
             'metadata' => $this->resource->metadata,
         ];
     }

@@ -10,7 +10,7 @@ use ZipArchive;
 
 class ExportService
 {
-    public const FEATURES = [
+    public const array FEATURES = [
         'todos',
         'notes',
         'calendars',

@@ -10,6 +10,7 @@ final readonly class DetectionResult
         public string $url,
         public QuickAddContentType $contentType,
         public float $confidence,
+        public bool $needsConfirmation = false,
         public ?array $metadata = null,
     ) {}
 }

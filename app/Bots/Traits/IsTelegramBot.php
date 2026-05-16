@@ -165,7 +165,11 @@ trait IsTelegramBot
 
     public function replyWithTextAndKeyboard(string $text, Keyboard $keyboard): bool
     {
-        return $this->telegramBotService->sendTextWithKeyboard($this->debugChatId ?? $this->getChatId(), $text, ['keyboard' => $keyboard->asArray()]);
+        return $this->telegramBotService->sendTextWithKeyboard($this->debugChatId ?? $this->getChatId(), $text, [
+            'keyboard' => $keyboard->asArray(),
+            'resize_keyboard' => true,
+            'one_time_keyboard' => true,
+        ]);
     }
 
     public function sendText(int $chatId, string $text): bool
