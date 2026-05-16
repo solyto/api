@@ -10,8 +10,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     schema="QuickAddDetection",
  *
  *     @OA\Property(property="url", type="string", format="uri"),
- *     @OA\Property(property="content_type", type="string", enum={"music","books","movies","games","links","recipes","plants","quotes","todo","note","feed"}),
+ *     @OA\Property(property="content_type", type="string", enum={"music","books","movies","games","links","recipes","plants","quotes","todo","note","feed","clipboard"}),
  *     @OA\Property(property="confidence", type="number", format="float", minimum=0, maximum=1),
+ *     @OA\Property(property="needs_confirmation", type="boolean"),
  *     @OA\Property(property="metadata", type="object", nullable=true)
  * )
  */
