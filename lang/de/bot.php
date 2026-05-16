@@ -29,6 +29,7 @@ return [
     'empty_day'               => 'Es scheinen heute keine Aufgaben oder Termine anstehend zu sein!',
     'no_todos'                => 'Du hast keine Aufgaben. Genieß die freie Zeit!',
     'error'                   => 'Tut mir leid, etwas Unerwartetes ist passiert. Ich versuche es zu beheben.',
+    'cancelled'               => 'Alles klar. Es wurde nichts hinzugefügt.',
     'check_in_reminder_title' => 'Tägliche Check-in Erinnerung',
     'check_in_reminder_body'  => 'Hast du deinen täglichen Check-in bereits abgeschlossen?',
     'check_in_action'         => 'Jetzt einchecken',

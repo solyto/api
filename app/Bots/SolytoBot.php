@@ -158,7 +158,8 @@ class SolytoBot implements BotInterface
 
         $keyboard = Keyboard::make()
             ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
-            ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
+            ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')])
+            ->withRow([Keyboard::button('Cancel')]);
 
         $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->trans(), $keyboard);
     }
@@ -168,13 +169,21 @@ class SolytoBot implements BotInterface
         $this->auth();
 
         $selectedLabel = trim((string) $this->getMessage());
+
+        if ($selectedLabel === 'Cancel') {
+            $this->state->destroy();
+            $this->replyWithText(SolytoMessage::CANCELLED->trans());
+            return;
+        }
+
         $contentType = self::TYPE_KEYBOARD_MAP[$selectedLabel] ?? null;
 
         if ($contentType === null) {
             $this->state->addActionEvent(SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value)->store();
             $keyboard = Keyboard::make()
                 ->withRow([Keyboard::button('Todo'), Keyboard::button('Note'), Keyboard::button('Quote')])
-                ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')]);
+                ->withRow([Keyboard::button('Clipboard'), Keyboard::button('Link'), Keyboard::button('Recipe')])
+                ->withRow([Keyboard::button('Cancel')]);
             $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->trans(), $keyboard);
             return;
         }

@@ -29,6 +29,7 @@ return [
     'empty_day'               => 'There seem to be no todos or appointments up today!',
     'no_todos'                => 'You have no todos. Enjoy the free time!',
     'error'                   => "Sorry, something unexpected happened. I'm trying to fix it.",
+    'cancelled'               => 'Got it. Nothing was added.',
     'check_in_reminder_title' => 'Daily Check-in Reminder',
     'check_in_reminder_body'  => 'Have you completed your daily check-in yet?',
     'check_in_action'         => 'Check In',

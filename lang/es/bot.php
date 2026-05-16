@@ -29,6 +29,7 @@ return [
     'empty_day'               => '¡Parece que no hay tareas ni citas para hoy!',
     'no_todos'                => '¡No tienes tareas. Disfruta del tiempo libre!',
     'error'                   => 'Lo siento, algo inesperado ocurrió. Estoy intentando solucionarlo.',
+    'cancelled'               => 'Entendido. No se ha añadido nada.',
     'check_in_reminder_title' => 'Recordatorio de Check-in Diario',
     'check_in_reminder_body'  => '¿Has completado tu check-in diario?',
     'check_in_action'         => 'Check-in',
