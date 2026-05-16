@@ -32,6 +32,7 @@ enum SolytoMessage: string
     case EMPTY_DAY                = 'bot.empty_day';
     case NO_TODOS                 = 'bot.no_todos';
     case ERROR                    = 'bot.error';
+    case CANCELLED                = 'bot.cancelled';
 
     public function trans(): string
     {
