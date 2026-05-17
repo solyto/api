@@ -53,10 +53,8 @@ class LibraryBookResource extends JsonResource
             'wishlist' => $this->wishlist,
             'publication_year' => $this->publication_year,
             'summary' => $this->summary,
-            'genres' => $this->whenLoaded('genres', fn () => LibraryBookGenreResource::collection($this->genres)
-            ),
-            'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)
-            ),
+            'genres' => $this->whenLoaded('genres', fn () => LibraryBookGenreResource::collection($this->genres)),
+            'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)),
             'started_at' => $this->started_at,
             'finished_at' => $this->finished_at,
             'created_at' => $this->created_at,
