@@ -56,4 +56,13 @@ class ShortcutService
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
     }
+
+    public function reorder(User $user, array $ids): void
+    {
+        foreach ($ids as $order => $id) {
+            Shortcut::where('id', $id)->where('user_id', $user->id)->update(['order' => $order]);
+        }
+
+        $this->cache->forget([self::CACHE_KEY, $user->id]);
+    }
 }
