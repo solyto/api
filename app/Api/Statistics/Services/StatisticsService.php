@@ -35,6 +35,7 @@ class StatisticsService
 
         return [
             'users' => User::count(),
+            'confirmed_users' => User::whereNotNull('email_verified_at')->count(),
             'todos' => Todo::count(),
             'todo_categories' => TodoCategory::count(),
             'todo_workspaces' => TodoWorkspace::count(),
