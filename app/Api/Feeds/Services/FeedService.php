@@ -111,7 +111,7 @@ class FeedService
         return $subscription;
     }
 
-    public function getAggregatedItems(string $userId): Collection
+    public function getAggregatedItems(string $userId, int $offset = 0, ?int $limit = 50): array
     {
         $subscriptions = $this->getUserFeeds($userId);
 
@@ -125,7 +125,14 @@ class FeedService
             );
         }
 
-        return $items;
+        $counts = $items->countBy('feed_id')->all();
+        $sorted = $items->sortByDesc('published_at');
+
+        $page = $limit === null
+            ? $sorted->values()
+            : $sorted->slice($offset, $limit)->values();
+
+        return ['items' => $page, 'counts' => $counts];
     }
 
     public function getUserFeeds(string $userId): Collection

@@ -77,11 +77,16 @@ class FeedController
      */
     public function listItems(Request $request): JsonResponse
     {
-        $items = $this->feedService->getAggregatedItems($request->user()->id);
+        $offset = (int) $request->query('offset', 0);
+        $limitParam = $request->query('limit', '50');
+        $limit = $limitParam === 'all' ? null : (int) $limitParam;
+
+        ['items' => $items, 'counts' => $counts] = $this->feedService->getAggregatedItems($request->user()->id, $offset, $limit);
 
         return ApiResponse::success(
             FeedItemResource::collection($items),
-            'Feed items retrieved successfully.'
+            'Feed items retrieved successfully.',
+            meta: ['has_more' => $items->count() === $limit, 'feed_counts' => $counts]
         );
     }
 
