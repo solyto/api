@@ -215,6 +215,15 @@ class ShortcutController
      *     )
      * )
      */
+    public function reorder(Request $request): JsonResponse
+    {
+        $request->validate(['shortcuts' => 'required|array', 'shortcuts.*' => 'string']);
+
+        $this->shortcutService->reorder($request->user(), $request->input('shortcuts'));
+
+        return ApiResponse::success(null, 'Shortcuts reordered successfully.');
+    }
+
     public function destroy(Request $request, Shortcut $shortcut): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $shortcut), 403);

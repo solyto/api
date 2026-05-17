@@ -313,6 +313,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
     });
 
+    Route::put('shortcuts/reorder', [ShortcutController::class, 'reorder']);
     Route::apiResource('shortcuts', ShortcutController::class);
 
     Route::get('statistics/overview', [StatisticsController::class, 'overview']);
