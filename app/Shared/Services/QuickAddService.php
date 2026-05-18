@@ -27,7 +27,7 @@ class QuickAddService
 
     public function detect(string $content): DetectionResult
     {
-        if (Str::contains($content, 'https://') || Str::contains($content, 'http://')) {
+        if (Str::contains($content, ['https://', 'http://', 'www.'])) {
             return $this->detectBasedOnUrl($content);
         }
 
@@ -180,7 +180,7 @@ class QuickAddService
         return $service->create($user, [
             'title' => $dto->getTitle(),
             'artist' => $dto->getArtist(),
-            'type' => $dto->getRecordType(),
+            'format' => $dto->getRecordType(),
             'cover_path' => $dto->getCover(),
             'link' => $dto->getUrl(),
             'publication_year' => $dto->getReleaseDate()?->year,
