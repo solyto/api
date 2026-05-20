@@ -27,12 +27,12 @@ class QuickAddService
 
     public function detect(string $content): DetectionResult
     {
-        if (Str::contains($content, ['https://', 'http://', 'www.'])) {
-            return $this->detectBasedOnUrl($content);
+        if (Str::contains($content, ['due', 'repeat', 'link:'])) {
+            return $this->makeResult($content, QuickAddContentType::Todo, 0.70);
         }
 
-        if (Str::contains($content, ['due', 'repeat'])) {
-            return $this->makeResult($content, QuickAddContentType::Todo, 0.70);
+        if (Str::contains($content, ['https://', 'http://', 'www.'])) {
+            return $this->detectBasedOnUrl($content);
         }
 
         if (Str::contains($content, ['/', '#'])) {
@@ -158,6 +158,11 @@ class QuickAddService
                 $data['recurrence_frequency'] = $match[1];
             }
             $title = trim(preg_replace('/repeat:(daily|weekly|monthly|yearly)/', '', $title));
+        }
+
+        if (preg_match('/link:(\S+)/', $title, $match)) {
+            $data['link'] = $match[1];
+            $title = trim(preg_replace('/link:\S+/', '', $title));
         }
 
         $data['title'] = $title;

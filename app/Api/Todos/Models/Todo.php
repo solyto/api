@@ -24,6 +24,7 @@ class Todo extends Model
     protected $fillable = [
         'title',
         'description',
+        'link',
         'is_completed',
         'priority',
         'due_at',

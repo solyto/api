@@ -12,6 +12,7 @@ class StoreTodoRequest extends FormRequest
         return [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
+            'link' => 'nullable|string|max:2048',
             'priority' => 'sometimes|in:low,medium,high',
             'due_at' => 'nullable|date|after_or_equal:today',
             'status' => 'sometimes|in:backlog,pending,in-progress,waiting,almost-done',

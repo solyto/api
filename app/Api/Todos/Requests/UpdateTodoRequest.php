@@ -12,6 +12,7 @@ class UpdateTodoRequest extends FormRequest
         return [
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|nullable|string|max:1000',
+            'link' => 'sometimes|nullable|string|max:2048',
             'priority' => 'sometimes|in:low,medium,high',
             'due_at' => 'sometimes|nullable|date|after_or_equal:today',
             'status' => 'sometimes|in:backlog,pending,in-progress,waiting,almost-done',
@@ -76,6 +77,10 @@ class UpdateTodoRequest extends FormRequest
 
         if ($this->has('description') && empty($this->description)) {
             $this->merge(['description' => null]);
+        }
+
+        if ($this->has('link') && empty($this->link)) {
+            $this->merge(['link' => null]);
         }
 
         if ($this->has('is_completed')) {
