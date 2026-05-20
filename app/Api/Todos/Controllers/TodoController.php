@@ -159,7 +159,7 @@ class TodoController
      */
     public function store(StoreTodoRequest $request): JsonResponse
     {
-        $todo = $this->todoService->create($request->user(), $request->validated());
+        $todo = $this->todoService->create($request->user(), $this->todoService->parse($request->user(), $request->validated()));
 
         return ApiResponse::success(new TodoResource($todo), 'Todo created successfully.', 201);
     }
