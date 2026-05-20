@@ -15,8 +15,6 @@ use App\Api\Libraries\Services\LibraryPlantService;
 use App\Api\Libraries\Services\LibraryQuoteService;
 use App\Api\Libraries\Services\LibraryRecipeService;
 use App\Api\Notes\Services\NoteService;
-use App\Api\Tags\Models\Tag;
-use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Str;
@@ -78,7 +76,7 @@ class QuickAddService
                 'title' => $metadata['title'] ?? null,
             ]),
 
-            QuickAddContentType::Todo => app(TodoService::class)->create($user, $this->parseTodoData($user, $content, $metadata)),
+            QuickAddContentType::Todo => $this->commitTodo($user, $content, $metadata),
 
             QuickAddContentType::Note => app(NoteService::class)->create($user, [
                 'title' => $metadata['title'] ?? $content,
@@ -119,55 +117,11 @@ class QuickAddService
         };
     }
 
-    private function parseTodoData(User $user, string $input, ?array $metadata): array
+    private function commitTodo(User $user, string $content, ?array $metadata): mixed
     {
-        $title = $metadata['title'] ?? $input;
-        $data = [];
+        $todoService = app(TodoService::class);
 
-        $tagMatches = [];
-        if (preg_match_all('/#([\w-]+)/', $title, $matches)) {
-            foreach ($matches[1] as $tagName) {
-                $tag = Tag::forUser($user->id)->whereRaw('LOWER(name) = ?', [strtolower($tagName)])->first()
-                    ?? Tag::create(['name' => $tagName, 'user_id' => $user->id]);
-                $tagMatches[] = $tag->id;
-                $title = trim(str_replace('#' . $tagName, '', $title));
-            }
-        }
-
-        if (!empty($tagMatches)) {
-            $data['tags'] = $tagMatches;
-        }
-
-        if (preg_match('/\/([\w-]+)/', $title, $match)) {
-            $category = TodoCategory::forUser($user->id)
-                ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
-                ->first();
-            if ($category) {
-                $data['category_id'] = $category->id;
-                $title = trim(str_replace('/' . $match[1], '', $title));
-            }
-        }
-
-        if (preg_match('/due:([\w.-]+)/', $title, $match)) {
-            $data['due_at'] = $match[1];
-            $title = trim(preg_replace('/due:[\w.-]+/', '', $title));
-        }
-
-        if (preg_match('/repeat:(daily|weekly|monthly|yearly)/', $title, $match)) {
-            if (isset($data['due_at'])) {
-                $data['recurrence_frequency'] = $match[1];
-            }
-            $title = trim(preg_replace('/repeat:(daily|weekly|monthly|yearly)/', '', $title));
-        }
-
-        if (preg_match('/link:(\S+)/', $title, $match)) {
-            $data['link'] = $match[1];
-            $title = trim(preg_replace('/link:\S+/', '', $title));
-        }
-
-        $data['title'] = $title;
-
-        return $data;
+        return $todoService->create($user, $todoService->parse($user, ['title' => $metadata['title'] ?? $content]));
     }
 
     private function commitMusic(User $user, string $url): mixed

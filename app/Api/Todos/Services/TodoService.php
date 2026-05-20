@@ -2,7 +2,9 @@
 
 namespace App\Api\Todos\Services;
 
+use App\Api\Tags\Models\Tag;
 use App\Api\Todos\Models\Todo;
+use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Models\TodoSubtask;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
@@ -53,6 +55,105 @@ class TodoService
         return $todo;
     }
 
+    public function parse(User $user, array $data): array
+    {
+        $data['priority'] ??= 'medium';
+
+        if (isset($data['due_at'])) {
+            $data['due_at'] = $this->resolveDate($data['due_at']);
+        }
+
+        $input = $data['title'] ?? '';
+
+        if (preg_match_all('/#([\w-]+)/', $input, $matches)) {
+            $parsedTagIds = [];
+            foreach ($matches[1] as $tagName) {
+                $tag = Tag::forUser($user->id)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($tagName)])
+                    ->first()
+                    ?? Tag::create(['name' => $tagName, 'user_id' => $user->id]);
+                $parsedTagIds[] = $tag->id;
+                $input = trim(str_replace('#' . $tagName, '', $input));
+            }
+            $data['tags'] = array_unique(array_merge($data['tags'] ?? [], $parsedTagIds));
+        }
+
+        if (!isset($data['category_id'])) {
+            if (preg_match('/\/([\w-]+)/', $input, $match)) {
+                $category = TodoCategory::forUser($user->id)
+                    ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
+                    ->first();
+                if ($category) {
+                    $data['category_id'] = $category->id;
+                    $input = trim(str_replace('/' . $match[1], '', $input));
+                }
+            }
+        }
+
+        if (preg_match('/due:([\w.-]+)/', $input, $match)) {
+            $data['due_at'] = $this->resolveDate($match[1]);
+            $input = trim(preg_replace('/due:[\w.-]+/', '', $input));
+        }
+
+        if (preg_match('/repeat:(daily|weekly|monthly|yearly)/', $input, $match)) {
+            if (isset($data['due_at'])) {
+                $data['recurrence_frequency'] = $match[1];
+            }
+            $input = trim(preg_replace('/repeat:(daily|weekly|monthly|yearly)/', '', $input));
+        }
+
+        if (preg_match('/link:(\S+)/', $input, $match)) {
+            $data['link'] = $match[1];
+            $input = trim(preg_replace('/link:\S+/', '', $input));
+        }
+
+        $data['title'] = $input;
+
+        if (empty($data['due_at'])) {
+            $data['recurrence_frequency'] = null;
+            $data['recurrence_ends_at'] = null;
+        }
+
+        return $data;
+    }
+
+    private function resolveDate(string $value): string
+    {
+        $relative = match (strtolower($value)) {
+            'today'    => now()->toDateString(),
+            'tomorrow' => now()->addDay()->toDateString(),
+            default    => null,
+        };
+
+        if ($relative) {
+            return $relative;
+        }
+
+        $formats = ['d.m.Y', 'd.m.y', 'Y-m-d', 'y-m-d'];
+
+        foreach ($formats as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $value);
+
+                if (strlen($format) === 5) {
+                    $currentYear = now()->year;
+                    $twoDigitYear = (int) $date->format('y');
+                    $fullYear = (int) ($currentYear / 100) * 100 + $twoDigitYear;
+                    if ($fullYear < $currentYear) {
+                        $fullYear += 100;
+                    }
+                    $date->setYear($fullYear);
+                }
+
+                return $date->format('Y-m-d');
+            } catch (\Exception) {
+                continue;
+            }
+        }
+
+        return $value;
+    }
+
     public function create(User $user, array $data): Todo
     {
         $data['user_id'] = $user->id;
@@ -72,6 +173,18 @@ class TodoService
 
     public function update(Todo $todo, array $data): Todo
     {
+        if (isset($data['due_at'])) {
+            $data['due_at'] = $this->resolveDate($data['due_at']);
+        }
+
+        if (array_key_exists('description', $data) && empty($data['description'])) {
+            $data['description'] = null;
+        }
+
+        if (array_key_exists('link', $data) && empty($data['link'])) {
+            $data['link'] = null;
+        }
+
         $completing = isset($data['is_completed']) && $data['is_completed'] === true && !$todo->is_completed;
 
         if ($completing) {
