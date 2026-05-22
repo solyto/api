@@ -272,7 +272,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('', [DevRequestController::class, 'index']);
         Route::post('', [DevRequestController::class, 'store']);
         Route::put('{devRequest}', [DevRequestController::class, 'update']);
-        Route::delete('{devRequest}', [DevRequestController::class, 'destroy']);
         Route::post('{devRequest}/vote', [DevRequestController::class, 'vote']);
         Route::get('{devRequest}/comments', [DevRequestController::class, 'listComments']);
         Route::post('{devRequest}/comments', [DevRequestController::class, 'storeComment']);
