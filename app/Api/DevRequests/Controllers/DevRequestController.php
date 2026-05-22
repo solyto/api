@@ -160,40 +160,6 @@ class DevRequestController
     }
 
     /**
-     * @OA\Delete(
-     *     path="/api/dev-requests/{devRequest}",
-     *     operationId="devRequestDestroy",
-     *     tags={"Dev Requests"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Parameter(
-     *         name="devRequest",
-     *         in="path",
-     *         required=true,
-     *
-     *         @OA\Schema(type="integer")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Dev Request deleted successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Dev Request deleted successfully.")
-     *         )
-     *     )
-     * )
-     */
-    public function destroy(DevRequest $devRequest): JsonResponse
-    {
-        $this->devRequestService->destroy($devRequest);
-
-        return ApiResponse::success(null, 'Dev Request deleted successfully.');
-    }
-
-    /**
      * @OA\Post(
      *     path="/api/dev-requests/{devRequest}/vote",
      *     operationId="devRequestVote",
