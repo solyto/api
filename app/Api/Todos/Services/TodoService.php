@@ -82,11 +82,10 @@ class TodoService
             if (preg_match('/\/([\w-]+)/', $input, $match)) {
                 $category = TodoCategory::forUser($user->id)
                     ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
-                    ->first();
-                if ($category) {
-                    $data['category_id'] = $category->id;
-                    $input = trim(str_replace('/' . $match[1], '', $input));
-                }
+                    ->first()
+                    ?? TodoCategory::create(['title' => $match[1], 'user_id' => $user->id]);
+                $data['category_id'] = $category->id;
+                $input = trim(str_replace('/' . $match[1], '', $input));
             }
         }
 
