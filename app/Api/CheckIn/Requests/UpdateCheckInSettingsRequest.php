@@ -8,7 +8,7 @@ class UpdateCheckInSettingsRequest extends FormRequest
 {
     public function rules(): array
     {
-        $validTrackers = implode(',', ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount', 'menstruation', 'alcohol', 'smoking']);
+        $validTrackers = implode(',', ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount', 'menstruation', 'alcohol', 'smoking', 'social_life']);
         $validSports = implode(',', ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder', 'yoga']);
 
         return [
