@@ -2,6 +2,7 @@
 
 namespace App\Api\Feeds\Services;
 
+use Illuminate\Support\Facades\Http;
 use SimplePie\SimplePie;
 
 class FeedReader {
@@ -75,6 +76,37 @@ class FeedReader {
             if ($html && preg_match('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $html, $matches)) {
                 return $matches[1];
             }
+        }
+
+        return $this->extractOgImage($item->get_link());
+    }
+
+    private function extractOgImage(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(5)->withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (compatible; FeedBot/1.0)',
+            ])->get($url);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $html = $response->body();
+
+            if (preg_match('/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\'][^>]*>/i', $html, $matches)) {
+                return $matches[1];
+            }
+
+            if (preg_match('/<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\'][^>]*>/i', $html, $matches)) {
+                return $matches[1];
+            }
+        } catch (\Throwable) {
+            return null;
         }
 
         return null;
