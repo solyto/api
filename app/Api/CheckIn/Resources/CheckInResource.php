@@ -22,6 +22,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="menstruation", type="boolean", nullable=true),
  *     @OA\Property(property="alcohol", type="boolean", nullable=true),
  *     @OA\Property(property="smoking", type="boolean", nullable=true),
+ *     @OA\Property(property="social_life", type="integer", nullable=true),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
@@ -49,6 +50,7 @@ class CheckInResource extends JsonResource
             'menstruation' => $this->menstruation,
             'alcohol' => $this->alcohol,
             'smoking' => $this->smoking,
+            'social_life' => $this->social_life,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

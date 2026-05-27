@@ -32,6 +32,7 @@ class CheckIn extends Model
         'menstruation',
         'alcohol',
         'smoking',
+        'social_life',
         'user_id',
     ];
 

@@ -21,6 +21,7 @@ class StoreCheckInRequest extends FormRequest
             'menstruation' => 'sometimes|nullable|in:1,2,3,4,5',
             'alcohol' => 'sometimes|nullable|in:1,2,3,4,5',
             'smoking' => 'sometimes|nullable|in:1,2,3,4,5',
+            'social_life' => 'sometimes|nullable|in:1,2,3,4,5',
         ];
     }
 }

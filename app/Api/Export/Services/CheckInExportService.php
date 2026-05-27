@@ -14,7 +14,7 @@ class CheckInExportService
         $handle = fopen($path, 'w');
         fputcsv($handle, [
             'Date', 'Mood', 'Water', 'Sports', 'Sleep', 'Dreams',
-            'Work', 'Food Quality', 'Food Amount', 'Menstruation', 'Alcohol', 'Smoking',
+            'Work', 'Food Quality', 'Food Amount', 'Menstruation', 'Alcohol', 'Smoking', 'Social Life',
         ]);
 
         foreach ($checkIns as $checkIn) {
@@ -31,6 +31,7 @@ class CheckInExportService
                 $checkIn->menstruation,
                 $checkIn->alcohol,
                 $checkIn->smoking,
+                $checkIn->social_life,
             ]);
         }
 
