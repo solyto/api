@@ -67,6 +67,7 @@ class TodoService
 
         if (preg_match_all('/#([\w-]+)/', $input, $matches)) {
             $parsedTagIds = [];
+
             foreach ($matches[1] as $tagName) {
                 $tag = Tag::forUser($user->id)
                     ->whereRaw('LOWER(name) = ?', [strtolower($tagName)])
@@ -75,17 +76,19 @@ class TodoService
                 $parsedTagIds[] = $tag->id;
                 $input = trim(str_replace('#' . $tagName, '', $input));
             }
+
             $data['tags'] = array_unique(array_merge($data['tags'] ?? [], $parsedTagIds));
         }
 
         if (!isset($data['category_id'])) {
-            if (preg_match('/\/([\w-]+)/', $input, $match)) {
+            if (preg_match('/^\s?\/([\w\/-]+)/', $input, $match)) {
                 $category = TodoCategory::forUser($user->id)
                     ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
                     ->first()
                     ?? TodoCategory::create(['title' => $match[1], 'user_id' => $user->id]);
+
                 $data['category_id'] = $category->id;
-                $input = trim(str_replace('/' . $match[1], '', $input));
+                $input = trim(str_replace($match[0], '', $input));
             }
         }
 
