@@ -45,6 +45,7 @@ use App\Api\Todos\Controllers\TodoCategoryController;
 use App\Api\Todos\Controllers\TodoController;
 use App\Api\Todos\Controllers\TodoWorkspaceController;
 use App\Api\Users\Controllers\AuthController;
+use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\FriendController;
 use App\Api\Users\Controllers\NotificationController;
 use App\Api\Users\Controllers\UserController;
@@ -71,6 +72,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('throttle:auth-login')->post('verify', [AuthController::class, 'verify']);
         Route::middleware('throttle:auth-password-reset')->post('forgot-password', [AuthController::class, 'forgotPassword']);
         Route::middleware('throttle:auth-password-reset')->post('reset-password', [AuthController::class, 'resetPassword']);
+        Route::middleware('throttle:auth-passkey')->post('passkey/authenticate-options', [PasskeyController::class, 'authenticationOptions']);
+        Route::middleware('throttle:auth-passkey')->post('passkey/authenticate', [PasskeyController::class, 'authenticate']);
     });
 });
 
@@ -81,6 +84,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('tokens', [AuthController::class, 'tokens']);
         Route::post('revoke-token', [AuthController::class, 'revokeToken']);
+        Route::prefix('passkeys')->group(function () {
+            Route::post('register-options', [PasskeyController::class, 'registerOptions']);
+            Route::post('register', [PasskeyController::class, 'register']);
+            Route::get('', [PasskeyController::class, 'index']);
+            Route::put('{passkey}', [PasskeyController::class, 'update']);
+            Route::delete('{passkey}', [PasskeyController::class, 'destroy']);
+        });
     });
 
     Route::prefix('users')->group(function () {
