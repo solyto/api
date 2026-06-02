@@ -27,7 +27,7 @@ class LoginRequest extends FormRequest
 
         $user = Auth::user();
 
-        if (!$user->email_verified_at) {
+        if (config('auth.policy.confirmation') && !$user->email_verified_at) {
             throw ValidationException::withMessages([
                 'email' => ['Please verify your email address first.'],
             ]);

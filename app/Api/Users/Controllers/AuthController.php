@@ -3,18 +3,24 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Requests\ForgotPasswordRequest;
 use App\Api\Users\Requests\LoginRequest;
 use App\Api\Users\Requests\RegisterRequest;
+use App\Api\Users\Requests\ResetPasswordRequest;
 use App\Api\Users\Requests\VerifyRequest;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\AuthService;
+use App\Api\Users\Services\PasswordService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class AuthController
 {
-    public function __construct(private readonly AuthService $authService) {}
+    public function __construct(
+        private readonly AuthService $authService,
+        private readonly PasswordService $passwordService,
+    ) {}
 
     /**
      * @OA\Post(
@@ -330,5 +336,27 @@ class AuthController
         }
 
         return ApiResponse::success(null, 'Token revoked successfully');
+    }
+
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $this->passwordService->requestReset($request->validated('email'));
+
+        return ApiResponse::success(null, 'If an account exists for this email, a password reset link has been sent.');
+    }
+
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        try {
+            $this->passwordService->resetPassword(
+                $request->validated('token'),
+                $request->validated('email'),
+                $request->validated('password'),
+            );
+        } catch (\RuntimeException $e) {
+            return ApiResponse::error('This reset link is invalid.', 401, ['invalid_token']);
+        }
+
+        return ApiResponse::success(null, 'Password reset successfully. You can now log in.');
     }
 }
