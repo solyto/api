@@ -51,6 +51,14 @@ class CalendarService
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 
+    public function updateOrder(User $user, array $orderedIds): void
+    {
+        foreach ($orderedIds as $index => $instanceId) {
+            $this->dav->calendars()->updateOrder((int) $instanceId, $index);
+        }
+        $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
+    }
+
     public function destroy(User $user, CalendarDTO $calendar): void
     {
         $this->dav->calendars()->delete($calendar);

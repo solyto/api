@@ -18,7 +18,7 @@ class CalendarDTO
         public ?string $uri = null,
         public ?string $shareOwner = null,
         public bool $isShared = false,
-        public bool $isDefault = false,
+        public int $order = 0,
         public ?string $inviteStatus = null,
         public ?string $shareToken = null,
     ) {}
@@ -47,7 +47,7 @@ class CalendarDTO
             uri: $data['uri'] ?? null,
             shareOwner: $data['share-resource-uri'] ?? null,
             isShared: !empty($data['share-access']) && $data['share-access'] > 1,
-            isDefault: $data['uri'] === 'default',
+            order: (int) ($data['{http://apple.com/ns/ical/}calendar-order'] ?? 0),
             inviteStatus: $inviteStatus,
             shareToken: $data['share-href'] ?? null,
         );
@@ -68,7 +68,6 @@ class CalendarDTO
             uri: null,
             shareOwner: null,
             isShared: false,
-            isDefault: $data['is_default'] ?? false
         );
     }
 
@@ -86,7 +85,6 @@ class CalendarDTO
             uri: null,
             shareOwner: null,
             isShared: false,
-            isDefault: $data['is_default'] ?? false
         );
     }
 }

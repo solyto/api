@@ -152,9 +152,21 @@ SQL
         parent::createCalendar($principalUri, Str::slug($dto->displayName), $calendar);
     }
 
-    public function updateCalendarCustom(CalendarDTO $dto): ?string
+    public function updateCalendarCustom(CalendarDTO $dto): void
     {
-        return parent::updateCalendar();
+        $propPatch = new \Sabre\DAV\PropPatch([
+            '{http://apple.com/ns/ical/}calendar-color' => $dto->color,
+        ]);
+        parent::updateCalendar([$dto->calendarId, $dto->instanceId], $propPatch);
+        $propPatch->commit();
+    }
+
+    public function updateCalendarOrderCustom(int $instanceId, int $order): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE ' . $this->calendarInstancesTableName . ' SET calendarorder = ? WHERE id = ?'
+        );
+        $stmt->execute([$order, $instanceId]);
     }
 
     public function deleteCalendarCustom(CalendarDTO $calendar): void

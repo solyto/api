@@ -158,7 +158,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('{yearMonth}', [CalendarController::class, 'listEvents']);
         });
 
-        Route::put('{instanceId}', [CalendarController::class, 'updateCalendar']);
+        Route::put('order', [CalendarController::class, 'updateCalendarsOrder']);
+        Route::put('{instanceId}', [CalendarController::class, 'updateCalendarColor']);
         Route::delete('{instanceId}', [CalendarController::class, 'destroyCalendar']);
         Route::delete('{instanceId}/unsubscribe', [CalendarController::class, 'unsubscribeFromCalendar']);
 
