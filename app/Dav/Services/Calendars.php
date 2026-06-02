@@ -64,7 +64,6 @@ class Calendars
             syncToken  : null,
             uri        : null,
             isShared   : false,
-            isDefault  : true,
         );
 
         return $this->create($user, $default);
@@ -81,6 +80,11 @@ class Calendars
         $this->backend->updateCalendarCustom($dto);
 
         return $this->get($user, $calendarId);
+    }
+
+    public function updateOrder(int $instanceId, int $order): void
+    {
+        $this->backend->updateCalendarOrderCustom($instanceId, $order);
     }
 
     public function delete(CalendarDTO $calendar): void

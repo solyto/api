@@ -109,7 +109,7 @@ class CalendarController
     /**
      * @OA\Put(
      *     path="/api/calendars/{instanceId}",
-     *     operationId="updateCalendar",
+     *     operationId="updateCalendarColor",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
      *
@@ -148,7 +148,7 @@ class CalendarController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function updateCalendar(UpdateCalendarRequest $request, int $instanceId): JsonResponse
+    public function updateCalendarColor(UpdateCalendarRequest $request, int $instanceId): JsonResponse
     {
         $calendar = $this->calendarService->get($request->user(), $instanceId);
 
@@ -168,37 +168,15 @@ class CalendarController
         return ApiResponse::success(new CalendarResource($calendar), 'Calendar updated successfully.');
     }
 
-    /**
-     * @OA\Delete(
-     *     path="/api/calendars/{instanceId}",
-     *     operationId="destroyCalendar",
-     *     tags={"Calendars"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\Parameter(
-     *         name="instanceId",
-     *         in="path",
-     *         required=true,
-     *         description="Calendar ID",
-     *
-     *         @OA\Schema(type="integer")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Calendar deleted successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar deleted successfully.")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Calendar not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
-     * )
-     */
+    public function updateCalendarsOrder(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['order' => 'required|array', 'order.*' => 'integer']);
+
+        $this->calendarService->updateOrder($request->user(), $validated['order']);
+
+        return ApiResponse::success(null, 'Calendar order updated successfully.');
+    }
+
     public function destroyCalendar(Request $request, int $instanceId): JsonResponse
     {
         $calendar = $this->calendarService->get($request->user(), $instanceId);

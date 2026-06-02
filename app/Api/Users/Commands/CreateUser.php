@@ -11,7 +11,7 @@ use function Laravel\Prompts\select;
 
 class CreateUser extends Command
 {
-    protected $signature = 'app:user:create';
+    protected $signature = 'app:users:create';
     protected $description = 'Create a new user';
 
     public function handle(): void
