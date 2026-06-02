@@ -68,6 +68,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('throttle:auth-register')->post('register', [AuthController::class, 'register']);
         Route::middleware('throttle:auth-login')->post('login', [AuthController::class, 'login']);
         Route::middleware('throttle:auth-login')->post('verify', [AuthController::class, 'verify']);
+        Route::middleware('throttle:auth-password-reset')->post('forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::middleware('throttle:auth-password-reset')->post('reset-password', [AuthController::class, 'resetPassword']);
     });
 });
 

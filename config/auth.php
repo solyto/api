@@ -112,4 +112,10 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'policy' => [
+        'min_length' => env('PASSWORD_MIN_LENGTH', 12),
+        'uncompromised' => env('PASSWORD_UNCOMPROMISED', true),
+        'confirmation' => env('EMAIL_CONFIRMATION', true),
+    ]
+
 ];

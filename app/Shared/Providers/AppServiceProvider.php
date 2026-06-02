@@ -35,7 +35,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Password::defaults(fn () => Password::min(12)->uncompromised());
+        Password::defaults(fn () => Password::min(config('auth.policy.min_length'))
+                                            ->when(config('auth.policy.uncompromised'), fn ($rule) => $rule->uncompromised()));
+
         User::observe(UserObserver::class);
         Gate::policy(User::class, UserPolicy::class);
 
@@ -44,6 +46,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('auth-register', function (Request $request) {
+            return Limit::perHour(10)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-password-reset', function (Request $request) {
             return Limit::perHour(10)->by($request->ip());
         });
     }
