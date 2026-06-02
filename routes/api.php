@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Api\Calendars\Controllers\CalendarController;
+use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\Clipboard\Controllers\ClipboardController;
@@ -156,6 +157,15 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::prefix('events')->group(function () {
             Route::get('widget', [CalendarController::class, 'listWidgetEvents']);
             Route::get('{yearMonth}', [CalendarController::class, 'listEvents']);
+
+            Route::prefix('{eventId}/attachments')->group(function () {
+                Route::get('todos', [EventAttachmentController::class, 'getTodoAttachments']);
+                Route::post('todos', [EventAttachmentController::class, 'attachTodo']);
+                Route::delete('todos/{todoId}', [EventAttachmentController::class, 'detachTodo']);
+                Route::get('notes', [EventAttachmentController::class, 'getNoteAttachments']);
+                Route::post('notes', [EventAttachmentController::class, 'attachNote']);
+                Route::delete('notes/{noteId}', [EventAttachmentController::class, 'detachNote']);
+            });
         });
 
         Route::put('order', [CalendarController::class, 'updateCalendarsOrder']);

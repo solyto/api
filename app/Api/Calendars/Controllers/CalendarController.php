@@ -12,6 +12,7 @@ use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Calendars\Resources\CalendarResource;
 use App\Api\Calendars\Resources\EventResource;
 use App\Api\Calendars\Services\CalendarService;
+use App\Api\Calendars\Services\EventAttachmentService;
 use App\Api\HandlesApiAuth;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
@@ -22,7 +23,10 @@ class CalendarController
 {
     use HandlesApiAuth;
 
-    public function __construct(private readonly CalendarService $calendarService) {}
+    public function __construct(
+        private readonly CalendarService $calendarService,
+        private readonly EventAttachmentService $attachmentService,
+    ) {}
 
     /**
      * @OA\Get(
@@ -505,6 +509,8 @@ class CalendarController
         if (! $this->calendarService->destroyEvent($request->user(), $calendar, $event)) {
             return ApiResponse::error('Error deleting event', 500);
         }
+
+        $this->attachmentService->deleteAllForEvent($request->user(), $event->id);
 
         return ApiResponse::success(null, 'Event deleted successfully.');
     }
