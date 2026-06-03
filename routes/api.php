@@ -62,7 +62,7 @@ Route::prefix('v1')->group(function () {
         return response()->json([
             'status' => 'OK',
             'timestamp' => now(),
-            'version' => '1.0.0'
+            'version' => env('API_VERSION', '0.0.0'),
         ]);
     });
 
