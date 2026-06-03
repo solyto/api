@@ -5,6 +5,7 @@ namespace App\Api\Users\Services;
 use App\Api\Users\Mails\UserVerification;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
+use App\Shared\Enums\AuthPlatformEnum;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -44,10 +45,10 @@ class AuthService
         return $user;
     }
 
-    public function createToken(User $user): array
+    public function createToken(User $user, AuthPlatformEnum $platform = AuthPlatformEnum::WEB): array
     {
-        $expiresAt = now()->addDays(7);
-        $token = $user->createToken('auth-token', expiresAt: $expiresAt)->plainTextToken;
+        $expiresAt = now()->addDays($platform->tokenExpiryDays());
+        $token = $user->createToken("auth-token-{$platform->value}", expiresAt: $expiresAt)->plainTextToken;
 
         return [
             'token' => $token,
@@ -68,9 +69,13 @@ class AuthService
 
     public function refreshToken(User $user): array
     {
+        $tokenName = $user->currentAccessToken()->name;
+        $platform = AuthPlatformEnum::tryFrom(Str::replace('auth-token-', '', $tokenName))
+            ?? AuthPlatformEnum::WEB;
+
         $user->currentAccessToken()->delete();
 
-        return $this->createToken($user);
+        return $this->createToken($user, $platform);
     }
 
     public function verify(array $data): bool

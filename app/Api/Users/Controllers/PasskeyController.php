@@ -8,6 +8,7 @@ use App\Api\Users\Requests\PasskeyAuthenticateRequest;
 use App\Api\Users\Requests\PasskeyRegisterRequest;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\PasskeyService;
+use App\Shared\Enums\AuthPlatformEnum;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,9 +25,11 @@ class PasskeyController
     public function authenticate(PasskeyAuthenticateRequest $request): JsonResponse
     {
         try {
+            $platform = AuthPlatformEnum::tryFrom($request->input('platform') ?? '') ?? AuthPlatformEnum::WEB;
             $result = $this->passkeyService->authenticate(
                 $request->validated('response'),
-                $request->ip()
+                $request->ip(),
+                $platform
             );
         } catch (\RuntimeException $e) {
             return ApiResponse::error('Authentication failed.', 401);

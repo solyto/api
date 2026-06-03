@@ -13,7 +13,8 @@ class LoginRequest extends FormRequest
     {
         return [
             'email' => 'required|string|email',
-            'password' => 'required|string'
+            'password' => 'required|string',
+            'platform' => 'nullable|string|in:web,mobile,desktop',
         ];
     }
 
