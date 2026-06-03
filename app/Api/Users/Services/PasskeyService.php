@@ -4,6 +4,7 @@ namespace App\Api\Users\Services;
 
 use App\Api\Users\Models\Passkey;
 use App\Api\Users\Models\User;
+use App\Shared\Enums\AuthPlatformEnum;
 use Illuminate\Support\Facades\Cache;
 
 class PasskeyService
@@ -135,7 +136,7 @@ class PasskeyService
         ];
     }
 
-    public function authenticate(array $response, string $ip): array
+    public function authenticate(array $response, string $ip, AuthPlatformEnum $platform = AuthPlatformEnum::WEB): array
     {
         $storedChallenge = Cache::get('webauthn_auth_' . $ip);
         if (!$storedChallenge) {
@@ -199,7 +200,7 @@ class PasskeyService
         Cache::forget('webauthn_auth_' . $ip);
 
         $user = $passkey->user->load(['profile', 'settings']);
-        $tokenData = $this->authService->createToken($user);
+        $tokenData = $this->authService->createToken($user, $platform);
 
         return ['user' => $user, 'token_data' => $tokenData];
     }

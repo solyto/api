@@ -11,6 +11,7 @@ use App\Api\Users\Requests\VerifyRequest;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\AuthService;
 use App\Api\Users\Services\PasswordService;
+use App\Shared\Enums\AuthPlatformEnum;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -112,7 +113,8 @@ class AuthController
             return ApiResponse::unauthorized();
         }
 
-        $tokenData = $this->authService->createToken($user);
+        $platform = AuthPlatformEnum::tryFrom($request->input('platform') ?? '') ?? AuthPlatformEnum::WEB;
+        $tokenData = $this->authService->createToken($user, $platform);
 
         return ApiResponse::success(
             array_merge(['user' => new UserResource($user)], $tokenData),

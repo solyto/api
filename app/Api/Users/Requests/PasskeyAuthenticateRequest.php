@@ -10,6 +10,7 @@ class PasskeyAuthenticateRequest extends FormRequest
     {
         return [
             'response' => 'required|array',
+            'platform' => 'nullable|string|in:web,mobile,desktop',
         ];
     }
 }
