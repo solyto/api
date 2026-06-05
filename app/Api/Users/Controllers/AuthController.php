@@ -342,7 +342,7 @@ class AuthController
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $this->passwordService->requestReset($request->validated('email'));
+        $this->passwordService->requestReset($request->validated('email'), $request->validated('platform'));
 
         return ApiResponse::success(null, 'If an account exists for this email, a password reset link has been sent.');
     }

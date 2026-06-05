@@ -10,6 +10,7 @@ class ForgotPasswordRequest extends FormRequest
     {
         return [
             'email' => 'required|string|email|max:255',
+            'platform' => 'sometimes|nullable|string|in:web,mobile,desktop',
         ];
     }
 }

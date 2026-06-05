@@ -17,12 +17,16 @@ class PasswordResetMail extends Mailable
         private readonly User $user,
         private readonly string $token,
         private readonly string $email,
-    ) {}
+        private readonly string $platform = 'web',
+        private readonly string $language = 'en',
+    ) {
+        $this->locale = $language;
+    }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Reset your Solyto password',
+            subject: __('mail.reset_subject'),
         );
     }
 
@@ -31,9 +35,10 @@ class PasswordResetMail extends Mailable
         return new Content(
             view: 'mails.password-reset',
         )->with([
-            'name'  => $this->user->name,
-            'token' => $this->token,
-            'email' => urlencode($this->email),
+            'name'     => $this->user->name,
+            'token'    => $this->token,
+            'email'    => urlencode($this->email),
+            'platform' => $this->platform,
         ]);
     }
 

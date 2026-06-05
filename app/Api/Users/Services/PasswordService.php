@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Password;
 
 class PasswordService
 {
-    public function requestReset(string $email): void
+    public function requestReset(string $email, ?string $platform = null): void
     {
         $user = User::where('email', $email)->first();
 
@@ -18,9 +18,13 @@ class PasswordService
             return;
         }
 
-        $token = Password::broker()->createToken($user);
-
-        Mail::to($user->email)->send(new PasswordResetMail($user, $token, $user->email));
+        Mail::to($user->email)->send(new PasswordResetMail(
+            user: $user,
+            token: Password::broker()->createToken($user),
+            email: $user->email,
+            platform: $platform ?? 'web',
+            language: $user->settings?->language ?? 'en'
+        ));
     }
 
     public function resetPassword(string $token, string $email, string $password): void
