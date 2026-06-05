@@ -40,7 +40,7 @@ class AuthService
             throw new \RuntimeException('Failed to create verification token.');
         }
 
-        Mail::to($user->email)->send(new UserVerification($user, $verificationToken));
+        Mail::to($user->email)->send(new UserVerification($user, $verificationToken, $data['platform'] ?? 'web', $data['language'] ?? 'en'));
 
         return $user;
     }

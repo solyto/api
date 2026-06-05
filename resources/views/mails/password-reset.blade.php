@@ -6,12 +6,13 @@
 
 <div style="width: 100%; height: 4px; background: linear-gradient(90deg,rgba(20, 165, 205, 1) 0%, rgba(97, 217, 106, 1) 100%); content: ' ';"></div>
 <div style="padding: 5px;">
-    <h3 style="margin-top: 20px;">Hello, {{ $name }}!</h3>
-    <p>Click the button below to reset your Solyto password. This link expires in 60 minutes and can only be used once.</p>
+    <h3 style="margin-top: 20px;">{{ __('mail.greeting', ['name' => $name]) }}</h3>
+    <p>{{ __('mail.reset_intro') }}</p>
     <br>
-    <a href="{{ config('app.frontend_url') }}/auth/reset-password?token={{ $token }}&email={{ $email }}" style="padding: 10px; background-color: #14a5cd; color: #ffffff; font-weight: bold; font-size: 16px; text-decoration: none;">Reset Password</a>
+    @php $resetUrl = config('app.frontend_url') . '/auth/reset-password?token=' . $token . '&email=' . $email . ($platform !== 'web' ? '&platform=' . $platform : ''); @endphp
+    <a href="{{ $resetUrl }}" style="padding: 10px; background-color: #14a5cd; color: #ffffff; font-weight: bold; font-size: 16px; text-decoration: none;">{{ __('mail.reset_button') }}</a>
     <br><br><br>
-    If you did not request a password reset, you can safely ignore this email.
+    {{ __('mail.reset_ignore') }}
     <br><br>
-    If you're having trouble clicking the button, copy and paste this URL into your browser: <a href="{{ config('app.frontend_url') }}/auth/reset-password?token={{ $token }}&email={{ $email }}">{{ config('app.frontend_url') }}/auth/reset-password?token={{ $token }}&email={{ $email }}</a>
+    {{ __('mail.reset_trouble') }} <a href="{{ $resetUrl }}">{{ $resetUrl }}</a>
 </div>

@@ -16,29 +16,25 @@ class UserVerification extends Mailable
 
     private readonly User $user;
     private readonly VerificationToken $verificationToken;
+    private readonly string $platform;
+    private readonly string $language;
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct(User $user, VerificationToken $verificationToken)
+    public function __construct(User $user, VerificationToken $verificationToken, string $platform = 'web', string $language = 'en')
     {
         $this->user = $user;
         $this->verificationToken = $verificationToken;
+        $this->platform = $platform;
+        $this->language = $language;
+        $this->locale = $language;
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Confirm your mail address',
+            subject: __('mail.verification_subject'),
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -47,14 +43,10 @@ class UserVerification extends Mailable
             'user_id' => $this->verificationToken->user_id,
             'name' => $this->user->name,
             'token' => $this->verificationToken->token,
+            'platform' => $this->platform,
         ]);
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

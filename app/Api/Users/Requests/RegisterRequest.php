@@ -14,6 +14,7 @@ class RegisterRequest extends FormRequest
             'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Password::defaults()],
             'language' => 'sometimes|nullable|string|in:en,de,fr,es',
+            'platform' => 'sometimes|nullable|string|in:web,mobile,desktop',
         ];
     }
 
