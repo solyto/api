@@ -62,7 +62,8 @@ Route::prefix('v1')->group(function () {
         return response()->json([
             'status' => 'OK',
             'timestamp' => now(),
-            'version' => env('API_VERSION', '0.0.0'),
+            'app' => 'solyto',
+            'version' => env('API_VERSION', '1.0.7'),
         ]);
     });
 
