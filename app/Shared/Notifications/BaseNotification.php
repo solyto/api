@@ -15,6 +15,21 @@ abstract class BaseNotification extends Notification
 
     abstract protected function getNotificationType(): string;
 
+    protected function resolveLocale(object $notifiable): string
+    {
+        $lang = $notifiable->settings?->language;
+        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
+    }
+
+    protected function withLocale(object $notifiable, callable $callback): mixed
+    {
+        $previous = app()->getLocale();
+        app()->setLocale($this->resolveLocale($notifiable));
+        $result = $callback();
+        app()->setLocale($previous);
+        return $result;
+    }
+
     public function via(object $notifiable): array
     {
         $channels = [];
@@ -32,8 +47,9 @@ abstract class BaseNotification extends Notification
             );
         }
 
-        $uiKey = "{$type}_ui";
-        $pushKey = "{$type}_push";
+        $uiKey       = "{$type}_ui";
+        $pushKey     = "{$type}_push";
+        $emailKey    = "{$type}_email";
         $telegramKey = "{$type}_telegram";
 
         if ($settings->$uiKey ?? false) {
@@ -43,8 +59,6 @@ abstract class BaseNotification extends Notification
         if ($settings->$pushKey ?? false) {
             $channels[] = WebPushChannel::class;
         }
-
-        $emailKey = "{$type}_email";
 
         if ($settings->$emailKey ?? false) {
             $channels[] = 'mail';

@@ -25,70 +25,64 @@ class ExportReadyNotification extends BaseNotification
 
     public function toDatabase(object $notifiable): array
     {
-        if ($this->success) {
-            return [
-                'message' => 'Your data export is ready to download.',
-                'export_id' => $this->exportId,
-            ];
-        }
-
-        return [
-            'message' => 'Your data export failed. Please try again later.',
-        ];
-    }
-
-    public function toMail(object $notifiable): MailMessage
-    {
-        if ($this->success) {
-            return (new MailMessage)
-                ->subject('Your Export is Ready')
-                ->greeting('Export Complete')
-                ->line('Your data export is ready to download. The file will be available for 48 hours.')
-                ->action('Download Export', config('app.frontend_url').'/settings?tab=export')
-                ->line('If you did not request this export, please ignore this email.');
-        }
-
-        return (new MailMessage)
-            ->subject('Export Failed')
-            ->greeting('Export Failed')
-            ->line('Your data export could not be completed. Please try again later.')
-            ->action('Open Settings', config('app.frontend_url').'/settings?tab=export');
+        return $this->withLocale($notifiable, fn () => [
+            'title' => $this->success
+                ? __('notifications.export_ready_title')
+                : __('notifications.export_failed_title'),
+            'body'  => $this->success
+                ? __('notifications.export_ready_body')
+                : __('notifications.export_failed_body'),
+            'link'  => '/settings?tab=export',
+        ]);
     }
 
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        if ($this->success) {
-            return (new WebPushMessage)
-                ->title('Export Ready')
-                ->body('Your data export is ready to download.')
-                ->icon(config('app.landing_page_url').'/logo_cut.png')
-                ->action('Download', 'open')
-                ->data([
-                    'url' => config('app.frontend_url').'/settings?tab=export',
-                ]);
-        }
+        return $this->withLocale($notifiable, fn () =>
+            (new WebPushMessage)
+                ->title($this->success
+                    ? __('notifications.export_ready_title')
+                    : __('notifications.export_failed_title'))
+                ->body($this->success
+                    ? __('notifications.export_ready_body')
+                    : __('notifications.export_failed_body'))
+                ->icon(config('app.landing_page_url') . '/logo_cut.png')
+                ->data(['url' => config('app.frontend_url') . '/settings?tab=export'])
+        );
+    }
 
-        return (new WebPushMessage)
-            ->title('Export Failed')
-            ->body('Your data export could not be completed.')
-            ->icon(config('app.landing_page_url').'/logo_cut.png')
-            ->data([
-                'url' => config('app.frontend_url').'/settings?tab=export',
-            ]);
+    public function toMail(object $notifiable): MailMessage
+    {
+        return $this->withLocale($notifiable, fn () => $this->success
+            ? (new MailMessage)
+                ->subject(__('notifications.export_ready_title'))
+                ->greeting(__('notifications.export_ready_title'))
+                ->line(__('notifications.export_ready_body'))
+                ->action(__('notifications.action_download_export'), config('app.frontend_url') . '/settings?tab=export')
+            : (new MailMessage)
+                ->subject(__('notifications.export_failed_title'))
+                ->greeting(__('notifications.export_failed_title'))
+                ->line(__('notifications.export_failed_body'))
+                ->action(__('notifications.action_open_settings'), config('app.frontend_url') . '/settings?tab=export')
+        );
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        $msg = TelegramMessage::create();
-
-        if ($this->success) {
-            $msg->line('Your data export is ready to download.')
-                ->url(config('app.frontend_url').'/settings?tab=export', 'Download Export');
-        } else {
-            $msg->line('Your data export failed. Please try again later.')
-                ->url(config('app.frontend_url').'/settings?tab=export', 'Open Settings');
-        }
-
-        return $msg;
+        return $this->withLocale($notifiable, fn () =>
+            TelegramMessage::create()
+                ->line($this->success
+                    ? __('notifications.export_ready_title')
+                    : __('notifications.export_failed_title'))
+                ->line($this->success
+                    ? __('notifications.export_ready_body')
+                    : __('notifications.export_failed_body'))
+                ->url(
+                    config('app.frontend_url') . '/settings?tab=export',
+                    $this->success
+                        ? __('notifications.action_download_export')
+                        : __('notifications.action_open_settings')
+                )
+        );
     }
 }

@@ -34,7 +34,9 @@ class TestNotification extends Notification
     public function toDatabase(object $notifiable): array
     {
         return [
-            'message' => 'This is a test notification.'
+            'title' => 'Test Notification',
+            'body'  => 'This is a test notification to verify all channels are working.',
+            'link'  => null,
         ];
     }
 
@@ -53,10 +55,7 @@ class TestNotification extends Notification
             ->title('Test Notification')
             ->body('This is a test notification to verify all channels are working.')
             ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action('Open', 'open')
-            ->data([
-                'url' => config('app.frontend_url'),
-            ]);
+            ->data(['url' => config('app.frontend_url')]);
     }
 
     public function toTelegram(object $notifiable): TelegramMessage

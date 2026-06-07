@@ -17,4 +17,9 @@ class NotificationService
         $notification = $user->notifications()->findOrFail($notificationId);
         $notification->markAsRead();
     }
+
+    public function markAllRead(User $user): void
+    {
+        $user->unreadNotifications->markAsRead();
+    }
 }

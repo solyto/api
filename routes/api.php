@@ -354,6 +354,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     Route::prefix('notifications')->group(function () {
         Route::get('', [NotificationController::class, 'list']);
+        Route::post('read-all', [NotificationController::class, 'markAllRead']);
         Route::put('{notification}/read', [NotificationController::class, 'markRead']);
 
         Route::prefix('push')->group(function () {

@@ -36,7 +36,7 @@ class PasswordService
                 $user->tokens()->delete();
             }
         );
-
+DEvRequest
         if ($status !== Password::PASSWORD_RESET) {
             throw new \RuntimeException(match ($status) {
                 Password::INVALID_TOKEN => 'invalid_token',

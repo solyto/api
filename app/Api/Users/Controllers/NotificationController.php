@@ -75,4 +75,31 @@ class NotificationController
 
         return ApiResponse::success([], 'Notification marked as read successfully.');
     }
+
+    /**
+     * @OA\Post(
+     *     path="/v1/notifications/read-all",
+     *     operationId="notificationMarkAllRead",
+     *     summary="Mark all notifications as read",
+     *     tags={"Notifications"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="All notifications marked as read",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items())
+     *         )
+     *     )
+     * )
+     */
+    public function markAllRead(Request $request): JsonResponse
+    {
+        $this->notificationService->markAllRead($request->user());
+
+        return ApiResponse::success([], 'All notifications marked as read.');
+    }
 }
