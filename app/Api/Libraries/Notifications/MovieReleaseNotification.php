@@ -27,47 +27,54 @@ class MovieReleaseNotification extends BaseNotification
 
     public function toDatabase(object $notifiable): array
     {
-        return [
-            'title' => $this->title,
-            'type' => $this->type,
-            'release_date' => $this->releaseDate,
-        ];
+        return $this->withLocale($notifiable, fn () => [
+            'title' => __('notifications.screen_release_title'),
+            'body'  => __('notifications.screen_release_body', [
+                'title' => $this->title,
+                'date'  => $this->releaseDate,
+            ]),
+            'link'  => '/libraries/movies?releases',
+        ]);
     }
 
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        $label = $this->type === 'tv' ? 'New Series Release' : 'New Movie Release';
-
-        return (new WebPushMessage)
-            ->title($label)
-            ->body("{$this->title} is releasing on {$this->releaseDate}.")
-            ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action('View Releases', 'view_releases')
-            ->data([
-                'url' => config('app.frontend_url') . '/libraries/movies?releases',
-                'title' => $this->title,
-                'release_date' => $this->releaseDate,
-            ]);
+        return $this->withLocale($notifiable, fn () =>
+            (new WebPushMessage)
+                ->title(__('notifications.screen_release_title'))
+                ->body(__('notifications.screen_release_body', [
+                    'title' => $this->title,
+                    'date'  => $this->releaseDate,
+                ]))
+                ->icon(config('app.landing_page_url') . '/logo_cut.png')
+                ->data(['url' => config('app.frontend_url') . '/libraries/movies?releases'])
+        );
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        $label = $this->type === 'tv' ? 'New Series Release' : 'New Movie Release';
-
-        return (new MailMessage)
-            ->subject($label)
-            ->greeting($label)
-            ->line("{$this->title} is releasing on {$this->releaseDate}!")
-            ->action('View Releases', config('app.frontend_url') . '/libraries/movies?releases');
+        return $this->withLocale($notifiable, fn () =>
+            (new MailMessage)
+                ->subject(__('notifications.screen_release_title'))
+                ->greeting(__('notifications.screen_release_title'))
+                ->line(__('notifications.screen_release_body', [
+                    'title' => $this->title,
+                    'date'  => $this->releaseDate,
+                ]))
+                ->action(__('notifications.action_view_releases'), config('app.frontend_url') . '/libraries/movies?releases')
+        );
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        $label = $this->type === 'tv' ? 'New Series Release' : 'New Movie Release';
-
-        return TelegramMessage::create()
-            ->line($label)
-            ->line("{$this->title} is releasing on {$this->releaseDate}!")
-            ->url(config('app.frontend_url') . '/libraries/movies?releases', 'View');
+        return $this->withLocale($notifiable, fn () =>
+            TelegramMessage::create()
+                ->line(__('notifications.screen_release_title'))
+                ->line(__('notifications.screen_release_body', [
+                    'title' => $this->title,
+                    'date'  => $this->releaseDate,
+                ]))
+                ->url(config('app.frontend_url') . '/libraries/movies?releases', __('notifications.action_view'))
+        );
     }
 }

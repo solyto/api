@@ -26,38 +26,54 @@ class DevRequestCommentNotification extends BaseNotification
 
     public function toDatabase(object $notifiable): array
     {
-        return [
-            'commenter_name' => $this->commenterName,
-            'dev_request_title' => $this->devRequestTitle,
-        ];
+        return $this->withLocale($notifiable, fn () => [
+            'title' => __('notifications.dev_request_comment_title'),
+            'body'  => __('notifications.dev_request_comment_body', [
+                'commenter' => $this->commenterName,
+                'title'     => $this->devRequestTitle,
+            ]),
+            'link'  => '/dev/requests',
+        ]);
     }
 
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        return (new WebPushMessage)
-            ->title('New Comment on Dev Request')
-            ->body("{$this->commenterName} commented on: {$this->devRequestTitle}")
-            ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action('View Dev Requests', 'view_dev_requests')
-            ->data([
-                'url' => config('app.frontend_url') . '/dev/requests',
-            ]);
+        return $this->withLocale($notifiable, fn () =>
+            (new WebPushMessage)
+                ->title(__('notifications.dev_request_comment_title'))
+                ->body(__('notifications.dev_request_comment_body', [
+                    'commenter' => $this->commenterName,
+                    'title'     => $this->devRequestTitle,
+                ]))
+                ->icon(config('app.landing_page_url') . '/logo_cut.png')
+                ->data(['url' => config('app.frontend_url') . '/dev/requests'])
+        );
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('New Comment on Dev Request')
-            ->greeting('New Comment on Dev Request')
-            ->line("{$this->commenterName} commented on: {$this->devRequestTitle}")
-            ->action('View Dev Requests', config('app.frontend_url') . '/dev/requests');
+        return $this->withLocale($notifiable, fn () =>
+            (new MailMessage)
+                ->subject(__('notifications.dev_request_comment_title'))
+                ->greeting(__('notifications.dev_request_comment_title'))
+                ->line(__('notifications.dev_request_comment_body', [
+                    'commenter' => $this->commenterName,
+                    'title'     => $this->devRequestTitle,
+                ]))
+                ->action(__('notifications.action_view_dev_requests'), config('app.frontend_url') . '/dev/requests')
+        );
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        return TelegramMessage::create()
-            ->line("New Comment on Dev Request")
-            ->line("{$this->commenterName} commented on: {$this->devRequestTitle}")
-            ->url(config('app.frontend_url') . '/dev/requests', 'View');
+        return $this->withLocale($notifiable, fn () =>
+            TelegramMessage::create()
+                ->line(__('notifications.dev_request_comment_title'))
+                ->line(__('notifications.dev_request_comment_body', [
+                    'commenter' => $this->commenterName,
+                    'title'     => $this->devRequestTitle,
+                ]))
+                ->url(config('app.frontend_url') . '/dev/requests', __('notifications.action_view'))
+        );
     }
 }

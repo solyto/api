@@ -25,61 +25,42 @@ class DailyCheckInReminderNotification extends BaseNotification
 
     public function toDatabase(object $notifiable): array
     {
-        return [
-            'date' => $this->date
-        ];
-    }
-
-    private function resolveLocale(object $notifiable): string
-    {
-        $lang = $notifiable->settings?->language ?? 'en';
-        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
+        return $this->withLocale($notifiable, fn () => [
+            'title' => __('notifications.daily_check_in_reminder_title'),
+            'body'  => __('notifications.daily_check_in_reminder_body'),
+            'link'  => "/check-in/date/{$this->date}",
+        ]);
     }
 
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        $previous = app()->getLocale();
-        app()->setLocale($this->resolveLocale($notifiable));
-
-        $message = (new WebPushMessage)
-            ->title(__('bot.check_in_reminder_title'))
-            ->body(__('bot.check_in_reminder_body'))
-            ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action(__('bot.check_in_action'), 'check_in')
-            ->data([
-                'url' => config('app.frontend_url') . "/check-in/date/{$this->date}",
-            ]);
-
-        app()->setLocale($previous);
-        return $message;
+        return $this->withLocale($notifiable, fn () =>
+            (new WebPushMessage)
+                ->title(__('notifications.daily_check_in_reminder_title'))
+                ->body(__('notifications.daily_check_in_reminder_body'))
+                ->icon(config('app.landing_page_url') . '/logo_cut.png')
+                ->data(['url' => config('app.frontend_url') . "/check-in/date/{$this->date}"])
+        );
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        $previous = app()->getLocale();
-        app()->setLocale($this->resolveLocale($notifiable));
-
-        $message = (new MailMessage)
-            ->subject(__('bot.check_in_reminder_title'))
-            ->greeting('Good Evening!')
-            ->line(__('bot.check_in_reminder_body'))
-            ->action(__('bot.check_in_action'), config('app.frontend_url') . "/check-in/date/{$this->date}");
-
-        app()->setLocale($previous);
-        return $message;
+        return $this->withLocale($notifiable, fn () =>
+            (new MailMessage)
+                ->subject(__('notifications.daily_check_in_reminder_title'))
+                ->greeting(__('notifications.greeting_evening'))
+                ->line(__('notifications.daily_check_in_reminder_body'))
+                ->action(__('notifications.action_check_in'), config('app.frontend_url') . "/check-in/date/{$this->date}")
+        );
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        $previous = app()->getLocale();
-        app()->setLocale($this->resolveLocale($notifiable));
-
-        $message = TelegramMessage::create()
-            ->line(__('bot.check_in_reminder_title'))
-            ->line(__('bot.check_in_reminder_body'))
-            ->url(config('app.frontend_url') . "/check-in/date/{$this->date}", __('bot.check_in_action'));
-
-        app()->setLocale($previous);
-        return $message;
+        return $this->withLocale($notifiable, fn () =>
+            TelegramMessage::create()
+                ->line(__('notifications.daily_check_in_reminder_title'))
+                ->line(__('notifications.daily_check_in_reminder_body'))
+                ->url(config('app.frontend_url') . "/check-in/date/{$this->date}", __('notifications.action_check_in'))
+        );
     }
 }

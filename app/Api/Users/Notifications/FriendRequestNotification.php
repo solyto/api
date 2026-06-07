@@ -25,37 +25,42 @@ class FriendRequestNotification extends BaseNotification
 
     public function toDatabase(object $notifiable): array
     {
-        return [
-            'name' => $this->name
-        ];
+        return $this->withLocale($notifiable, fn () => [
+            'title' => __('notifications.friend_request_title'),
+            'body'  => __('notifications.friend_request_body', ['name' => $this->name]),
+            'link'  => '/profile',
+        ]);
     }
 
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        return (new WebPushMessage)
-            ->title('New Friend Request')
-            ->body("You have a new Friend Request from {$this->name}.")
-            ->icon(config('app.landing_page_url') . '/logo_cut.png')
-            ->action('View Friend Requests', 'view_friend_requests')
-            ->data([
-                'url' => config('app.frontend_url') . '/profile',
-            ]);
+        return $this->withLocale($notifiable, fn () =>
+            (new WebPushMessage)
+                ->title(__('notifications.friend_request_title'))
+                ->body(__('notifications.friend_request_body', ['name' => $this->name]))
+                ->icon(config('app.landing_page_url') . '/logo_cut.png')
+                ->data(['url' => config('app.frontend_url') . '/profile'])
+        );
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('New Friend Request')
-            ->greeting('New Friend Request')
-            ->line("You have a new friend request from {$this->name}.")
-            ->action('View Profile', config('app.frontend_url') . '/profile');
+        return $this->withLocale($notifiable, fn () =>
+            (new MailMessage)
+                ->subject(__('notifications.friend_request_title'))
+                ->greeting(__('notifications.friend_request_title'))
+                ->line(__('notifications.friend_request_body', ['name' => $this->name]))
+                ->action(__('notifications.action_view_profile'), config('app.frontend_url') . '/profile')
+        );
     }
 
     public function toTelegram(object $notifiable): TelegramMessage
     {
-        return TelegramMessage::create()
-            ->line("New Friend Request")
-            ->line("You have a new Friend Request from {$this->name}.")
-            ->url(config('app.frontend_url') . '/profile', 'View');
+        return $this->withLocale($notifiable, fn () =>
+            TelegramMessage::create()
+                ->line(__('notifications.friend_request_title'))
+                ->line(__('notifications.friend_request_body', ['name' => $this->name]))
+                ->url(config('app.frontend_url') . '/profile', __('notifications.action_view'))
+        );
     }
 }
