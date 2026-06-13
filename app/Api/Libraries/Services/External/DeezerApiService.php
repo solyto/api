@@ -8,13 +8,10 @@ use Illuminate\Support\Facades\Http;
 
 class DeezerApiService
 {
-    private const SEARCH_ARTIST_URL = 'https://api.deezer.com/search/artist?q=%s';
-
-    private const SEARCH_ALBUM_URL = 'https://api.deezer.com/search/album?q=%s';
-
-    private const GET_ALBUMS_URL = 'https://api.deezer.com/artist/%d/albums';
-
-    private const GET_ALBUM_URL = 'https://api.deezer.com/album/%d';
+    private const string SEARCH_ARTIST_URL = 'https://api.deezer.com/search/artist?q=%s';
+    private const string SEARCH_ALBUM_URL = 'https://api.deezer.com/search/album?q=%s';
+    private const string GET_ALBUMS_URL = 'https://api.deezer.com/artist/%d/albums';
+    private const string GET_ALBUM_URL = 'https://api.deezer.com/album/%d';
 
     public function searchArtists(string $artist): ?array
     {

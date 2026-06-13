@@ -93,7 +93,7 @@ class DevRequestService
         if ($devRequest->created_by_user_id && $devRequest->created_by_user_id !== $user->id) {
             $devRequest->load('createdByUser');
             $devRequest->createdByUser->notify(
-                new DevRequestCommentNotification($user->name, $devRequest->title)
+                new DevRequestCommentNotification($devRequest, $user)
             );
         }
 
