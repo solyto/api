@@ -5,7 +5,7 @@ namespace App\Api\Libraries\Services\External;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
-class TmdbApiService
+class TmdbService
 {
     private const string BASE_URL = 'https://api.themoviedb.org/3';
     public const string IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';

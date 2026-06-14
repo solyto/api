@@ -3,8 +3,8 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
-use App\Api\Libraries\Services\External\BggApiService;
-use App\Api\Libraries\Services\External\SteamApiService;
+use App\Api\Libraries\Services\External\BggService;
+use App\Api\Libraries\Services\External\SteamService;
 use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Libraries\Models\LibraryGameGenre;
 use App\Api\Users\Models\User;
@@ -18,10 +18,8 @@ class LibraryGameService
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
-        private readonly SteamImportService $steamImportService,
-        private readonly BggImportService $bggImportService,
-        private readonly SteamApiService $steamApiService,
-        private readonly BggApiService $bggApiService,
+        private readonly SteamService $steamService,
+        private readonly BggService $bggService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -105,22 +103,22 @@ class LibraryGameService
 
     public function searchOnSteam(string $query): ?array
     {
-        return $this->steamApiService->searchGames($query);
+        return $this->steamService->searchGames($query);
     }
 
     public function searchOnBgg(string $query): ?array
     {
-        return $this->bggApiService->searchGames($query);
+        return $this->bggService->searchGames($query);
     }
 
     public function importFromSteam(string $url): mixed
     {
-        return $this->steamImportService->importGameFromUrl($url);
+        return $this->steamService->importFromUrl($url);
     }
 
     public function importFromBgg(string $url): mixed
     {
-        return $this->bggImportService->importGameFromUrl($url);
+        return $this->bggService->importFromUrl($url);
     }
 
     public function listGenres(User $user): Collection

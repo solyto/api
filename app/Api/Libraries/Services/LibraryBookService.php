@@ -8,8 +8,8 @@ use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
-use App\Api\Libraries\Services\External\GoodreadsCrawler;
-use App\Api\Libraries\Services\External\HardcoverApiService;
+use App\Api\Libraries\Services\External\GoodreadsService;
+use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -24,9 +24,8 @@ class LibraryBookService
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
-        private readonly HardcoverImportService $hardcoverImportService,
-        private readonly HardcoverApiService $hardcoverApiService,
-        private readonly GoodreadsCrawler $goodreadsCrawler,
+        private readonly HardcoverService $hardcoverService,
+        private readonly GoodreadsService $goodreadsService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -149,17 +148,17 @@ class LibraryBookService
 
     public function searchOnHardcover(string $title): ?array
     {
-        return $this->hardcoverApiService->searchBooks($title);
+        return $this->hardcoverService->searchBooks($title);
     }
 
     public function importFromHardcover(string $url): ?HardcoverBookDTO
     {
-        return $this->hardcoverImportService->importBookFromUrl($url);
+        return $this->hardcoverService->importFromUrl($url);
     }
 
     public function importFromGoodreads(string $url): ?GoodreadsBookDTO
     {
-        return $this->goodreadsCrawler->getBookFromUrl($url);
+        return $this->goodreadsService->importFromUrl($url);
     }
 
     public function listGenres(User $user): Collection
