@@ -4,6 +4,7 @@ namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Enums\MusicServiceEnum;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
@@ -136,24 +137,20 @@ class LibraryMusicService
         );
     }
 
-    public function importFromDeezer(string $url): mixed
+    public function search(MusicServiceEnum $service, string $query): mixed
     {
-        return $this->deezerService->importFromUrl($url);
+        return match ($service) {
+            MusicServiceEnum::DEEZER  => $this->deezerService->searchAlbum($query),
+            MusicServiceEnum::DISCOGS => $this->discogsService->search($query),
+        };
     }
 
-    public function importFromDiscogs(string $url): mixed
+    public function import(MusicServiceEnum $service, string $url): mixed
     {
-        return $this->discogsService->importFromUrl($url);
-    }
-
-    public function searchOnDeezer(string $artist, string $album): mixed
-    {
-        return $this->deezerService->searchAlbum($artist, $album);
-    }
-
-    public function searchOnDiscogs(string $query): mixed
-    {
-        return $this->discogsService->search($query);
+        return match ($service) {
+            MusicServiceEnum::DEEZER  => $this->deezerService->importFromUrl($url),
+            MusicServiceEnum::DISCOGS => $this->discogsService->importFromUrl($url),
+        };
     }
 
     public function listGenres(User $user): Collection

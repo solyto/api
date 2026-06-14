@@ -3,12 +3,11 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
-use App\Api\Libraries\Services\LibraryReleases;
+use App\Api\Libraries\Enums\MovieServiceEnum;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMovieGenre;
 use App\Api\Libraries\Services\External\ImdbService;
 use App\Api\Libraries\Services\External\TmdbService;
-use App\Api\Libraries\Services\External\TmdbReleasesService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -16,14 +15,16 @@ use Illuminate\Support\Collection;
 class LibraryMovieService
 {
     private const string CACHE_KEY = 'movies';
+
     private const string CACHE_KEY_RELEASES = 'movie_releases';
+
     private const int CACHE_TTL = 86400;
+
     private const int CACHE_TTL_RELEASES = 604800;
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
         private readonly ImdbService $imdbService,
-        private readonly TmdbReleasesService $tmdbReleasesService,
         private readonly TmdbService $tmdbService,
         private readonly UserCacheService $cache,
     ) {}
@@ -33,7 +34,7 @@ class LibraryMovieService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => LibraryMovie::forUser($user->id)->orderBy('title', 'asc')->with(['genres', 'tags'])->get()
+            fn () => LibraryMovie::forUser($user->id)->orderBy('title', 'asc')->with(['genres', 'tags'])->get()
         );
     }
 
@@ -48,7 +49,7 @@ class LibraryMovieService
     {
         $data['user_id'] = $user->id;
 
-        if (!empty($data['cover_path'])) {
+        if (! empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($data['user_id'], $data['cover_path'], LibraryTypeEnum::MOVIE);
             if ($save) {
                 $data['cover_path'] = $save;
@@ -74,7 +75,7 @@ class LibraryMovieService
 
     public function update(LibraryMovie $movie, array $data): LibraryMovie
     {
-        if (!empty($data['cover_path'])) {
+        if (! empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($movie->user_id, $data['cover_path'], LibraryTypeEnum::MOVIE);
             if ($save) {
                 $data['cover_path'] = $save;
@@ -113,6 +114,7 @@ class LibraryMovieService
             self::CACHE_TTL_RELEASES,
             function () use ($user) {
                 $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
+
                 return $service->getMovieReleases();
             }
         );
@@ -122,28 +124,38 @@ class LibraryMovieService
     {
         if ($movie->category === 'series') {
             $results = $this->tmdbService->searchTv($movie->title);
-            if (empty($results)) return [];
+            if (empty($results)) {
+                return [];
+            }
             $videos = $this->tmdbService->getTvVideos($results[0]['id']);
         } else {
             $results = $this->tmdbService->searchMovie($movie->title, $movie->publication_year);
-            if (empty($results)) return [];
+            if (empty($results)) {
+                return [];
+            }
             $videos = $this->tmdbService->getMovieVideos($results[0]['id']);
         }
 
         return collect($videos ?? [])
-            ->filter(fn($v) => $v['site'] === 'YouTube' && $v['type'] === 'Trailer')
+            ->filter(fn ($v) => $v['site'] === 'YouTube' && $v['type'] === 'Trailer')
             ->values()
             ->toArray();
     }
 
-    public function searchOnTmdb(string $title): ?array
+    public function search(MovieServiceEnum $service, string $query): ?array
     {
-        return $this->tmdbService->searchMovie($title);
+        return match ($service) {
+            MovieServiceEnum::TMDB => $this->tmdbService->searchMovie($query),
+            MovieServiceEnum::IMDB => [],
+        };
     }
 
-    public function importFromImdb(string $url): mixed
+    public function import(MovieServiceEnum $service, string $url): mixed
     {
-        return $this->imdbService->importFromUrl($url);
+        return match ($service) {
+            MovieServiceEnum::IMDB => $this->imdbService->importFromUrl($url),
+            MovieServiceEnum::TMDB => $this->tmdbService->importFromUrl($url),
+        };
     }
 
     public function listGenres(User $user): Collection

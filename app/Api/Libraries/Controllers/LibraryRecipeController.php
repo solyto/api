@@ -4,10 +4,12 @@ namespace App\Api\Libraries\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
+use App\Api\Libraries\Enums\RecipeServiceEnum;
 use App\Api\Libraries\Models\LibraryRecipe;
 use App\Api\Libraries\Requests\Recipes\StoreLibraryRecipeRequest;
 use App\Api\Libraries\Requests\Recipes\UpdateLibraryRecipeRequest;
 use App\Api\Libraries\Resources\LibraryRecipeResource;
+use App\Api\Libraries\Resources\RecipeReleaseResource;
 use App\Api\Libraries\Services\LibraryRecipeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -155,6 +157,7 @@ class LibraryRecipeController
      *         required=true,
      *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="rating", type="integer", minimum=1, maximum=5, nullable=true),
      *             @OA\Property(property="time_to_make", type="integer", nullable=true),
@@ -230,5 +233,61 @@ class LibraryRecipeController
         $this->libraryRecipeService->destroy($recipe);
 
         return ApiResponse::success(null, 'Recipe deleted successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/libraries/recipes/import/{service}",
+     *     operationId="import",
+     *     tags={"Libraries - Recipes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="service",
+     *         in="path",
+     *         required=true,
+     *         description="Import service (chefkoch)",
+     *
+     *         @OA\Schema(type="string", enum={"chefkoch"})
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"url"},
+     *
+     *             @OA\Property(property="url", type="string", format="uri", example="https://www.chefkoch.de/rezepte/1632851270878963/Example.html")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Recipe imported successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Recipe imported successfully."),
+     *             @OA\Property(property="data", ref="#/components/schemas/RecipeReleaseImport")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Recipe not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     * )
+     */
+    public function import(Request $request, RecipeServiceEnum $service): JsonResponse
+    {
+        $data = $request->validate(['url' => 'required|string|url']);
+
+        $recipe = $this->libraryRecipeService->import($service, $data['url']);
+
+        if (!$recipe) {
+            return ApiResponse::error('Recipe not found.', 404);
+        }
+
+        return ApiResponse::success(new RecipeReleaseResource($recipe), 'Recipe imported successfully.');
     }
 }

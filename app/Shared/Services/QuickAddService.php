@@ -2,10 +2,15 @@
 
 namespace App\Shared\Services;
 
+use App\Api\Clipboard\Services\ClipboardService;
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
-use App\Api\Clipboard\Services\ClipboardService;
 use App\Api\Feeds\Services\FeedService;
+use App\Api\Libraries\Enums\BookServiceEnum;
+use App\Api\Libraries\Enums\GameServiceEnum;
+use App\Api\Libraries\Enums\MovieServiceEnum;
+use App\Api\Libraries\Enums\MusicServiceEnum;
+use App\Api\Libraries\Enums\RecipeServiceEnum;
 use App\Api\Libraries\Services\LibraryBookService;
 use App\Api\Libraries\Services\LibraryGameService;
 use App\Api\Libraries\Services\LibraryLinkService;
@@ -42,20 +47,24 @@ class QuickAddService
 
     private function detectBasedOnUrl(string $content): DetectionResult
     {
-        if (Str::contains($content, ['deezer.com', 'discogs.com'])) {
+        if (Str::contains($content, [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl()])) {
             return $this->makeResult($content, QuickAddContentType::Music, 0.95);
         }
 
-        if (Str::contains($content, ['hardcover.app', 'goodreads.com'])) {
+        if (Str::contains($content, [BookServiceEnum::HARDCOVER->baseUrl(), BookServiceEnum::GOODREADS->baseUrl()])) {
             return $this->makeResult($content, QuickAddContentType::Books, 0.95);
         }
 
-        if (Str::contains($content, 'imdb.com')) {
+        if (Str::contains($content, MovieServiceEnum::IMDB->baseUrl())) {
             return $this->makeResult($content, QuickAddContentType::Movies, 0.95);
         }
 
-        if (Str::contains($content, ['store.steampowered.com', 'boardgamegeek.com'])) {
+        if (Str::contains($content, [GameServiceEnum::STEAM->baseUrl(), GameServiceEnum::BGG->baseUrl()])) {
             return $this->makeResult($content, QuickAddContentType::Games, 0.95);
+        }
+
+        if (Str::contains($content, RecipeServiceEnum::CHEFKOCH->baseUrl())) {
+            return $this->makeResult($content, QuickAddContentType::Recipes, 0.95);
         }
 
         return $this->makeResult($content, QuickAddContentType::Links, 0.95);
@@ -83,15 +92,12 @@ class QuickAddService
             ]),
 
             QuickAddContentType::Quotes => app(LibraryQuoteService::class)->create($user, [
-                'quote'  => $metadata['quote'] ?? $content,
+                'quote' => $metadata['quote'] ?? $content,
                 'author' => $metadata['author'] ?? null,
                 'source' => $metadata['source'] ?? null,
             ]),
 
-            QuickAddContentType::Recipes => app(LibraryRecipeService::class)->create($user, [
-                'title' => $metadata['title'] ?? $content,
-                'link'  => $content,
-            ]),
+            QuickAddContentType::Recipes => $this->commitRecipe($user, $content, $metadata),
 
             QuickAddContentType::Plants => app(LibraryPlantService::class)->create($user, [
                 'name' => $metadata['name'] ?? $content,
@@ -128,7 +134,7 @@ class QuickAddService
     {
         $service = app(LibraryMusicService::class);
 
-        $dto = Str::contains($url, 'discogs.com')
+        $dto = Str::contains($url, MusicServiceEnum::DISCOGS->baseUrl())
             ? $service->importFromDiscogs($url)
             : $service->importFromDeezer($url);
 
@@ -150,7 +156,7 @@ class QuickAddService
     {
         $service = app(LibraryBookService::class);
 
-        $dto = Str::contains($url, 'goodreads.com')
+        $dto = Str::contains($url, BookServiceEnum::GOODREADS->baseUrl())
             ? $service->importFromGoodreads($url)
             : $service->importFromHardcover($url);
 
@@ -197,7 +203,7 @@ class QuickAddService
     {
         $service = app(LibraryGameService::class);
 
-        $isBgg = Str::contains($url, 'boardgamegeek.com');
+        $isBgg = Str::contains($url, GameServiceEnum::BGG->baseUrl());
         $dto = $isBgg
             ? $service->importFromBgg($url)
             : $service->importFromSteam($url);
@@ -216,6 +222,34 @@ class QuickAddService
             'publication_year' => $isBgg
                 ? $dto->getPublicationYear()
                 : (is_string($dto->getReleaseDate()) ? (int) substr($dto->getReleaseDate(), 0, 4) : null),
+        ]);
+    }
+
+    private function commitRecipe(User $user, string $content, ?array $metadata): mixed
+    {
+        $service = app(LibraryRecipeService::class);
+
+        if (Str::contains($content, RecipeServiceEnum::CHEFKOCH->baseUrl())) {
+            $dto = $service->importFromChefkoch($content);
+
+            if ($dto === null) {
+                return null;
+            }
+
+            return $service->create($user, [
+                'title' => $dto->getTitle(),
+                'link' => $dto->getUrl(),
+                'cover_path' => $dto->getCover(),
+                'description' => $dto->getDescription(),
+                'ingredients' => $dto->getIngredients(),
+                'time_to_make' => $dto->getTimeToMake(),
+                'rating' => $dto->getRating() ? (int) round($dto->getRating()) : null,
+            ]);
+        }
+
+        return $service->create($user, [
+            'title' => $metadata['title'] ?? $content,
+            'link' => $content,
         ]);
     }
 }

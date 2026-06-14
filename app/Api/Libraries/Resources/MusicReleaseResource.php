@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @OA\Schema(
- *     schema="DeezerAlbumImport",
+ *     schema="MusicReleaseImport",
  *
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="artist", type="string"),
@@ -15,12 +15,13 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="url", type="string", format="uri"),
  *     @OA\Property(property="cover", type="string", format="uri"),
- *     @OA\Property(property="release_date", type="string", format="date"),
+ *     @OA\Property(property="provider", type="string"),
+ *     @OA\Property(property="release_date", type="string", format="date", nullable=true),
  *     @OA\Property(property="genres", type="array", @OA\Items(type="string")),
- *     @OA\Property(property="record_type", type="string")
+ *     @OA\Property(property="record_type", type="string", nullable=true)
  * )
  */
-class DeezerAlbumImportResource extends JsonResource
+class MusicReleaseResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
@@ -31,7 +32,8 @@ class DeezerAlbumImportResource extends JsonResource
             'title' => $this->getTitle(),
             'url' => $this->getUrl(),
             'cover' => $this->getCover(),
-            'release_date' => $this->getReleaseDate()->format('Y-m-d'),
+            'provider' => $this->getProvider(),
+            'release_date' => $this->getReleaseDate()?->format('Y-m-d'),
             'genres' => $this->getGenres(),
             'record_type' => $this->getRecordType(),
         ];

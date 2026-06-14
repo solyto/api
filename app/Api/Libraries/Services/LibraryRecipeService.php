@@ -3,7 +3,9 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Enums\RecipeServiceEnum;
 use App\Api\Libraries\Models\LibraryRecipe;
+use App\Api\Libraries\Services\External\ChefkochService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -11,10 +13,12 @@ use Illuminate\Support\Collection;
 class LibraryRecipeService
 {
     private const string CACHE_KEY = 'recipes';
+
     private const int CACHE_TTL = 86400;
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
+        private readonly ChefkochService $chefkochService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -23,7 +27,7 @@ class LibraryRecipeService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => LibraryRecipe::forUser($user->id)->orderBy('title', 'asc')->get()
+            fn () => LibraryRecipe::forUser($user->id)->orderBy('title', 'asc')->get()
         );
     }
 
@@ -36,7 +40,7 @@ class LibraryRecipeService
     {
         $data['user_id'] = $user->id;
 
-        if (!empty($data['cover_path'])) {
+        if (! empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($data['user_id'], $data['cover_path'], LibraryTypeEnum::RECIPE);
             if ($save) {
                 $data['cover_path'] = $save;
@@ -53,7 +57,7 @@ class LibraryRecipeService
 
     public function update(LibraryRecipe $recipe, array $data): LibraryRecipe
     {
-        if (!empty($data['cover_path'])) {
+        if (! empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($recipe->user_id, $data['cover_path'], LibraryTypeEnum::RECIPE);
             if ($save) {
                 $data['cover_path'] = $save;
@@ -74,5 +78,12 @@ class LibraryRecipeService
         $recipe->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function import(RecipeServiceEnum $service, string $url): mixed
+    {
+        return match ($service) {
+            RecipeServiceEnum::CHEFKOCH => $this->chefkochService->importFromUrl($url),
+        };
     }
 }

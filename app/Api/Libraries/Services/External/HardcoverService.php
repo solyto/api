@@ -2,13 +2,16 @@
 
 namespace App\Api\Libraries\Services\External;
 
-use App\Api\Libraries\DTOs\HardcoverBookDTO;
+use App\Api\Libraries\DTOs\BookReleaseDTO;
+use App\Api\Libraries\DTOs\BookSearchResultDTO;
+use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 
 class HardcoverService
 {
     private const string API_URL = 'https://api.hardcover.app/v1/graphql';
+    private const string BOOK_URL = 'https://hardcover.app/books/%s';
 
     private string $apiKey;
 
@@ -17,7 +20,12 @@ class HardcoverService
         $this->apiKey = config('services.hardcover.api_key') ?? '';
     }
 
-    public function importFromUrl(string $url): ?HardcoverBookDTO
+    public static function getReleaseUrl(string $slug): string
+    {
+        return sprintf(self::BOOK_URL, $slug);
+    }
+
+    public function importFromUrl(string $url): ?BookReleaseDTO
     {
         $slug = $this->getSlugFromUrl($url);
         $book = $this->getBook($slug);
@@ -26,48 +34,53 @@ class HardcoverService
             return null;
         }
 
-        return new HardcoverBookDTO(
-            id: $book['id'],
+        return new BookReleaseDTO(
             title: $book['title'],
-            description: $book['description'],
             author: $book['contributions'][0]['author']['name'] ?? null,
+            url: self::getReleaseUrl($book['slug']),
+            provider: BookServiceEnum::HARDCOVER->value,
+            id: $book['id'],
+            description: $book['description'],
             authorId: $book['contributions'][0]['author']['id'] ?? null,
             pageCount: $book['pages'],
             cover: $book['image']['url'] ?? null,
-            url: 'https://hardcover.app/books/' . $book['slug'],
             releaseDate: $book['release_date'] ? Carbon::createFromFormat('Y-m-d', $book['release_date']) : null
         );
     }
 
-    public function searchBooks(string $title): ?array
+    public function searchBooks(string $query): ?array
     {
         $response = $this->post('
-            query SearchBooks($title: String!) {
-                books(
-                    where: { title: { _ilike: $title } }
-                    order_by: { users_count: desc }
-                    limit: 10
+            query SearchBooks($query: String!) {
+                search(
+                    query: $query,
+                    query_type: "Book",
+                    per_page: 10,
+                    page: 1
                 ) {
-                    id
-                    slug
-                    title
-                    release_date
-                    description
-                    pages
-                    image {
-                        url
-                    }
-                    contributions {
-                        author {
-                            id
-                            name
-                        }
-                    }
+                    results
                 }
             }
-        ', ['title' => '%' . $title . '%']);
+        ', ['query' => $query]);
 
-        return $response['data']['books'] ?? null;
+        $hits = $response['data']['search']['results']['hits'] ?? null;
+
+        if (!is_array($hits)) {
+            return null;
+        }
+
+        return array_map(function ($hit) {
+            $doc = $hit['document'];
+            return new BookSearchResultDTO(
+                id: (int) $doc['id'],
+                title: $doc['title'],
+                author: $doc['author_names'][0] ?? null,
+                cover: !empty($doc['image']['url']) ? $doc['image']['url'] : null,
+                releaseYear: isset($doc['release_year']) ? (int) $doc['release_year'] : null,
+                provider: BookServiceEnum::HARDCOVER->value,
+                url: self::getReleaseUrl($doc['slug']),
+            );
+        }, $hits);
     }
 
     public function getNewReleases(string $author): ?array

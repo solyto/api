@@ -1,15 +1,13 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
 use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
-use App\Api\Dashboard\Controllers\QuickAddController as DashboardQuickAddController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
+use App\Api\Dashboard\Controllers\QuickAddController as DashboardQuickAddController;
 use App\Api\DevRequests\Controllers\DevRequestController;
 use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
@@ -45,12 +43,13 @@ use App\Api\Todos\Controllers\TodoCategoryController;
 use App\Api\Todos\Controllers\TodoController;
 use App\Api\Todos\Controllers\TodoWorkspaceController;
 use App\Api\Users\Controllers\AuthController;
-use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\FriendController;
 use App\Api\Users\Controllers\NotificationController;
+use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -237,10 +236,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('genres', LibraryMusicGenreController::class);
             Route::get('recommend/{type}', [LibraryMusicController::class, 'recommend']);
             Route::get('releases', [LibraryMusicController::class, 'releases']);
-            Route::get('search/deezer/{artist}/{album}', [LibraryMusicController::class, 'searchAlbumOnDeezer']);
-            Route::get('search/discogs/{query}', [LibraryMusicController::class, 'searchAlbumOnDiscogs']);
-            Route::post('import/deezer', [LibraryMusicController::class, 'importAlbumFromDeezer']);
-            Route::post('import/discogs', [LibraryMusicController::class, 'importAlbumFromDiscogs']);
+            Route::get('search/{service}/{query}', [LibraryMusicController::class, 'search']);
+            Route::post('import/{service}', [LibraryMusicController::class, 'import']);
 
             Route::apiResource('/', LibraryMusicController::class)->parameters(['' => 'music']);
         });
@@ -249,9 +246,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('genres', LibraryBookGenreController::class);
             Route::get('recommend/{type}', [LibraryBookController::class, 'recommend']);
             Route::get('releases', [LibraryBookController::class, 'releases']);
-            Route::get('search/hardcover/{title}', [LibraryBookController::class, 'searchBookOnHardcover']);
-            Route::post('import/hardcover', [LibraryBookController::class, 'importBookFromHardcover']);
-            Route::post('import/goodreads', [LibraryBookController::class, 'importBookFromGoodreads']);
+            Route::get('search/{service}/{query}', [LibraryBookController::class, 'search']);
+            Route::post('import/{service}', [LibraryBookController::class, 'import']);
 
             Route::apiResource('/', LibraryBookController::class)->parameters(['' => 'book']);
         });
@@ -269,12 +265,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('/', LibraryQuoteController::class)->parameters(['' => 'quote']);
         });
 
+        Route::post('recipes/import/{service}', [LibraryRecipeController::class, 'import']);
         Route::apiResource('recipes', LibraryRecipeController::class);
 
         Route::prefix('movies')->name('movies.')->group(function () {
             Route::apiResource('genres', LibraryMovieGenreController::class);
-            Route::get('search/tmdb/{title}', [LibraryMovieController::class, 'searchMovieOnTmdb']);
-            Route::post('import/imdb', [LibraryMovieController::class, 'importMovieFromImdb']);
+            Route::get('search/{service}/{title}', [LibraryMovieController::class, 'search']);
+            Route::post('import/{service}', [LibraryMovieController::class, 'import']);
             Route::get('releases', [LibraryMovieController::class, 'releases']);
             Route::get('{movie}/trailers', [LibraryMovieController::class, 'trailers']);
 
@@ -283,10 +280,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('games')->name('games.')->group(function () {
             Route::apiResource('genres', LibraryGameGenreController::class);
-            Route::get('search/steam/{query}', [LibraryGameController::class, 'searchGameOnSteam']);
-            Route::get('search/bgg/{query}', [LibraryGameController::class, 'searchGameOnBgg']);
-            Route::post('import/steam', [LibraryGameController::class, 'importGameFromSteam']);
-            Route::post('import/bgg', [LibraryGameController::class, 'importGameFromBgg']);
+            Route::get('search/{service}/{query}', [LibraryGameController::class, 'search']);
+            Route::post('import/{service}', [LibraryGameController::class, 'import']);
 
             Route::apiResource('/', LibraryGameController::class)->parameters(['' => 'game']);
         });

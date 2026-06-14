@@ -2,14 +2,15 @@
 
 namespace App\Api\Libraries\Services\External;
 
-use App\Api\Libraries\DTOs\GoodreadsBookDTO;
+use App\Api\Libraries\DTOs\BookReleaseDTO;
+use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMXPath;
 
 class GoodreadsService
 {
-    public function importFromUrl(string $url): ?GoodreadsBookDTO
+    public function importFromUrl(string $url): ?BookReleaseDTO
     {
         try {
             $html = file_get_contents($url);
@@ -27,12 +28,13 @@ class GoodreadsService
             $publicationDate = $this->extractPublicationDate($xpath);
             $coverImage = $this->extractCoverImage($xpath);
 
-            return new GoodreadsBookDTO(
+            return new BookReleaseDTO(
                 title: $title,
                 author: $authors[0] ?? null,
+                url: $url,
+                provider: BookServiceEnum::GOODREADS->value,
                 pageCount: $pageCount,
                 cover: $coverImage,
-                url: $url,
                 releaseDate: $publicationDate ?? null
             );
         } catch (\Exception $e) {

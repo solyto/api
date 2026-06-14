@@ -2,10 +2,10 @@
 
 namespace App\Api\Libraries\Services;
 
-use App\Api\Libraries\DTOs\GoodreadsBookDTO;
-use App\Api\Libraries\DTOs\HardcoverBookDTO;
+use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Enums\BookServiceEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Services\External\GoodreadsService;
@@ -20,7 +20,7 @@ class LibraryBookService
     private const string CACHE_KEY_RELEASES        = 'book_releases';
     private const string CACHE_KEY_RECOMMENDATIONS = 'book_recommendations';
     private const int CACHE_TTL                    = 86400;
-    private const int CACHE_TTL_RELEASES = 86400;
+    private const int CACHE_TTL_RELEASES           = 86400;
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
@@ -146,19 +146,20 @@ class LibraryBookService
         );
     }
 
-    public function searchOnHardcover(string $title): ?array
+    public function search(BookServiceEnum $service, string $query): ?array
     {
-        return $this->hardcoverService->searchBooks($title);
+        return match ($service) {
+            BookServiceEnum::HARDCOVER => $this->hardcoverService->searchBooks($query),
+            BookServiceEnum::GOODREADS => [],
+        };
     }
 
-    public function importFromHardcover(string $url): ?HardcoverBookDTO
+    public function import(BookServiceEnum $service, string $url): ?BookReleaseDTO
     {
-        return $this->hardcoverService->importFromUrl($url);
-    }
-
-    public function importFromGoodreads(string $url): ?GoodreadsBookDTO
-    {
-        return $this->goodreadsService->importFromUrl($url);
+        return match ($service) {
+            BookServiceEnum::HARDCOVER  => $this->hardcoverService->importFromUrl($url),
+            BookServiceEnum::GOODREADS  => $this->goodreadsService->importFromUrl($url),
+        };
     }
 
     public function listGenres(User $user): Collection

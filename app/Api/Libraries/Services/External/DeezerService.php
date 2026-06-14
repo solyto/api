@@ -2,7 +2,9 @@
 
 namespace App\Api\Libraries\Services\External;
 
-use App\Api\Libraries\DTOs\DeezerAlbumDTO;
+use App\Api\Libraries\DTOs\MusicReleaseDTO;
+use App\Api\Libraries\DTOs\MusicSearchResultDTO;
+use App\Api\Libraries\Enums\MusicServiceEnum;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -14,7 +16,7 @@ class DeezerService
     private const string GET_ALBUMS_URL = 'https://api.deezer.com/artist/%d/albums';
     private const string GET_ALBUM_URL = 'https://api.deezer.com/album/%d';
 
-    public function importFromUrl(string $url): ?DeezerAlbumDTO
+    public function importFromUrl(string $url): ?MusicReleaseDTO
     {
         $albumId = $this->getAlbumIdFromUrl($url);
         $result = $this->getAlbum($albumId);
@@ -23,13 +25,14 @@ class DeezerService
             return null;
         }
 
-        return new DeezerAlbumDTO(
+        return new MusicReleaseDTO(
             id: $result['id'],
             artist: $result['artist']['name'],
             artistId: $result['artist']['id'],
             title: $result['title'],
             url: $result['link'],
             cover: $result['cover_big'],
+            provider: MusicServiceEnum::DEEZER->value,
             releaseDate: Carbon::createFromFormat('Y-m-d', $result['release_date']),
             genres: array_map(fn($genre) => $genre['name'], $result['genres']['data']),
             recordType: $result['record_type'] ?? null,
@@ -51,16 +54,30 @@ class DeezerService
         }
     }
 
-    public function searchAlbum(string $artist, string $album): ?array
+    public function searchAlbum(string $query): ?array
     {
         try {
-            $response = Http::get(sprintf(self::SEARCH_ALBUM_URL, $artist . ' ' . $album));
+            $response = Http::get(sprintf(self::SEARCH_ALBUM_URL, $query));
 
             if (!$response->successful()) {
                 return null;
             }
 
-            return $response->json()['data'] ?? null;
+            $items = $response->json()['data'] ?? null;
+
+            if (!is_array($items)) {
+                return null;
+            }
+
+            return array_map(fn($item) => new MusicSearchResultDTO(
+                id: (int) $item['id'],
+                title: $item['title'],
+                artist: $item['artist']['name'] ?? null,
+                cover: $item['cover_big'] ?? null,
+                releaseYear: isset($item['release_date']) ? (int) substr($item['release_date'], 0, 4) : null,
+                provider: MusicServiceEnum::DEEZER->value,
+                url: $item['link'],
+            ), $items);
         } catch (ConnectionException $e) {
             return null;
         }

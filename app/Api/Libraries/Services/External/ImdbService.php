@@ -2,7 +2,8 @@
 
 namespace App\Api\Libraries\Services\External;
 
-use App\Api\Libraries\DTOs\ImdbMovieDTO;
+use App\Api\Libraries\DTOs\MovieReleaseDTO;
+use App\Api\Libraries\Enums\MovieServiceEnum;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -10,7 +11,7 @@ class ImdbService
 {
     private const string GET_MOVIE_URL = 'https://api.imdbapi.dev/titles/%s';
 
-    public function importFromUrl(string $url): ?ImdbMovieDTO
+    public function importFromUrl(string $url): ?MovieReleaseDTO
     {
         $titleId = $this->getTitleIdFromUrl($url);
 
@@ -24,10 +25,12 @@ class ImdbService
             return null;
         }
 
-        return new ImdbMovieDTO(
+        return new MovieReleaseDTO(
             id: $result['id'],
-            type: $result['type'],
             title: $result['primaryTitle'],
+            url: $url,
+            provider: MovieServiceEnum::IMDB->value,
+            type: $result['type'],
             description: $result['plot'],
             cover: $result['primaryImage']['url'] ?? null,
             releaseYear: $result['startYear'],

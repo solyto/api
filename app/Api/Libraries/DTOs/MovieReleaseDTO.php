@@ -2,16 +2,18 @@
 
 namespace App\Api\Libraries\DTOs;
 
-class ImdbMovieDTO
+readonly class MovieReleaseDTO
 {
     public function __construct(
         private string $id,
-        private string $type,
         private string $title,
-        private string $description,
-        private ?string $cover,
-        private int $releaseYear,
-        private ?int $runtime,
+        private string $url,
+        private string $provider,
+        private ?string $type = null,
+        private ?string $description = null,
+        private ?string $cover = null,
+        private ?int $releaseYear = null,
+        private ?int $runtime = null,
         private array $genres = []
     ) {}
 
@@ -20,14 +22,19 @@ class ImdbMovieDTO
         return $this->id;
     }
 
-    public function getType(): string
-    {
-        return $this->type;
-    }
-
     public function getTitle(): string
     {
         return $this->title;
+    }
+
+    public function getUrl(): string
+    {
+        return $this->url;
+    }
+
+    public function getType(): string
+    {
+        return $this->type;
     }
 
     public function getCover(): ?string
@@ -58,5 +65,10 @@ class ImdbMovieDTO
     public function getLink(): string
     {
         return 'https://www.imdb.com/title/' . $this->id;
+    }
+
+    public function getProvider(): string
+    {
+        return $this->provider;
     }
 }

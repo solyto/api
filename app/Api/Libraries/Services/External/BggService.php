@@ -2,16 +2,24 @@
 
 namespace App\Api\Libraries\Services\External;
 
-use App\Api\Libraries\DTOs\BggGameDTO;
+use App\Api\Libraries\DTOs\GameReleaseDTO;
+use App\Api\Libraries\DTOs\GameSearchResultDTO;
+use App\Api\Libraries\Enums\GameServiceEnum;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class BggService
 {
+    private const string GAME_URL = 'https://boardgamegeek.com/boardgame/%d';
     private const string GET_THING_URL = 'https://boardgamegeek.com/xmlapi2/thing?id=%d';
     private const string SEARCH_URL = 'https://boardgamegeek.com/xmlapi2/search?query=%s&type=boardgame';
 
-    public function importFromUrl(string $url): ?BggGameDTO
+    public static function getGameUrl(int $id): string
+    {
+        return sprintf(self::GAME_URL, $id);
+    }
+
+    public function importFromUrl(string $url): ?GameReleaseDTO
     {
         $gameId = $this->getGameIdFromUrl($url);
 
@@ -25,14 +33,15 @@ class BggService
             return null;
         }
 
-        return new BggGameDTO(
+        return new GameReleaseDTO(
             id: $gameId,
             title: $result['title'],
             url: $url,
+            provider: GameServiceEnum::BGG->value,
             cover: $result['cover'],
             description: $result['description'],
             publicationYear: $result['year_published'],
-            designer: $result['designer'],
+            developer: $result['designer'],
             publisher: $result['publisher'],
             genres: $result['genres'],
         );
@@ -68,11 +77,15 @@ class BggService
                     continue;
                 }
 
-                $results[] = [
-                    'id' => (int) $item['id'],
-                    'title' => $title,
-                    'year_published' => isset($item->yearpublished) ? (int) $item->yearpublished['value'] : null,
-                ];
+                $id = (int) $item['id'];
+                $results[] = new GameSearchResultDTO(
+                    id: $id,
+                    title: $title,
+                    cover: null,
+                    releaseYear: isset($item->yearpublished) ? (int) $item->yearpublished['value'] : null,
+                    provider: GameServiceEnum::BGG->value,
+                    url: self::getGameUrl($id),
+                );
             }
 
             return $results;
