@@ -14,6 +14,16 @@ class DiscogsApiService
         $this->client = ClientFactory::create();
     }
 
+    public function search(string $query): ?array
+    {
+        $result = $this->client->search([
+            'q' => $query,
+            'type' => 'release',
+        ]);
+
+        return $result['results'] ?? null;
+    }
+
     public function getRelease(int $releaseId)
     {
         return $this->client->releaseGet([

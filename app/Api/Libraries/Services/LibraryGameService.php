@@ -3,6 +3,8 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Services\External\BggApiService;
+use App\Api\Libraries\Services\External\SteamApiService;
 use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Libraries\Models\LibraryGameGenre;
 use App\Api\Users\Models\User;
@@ -18,6 +20,8 @@ class LibraryGameService
         private readonly LibraryCoverService $coverService,
         private readonly SteamImportService $steamImportService,
         private readonly BggImportService $bggImportService,
+        private readonly SteamApiService $steamApiService,
+        private readonly BggApiService $bggApiService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -97,6 +101,16 @@ class LibraryGameService
         $game->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function searchOnSteam(string $query): ?array
+    {
+        return $this->steamApiService->searchGames($query);
+    }
+
+    public function searchOnBgg(string $query): ?array
+    {
+        return $this->bggApiService->searchGames($query);
     }
 
     public function importFromSteam(string $url): mixed

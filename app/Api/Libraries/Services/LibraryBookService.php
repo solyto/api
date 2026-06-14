@@ -9,6 +9,7 @@ use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Services\External\GoodreadsCrawler;
+use App\Api\Libraries\Services\External\HardcoverApiService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -24,6 +25,7 @@ class LibraryBookService
     public function __construct(
         private readonly LibraryCoverService $coverService,
         private readonly HardcoverImportService $hardcoverImportService,
+        private readonly HardcoverApiService $hardcoverApiService,
         private readonly GoodreadsCrawler $goodreadsCrawler,
         private readonly UserCacheService $cache,
     ) {}
@@ -143,6 +145,11 @@ class LibraryBookService
                 return $service->getBookReleases();
             }
         );
+    }
+
+    public function searchOnHardcover(string $title): ?array
+    {
+        return $this->hardcoverApiService->searchBooks($title);
     }
 
     public function importFromHardcover(string $url): ?HardcoverBookDTO

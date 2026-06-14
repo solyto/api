@@ -238,6 +238,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::get('recommend/{type}', [LibraryMusicController::class, 'recommend']);
             Route::get('releases', [LibraryMusicController::class, 'releases']);
             Route::get('search/deezer/{artist}/{album}', [LibraryMusicController::class, 'searchAlbumOnDeezer']);
+            Route::get('search/discogs/{query}', [LibraryMusicController::class, 'searchAlbumOnDiscogs']);
             Route::post('import/deezer', [LibraryMusicController::class, 'importAlbumFromDeezer']);
             Route::post('import/discogs', [LibraryMusicController::class, 'importAlbumFromDiscogs']);
 
@@ -248,6 +249,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('genres', LibraryBookGenreController::class);
             Route::get('recommend/{type}', [LibraryBookController::class, 'recommend']);
             Route::get('releases', [LibraryBookController::class, 'releases']);
+            Route::get('search/hardcover/{title}', [LibraryBookController::class, 'searchBookOnHardcover']);
             Route::post('import/hardcover', [LibraryBookController::class, 'importBookFromHardcover']);
             Route::post('import/goodreads', [LibraryBookController::class, 'importBookFromGoodreads']);
 
@@ -271,6 +273,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('movies')->name('movies.')->group(function () {
             Route::apiResource('genres', LibraryMovieGenreController::class);
+            Route::get('search/tmdb/{title}', [LibraryMovieController::class, 'searchMovieOnTmdb']);
             Route::post('import/imdb', [LibraryMovieController::class, 'importMovieFromImdb']);
             Route::get('releases', [LibraryMovieController::class, 'releases']);
             Route::get('{movie}/trailers', [LibraryMovieController::class, 'trailers']);
@@ -280,6 +283,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('games')->name('games.')->group(function () {
             Route::apiResource('genres', LibraryGameGenreController::class);
+            Route::get('search/steam/{query}', [LibraryGameController::class, 'searchGameOnSteam']);
+            Route::get('search/bgg/{query}', [LibraryGameController::class, 'searchGameOnBgg']);
             Route::post('import/steam', [LibraryGameController::class, 'importGameFromSteam']);
             Route::post('import/bgg', [LibraryGameController::class, 'importGameFromBgg']);
 
