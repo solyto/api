@@ -7,6 +7,7 @@ use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerApiService;
+use App\Api\Libraries\Services\External\DiscogsApiService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -24,6 +25,7 @@ class LibraryMusicService
         private readonly DeezerImportService $deezerImportService,
         private readonly DiscogsImportService $discogsImportService,
         private readonly DeezerApiService $deezerApiService,
+        private readonly DiscogsApiService $discogsApiService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -149,6 +151,11 @@ class LibraryMusicService
     public function searchOnDeezer(string $artist, string $album): mixed
     {
         return $this->deezerApiService->searchAlbum($artist, $album);
+    }
+
+    public function searchOnDiscogs(string $query): mixed
+    {
+        return $this->discogsApiService->search($query);
     }
 
     public function listGenres(User $user): Collection

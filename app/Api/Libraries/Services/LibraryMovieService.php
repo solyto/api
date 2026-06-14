@@ -135,6 +135,11 @@ class LibraryMovieService
             ->toArray();
     }
 
+    public function searchOnTmdb(string $title): ?array
+    {
+        return $this->tmdbApiService->searchMovie($title);
+    }
+
     public function importFromImdb(string $url): mixed
     {
         return $this->imdbImportService->importMovieFromUrl($url);

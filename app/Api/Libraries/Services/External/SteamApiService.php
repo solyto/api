@@ -8,6 +8,22 @@ use Illuminate\Support\Facades\Http;
 class SteamApiService
 {
     private const GET_APP_DETAILS_URL = 'https://store.steampowered.com/api/appdetails?appids=%d';
+    private const SEARCH_URL = 'https://store.steampowered.com/api/storesearch?term=%s&l=english&cc=US';
+
+    public function searchGames(string $query): ?array
+    {
+        try {
+            $response = Http::get(sprintf(self::SEARCH_URL, urlencode($query)));
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            return $response->json()['items'] ?? null;
+        } catch (ConnectionException $e) {
+            return null;
+        }
+    }
 
     public function getAppDetails(int $appId): ?array
     {

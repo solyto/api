@@ -251,6 +251,82 @@ class LibraryGameController
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/libraries/games/search/steam/{query}",
+     *     operationId="searchGameOnSteam",
+     *     tags={"Libraries - Games"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="query",
+     *         in="path",
+     *         required=true,
+     *         description="Game title to search for",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function searchGameOnSteam(Request $request, string $query): JsonResponse
+    {
+        $results = $this->libraryGameService->searchOnSteam($query);
+
+        return ApiResponse::success($results, 'Search results retrieved successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/libraries/games/search/bgg/{query}",
+     *     operationId="searchGameOnBgg",
+     *     tags={"Libraries - Games"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="query",
+     *         in="path",
+     *         required=true,
+     *         description="Board game title to search for",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function searchGameOnBgg(Request $request, string $query): JsonResponse
+    {
+        $results = $this->libraryGameService->searchOnBgg($query);
+
+        return ApiResponse::success($results, 'Search results retrieved successfully.');
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/libraries/games/import/steam",
      *     operationId="importGameFromSteam",

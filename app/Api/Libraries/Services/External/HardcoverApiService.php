@@ -82,6 +82,50 @@ class HardcoverApiService
         return $newBooks;
     }
 
+    public function searchBooks(string $title): ?array
+    {
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->apiKey,
+        ])
+        ->post(self::API_URL, [
+            'query' => '
+                query SearchBooks($title: String!) {
+                    books(
+                        where: { title: { _ilike: $title } }
+                        order_by: { users_count: desc }
+                        limit: 10
+                    ) {
+                        id
+                        slug
+                        title
+                        release_date
+                        description
+                        pages
+                        image {
+                            url
+                        }
+                        contributions {
+                            author {
+                                id
+                                name
+                            }
+                        }
+                    }
+                }
+            ',
+            'variables' => [
+                'title' => '%' . $title . '%',
+            ],
+        ]);
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        return $response->json()['data']['books'] ?? null;
+    }
+
     public function getBook(string $slug): ?array
     {
         $response = Http::withHeaders([

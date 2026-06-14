@@ -390,6 +390,44 @@ class LibraryMusicController
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/libraries/music/search/discogs/{query}",
+     *     operationId="searchAlbumOnDiscogs",
+     *     tags={"Libraries - Music"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="query",
+     *         in="path",
+     *         required=true,
+     *         description="Search query (artist, album or both)",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function searchAlbumOnDiscogs(Request $request, string $query): JsonResponse
+    {
+        $results = $this->libraryMusicService->searchOnDiscogs($query);
+
+        return ApiResponse::success($results, 'Search results retrieved successfully.');
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/libraries/music/import/deezer",
      *     operationId="importAlbumFromDeezer",

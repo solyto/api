@@ -245,6 +245,44 @@ class LibraryMovieController
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/libraries/movies/search/tmdb/{title}",
+     *     operationId="searchMovieOnTmdb",
+     *     tags={"Libraries - Movies"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="title",
+     *         in="path",
+     *         required=true,
+     *         description="Movie title to search for",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function searchMovieOnTmdb(Request $request, string $title): JsonResponse
+    {
+        $results = $this->libraryMovieService->searchOnTmdb($title);
+
+        return ApiResponse::success($results, 'Search results retrieved successfully.');
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/libraries/movies/import/imdb",
      *     operationId="importMovieFromImdb",

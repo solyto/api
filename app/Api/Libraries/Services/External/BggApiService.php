@@ -8,6 +8,50 @@ use Illuminate\Support\Facades\Http;
 class BggApiService
 {
     private const GET_THING_URL = 'https://boardgamegeek.com/xmlapi2/thing?id=%d';
+    private const SEARCH_URL = 'https://boardgamegeek.com/xmlapi2/search?query=%s&type=boardgame';
+
+    public function searchGames(string $query): ?array
+    {
+        try {
+            $url = sprintf(self::SEARCH_URL, urlencode($query));
+            $response = Http::withHeaders(['Accept' => 'application/xml'])->get($url);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $xml = simplexml_load_string($response->body());
+
+            if ($xml === false || !isset($xml->item)) {
+                return [];
+            }
+
+            $results = [];
+            foreach ($xml->item as $item) {
+                $title = null;
+                foreach ($item->name as $name) {
+                    if ((string) $name['type'] === 'primary') {
+                        $title = (string) $name['value'];
+                        break;
+                    }
+                }
+
+                if (!$title) {
+                    continue;
+                }
+
+                $results[] = [
+                    'id' => (int) $item['id'],
+                    'title' => $title,
+                    'year_published' => isset($item->yearpublished) ? (int) $item->yearpublished['value'] : null,
+                ];
+            }
+
+            return $results;
+        } catch (ConnectionException $e) {
+            return null;
+        }
+    }
 
     public function getGameDetails(int $gameId): ?array
     {
