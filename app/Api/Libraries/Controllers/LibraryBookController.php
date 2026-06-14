@@ -5,11 +5,12 @@ namespace App\Api\Libraries\Controllers;
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
+use App\Api\Libraries\Enums\BookServiceEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Requests\Books\StoreLibraryBookRequest;
 use App\Api\Libraries\Requests\Books\UpdateLibraryBookRequest;
-use App\Api\Libraries\Resources\GoodreadsBookImportResource;
-use App\Api\Libraries\Resources\HardcoverBookImportResource;
+use App\Api\Libraries\Resources\BookReleaseResource;
+use App\Api\Libraries\Resources\BookSearchResultResource;
 use App\Api\Libraries\Resources\LibraryBookReleaseResource;
 use App\Api\Libraries\Resources\LibraryBookResource;
 use App\Api\Libraries\Resources\LibraryRecommendationResource;
@@ -352,16 +353,16 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/search/hardcover/{title}",
-     *     operationId="searchBookOnHardcover",
+     *     path="/api/libraries/books/search/{service}/{query}",
+     *     operationId="search",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="title",
+     *         name="query",
      *         in="path",
      *         required=true,
-     *         description="Book title to search for",
+     *         description="Query to search for",
      *
      *         @OA\Schema(type="string")
      *     ),
@@ -381,19 +382,31 @@ class LibraryBookController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function searchBookOnHardcover(Request $request, string $title): JsonResponse
+    public function search(Request $request, BookServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryBookService->searchOnHardcover($title);
+        $results = $this->libraryBookService->search($service, $query);
 
-        return ApiResponse::success($results, 'Search results retrieved successfully.');
+        return ApiResponse::success(
+            BookSearchResultResource::collection(collect($results ?? [])),
+            'Search results retrieved successfully.'
+        );
     }
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/books/import/hardcover",
-     *     operationId="importBookFromHardcover",
+     *     path="/api/libraries/books/import/{service}",
+     *     operationId="import",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="service",
+     *         in="path",
+     *         required=true,
+     *         description="Import service (hardcover, goodreads)",
+     *
+     *         @OA\Schema(type="string", enum={"hardcover", "goodreads"})
+     *     ),
      *
      *     @OA\RequestBody(
      *         required=true,
@@ -401,7 +414,7 @@ class LibraryBookController
      *         @OA\JsonContent(
      *             required={"url"},
      *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://hardcover.app/book/example")
+     *             @OA\Property(property="url", type="string", format="uri", example="https://hardcover.app/books/example")
      *         )
      *     ),
      *
@@ -413,7 +426,7 @@ class LibraryBookController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Book imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/HardcoverBookImport")
+     *             @OA\Property(property="data", ref="#/components/schemas/BookReleaseImport")
      *         )
      *     ),
      *
@@ -422,63 +435,16 @@ class LibraryBookController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function importBookFromHardcover(Request $request): JsonResponse
+    public function import(Request $request, BookServiceEnum $service): JsonResponse
     {
         $data = $request->validate(['url' => 'required|string|url']);
 
-        $book = $this->libraryBookService->importFromHardcover($data['url']);
+        $book = $this->libraryBookService->import($service, $data['url']);
 
-        if (! $book) {
+        if (!$book) {
             return ApiResponse::error('Book not found.', 404);
         }
 
-        return ApiResponse::success(new HardcoverBookImportResource($book), 'Book imported successfully.');
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/libraries/books/import/goodreads",
-     *     operationId="importBookFromGoodreads",
-     *     tags={"Libraries - Books"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *             required={"url"},
-     *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://www.goodreads.com/book/show/example")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Book imported successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/GoodreadsBookImport")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Book not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
-     * )
-     */
-    public function importBookFromGoodreads(Request $request): JsonResponse
-    {
-        $data = $request->validate(['url' => 'required|string|url']);
-
-        $book = $this->libraryBookService->importFromGoodreads($data['url']);
-
-        if (! $book) {
-            return ApiResponse::error('Book not found.', 404);
-        }
-
-        return ApiResponse::success(new GoodreadsBookImportResource($book), 'Book imported successfully.');
+        return ApiResponse::success(new BookReleaseResource($book), 'Book imported successfully.');
     }
 }

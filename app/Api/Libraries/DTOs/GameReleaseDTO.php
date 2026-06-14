@@ -2,17 +2,18 @@
 
 namespace App\Api\Libraries\DTOs;
 
-readonly class SteamGameDTO
+readonly class GameReleaseDTO
 {
     public function __construct(
         private int     $id,
         private string  $title,
         private string  $url,
-        private ?string $cover,
-        private ?string $description,
-        private ?string $releaseDate,
-        private ?string $developer,
-        private ?string $publisher,
+        private string  $provider,
+        private ?string $cover = null,
+        private ?string $description = null,
+        private ?int    $publicationYear = null,
+        private ?string $developer = null,
+        private ?string $publisher = null,
         private array   $genres = [],
     ) {}
 
@@ -31,6 +32,11 @@ readonly class SteamGameDTO
         return $this->url;
     }
 
+    public function getProvider(): string
+    {
+        return $this->provider;
+    }
+
     public function getCover(): ?string
     {
         return $this->cover;
@@ -41,9 +47,9 @@ readonly class SteamGameDTO
         return $this->description;
     }
 
-    public function getReleaseDate(): ?string
+    public function getPublicationYear(): ?int
     {
-        return $this->releaseDate;
+        return $this->publicationYear;
     }
 
     public function getDeveloper(): ?string

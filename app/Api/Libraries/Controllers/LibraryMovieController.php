@@ -4,10 +4,12 @@ namespace App\Api\Libraries\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
+use App\Api\Libraries\Enums\MovieServiceEnum;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Requests\Movies\StoreLibraryMovieRequest;
 use App\Api\Libraries\Requests\Movies\UpdateLibraryMovieRequest;
-use App\Api\Libraries\Resources\ImdbMovieImportResource;
+use App\Api\Libraries\Resources\MovieReleaseResource;
+use App\Api\Libraries\Resources\MovieSearchResultResource;
 use App\Api\Libraries\Resources\LibraryMovieReleaseResource;
 use App\Api\Libraries\Resources\LibraryMovieResource;
 use App\Api\Libraries\Services\LibraryMovieService;
@@ -246,78 +248,6 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/search/tmdb/{title}",
-     *     operationId="searchMovieOnTmdb",
-     *     tags={"Libraries - Movies"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\Parameter(
-     *         name="title",
-     *         in="path",
-     *         required=true,
-     *         description="Movie title to search for",
-     *
-     *         @OA\Schema(type="string")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Search results retrieved successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
-     * )
-     */
-    public function searchMovieOnTmdb(Request $request, string $title): JsonResponse
-    {
-        $results = $this->libraryMovieService->searchOnTmdb($title);
-
-        return ApiResponse::success($results, 'Search results retrieved successfully.');
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/libraries/movies/import/imdb",
-     *     operationId="importMovieFromImdb",
-     *     tags={"Libraries - Movies"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *             required={"url"},
-     *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://www.imdb.com/title/tt1234567")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Movie imported successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/ImdbMovieImport")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Movie not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
-     * )
-     */
-    /**
-     * @OA\Get(
      *     path="/api/libraries/movies/releases",
      *     operationId="listLibraryMovieReleases",
      *     tags={"Libraries - Movies"},
@@ -395,16 +325,109 @@ class LibraryMovieController
         );
     }
 
-    public function importMovieFromImdb(Request $request): JsonResponse
+    /**
+     * @OA\Post(
+     *     path="/api/libraries/movies/import/{service}",
+     *     operationId="import",
+     *     tags={"Libraries - Movies"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="service",
+     *         in="path",
+     *         required=true,
+     *         description="Import service (imdb)",
+     *
+     *         @OA\Schema(type="string", enum={"imdb"})
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"url"},
+     *
+     *             @OA\Property(property="url", type="string", format="uri", example="https://www.imdb.com/title/tt1234567")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Movie imported successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Movie imported successfully."),
+     *             @OA\Property(property="data", ref="#/components/schemas/MovieReleaseImport")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Movie not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     * )
+     */
+    public function import(Request $request, MovieServiceEnum $service): JsonResponse
     {
         $data = $request->validate(['url' => 'required|string|url']);
 
-        $movie = $this->libraryMovieService->importFromImdb($data['url']);
+        $movie = $this->libraryMovieService->import($service, $data['url']);
 
         if (! $movie) {
             return ApiResponse::error('Movie not found.', 404);
         }
 
-        return ApiResponse::success(new ImdbMovieImportResource($movie), 'Movie imported successfully.');
+        return ApiResponse::success(new MovieReleaseResource($movie), 'Movie imported successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/libraries/movies/search/{service}/{query}",
+     *     operationId="search",
+     *     tags={"Libraries - Movies"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *          name="service",
+     *          in="path",
+     *          required=true,
+     *          description="Search service (tmdb)",
+     *
+     *          @OA\Schema(type="string", enum={"tmdb"})
+     *      ),
+     *
+     *     @OA\Parameter(
+     *         name="query",
+     *         in="path",
+     *         required=true,
+     *         description="Query to search for",
+     *
+     *         @OA\Schema(type="string")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Search results retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function search(Request $request, MovieServiceEnum $service, string $query): JsonResponse
+    {
+        $results = $this->libraryMovieService->search($service, $query);
+
+        return ApiResponse::success(
+            MovieSearchResultResource::collection(collect($results ?? [])),
+            'Search results retrieved successfully.'
+        );
     }
 }

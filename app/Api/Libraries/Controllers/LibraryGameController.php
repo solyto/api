@@ -4,12 +4,13 @@ namespace App\Api\Libraries\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
+use App\Api\Libraries\Enums\GameServiceEnum;
 use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Libraries\Requests\Games\StoreLibraryGameRequest;
 use App\Api\Libraries\Requests\Games\UpdateLibraryGameRequest;
-use App\Api\Libraries\Resources\BggGameImportResource;
+use App\Api\Libraries\Resources\GameReleaseResource;
+use App\Api\Libraries\Resources\GameSearchResultResource;
 use App\Api\Libraries\Resources\LibraryGameResource;
-use App\Api\Libraries\Resources\SteamGameImportResource;
 use App\Api\Libraries\Services\LibraryGameService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -252,48 +253,19 @@ class LibraryGameController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/games/search/steam/{query}",
-     *     operationId="searchGameOnSteam",
+     *     path="/api/libraries/games/search/{service}/{query}",
+     *     operationId="search",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="query",
+     *         name="service",
      *         in="path",
      *         required=true,
-     *         description="Game title to search for",
+     *         description="Search service (steam, bgg)",
      *
-     *         @OA\Schema(type="string")
+     *         @OA\Schema(type="string", enum={"steam", "bgg"})
      *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Search results retrieved successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
-     * )
-     */
-    public function searchGameOnSteam(Request $request, string $query): JsonResponse
-    {
-        $results = $this->libraryGameService->searchOnSteam($query);
-
-        return ApiResponse::success($results, 'Search results retrieved successfully.');
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/libraries/games/search/bgg/{query}",
-     *     operationId="searchGameOnBgg",
-     *     tags={"Libraries - Games"},
-     *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
      *         name="query",
@@ -319,66 +291,31 @@ class LibraryGameController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function searchGameOnBgg(Request $request, string $query): JsonResponse
+    public function search(Request $request, GameServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryGameService->searchOnBgg($query);
+        $results = $this->libraryGameService->search($service, $query);
 
-        return ApiResponse::success($results, 'Search results retrieved successfully.');
+        return ApiResponse::success(
+            GameSearchResultResource::collection(collect($results ?? [])),
+            'Search results retrieved successfully.'
+        );
     }
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/games/import/steam",
-     *     operationId="importGameFromSteam",
+     *     path="/api/libraries/games/import/{service}",
+     *     operationId="import",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
      *
-     *     @OA\RequestBody(
-     *         required=true,
+     *     @OA\Parameter(
+     *          name="service",
+     *          in="path",
+     *          required=true,
+     *          description="Import service (steam, bgg)",
      *
-     *         @OA\JsonContent(
-     *             required={"url"},
-     *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://store.steampowered.com/app/example")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Game imported successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/SteamGameImport")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Game not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
-     * )
-     */
-    public function importGameFromSteam(Request $request): JsonResponse
-    {
-        $data = $request->validate(['url' => 'required|string|url']);
-
-        $game = $this->libraryGameService->importFromSteam($data['url']);
-
-        if (! $game) {
-            return ApiResponse::error('Game not found.', 404);
-        }
-
-        return ApiResponse::success(new SteamGameImportResource($game), 'Game imported successfully.');
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/libraries/games/import/bgg",
-     *     operationId="importGameFromBgg",
-     *     tags={"Libraries - Games"},
-     *     security={{"sanctum": {}}},
+     *          @OA\Schema(type="string", enum={"steam", "bgg"})
+     *      ),
      *
      *     @OA\RequestBody(
      *         required=true,
@@ -398,7 +335,7 @@ class LibraryGameController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Game imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/BggGameImport")
+     *             @OA\Property(property="data", ref="#/components/schemas/GameReleaseImport")
      *         )
      *     ),
      *
@@ -407,16 +344,16 @@ class LibraryGameController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function importGameFromBgg(Request $request): JsonResponse
+    public function import(Request $request, GameServiceEnum $service): JsonResponse
     {
         $data = $request->validate(['url' => 'required|string|url']);
 
-        $game = $this->libraryGameService->importFromBgg($data['url']);
+        $game = $this->libraryGameService->import($service, $data['url']);
 
-        if (! $game) {
+        if (!$game) {
             return ApiResponse::error('Game not found.', 404);
         }
 
-        return ApiResponse::success(new BggGameImportResource($game), 'Game imported successfully.');
+        return ApiResponse::success(new GameReleaseResource($game), 'Game imported successfully.');
     }
 }

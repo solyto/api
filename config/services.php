@@ -64,6 +64,10 @@ return [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('BGG_API_KEY'),
     ],
 
+    'discogs' => [
+        'access_token' => \App\Shared\Helpers\DockerSecretHelper::get('DISCOGS_ACCESS_TOKEN'),
+    ],
+
     'imgproxy' => [
         'url'  => env('IMGPROXY_URL', 'http://imgproxy:8080'),
         'key'  => \App\Shared\Helpers\DockerSecretHelper::get('IMGPROXY_KEY'),

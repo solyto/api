@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Enums\GameServiceEnum;
 use App\Api\Libraries\Services\External\BggService;
 use App\Api\Libraries\Services\External\SteamService;
 use App\Api\Libraries\Models\LibraryGame;
@@ -101,24 +102,20 @@ class LibraryGameService
         $this->cache->forget([self::CACHE_KEY, $userId]);
     }
 
-    public function searchOnSteam(string $query): ?array
+    public function search(GameServiceEnum $service, string $query): ?array
     {
-        return $this->steamService->searchGames($query);
+        return match ($service) {
+            GameServiceEnum::STEAM => $this->steamService->searchGames($query),
+            GameServiceEnum::BGG   => $this->bggService->searchGames($query),
+        };
     }
 
-    public function searchOnBgg(string $query): ?array
+    public function import(GameServiceEnum $service, string $url): mixed
     {
-        return $this->bggService->searchGames($query);
-    }
-
-    public function importFromSteam(string $url): mixed
-    {
-        return $this->steamService->importFromUrl($url);
-    }
-
-    public function importFromBgg(string $url): mixed
-    {
-        return $this->bggService->importFromUrl($url);
+        return match ($service) {
+            GameServiceEnum::STEAM => $this->steamService->importFromUrl($url),
+            GameServiceEnum::BGG   => $this->bggService->importFromUrl($url),
+        };
     }
 
     public function listGenres(User $user): Collection

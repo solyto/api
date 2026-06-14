@@ -2,14 +2,14 @@
 
 namespace App\Api\Libraries\Services;
 
-use App\Api\Libraries\DTOs\DeezerAlbumDTO;
-use App\Api\Libraries\DTOs\HardcoverBookDTO;
+use App\Api\Libraries\DTOs\BookReleaseDTO;
+use App\Api\Libraries\DTOs\MusicReleaseDTO;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
-use App\Api\Libraries\Services\External\TmdbReleasesService;
+use App\Api\Libraries\Services\External\TmdbService;
 use App\Api\Users\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
@@ -19,7 +19,7 @@ class LibraryReleases
     public function __construct(
         private readonly DeezerService $deezerService,
         private readonly HardcoverService $hardcoverService,
-        private readonly TmdbReleasesService $tmdbReleasesService,
+        private readonly TmdbService $tmdbService,
         private readonly User $user
     ) {}
 
@@ -39,19 +39,19 @@ class LibraryReleases
             $processedArtists[] = $artist;
             $search = $this->deezerService->searchArtists($artist);
 
-            if (!$search) {
+            if (! $search) {
                 continue;
             }
 
             $artistId = $search[0]['id'];
             $artistReleases = $this->deezerService->getNewReleases($artistId);
 
-            if (!$artistReleases || count($artistReleases) === 0) {
+            if (! $artistReleases || count($artistReleases) === 0) {
                 continue;
             }
 
             foreach ($artistReleases as $release) {
-                $releases[] = new DeezerAlbumDTO(
+                $releases[] = new MusicReleaseDTO(
                     id: $release['id'],
                     artist: $artist,
                     artistId: $artistId,
@@ -84,20 +84,20 @@ class LibraryReleases
             $processedAuthors[] = $author;
             $authorReleases = $this->hardcoverService->getNewReleases($author);
 
-            if (!$authorReleases) {
+            if (! $authorReleases) {
                 continue;
             }
 
             foreach ($authorReleases as $release) {
-                $releases[] = new HardcoverBookDTO(
-                    id: $release['id'],
+                $releases[] = new BookReleaseDTO(
                     title: $release['title'],
-                    description: $release['description'],
                     author: $author,
+                    url: HardcoverService::getReleaseUrl($release['slug']),
+                    id: $release['id'],
+                    description: $release['description'],
                     authorId: $release['contributions'][0]['author']['id'] ?? null,
                     pageCount: $release['pages'],
                     cover: $release['image']['url'] ?? null,
-                    url: 'https://hardcover.app/books/' . $release['slug'],
                     releaseDate: $release['release_date'] ? Carbon::createFromFormat('Y-m-d', $release['release_date']) : null
                 );
             }
@@ -113,11 +113,11 @@ class LibraryReleases
         $favorites = LibraryMovie::forUser($this->user->id)->where('rating', '>=', 4)->with('genres')->get();
 
         $genreNames = $favorites
-            ->flatMap(fn($m) => $m->genres->pluck('title'))
+            ->flatMap(fn ($m) => $m->genres->pluck('title'))
             ->unique()
             ->values()
             ->toArray();
 
-        return $this->tmdbReleasesService->getReleasesForGenres($genreNames);
+        return $this->tmdbService->getReleasesForGenres($genreNames);
     }
 }

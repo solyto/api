@@ -7,20 +7,21 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @OA\Schema(
- *     schema="HardcoverBookImport",
+ *     schema="BookReleaseImport",
  *
- *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="id", type="integer", nullable=true),
  *     @OA\Property(property="author", type="string"),
- *     @OA\Property(property="author_id", type="integer"),
+ *     @OA\Property(property="author_id", type="integer", nullable=true),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="description", type="string", nullable=true),
- *     @OA\Property(property="page_count", type="integer"),
+ *     @OA\Property(property="page_count", type="integer", nullable=true),
  *     @OA\Property(property="url", type="string", format="uri"),
- *     @OA\Property(property="cover", type="string", format="uri"),
- *     @OA\Property(property="release_date", type="string", format="date")
+ *     @OA\Property(property="cover", type="string", format="uri", nullable=true),
+ *     @OA\Property(property="provider", type="string"),
+ *     @OA\Property(property="release_date", type="string", format="date", nullable=true)
  * )
  */
-class HardcoverBookImportResource extends JsonResource
+class BookReleaseResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
@@ -33,7 +34,8 @@ class HardcoverBookImportResource extends JsonResource
             'page_count' => $this->getPageCount(),
             'url' => $this->getUrl(),
             'cover' => $this->getCover(),
-            'release_date' => $this->getReleaseDate()->format('Y-m-d'),
+            'provider' => $this->getProvider(),
+            'release_date' => $this->getReleaseDate()?->format('Y-m-d'),
         ];
     }
 }

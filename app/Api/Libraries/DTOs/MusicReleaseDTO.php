@@ -4,16 +4,17 @@ namespace App\Api\Libraries\DTOs;
 
 use Carbon\Carbon;
 
-readonly class DeezerAlbumDTO
+readonly class MusicReleaseDTO
 {
     public function __construct(
-        private int    $id,
-        private string $artist,
-        private int    $artistId,
-        private string $title,
-        private string $url,
-        private string $cover,
-        private Carbon $releaseDate,
+        private int     $id,
+        private ?string $artist,
+        private ?int    $artistId,
+        private string  $title,
+        private string  $url,
+        private ?string $cover,
+        private string $provider,
+        private ?Carbon $releaseDate = null,
         private array $genres = [],
         private ?string $recordType = null,
     ) {}
@@ -33,12 +34,12 @@ readonly class DeezerAlbumDTO
         return $this->id;
     }
 
-    public function getArtist(): string
+    public function getArtist(): ?string
     {
         return $this->artist;
     }
 
-    public function getArtistId(): int
+    public function getArtistId(): ?int
     {
         return $this->artistId;
     }
@@ -53,13 +54,18 @@ readonly class DeezerAlbumDTO
         return $this->url;
     }
 
-    public function getCover(): string
+    public function getCover(): ?string
     {
         return $this->cover;
     }
 
-    public function getReleaseDate(): Carbon
+    public function getReleaseDate(): ?Carbon
     {
         return $this->releaseDate;
+    }
+
+    public function getProvider(): string
+    {
+        return $this->provider;
     }
 }

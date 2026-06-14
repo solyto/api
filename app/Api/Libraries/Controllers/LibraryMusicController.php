@@ -5,11 +5,12 @@ namespace App\Api\Libraries\Controllers;
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
+use App\Api\Libraries\Enums\MusicServiceEnum;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Requests\Music\StoreLibraryMusicRequest;
 use App\Api\Libraries\Requests\Music\UpdateLibraryMusicRequest;
-use App\Api\Libraries\Resources\DeezerAlbumImportResource;
-use App\Api\Libraries\Resources\DiscogsAlbumImportResource;
+use App\Api\Libraries\Resources\MusicReleaseResource;
+use App\Api\Libraries\Resources\MusicSearchResultResource;
 use App\Api\Libraries\Resources\LibraryMusicReleaseResource;
 use App\Api\Libraries\Resources\LibraryMusicResource;
 use App\Api\Libraries\Resources\LibraryRecommendationResource;
@@ -382,19 +383,28 @@ class LibraryMusicController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function searchAlbumOnDeezer(Request $request, string $artist, string $album): JsonResponse
+    public function searchAlbumOnDeezer(Request $request, string $query): JsonResponse
     {
-        $search = $this->libraryMusicService->searchOnDeezer($artist, $album);
+        $search = $this->libraryMusicService->searchOnDeezer($query);
 
         return ApiResponse::success($search, 'Info from Deeezer retrieved.');
     }
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/search/discogs/{query}",
-     *     operationId="searchAlbumOnDiscogs",
+     *     path="/api/libraries/music/search/{service}/{query}",
+     *     operationId="search",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *          name="service",
+     *          in="path",
+     *          required=true,
+     *          description="Search service (deezer, discogs)",
+     *
+     *          @OA\Schema(type="string", enum={"deezer", "discogs"})
+     *      ),
      *
      *     @OA\Parameter(
      *         name="query",
@@ -420,19 +430,31 @@ class LibraryMusicController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function searchAlbumOnDiscogs(Request $request, string $query): JsonResponse
+    public function search(Request $request, MusicServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryMusicService->searchOnDiscogs($query);
+        $results = $this->libraryMusicService->search($service, $query);
 
-        return ApiResponse::success($results, 'Search results retrieved successfully.');
+        return ApiResponse::success(
+            MusicSearchResultResource::collection(collect($results ?? [])),
+            'Search results retrieved successfully.'
+        );
     }
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/music/import/deezer",
-     *     operationId="importAlbumFromDeezer",
+     *     path="/api/libraries/music/import/{service}",
+     *     operationId="import",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="service",
+     *         in="path",
+     *         required=true,
+     *         description="Import service (deezer, discogs)",
+     *
+     *         @OA\Schema(type="string", enum={"deezer", "discogs"})
+     *     ),
      *
      *     @OA\RequestBody(
      *         required=true,
@@ -452,7 +474,7 @@ class LibraryMusicController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Album imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/DeezerAlbumImport")
+     *             @OA\Property(property="data", ref="#/components/schemas/MusicReleaseImport")
      *         )
      *     ),
      *
@@ -461,63 +483,16 @@ class LibraryMusicController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function importAlbumFromDeezer(Request $request): JsonResponse
+    public function import(Request $request, MusicServiceEnum $service): JsonResponse
     {
         $data = $request->validate(['url' => 'required|string|url']);
 
-        $album = $this->libraryMusicService->importFromDeezer($data['url']);
+        $album = $this->libraryMusicService->import($service, $data['url']);
 
-        if (! $album) {
+        if (!$album) {
             return ApiResponse::error('Album not found.', 404);
         }
 
-        return ApiResponse::success(new DeezerAlbumImportResource($album), 'Album imported successfully.');
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/libraries/music/import/discogs",
-     *     operationId="importAlbumFromDiscogs",
-     *     tags={"Libraries - Music"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *             required={"url"},
-     *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://www.discogs.com/master/example")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Album imported successfully",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Album imported successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/DiscogsAlbumImport")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Album not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
-     * )
-     */
-    public function importAlbumFromDiscogs(Request $request): JsonResponse
-    {
-        $data = $request->validate(['url' => 'required|string|url']);
-
-        $album = $this->libraryMusicService->importFromDiscogs($data['url']);
-
-        if (! $album) {
-            return ApiResponse::error('Album not found.', 404);
-        }
-
-        return ApiResponse::success(new DiscogsAlbumImportResource($album), 'Album imported successfully.');
+        return ApiResponse::success(new MusicReleaseResource($album), 'Album imported successfully.');
     }
 }
