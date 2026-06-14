@@ -45,7 +45,7 @@ class TmdbReleasesService
         'western'          => 37,
     ];
 
-    public function __construct(private readonly TmdbApiService $tmdbApiService) {}
+    public function __construct(private readonly TmdbService $tmdbService) {}
 
     /** @return TmdbMovieDTO[] */
     public function getReleasesForGenres(array $genreNames): array
@@ -56,7 +56,7 @@ class TmdbReleasesService
         $releases = [];
         $seen     = [];
 
-        foreach ($this->tmdbApiService->getUpcomingMovies($movieGenreIds) ?? [] as $item) {
+        foreach ($this->tmdbService->getUpcomingMovies($movieGenreIds) ?? [] as $item) {
             $release = $this->buildMovieDTO($item, $seen);
             if ($release) {
                 $releases[] = $release;
@@ -64,7 +64,7 @@ class TmdbReleasesService
             }
         }
 
-        foreach ($this->tmdbApiService->getUpcomingTvShows($tvGenreIds) ?? [] as $item) {
+        foreach ($this->tmdbService->getUpcomingTvShows($tvGenreIds) ?? [] as $item) {
             $release = $this->buildTvDTO($item, $seen);
             if ($release) {
                 $releases[] = $release;
@@ -88,7 +88,7 @@ class TmdbReleasesService
                 id: $item['id'],
                 title: $item['title'],
                 overview: $item['overview'] ?? null,
-                poster: isset($item['poster_path']) ? TmdbApiService::IMAGE_BASE_URL . $item['poster_path'] : null,
+                poster: isset($item['poster_path']) ? TmdbService::IMAGE_BASE_URL . $item['poster_path'] : null,
                 releaseDate: Carbon::createFromFormat('Y-m-d', $item['release_date']),
                 type: 'movie',
                 url: 'https://www.themoviedb.org/movie/' . $item['id'],
@@ -109,7 +109,7 @@ class TmdbReleasesService
                 id: $item['id'],
                 title: $item['name'],
                 overview: $item['overview'] ?? null,
-                poster: isset($item['poster_path']) ? TmdbApiService::IMAGE_BASE_URL . $item['poster_path'] : null,
+                poster: isset($item['poster_path']) ? TmdbService::IMAGE_BASE_URL . $item['poster_path'] : null,
                 releaseDate: Carbon::createFromFormat('Y-m-d', $item['first_air_date']),
                 type: 'tv',
                 url: 'https://www.themoviedb.org/tv/' . $item['id'],

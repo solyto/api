@@ -6,8 +6,8 @@ use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
-use App\Api\Libraries\Services\External\DeezerApiService;
-use App\Api\Libraries\Services\External\DiscogsApiService;
+use App\Api\Libraries\Services\External\DeezerService;
+use App\Api\Libraries\Services\External\DiscogsService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -22,10 +22,8 @@ class LibraryMusicService
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
-        private readonly DeezerImportService $deezerImportService,
-        private readonly DiscogsImportService $discogsImportService,
-        private readonly DeezerApiService $deezerApiService,
-        private readonly DiscogsApiService $discogsApiService,
+        private readonly DeezerService $deezerService,
+        private readonly DiscogsService $discogsService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -140,22 +138,22 @@ class LibraryMusicService
 
     public function importFromDeezer(string $url): mixed
     {
-        return $this->deezerImportService->importAlbumFromUrl($url);
+        return $this->deezerService->importFromUrl($url);
     }
 
     public function importFromDiscogs(string $url): mixed
     {
-        return $this->discogsImportService->importAlbumFromUrl($url);
+        return $this->discogsService->importFromUrl($url);
     }
 
     public function searchOnDeezer(string $artist, string $album): mixed
     {
-        return $this->deezerApiService->searchAlbum($artist, $album);
+        return $this->deezerService->searchAlbum($artist, $album);
     }
 
     public function searchOnDiscogs(string $query): mixed
     {
-        return $this->discogsApiService->search($query);
+        return $this->discogsService->search($query);
     }
 
     public function listGenres(User $user): Collection

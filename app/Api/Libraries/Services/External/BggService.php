@@ -2,19 +2,47 @@
 
 namespace App\Api\Libraries\Services\External;
 
+use App\Api\Libraries\DTOs\BggGameDTO;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
-class BggApiService
+class BggService
 {
-    private const GET_THING_URL = 'https://boardgamegeek.com/xmlapi2/thing?id=%d';
-    private const SEARCH_URL = 'https://boardgamegeek.com/xmlapi2/search?query=%s&type=boardgame';
+    private const string GET_THING_URL = 'https://boardgamegeek.com/xmlapi2/thing?id=%d';
+    private const string SEARCH_URL = 'https://boardgamegeek.com/xmlapi2/search?query=%s&type=boardgame';
+
+    public function importFromUrl(string $url): ?BggGameDTO
+    {
+        $gameId = $this->getGameIdFromUrl($url);
+
+        if (!$gameId) {
+            return null;
+        }
+
+        $result = $this->getGameDetails($gameId);
+
+        if (!$result) {
+            return null;
+        }
+
+        return new BggGameDTO(
+            id: $gameId,
+            title: $result['title'],
+            url: $url,
+            cover: $result['cover'],
+            description: $result['description'],
+            publicationYear: $result['year_published'],
+            designer: $result['designer'],
+            publisher: $result['publisher'],
+            genres: $result['genres'],
+        );
+    }
 
     public function searchGames(string $query): ?array
     {
         try {
-            $url = sprintf(self::SEARCH_URL, urlencode($query));
-            $response = Http::withHeaders(['Accept' => 'application/xml'])->get($url);
+            $response = Http::withHeaders(['Accept' => 'application/xml'])
+                ->get(sprintf(self::SEARCH_URL, urlencode($query)));
 
             if (!$response->successful()) {
                 return null;
@@ -53,14 +81,12 @@ class BggApiService
         }
     }
 
-    public function getGameDetails(int $gameId): ?array
+    private function getGameDetails(int $gameId): ?array
     {
         try {
             $url = sprintf(self::GET_THING_URL, $gameId);
 
-            $headers = [
-                'Accept' => 'application/xml',
-            ];
+            $headers = ['Accept' => 'application/xml'];
 
             $apiKey = config('services.bgg.api_key');
             if ($apiKey) {
@@ -129,5 +155,14 @@ class BggApiService
         } catch (ConnectionException $e) {
             return null;
         }
+    }
+
+    private function getGameIdFromUrl(string $url): ?int
+    {
+        if (preg_match('/boardgamegeek\.com\/boardgame\/(\d+)/', $url, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return null;
     }
 }

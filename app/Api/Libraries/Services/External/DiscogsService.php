@@ -1,22 +1,26 @@
 <?php
 
-namespace App\Api\Libraries\Services;
+namespace App\Api\Libraries\Services\External;
 
 use App\Api\Libraries\DTOs\DiscogsReleaseDTO;
-use App\Api\Libraries\Services\External\DiscogsApiService;
+use Calliostro\Discogs\ClientFactory;
+use Calliostro\Discogs\DiscogsApiClient;
 use Carbon\Carbon;
 use Carbon\Exceptions\InvalidFormatException;
 
-class DiscogsImportService
+class DiscogsService
 {
-    public function __construct(
-        private readonly DiscogsApiService $discogsApiService,
-    ) {}
+    private readonly DiscogsApiClient $client;
 
-    public function importAlbumFromUrl(string $url): ?DiscogsReleaseDTO
+    public function __construct()
+    {
+        $this->client = ClientFactory::create();
+    }
+
+    public function importFromUrl(string $url): ?DiscogsReleaseDTO
     {
         $releaseId = $this->getReleaseIdFromUrl($url);
-        $result = $this->discogsApiService->getRelease($releaseId);
+        $result = $this->getRelease($releaseId);
 
         if (!$result) {
             return null;
@@ -39,6 +43,21 @@ class DiscogsImportService
             genres: $result['genres'],
             recordType: $result['record_type'] ?? null,
         );
+    }
+
+    public function search(string $query): ?array
+    {
+        $result = $this->client->search([
+            'q' => $query,
+            'type' => 'release',
+        ]);
+
+        return $result['results'] ?? null;
+    }
+
+    private function getRelease(int $releaseId): mixed
+    {
+        return $this->client->releaseGet(['id' => $releaseId]);
     }
 
     private function getReleaseIdFromUrl(string $url): int

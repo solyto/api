@@ -2,7 +2,6 @@
 
 namespace App\Api\Libraries\Jobs;
 
-use App\Api\Libraries\Services\External\DeezerApiService;
 use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
@@ -68,7 +67,7 @@ class ScaleCovers implements ShouldQueue
         $users = User::all();
 
         foreach ($users as $user) {
-            $service = new LibraryReleases(new DeezerApiService(), $user);
+            $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
             $releases = $service->getMusicReleases();
             $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
 

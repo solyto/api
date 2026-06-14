@@ -7,8 +7,8 @@ use App\Api\Libraries\DTOs\HardcoverBookDTO;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
-use App\Api\Libraries\Services\External\DeezerApiService;
-use App\Api\Libraries\Services\External\HardcoverApiService;
+use App\Api\Libraries\Services\External\DeezerService;
+use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Libraries\Services\External\TmdbReleasesService;
 use App\Api\Users\Models\User;
 use Carbon\Carbon;
@@ -17,8 +17,8 @@ use Illuminate\Support\Str;
 class LibraryReleases
 {
     public function __construct(
-        private readonly DeezerApiService $deezerApiService,
-        private readonly HardcoverApiService $hardcoverApiService,
+        private readonly DeezerService $deezerService,
+        private readonly HardcoverService $hardcoverService,
         private readonly TmdbReleasesService $tmdbReleasesService,
         private readonly User $user
     ) {}
@@ -37,14 +37,14 @@ class LibraryReleases
             }
 
             $processedArtists[] = $artist;
-            $search = $this->deezerApiService->searchArtists($artist);
+            $search = $this->deezerService->searchArtists($artist);
 
             if (!$search) {
                 continue;
             }
 
             $artistId = $search[0]['id'];
-            $artistReleases = $this->deezerApiService->getNewReleases($artistId);
+            $artistReleases = $this->deezerService->getNewReleases($artistId);
 
             if (!$artistReleases || count($artistReleases) === 0) {
                 continue;
@@ -82,7 +82,7 @@ class LibraryReleases
             }
 
             $processedAuthors[] = $author;
-            $authorReleases = $this->hardcoverApiService->getNewReleases($author);
+            $authorReleases = $this->hardcoverService->getNewReleases($author);
 
             if (!$authorReleases) {
                 continue;
@@ -98,7 +98,7 @@ class LibraryReleases
                     pageCount: $release['pages'],
                     cover: $release['image']['url'] ?? null,
                     url: 'https://hardcover.app/books/' . $release['slug'],
-                    releaseDate: Carbon::createFromFormat('Y-m-d', $release['release_date'])
+                    releaseDate: $release['release_date'] ? Carbon::createFromFormat('Y-m-d', $release['release_date']) : null
                 );
             }
         }

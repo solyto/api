@@ -6,7 +6,8 @@ use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMovieGenre;
-use App\Api\Libraries\Services\External\TmdbApiService;
+use App\Api\Libraries\Services\External\ImdbService;
+use App\Api\Libraries\Services\External\TmdbService;
 use App\Api\Libraries\Services\External\TmdbReleasesService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
@@ -21,9 +22,9 @@ class LibraryMovieService
 
     public function __construct(
         private readonly LibraryCoverService $coverService,
-        private readonly ImdbImportService $imdbImportService,
+        private readonly ImdbService $imdbService,
         private readonly TmdbReleasesService $tmdbReleasesService,
-        private readonly TmdbApiService $tmdbApiService,
+        private readonly TmdbService $tmdbService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -120,13 +121,13 @@ class LibraryMovieService
     public function trailers(LibraryMovie $movie): array
     {
         if ($movie->category === 'series') {
-            $results = $this->tmdbApiService->searchTv($movie->title);
+            $results = $this->tmdbService->searchTv($movie->title);
             if (empty($results)) return [];
-            $videos = $this->tmdbApiService->getTvVideos($results[0]['id']);
+            $videos = $this->tmdbService->getTvVideos($results[0]['id']);
         } else {
-            $results = $this->tmdbApiService->searchMovie($movie->title, $movie->publication_year);
+            $results = $this->tmdbService->searchMovie($movie->title, $movie->publication_year);
             if (empty($results)) return [];
-            $videos = $this->tmdbApiService->getMovieVideos($results[0]['id']);
+            $videos = $this->tmdbService->getMovieVideos($results[0]['id']);
         }
 
         return collect($videos ?? [])
@@ -137,12 +138,12 @@ class LibraryMovieService
 
     public function searchOnTmdb(string $title): ?array
     {
-        return $this->tmdbApiService->searchMovie($title);
+        return $this->tmdbService->searchMovie($title);
     }
 
     public function importFromImdb(string $url): mixed
     {
-        return $this->imdbImportService->importMovieFromUrl($url);
+        return $this->imdbService->importFromUrl($url);
     }
 
     public function listGenres(User $user): Collection
