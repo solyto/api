@@ -43,7 +43,7 @@ class HardcoverService
             description: $book['description'],
             authorId: $book['contributions'][0]['author']['id'] ?? null,
             pageCount: $book['pages'],
-            cover: $book['image']['url'] ?? null,
+            cover: $book['default_cover_edition']['image']['url'] ?? $book['image']['url'] ?? null,
             releaseDate: $book['release_date'] ? Carbon::createFromFormat('Y-m-d', $book['release_date']) : null
         );
     }
@@ -157,6 +157,11 @@ class HardcoverService
                     pages
                     image {
                         url
+                    }
+                    default_cover_edition {
+                        image {
+                            url
+                        }
                     }
                     contributions {
                         author {
