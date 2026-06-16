@@ -81,7 +81,7 @@ class TodoService
         }
 
         if (!isset($data['category_id'])) {
-            if (preg_match('/^\s?\/([\w\/-]+)/', $input, $match)) {
+            if (preg_match('/(?:^|\s)\/([\w\/-]+)/', $input, $match)) {
                 $category = TodoCategory::forUser($user->id)
                     ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
                     ->first()
