@@ -25,6 +25,6 @@ class DeleteOldDevRequests implements ShouldQueue
      */
     public function handle(): void
     {
-        DevRequest::where('created_at', '<', now()->subDays(30))->whereIn('status', ['backlog', 'pending', 'in-progress'])->delete();
+        DevRequest::where('created_at', '<', now()->subDays(30))->whereIn('status', ['cancelled', 'completed'])->delete();
     }
 }
