@@ -4,6 +4,7 @@ namespace App\Dav\Backend;
 
 use App\Dav\DTOs\AddressBookDTO;
 use App\Dav\DTOs\ContactDTO;
+use App\Dav\Services\VCardPhotoProcessor;
 use Illuminate\Support\Str;
 use Sabre\CardDAV\Backend\PDO as SabrePDO;
 
@@ -155,5 +156,15 @@ class AppContactsPDO extends SabrePDO
     public function deleteContactCustom(AddressBookDTO $addressBook, string $cardUri): bool
     {
         return parent::deleteCard($addressBook->id, $cardUri);
+    }
+
+    public function createCard($addressBookId, $cardUri, $cardData): string
+    {
+        return parent::createCard($addressBookId, $cardUri, app(VCardPhotoProcessor::class)->process($cardData));
+    }
+
+    public function updateCard($addressBookId, $cardUri, $cardData): ?string
+    {
+        return parent::updateCard($addressBookId, $cardUri, app(VCardPhotoProcessor::class)->process($cardData));
     }
 }

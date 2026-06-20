@@ -46,6 +46,34 @@ class InterventionDriver implements ImageDriverInterface
         return true;
     }
 
+    public function scaleToFileSize(string $absolutePath, int $maxBytes): bool
+    {
+        try {
+            $image   = $this->manager->read($absolutePath);
+            $width   = $image->width();
+            $quality = 85;
+
+            while (true) {
+                $encoded = $image->scale(width: $width)->toJpeg(quality: $quality);
+
+                if (strlen((string) $encoded) <= $maxBytes || $width <= 100) {
+                    file_put_contents($absolutePath, (string) $encoded);
+                    return true;
+                }
+
+                if ($quality > 60) {
+                    $quality -= 15;
+                } else {
+                    $width   = (int) ($width * 0.7);
+                    $quality = 80;
+                    $image   = $this->manager->read($absolutePath);
+                }
+            }
+        } catch (\Exception) {
+            return false;
+        }
+    }
+
     private function previewPath(string $path): string
     {
         $extension = pathinfo($path, PATHINFO_EXTENSION);

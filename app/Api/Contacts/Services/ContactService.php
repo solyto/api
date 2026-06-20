@@ -15,8 +15,7 @@ class ContactService
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
     private const string CACHE_KEY_CONTACTS = 'contacts';
     private const int CACHE_TTL = 86400;
-    private const int PHOTO_MAX_WIDTH = 400;
-    private const int PHOTO_QUALITY = 85;
+    public const int PHOTO_MAX_BYTES = 200 * 1024;
 
     public function __construct(
         private readonly DavService $dav,
@@ -127,7 +126,7 @@ class ContactService
 
     public function updateContactPhoto(User $user, AddressBookDTO $addressBook, ContactDTO $contact, UploadedFile $photo): ?ContactDTO
     {
-        $this->imageTransformation->scaleToWidth($photo->getRealPath(), self::PHOTO_MAX_WIDTH, self::PHOTO_QUALITY);
+        $this->imageTransformation->scaleToFileSize($photo->getRealPath(), self::PHOTO_MAX_BYTES);
         $contact->updatePhoto($photo);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
