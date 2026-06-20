@@ -34,6 +34,32 @@ class ImgproxyDriver implements ImageDriverInterface
         return $stored ? $previewPath : false;
     }
 
+    public function scaleToFileSize(string $absolutePath, int $maxBytes): bool
+    {
+        $quality = 82;
+        $width   = 800;
+
+        while ($width >= 100) {
+            if (!$this->scaleToWidth($absolutePath, $width, $quality)) {
+                return false;
+            }
+
+            clearstatcache(true, $absolutePath);
+            $size = filesize($absolutePath);
+            if ($size <= $maxBytes) {
+                return true;
+            }
+
+            // Estimate next width using area-ratio heuristic, but always reduce by at least 20%
+            $estimated = (int) ($width * sqrt($maxBytes / $size));
+            $width     = min($estimated, (int) ($width * 0.8));
+            $width     = max($width, 100);
+        }
+
+        clearstatcache(true, $absolutePath);
+        return filesize($absolutePath) <= $maxBytes;
+    }
+
     public function scaleToWidth(string $absolutePath, int $width, int $quality): bool
     {
         $localPath = ltrim(str_replace(storage_path(), '', $absolutePath), '/');
