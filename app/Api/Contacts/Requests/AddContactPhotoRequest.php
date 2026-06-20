@@ -9,7 +9,7 @@ class AddContactPhotoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'photo' => 'required|string',
+            'photo' => 'required|file|image|mimes:jpeg,png,gif,webp|max:10240',
         ];
     }
 }

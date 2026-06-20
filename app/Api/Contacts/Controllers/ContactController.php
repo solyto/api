@@ -3,6 +3,7 @@
 namespace App\Api\Contacts\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Contacts\Requests\AddContactPhotoRequest;
 use App\Api\Contacts\Requests\GetContactPhotosRequest;
 use App\Api\Contacts\Requests\StoreAddressBookRequest;
 use App\Api\Contacts\Requests\StoreContactRequest;
@@ -582,7 +583,7 @@ class ContactController
      *     @OA\Response(response=404, description="Address Book or Contact not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function updateContactPhoto(Request $request, int $addressBookId, string $contactUri): JsonResponse
+    public function updateContactPhoto(AddContactPhotoRequest $request, int $addressBookId, string $contactUri): JsonResponse
     {
         $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
 

@@ -6,17 +6,22 @@ use App\Api\Users\Models\User;
 use App\Dav\DTOs\AddressBookDTO;
 use App\Dav\DTOs\ContactDTO;
 use App\Dav\Services\DavService;
+use App\Shared\Services\Images\ImageTransformationService;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Http\UploadedFile;
 
 class ContactService
 {
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
     private const string CACHE_KEY_CONTACTS = 'contacts';
     private const int CACHE_TTL = 86400;
+    private const int PHOTO_MAX_WIDTH = 400;
+    private const int PHOTO_QUALITY = 85;
 
     public function __construct(
         private readonly DavService $dav,
-        private readonly UserCacheService $cache
+        private readonly UserCacheService $cache,
+        private readonly ImageTransformationService $imageTransformation
     ) {}
 
     public function listAddressBooks(User $user): array
@@ -120,8 +125,9 @@ class ContactService
         return $success;
     }
 
-    public function updateContactPhoto(User $user, AddressBookDTO $addressBook, ContactDTO $contact, mixed $photo): ?ContactDTO
+    public function updateContactPhoto(User $user, AddressBookDTO $addressBook, ContactDTO $contact, UploadedFile $photo): ?ContactDTO
     {
+        $this->imageTransformation->scaleToWidth($photo->getRealPath(), self::PHOTO_MAX_WIDTH, self::PHOTO_QUALITY);
         $contact->updatePhoto($photo);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
