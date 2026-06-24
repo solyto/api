@@ -251,6 +251,16 @@ class FeedService
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $userId]);
     }
 
+    private function sanitizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Strip zero-width and other invisible Unicode characters that RSS feeds sometimes append
+        return trim(preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}\x{2060}]/u', '', $value));
+    }
+
     public function syncFeed(string $feedId): bool
     {
         $feed = Feed::find($feedId);
@@ -269,7 +279,7 @@ class FeedService
             $feedItem = FeedItem::firstOrCreate(
                 ['feed_item_id' => $item->get_id()],
                 [
-                    'title'        => $item->get_title(),
+                    'title'        => $this->sanitizeText($item->get_title()),
                     'description'  => $item->get_description(),
                     'link'         => $item->get_link(),
                     'image_url'    => $this->feedReader->extractImageUrl($item),
