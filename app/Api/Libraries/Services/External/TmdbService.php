@@ -175,7 +175,7 @@ class TmdbService
             }
         }
 
-        usort($releases, fn ($a, $b) => $a->getReleaseDate()->timestamp <=> $b->getReleaseDate()->timestamp);
+        usort($releases, fn ($a, $b) => $a->getReleaseYear() <=> $b->getReleaseYear());
 
         return $releases;
     }
