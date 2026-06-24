@@ -15,7 +15,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="url", type="string", format="uri"),
  *     @OA\Property(property="cover", type="string", format="uri"),
- *     @OA\Property(property="release_date", type="string", format="date")
+ *     @OA\Property(property="release_date", type="string", format="date", nullable=true),
+ *     @OA\Property(property="provider", type="string")
  * )
  */
 class LibraryMusicReleaseResource extends JsonResource
@@ -29,7 +30,8 @@ class LibraryMusicReleaseResource extends JsonResource
             'title' => $this->getTitle(),
             'url' => $this->getUrl(),
             'cover' => $this->getCover(),
-            'release_date' => $this->getReleaseDate()->format('Y-m-d'),
+            'release_date' => $this->getReleaseDate()?->format('Y-m-d'),
+            'provider' => $this->getProvider(),
         ];
     }
 }

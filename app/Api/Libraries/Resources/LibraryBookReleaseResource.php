@@ -17,7 +17,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="page_count", type="integer"),
  *     @OA\Property(property="url", type="string", format="uri"),
  *     @OA\Property(property="cover", type="string", format="uri"),
- *     @OA\Property(property="release_date", type="string", format="date")
+ *     @OA\Property(property="release_date", type="string", format="date", nullable=true),
+ *     @OA\Property(property="provider", type="string")
  * )
  */
 class LibraryBookReleaseResource extends JsonResource
@@ -33,7 +34,8 @@ class LibraryBookReleaseResource extends JsonResource
             'page_count' => $this->getPageCount(),
             'url' => $this->getUrl(),
             'cover' => $this->getCover(),
-            'release_date' => $this->getReleaseDate()->format('Y-m-d'),
+            'release_date' => $this->getReleaseDate()?->format('Y-m-d'),
+            'provider' => $this->getProvider(),
         ];
     }
 }
