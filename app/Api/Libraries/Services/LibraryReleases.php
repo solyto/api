@@ -4,6 +4,8 @@ namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\DTOs\MusicReleaseDTO;
+use App\Api\Libraries\Enums\BookServiceEnum;
+use App\Api\Libraries\Enums\MusicServiceEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
@@ -58,6 +60,7 @@ class LibraryReleases
                     title: $release['title'],
                     url: $release['link'],
                     cover: $release['cover_big'],
+                    provider: MusicServiceEnum::DEEZER->value,
                     releaseDate: Carbon::createFromFormat('Y-m-d', $release['release_date'])
                 );
             }
@@ -93,6 +96,7 @@ class LibraryReleases
                     title: $release['title'],
                     author: $author,
                     url: HardcoverService::getReleaseUrl($release['slug']),
+                    provider: BookServiceEnum::HARDCOVER->value,
                     id: $release['id'],
                     description: $release['description'],
                     authorId: $release['contributions'][0]['author']['id'] ?? null,
