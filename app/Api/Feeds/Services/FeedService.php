@@ -276,6 +276,10 @@ class FeedService
         }
 
         foreach ($items as $item) {
+            if (empty($item->get_link())) {
+                continue;
+            }
+
             $feedItem = FeedItem::firstOrCreate(
                 ['feed_item_id' => $item->get_id()],
                 [
