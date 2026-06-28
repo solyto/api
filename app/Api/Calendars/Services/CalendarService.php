@@ -7,6 +7,7 @@ use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Support\Collection;
 
 class CalendarService
 {
@@ -198,7 +199,7 @@ class CalendarService
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
     }
 
-    public function listInvites(User $user): array
+    public function listInvites(User $user): \Illuminate\Support\Collection
     {
         return $this->dav->calendars()->sharing()->listInvites($user);
     }
