@@ -692,6 +692,66 @@ class CalendarController
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/calendars/{instanceId}/share",
+     *     operationId="listSharees",
+     *     tags={"Calendars"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="instanceId",
+     *         in="path",
+     *         required=true,
+     *         description="Calendar ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sharees retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Sharees retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(
+     *
+     *                     @OA\Property(property="user_id", type="string", format="uuid"),
+     *                     @OA\Property(property="user_name", type="string"),
+     *                     @OA\Property(property="user_email", type="string", format="email"),
+     *                     @OA\Property(property="access", type="integer"),
+     *                     @OA\Property(property="status", type="string", enum={"pending", "accepted", "declined"})
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="You can only list sharees for calendars you own", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Calendar not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function listSharees(Request $request, int $instanceId): JsonResponse
+    {
+        $calendar = $this->calendarService->get($request->user(), $instanceId);
+
+        if ($calendar === null) {
+            return ApiResponse::error('Calendar does not exist', 404);
+        }
+
+        if ($calendar->isShared) {
+            return ApiResponse::error('You can only list sharees for calendars you own', 403);
+        }
+
+        return ApiResponse::success($this->calendarService->listSharees($calendar), 'Sharees retrieved successfully.');
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/calendars/{instanceId}/share",
      *     operationId="shareCalendar",
