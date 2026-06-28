@@ -45,7 +45,7 @@ class CalendarDTO
             timezone: $data['{urn:ietf:params:xml:ns:caldav}calendar-timezone'] ?? null,
             syncToken: $data['{http://sabredav.org/ns}sync-token'] ?? null,
             uri: $data['uri'] ?? null,
-            shareOwner: $data['share-resource-uri'] ?? null,
+            shareOwner: $data['owner-name'] ?? null,
             isShared: !empty($data['share-access']) && $data['share-access'] > 1,
             order: (int) ($data['{http://apple.com/ns/ical/}calendar-order'] ?? 0),
             inviteStatus: $inviteStatus,

@@ -184,6 +184,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('{instanceId}/unsubscribe', [CalendarController::class, 'unsubscribeFromCalendar']);
 
         Route::prefix('{instanceId}/share')->group(function () {
+            Route::get('', [CalendarController::class, 'listSharees']);
             Route::post('', [CalendarController::class, 'shareCalendar']);
             Route::delete('{userId}', [CalendarController::class, 'revokeShare']);
         });

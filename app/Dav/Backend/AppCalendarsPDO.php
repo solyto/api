@@ -20,9 +20,25 @@ class AppCalendarsPDO extends SabreBackend
     {
         $entries = parent::getCalendarsForUser($principalUri);
 
+        $stmt = $this->pdo->prepare(
+            'SELECT ci.share_invitestatus, ci.share_href, o.principaluri AS owner_principaluri
+             FROM ' . $this->calendarInstancesTableName . ' ci
+             LEFT JOIN ' . $this->calendarInstancesTableName . ' o ON o.calendarid = ci.calendarid AND o.access = 1
+             WHERE ci.id = ?'
+        );
+
         $calendars = [];
 
         foreach ($entries as $entry) {
+            if ((int) ($entry['share-access'] ?? 0) > 1) {
+                $stmt->execute([$entry['id'][1]]);
+                if ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $entry['share-invitestatus'] = (int) $row['share_invitestatus'];
+                    $entry['share-href']         = $row['share_href'];
+                    $email = str_replace('principals/', '', $row['owner_principaluri']);
+                    $entry['owner-name'] = User::where('email', $email)->value('name');
+                }
+            }
             $calendars[] = CalendarDTO::fromSabre($entry);
         }
 
@@ -326,6 +342,61 @@ SQL
         return $this->getEventByUriCustom($calendar, $dto->uri) === null;
     }
 
+    public function updateInvites($calendarId, array $sharees): void
+    {
+        if (!is_array($calendarId)) {
+            throw new \InvalidArgumentException('The value passed to $calendarId is expected to be an array with a calendarId and an instanceId');
+        }
+        $currentInvites = $this->getInvites($calendarId);
+        [$calendarId, $instanceId] = $calendarId;
+
+        $removeStmt = $this->pdo->prepare('DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND share_href = ? AND access IN (2,3)');
+        $updateStmt = $this->pdo->prepare('UPDATE ' . $this->calendarInstancesTableName . ' SET access = ?, share_displayname = ?, share_invitestatus = ? WHERE calendarid = ? AND share_href = ?');
+        $insertStmt = $this->pdo->prepare('
+INSERT INTO ' . $this->calendarInstancesTableName . '
+    (calendarid, principaluri, access, displayname, uri, description, calendarorder, calendarcolor, timezone, transparent, share_href, share_displayname, share_invitestatus)
+    SELECT ?, ?, ?, displayname, ?, description, calendarorder, calendarcolor, timezone, 1, ?, ?, ?
+    FROM ' . $this->calendarInstancesTableName . ' WHERE id = ?');
+
+        foreach ($sharees as $sharee) {
+            if (\Sabre\DAV\Sharing\Plugin::ACCESS_NOACCESS === $sharee->access) {
+                $removeStmt->execute([$calendarId, $sharee->href]);
+                continue;
+            }
+
+            if (is_null($sharee->principal)) {
+                $sharee->inviteStatus = \Sabre\DAV\Sharing\Plugin::INVITE_INVALID;
+            } else {
+                $sharee->inviteStatus = \Sabre\DAV\Sharing\Plugin::INVITE_NORESPONSE;
+            }
+
+            foreach ($currentInvites as $oldSharee) {
+                if ($oldSharee->href === $sharee->href) {
+                    $sharee->properties = array_merge($oldSharee->properties, $sharee->properties);
+                    $updateStmt->execute([
+                        $sharee->access,
+                        $sharee->properties['{DAV:}displayname'] ?? null,
+                        $sharee->inviteStatus ?: $oldSharee->inviteStatus,
+                        $calendarId,
+                        $sharee->href,
+                    ]);
+                    continue 2;
+                }
+            }
+
+            $insertStmt->execute([
+                $calendarId,
+                $sharee->principal,
+                $sharee->access,
+                \Sabre\DAV\UUIDUtil::getUUID(),
+                $sharee->href,
+                $sharee->properties['{DAV:}displayname'] ?? null,
+                $sharee->inviteStatus ?: \Sabre\DAV\Sharing\Plugin::INVITE_NORESPONSE,
+                $instanceId,
+            ]);
+        }
+    }
+
     public function shareCalendarWithUserCustom(
         User $sender,
         User $receiver,
@@ -333,7 +404,7 @@ SQL
         bool $writeAccess
     )
     {
-        parent::updateInvites([$calendar->calendarId, $calendar->instanceId], [
+        $this->updateInvites([$calendar->calendarId, $calendar->instanceId], [
             new Sharee([
                 'href' => 'mailto:' . $receiver->email,
                 'principal' => DavHelper::getPrincipalUri($receiver),

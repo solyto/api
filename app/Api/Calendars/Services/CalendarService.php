@@ -68,7 +68,7 @@ class CalendarService
 
     public function listEvents(User $user, string $yearMonth): array
     {
-        $calendars = $this->list($user);
+        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $now = date('Y-m');
         $ttl = match(true) {
             $yearMonth < $now   => self::CACHE_TTL_EVENTS_PAST,
@@ -94,7 +94,7 @@ class CalendarService
 
     public function listWidgetEvents(User $user): array
     {
-        $calendars = $this->list($user);
+        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $today = date('Y-m-d');
         $events = [];
 
@@ -179,16 +179,23 @@ class CalendarService
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
     }
 
+    public function listSharees(CalendarDTO $calendar): array
+    {
+        return $this->dav->calendars()->sharing()->listSharees($calendar);
+    }
+
     public function revokeShare(CalendarDTO $calendar, User $recipient): void
     {
         $this->dav->calendars()->sharing()->revokeShare($calendar->calendarId, $recipient);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
+        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $recipient->id, $calendar->calendarId]);
     }
 
     public function unsubscribe(User $user, CalendarDTO $calendar): void
     {
         $this->dav->calendars()->delete($calendar);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
+        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
     }
 
     public function listInvites(User $user): array

@@ -32,7 +32,7 @@ class CalendarShareNotification extends BaseNotification
                 'sender'   => $this->senderName,
                 'calendar' => $this->calendarName,
             ]),
-            'link'  => '/calendars',
+            'link'  => '/calendar?invitations',
         ]);
     }
 
@@ -46,7 +46,7 @@ class CalendarShareNotification extends BaseNotification
                     'calendar' => $this->calendarName,
                 ]))
                 ->icon(config('app.landing_page_url') . '/logo_cut.png')
-                ->data(['url' => config('app.frontend_url') . '/calendars'])
+                ->data(['url' => config('app.frontend_url') . '/calendar?invitations'])
         );
     }
 
@@ -60,7 +60,7 @@ class CalendarShareNotification extends BaseNotification
                     'sender'   => $this->senderName,
                     'calendar' => $this->calendarName,
                 ]))
-                ->action(__('notifications.action_view_calendars'), config('app.frontend_url') . '/calendars')
+                ->action(__('notifications.action_view_calendars'), config('app.frontend_url') . '/calendar?invitations')
         );
     }
 
@@ -73,7 +73,7 @@ class CalendarShareNotification extends BaseNotification
                     'sender'   => $this->senderName,
                     'calendar' => $this->calendarName,
                 ]))
-                ->url(config('app.frontend_url') . '/calendars', __('notifications.action_view'))
+                ->url(config('app.frontend_url') . '/calendar?invitations', __('notifications.action_view'))
         );
     }
 }
