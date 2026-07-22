@@ -53,7 +53,7 @@ class QuickAddController
      */
     public function detect(DetectRequest $request): JsonResponse
     {
-        $result = $this->quickAddService->detect($request->validated('url'));
+        $result = $this->quickAddService->detect($request->validated('content'));
 
         return ApiResponse::success(
             new QuickAddResource($result),
@@ -102,7 +102,7 @@ class QuickAddController
 
         $result = $this->quickAddService->commit(
             $request->user(),
-            $validated['url'],
+            $validated['content'],
             QuickAddContentType::from($validated['content_type']),
             $validated['metadata'] ?? null,
         );

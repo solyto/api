@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @OA\Schema(
  *     schema="QuickAddDetection",
  *
- *     @OA\Property(property="url", type="string", format="uri"),
+ *     @OA\Property(property="content", type="string"),
  *     @OA\Property(property="content_type", type="string", enum={"music","books","movies","games","links","recipes","plants","quotes","todo","note","feed","clipboard"}),
  *     @OA\Property(property="confidence", type="number", format="float", minimum=0, maximum=1),
  *     @OA\Property(property="needs_confirmation", type="boolean"),
@@ -21,7 +21,7 @@ class QuickAddResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'url' => $this->resource->url,
+            'content' => $this->resource->content,
             'content_type' => $this->resource->contentType->value,
             'confidence' => $this->resource->confidence,
             'needs_confirmation' => $this->resource->needsConfirmation,
