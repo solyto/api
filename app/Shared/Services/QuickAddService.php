@@ -22,6 +22,7 @@ use App\Api\Libraries\Services\LibraryRecipeService;
 use App\Api\Notes\Services\NoteService;
 use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
+use App\Shared\Helpers\UrlHelper;
 use Illuminate\Support\Str;
 
 class QuickAddService
@@ -34,7 +35,7 @@ class QuickAddService
             return $this->makeResult($content, QuickAddContentType::Todo, 0.70);
         }
 
-        if (Str::contains($content, ['https://', 'http://', 'www.'])) {
+        if (UrlHelper::hasUrl($content)) {
             return $this->detectBasedOnUrl($content);
         }
 
@@ -47,6 +48,8 @@ class QuickAddService
 
     private function detectBasedOnUrl(string $content): DetectionResult
     {
+        $content = UrlHelper::extractUrl($content) ?? $content;
+
         if (Str::contains($content, [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl()])) {
             return $this->makeResult($content, QuickAddContentType::Music, 0.95);
         }
@@ -78,6 +81,10 @@ class QuickAddService
     public function commit(User $user, string $content, QuickAddContentType $contentType, ?array $metadata): mixed
     {
         $metadata ??= [];
+
+        if (UrlHelper::hasUrl($content)) {
+            $content = UrlHelper::extractUrl($content) ?? $content;
+        }
 
         return match ($contentType) {
             QuickAddContentType::Links => app(LibraryLinkService::class)->create($user, [

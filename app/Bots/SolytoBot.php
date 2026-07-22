@@ -140,7 +140,7 @@ class SolytoBot implements BotInterface
 
         if (!$detection->needsConfirmation) {
             $result = $this->gateway->commit(
-                $detection->url,
+                $detection->content,
                 $detection->contentType,
                 $detection->metadata,
             );
