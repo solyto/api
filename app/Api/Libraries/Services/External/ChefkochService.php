@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 class ChefkochService
 {
     private const string GET_RECIPE_URL = 'https://api.chefkoch.de/v2/recipes/%d';
+
     private const string SEARCH_URL = 'https://api.chefkoch.de/v2/api-gateway/recipes/v1/search';
 
     public function importFromUrl(string $url): ?RecipeReleaseDTO
@@ -23,12 +24,20 @@ class ChefkochService
 
         $ingredients = collect($result['ingredientGroups'] ?? [])
             ->flatMap(fn ($group) => $group['ingredients'] ?? [])
-            ->map(fn ($ingredient) => trim(
-                $this->formatAmount($ingredient['amount'] ?? 0, $ingredient['unit'] ?? '').
-                ' '.($ingredient['name'] ?? '')
-            ))
+            ->map(fn ($ingredient) => [
+                'name' => trim($ingredient['name'] ?? ''),
+                'amount' => ! empty($ingredient['amount']) ? (float) $ingredient['amount'] : null,
+                'unit' => ! empty($ingredient['unit']) ? trim($ingredient['unit']) : null,
+            ])
+            ->filter(fn ($ingredient) => $ingredient['name'] !== '')
+            ->values()
+            ->all();
+
+        $steps = collect(preg_split('/\r\n|\r|\n/', (string) ($result['instructions'] ?? '')) ?: [])
+            ->map(fn ($step) => trim($step))
             ->filter()
-            ->implode("\n");
+            ->values()
+            ->all();
 
         $cover = null;
         if (! empty($result['previewImageUrlTemplate'])) {
@@ -44,8 +53,8 @@ class ChefkochService
             description: $result['subtitle'] ?? null,
             timeToMake: $result['totalTime'] ?? null,
             rating: $result['rating']['rating'] ?? null,
-            ingredients: $ingredients ?: null,
-            instructions: $result['instructions'] ?? null,
+            ingredients: $ingredients,
+            steps: $steps,
             servings: $result['servings'] ?? null,
             tags: $result['tags'] ?? [],
         );
@@ -90,16 +99,5 @@ class ChefkochService
         preg_match('/(\d+)/', $path, $matches);
 
         return (int) ($matches[1] ?? 0);
-    }
-
-    private function formatAmount(float $amount, string $unit): string
-    {
-        if ($amount == 0 && empty($unit)) {
-            return '';
-        }
-
-        $formatted = rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
-
-        return $formatted.($unit ? ' '.$unit : '');
     }
 }

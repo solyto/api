@@ -142,8 +142,8 @@ class QuickAddService
         $service = app(LibraryMusicService::class);
 
         $dto = Str::contains($url, MusicServiceEnum::DISCOGS->baseUrl())
-            ? $service->importFromDiscogs($url)
-            : $service->importFromDeezer($url);
+            ? $service->import(MusicServiceEnum::DISCOGS, $url)
+            : $service->import(MusicServiceEnum::DEEZER, $url);
 
         if ($dto === null) {
             return null;
@@ -164,8 +164,8 @@ class QuickAddService
         $service = app(LibraryBookService::class);
 
         $dto = Str::contains($url, BookServiceEnum::GOODREADS->baseUrl())
-            ? $service->importFromGoodreads($url)
-            : $service->importFromHardcover($url);
+            ? $service->import(BookServiceEnum::GOODREADS, $url)
+            : $service->import(BookServiceEnum::HARDCOVER, $url);
 
         if ($dto === null) {
             return null;
@@ -191,7 +191,7 @@ class QuickAddService
     {
         $service = app(LibraryMovieService::class);
 
-        $dto = $service->importFromImdb($url);
+        $dto = $service->import(MovieServiceEnum::IMDB, $url);
 
         if ($dto === null) {
             return null;
@@ -212,8 +212,8 @@ class QuickAddService
 
         $isBgg = Str::contains($url, GameServiceEnum::BGG->baseUrl());
         $dto = $isBgg
-            ? $service->importFromBgg($url)
-            : $service->importFromSteam($url);
+            ? $service->import(GameServiceEnum::BGG, $url)
+            : $service->import(GameServiceEnum::STEAM, $url);
 
         if ($dto === null) {
             return null;
@@ -237,7 +237,7 @@ class QuickAddService
         $service = app(LibraryRecipeService::class);
 
         if (Str::contains($content, RecipeServiceEnum::CHEFKOCH->baseUrl())) {
-            $dto = $service->importFromChefkoch($content);
+            $dto = $service->import(RecipeServiceEnum::CHEFKOCH, $content);
 
             if ($dto === null) {
                 return null;
@@ -249,7 +249,9 @@ class QuickAddService
                 'cover_path' => $dto->getCover(),
                 'description' => $dto->getDescription(),
                 'ingredients' => $dto->getIngredients(),
+                'steps' => $dto->getSteps(),
                 'time_to_make' => $dto->getTimeToMake(),
+                'servings' => $dto->getServings(),
                 'rating' => $dto->getRating() ? (int) round($dto->getRating()) : null,
             ]);
         }

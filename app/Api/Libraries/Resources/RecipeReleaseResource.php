@@ -17,8 +17,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="description", type="string", nullable=true),
  *     @OA\Property(property="time_to_make", type="integer", nullable=true),
  *     @OA\Property(property="rating", type="number", nullable=true),
- *     @OA\Property(property="ingredients", type="string", nullable=true),
- *     @OA\Property(property="instructions", type="string", nullable=true),
+ *     @OA\Property(property="ingredients", type="array", @OA\Items(@OA\Property(property="name", type="string"), @OA\Property(property="amount", type="number", nullable=true), @OA\Property(property="unit", type="string", nullable=true))),
+ *     @OA\Property(property="steps", type="array", @OA\Items(type="string")),
  *     @OA\Property(property="servings", type="integer", nullable=true),
  *     @OA\Property(property="tags", type="array", @OA\Items(type="string"))
  * )
@@ -37,7 +37,7 @@ class RecipeReleaseResource extends JsonResource
             'time_to_make' => $this->getTimeToMake(),
             'rating' => $this->getRating(),
             'ingredients' => $this->getIngredients(),
-            'instructions' => $this->getInstructions(),
+            'steps' => $this->getSteps(),
             'servings' => $this->getServings(),
             'tags' => $this->getTags(),
         ];
