@@ -26,6 +26,7 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Shared\Models\AiUsage;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class StatisticsService
 {
@@ -36,6 +37,10 @@ class StatisticsService
         return [
             'users' => User::count(),
             'confirmed_users' => User::whereNotNull('email_verified_at')->count(),
+            'active_users' => PersonalAccessToken::where('tokenable_type', User::class)
+                ->where('last_used_at', '>=', now()->subDays(30))
+                ->distinct()
+                ->count('tokenable_id'),
             'todos' => Todo::count(),
             'todo_categories' => TodoCategory::count(),
             'todo_workspaces' => TodoWorkspace::count(),
