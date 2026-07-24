@@ -101,15 +101,18 @@ class LibraryRecipeController
      *         required=true,
      *
      *         @OA\JsonContent(
-     *             required={"title", "platform"},
+     *             required={"title"},
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="rating", type="integer", minimum=1, maximum=5, nullable=true),
+     *             @OA\Property(property="calories", type="integer", minimum=0, nullable=true),
      *             @OA\Property(property="time_to_make", type="integer", nullable=true),
+     *             @OA\Property(property="servings", type="integer", minimum=1, nullable=true),
      *             @OA\Property(property="cover_path", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true),
      *             @OA\Property(property="description", type="string", nullable=true),
-     *             @OA\Property(property="ingredients", type="string", maxLength=255, nullable=true),
+     *             @OA\Property(property="ingredients", type="array", nullable=true, @OA\Items(@OA\Property(property="name", type="string"), @OA\Property(property="amount", type="number", nullable=true), @OA\Property(property="unit", type="string", nullable=true))),
+     *             @OA\Property(property="steps", type="array", nullable=true, @OA\Items(type="string")),
      *             @OA\Property(property="type", type="string", enum={"breakfast", "lunch", "dinner", "snack", "dessert", "drink", "other"}, nullable=true)
      *         )
      *     ),
@@ -160,11 +163,14 @@ class LibraryRecipeController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="rating", type="integer", minimum=1, maximum=5, nullable=true),
+     *             @OA\Property(property="calories", type="integer", minimum=0, nullable=true),
      *             @OA\Property(property="time_to_make", type="integer", nullable=true),
+     *             @OA\Property(property="servings", type="integer", minimum=1, nullable=true),
      *             @OA\Property(property="cover_path", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="link", type="string", format="uri", maxLength=255, nullable=true),
      *             @OA\Property(property="description", type="string", nullable=true),
-     *             @OA\Property(property="ingredients", type="string", maxLength=255, nullable=true),
+     *             @OA\Property(property="ingredients", type="array", nullable=true, @OA\Items(@OA\Property(property="name", type="string"), @OA\Property(property="amount", type="number", nullable=true), @OA\Property(property="unit", type="string", nullable=true))),
+     *             @OA\Property(property="steps", type="array", nullable=true, @OA\Items(type="string")),
      *             @OA\Property(property="type", type="string", enum={"breakfast", "lunch", "dinner", "snack", "dessert", "drink", "other"}, nullable=true)
      *         )
      *     ),
@@ -284,7 +290,7 @@ class LibraryRecipeController
 
         $recipe = $this->libraryRecipeService->import($service, $data['url']);
 
-        if (!$recipe) {
+        if (! $recipe) {
             return ApiResponse::error('Recipe not found.', 404);
         }
 

@@ -23,8 +23,11 @@ class LibraryRecipe extends Model
     protected $fillable = [
         'title',
         'rating',
+        'calories',
         'time_to_make',
+        'servings',
         'description',
+        'steps',
         'ingredients',
         'type',
         'cover_path',
@@ -33,6 +36,10 @@ class LibraryRecipe extends Model
     ];
 
     protected $casts = [
+        'calories' => 'integer',
+        'servings' => 'integer',
+        'ingredients' => 'array',
+        'steps' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

@@ -15,14 +15,28 @@ class LibraryRecipeFactory extends Factory
         return [
             'title' => $this->faker->sentence(4),
             'rating' => $this->faker->numberBetween(1, 5),
+            'calories' => $this->faker->optional(0.6)->numberBetween(150, 900),
             'time_to_make' => $this->faker->numberBetween(15, 180),
+            'servings' => $this->faker->numberBetween(1, 6),
             'description' => $this->faker->optional(0.7)->paragraph(),
+            'steps' => $this->faker->randomElement([
+                ['Preheat the oven to 180°C.', 'Mix all dry ingredients.', 'Bake for 25 minutes.'],
+                ['Bring water to a boil.', 'Cook the pasta al dente.', 'Toss with the sauce and serve.'],
+                ['Sear the meat on both sides.', 'Add the vegetables.', 'Simmer for one hour.'],
+            ]),
             'ingredients' => $this->faker->randomElement([
-                'Flour, sugar, eggs, butter',
-                'Pasta, tomato sauce, basil, parmesan',
-                'Chicken, rice, vegetables, soy sauce',
-                'Beef, potatoes, carrots, onions',
-                'Fish, lemon, herbs, olive oil',
+                [
+                    ['name' => 'Flour', 'amount' => 500, 'unit' => 'g'],
+                    ['name' => 'Sugar', 'amount' => 200, 'unit' => 'g'],
+                    ['name' => 'Eggs', 'amount' => 3, 'unit' => null],
+                    ['name' => 'Butter', 'amount' => 250, 'unit' => 'g'],
+                ],
+                [
+                    ['name' => 'Pasta', 'amount' => 400, 'unit' => 'g'],
+                    ['name' => 'Tomato sauce', 'amount' => 500, 'unit' => 'ml'],
+                    ['name' => 'Basil', 'amount' => null, 'unit' => null],
+                    ['name' => 'Parmesan', 'amount' => 50, 'unit' => 'g'],
+                ],
             ]),
             'type' => $this->faker->randomElement(['breakfast', 'lunch', 'dinner', 'snack', 'dessert']),
             'cover_path' => null,

@@ -13,8 +13,8 @@ readonly class RecipeReleaseDTO
         private ?string $description = null,
         private ?int $timeToMake = null,
         private ?float $rating = null,
-        private ?string $ingredients = null,
-        private ?string $instructions = null,
+        private array $ingredients = [],
+        private array $steps = [],
         private ?int $servings = null,
         private array $tags = [],
     ) {}
@@ -59,14 +59,14 @@ readonly class RecipeReleaseDTO
         return $this->rating;
     }
 
-    public function getIngredients(): ?string
+    public function getIngredients(): array
     {
         return $this->ingredients;
     }
 
-    public function getInstructions(): ?string
+    public function getSteps(): array
     {
-        return $this->instructions;
+        return $this->steps;
     }
 
     public function getServings(): ?int
