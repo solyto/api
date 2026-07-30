@@ -26,7 +26,7 @@ class ScaleCovers implements ShouldQueue
         Log::channel('queue')->info('Looking for covers that are too big..');
 
         $folders = File::directories(storage_path('app/public/user'));
-        $dirs = ['music', 'movies', 'books', 'recipes'];
+        $dirs = ['music', 'movies', 'books', 'recipes', 'youtube'];
 
         foreach ($folders as $folder) {
             $folderName = Str::replace(storage_path('app/public/user/'), '', $folder);
