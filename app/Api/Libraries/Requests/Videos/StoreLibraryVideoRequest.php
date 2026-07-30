@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Api\Libraries\Requests\Youtube;
+namespace App\Api\Libraries\Requests\Videos;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreLibraryYoutubeVideoRequest extends FormRequest
+class StoreLibraryVideoRequest extends FormRequest
 {
     public function rules(): array
     {
@@ -13,7 +13,7 @@ class StoreLibraryYoutubeVideoRequest extends FormRequest
             'url' => 'required|url',
             'is_favorite' => 'boolean',
             'cover_path' => 'nullable|string',
-            'category_id' => 'nullable|exists:library_youtube_categories,id',
+            'category_id' => 'nullable|exists:library_videos_categories,id',
         ];
     }
 }

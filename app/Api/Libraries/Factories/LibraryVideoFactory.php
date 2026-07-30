@@ -2,14 +2,14 @@
 
 namespace App\Api\Libraries\Factories;
 
-use App\Api\Libraries\Models\LibraryYoutubeCategory;
-use App\Api\Libraries\Models\LibraryYoutubeVideo;
+use App\Api\Libraries\Models\LibraryVideoCategory;
+use App\Api\Libraries\Models\LibraryVideo;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-class LibraryYoutubeVideoFactory extends Factory
+class LibraryVideoFactory extends Factory
 {
-    protected $model = LibraryYoutubeVideo::class;
+    protected $model = LibraryVideo::class;
 
     public function definition(): array
     {
@@ -40,7 +40,7 @@ class LibraryYoutubeVideoFactory extends Factory
         ]);
     }
 
-    public function withCategory(LibraryYoutubeCategory $category): static
+    public function withCategory(LibraryVideoCategory $category): static
     {
         return $this->state(fn (array $attributes) => [
             'category_id' => $category->id,

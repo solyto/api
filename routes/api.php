@@ -27,8 +27,8 @@ use App\Api\Libraries\Controllers\LibraryMusicGenreController;
 use App\Api\Libraries\Controllers\LibraryPlantController;
 use App\Api\Libraries\Controllers\LibraryQuoteController;
 use App\Api\Libraries\Controllers\LibraryRecipeController;
-use App\Api\Libraries\Controllers\LibraryYoutubeCategoryController;
-use App\Api\Libraries\Controllers\LibraryYoutubeVideoController;
+use App\Api\Libraries\Controllers\LibraryVideoCategoryController;
+use App\Api\Libraries\Controllers\LibraryVideoController;
 use App\Api\Notes\Controllers\NoteCategoryController;
 use App\Api\Notes\Controllers\NoteController;
 use App\Api\Notes\Controllers\NotesImportExportController;
@@ -294,12 +294,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover'])->name('uploadCover');
         });
 
-        Route::prefix('youtube')->name('youtube.')->group(function () {
-            Route::put('categories/reorder', [LibraryYoutubeCategoryController::class, 'reorder']);
-            Route::apiResource('categories', LibraryYoutubeCategoryController::class);
+        Route::prefix('videos')->name('videos.')->group(function () {
+            Route::put('categories/reorder', [LibraryVideoCategoryController::class, 'reorder']);
+            Route::apiResource('categories', LibraryVideoCategoryController::class);
 
-            Route::put('reorder', [LibraryYoutubeVideoController::class, 'reorder']);
-            Route::apiResource('/', LibraryYoutubeVideoController::class)->parameters(['' => 'video']);
+            Route::put('reorder', [LibraryVideoController::class, 'reorder']);
+            Route::apiResource('/', LibraryVideoController::class)->parameters(['' => 'video']);
         });
     });
 

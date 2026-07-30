@@ -19,7 +19,7 @@ class GenerateLibraryCoverPreviews extends Command
         LibraryTypeEnum::PLANT,
         LibraryTypeEnum::RECIPE,
         LibraryTypeEnum::MOVIE,
-        LibraryTypeEnum::YOUTUBE_VIDEO,
+        LibraryTypeEnum::VIDEO,
     ];
 
     public function handle(ImageTransformationService $imageTransformation): int

@@ -3,16 +3,16 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
-use App\Api\Libraries\Models\LibraryYoutubeCategory;
-use App\Api\Libraries\Models\LibraryYoutubeVideo;
+use App\Api\Libraries\Models\LibraryVideo;
+use App\Api\Libraries\Models\LibraryVideoCategory;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UrlCrawlerService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
 
-class LibraryYoutubeService
+class LibraryVideoService
 {
-    private const string CACHE_KEY = 'youtube_videos';
+    private const string CACHE_KEY = 'videos';
     private const int CACHE_TTL = 86400;
 
     public function __construct(
@@ -26,7 +26,7 @@ class LibraryYoutubeService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => LibraryYoutubeVideo::forUser($user->id)
+            fn() => LibraryVideo::forUser($user->id)
                 ->with('category')
                 ->orderBy('sort_order', 'asc')
                 ->orderBy('created_at', 'desc')
@@ -34,14 +34,14 @@ class LibraryYoutubeService
         );
     }
 
-    public function find(LibraryYoutubeVideo $video): LibraryYoutubeVideo
+    public function find(LibraryVideo $video): LibraryVideo
     {
         $video->load('category');
 
         return $video;
     }
 
-    public function create(User $user, array $data): LibraryYoutubeVideo
+    public function create(User $user, array $data): LibraryVideo
     {
         $data['user_id'] = $user->id;
 
@@ -55,13 +55,13 @@ class LibraryYoutubeService
         $data['cover_path'] = null;
 
         if ($thumbnailUrl) {
-            $save = $this->coverService->saveCover($data['user_id'], $thumbnailUrl, LibraryTypeEnum::YOUTUBE_VIDEO);
+            $save = $this->coverService->saveCover($data['user_id'], $thumbnailUrl, LibraryTypeEnum::VIDEO);
             if ($save) {
                 $data['cover_path'] = $save;
             }
         }
 
-        $video = LibraryYoutubeVideo::create($data);
+        $video = LibraryVideo::create($data);
         $video->load(['user', 'category']);
 
         $this->cache->forget([self::CACHE_KEY, $user->id]);
@@ -69,14 +69,14 @@ class LibraryYoutubeService
         return $video;
     }
 
-    public function update(LibraryYoutubeVideo $video, array $data): LibraryYoutubeVideo
+    public function update(LibraryVideo $video, array $data): LibraryVideo
     {
         if (!empty($data['url']) && $data['url'] !== $video->url) {
             $data['video_id'] = $this->extractVideoId($data['url']) ?? $video->video_id;
         }
 
         if (!empty($data['cover_path'])) {
-            $save = $this->coverService->saveCover($video->user_id, $data['cover_path'], LibraryTypeEnum::YOUTUBE_VIDEO);
+            $save = $this->coverService->saveCover($video->user_id, $data['cover_path'], LibraryTypeEnum::VIDEO);
             if ($save) {
                 $data['cover_path'] = $save;
             }
@@ -90,7 +90,7 @@ class LibraryYoutubeService
         return $video;
     }
 
-    public function destroy(LibraryYoutubeVideo $video): void
+    public function destroy(LibraryVideo $video): void
     {
         $userId = $video->user_id;
         $video->delete();
@@ -101,7 +101,7 @@ class LibraryYoutubeService
     public function reorder(User $user, array $ids): void
     {
         foreach ($ids as $order => $id) {
-            LibraryYoutubeVideo::where('id', $id)->where('user_id', $user->id)->update(['sort_order' => $order]);
+            LibraryVideo::where('id', $id)->where('user_id', $user->id)->update(['sort_order' => $order]);
         }
 
         $this->cache->forget([self::CACHE_KEY, $user->id]);
@@ -109,20 +109,20 @@ class LibraryYoutubeService
 
     public function listCategories(User $user): Collection
     {
-        return LibraryYoutubeCategory::forUser($user->id)->orderBy('sort_order', 'asc')->orderBy('title', 'asc')->get();
+        return LibraryVideoCategory::forUser($user->id)->orderBy('sort_order', 'asc')->orderBy('title', 'asc')->get();
     }
 
-    public function createCategory(User $user, array $data): LibraryYoutubeCategory
+    public function createCategory(User $user, array $data): LibraryVideoCategory
     {
         $data['user_id'] = $user->id;
-        $category = LibraryYoutubeCategory::create($data);
+        $category = LibraryVideoCategory::create($data);
 
         $this->cache->forget([self::CACHE_KEY, $user->id]);
 
         return $category;
     }
 
-    public function updateCategory(LibraryYoutubeCategory $category, array $data): LibraryYoutubeCategory
+    public function updateCategory(LibraryVideoCategory $category, array $data): LibraryVideoCategory
     {
         $userId = $category->user_id;
         $category->update($data);
@@ -132,7 +132,7 @@ class LibraryYoutubeService
         return $category;
     }
 
-    public function destroyCategory(LibraryYoutubeCategory $category): void
+    public function destroyCategory(LibraryVideoCategory $category): void
     {
         $userId = $category->user_id;
         $category->delete();
@@ -143,7 +143,7 @@ class LibraryYoutubeService
     public function reorderCategories(User $user, array $ids): void
     {
         foreach ($ids as $order => $id) {
-            LibraryYoutubeCategory::where('id', $id)->where('user_id', $user->id)->update(['sort_order' => $order]);
+            LibraryVideoCategory::where('id', $id)->where('user_id', $user->id)->update(['sort_order' => $order]);
         }
 
         $this->cache->forget([self::CACHE_KEY, $user->id]);

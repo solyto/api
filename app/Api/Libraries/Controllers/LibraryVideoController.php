@@ -4,25 +4,25 @@ namespace App\Api\Libraries\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
-use App\Api\Libraries\Models\LibraryYoutubeVideo;
-use App\Api\Libraries\Requests\Youtube\StoreLibraryYoutubeVideoRequest;
-use App\Api\Libraries\Requests\Youtube\UpdateLibraryYoutubeVideoRequest;
-use App\Api\Libraries\Resources\LibraryYoutubeVideoResource;
-use App\Api\Libraries\Services\LibraryYoutubeService;
+use App\Api\Libraries\Models\LibraryVideo;
+use App\Api\Libraries\Requests\Videos\StoreLibraryVideoRequest;
+use App\Api\Libraries\Requests\Videos\UpdateLibraryVideoRequest;
+use App\Api\Libraries\Resources\LibraryVideoResource;
+use App\Api\Libraries\Services\LibraryVideoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class LibraryYoutubeVideoController
+class LibraryVideoController
 {
     use HandlesApiAuth;
 
-    public function __construct(private readonly LibraryYoutubeService $libraryYoutubeService) {}
+    public function __construct(private readonly LibraryVideoService $libraryVideoService) {}
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/youtube",
-     *     operationId="listLibraryYoutubeVideos",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos",
+     *     operationId="listLibraryVideos",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Response(
@@ -33,7 +33,7 @@ class LibraryYoutubeVideoController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Videos retrieved successfully."),
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryYoutubeVideo"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryVideo"))
      *         )
      *     ),
      *
@@ -43,16 +43,16 @@ class LibraryYoutubeVideoController
     public function index(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            LibraryYoutubeVideoResource::collection($this->libraryYoutubeService->list($request->user())),
+            LibraryVideoResource::collection($this->libraryVideoService->list($request->user())),
             'Videos retrieved successfully.'
         );
     }
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/youtube/{video}",
-     *     operationId="showLibraryYoutubeVideo",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/{video}",
+     *     operationId="showLibraryVideo",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -72,7 +72,7 @@ class LibraryYoutubeVideoController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Video retrieved successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/LibraryYoutubeVideo")
+     *             @OA\Property(property="data", ref="#/components/schemas/LibraryVideo")
      *         )
      *     ),
      *
@@ -81,20 +81,20 @@ class LibraryYoutubeVideoController
      *     @OA\Response(response=404, description="Video not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function show(Request $request, LibraryYoutubeVideo $video): JsonResponse
+    public function show(Request $request, LibraryVideo $video): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $video), 403);
 
-        $video = $this->libraryYoutubeService->find($video);
+        $video = $this->libraryVideoService->find($video);
 
-        return ApiResponse::success(new LibraryYoutubeVideoResource($video), 'Video retrieved successfully.');
+        return ApiResponse::success(new LibraryVideoResource($video), 'Video retrieved successfully.');
     }
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/youtube",
-     *     operationId="storeLibraryYoutubeVideo",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos",
+     *     operationId="storeLibraryVideo",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\RequestBody(
@@ -119,7 +119,7 @@ class LibraryYoutubeVideoController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Video created successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/LibraryYoutubeVideo")
+     *             @OA\Property(property="data", ref="#/components/schemas/LibraryVideo")
      *         )
      *     ),
      *
@@ -127,18 +127,18 @@ class LibraryYoutubeVideoController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function store(StoreLibraryYoutubeVideoRequest $request): JsonResponse
+    public function store(StoreLibraryVideoRequest $request): JsonResponse
     {
-        $video = $this->libraryYoutubeService->create($request->user(), $request->validated());
+        $video = $this->libraryVideoService->create($request->user(), $request->validated());
 
-        return ApiResponse::success(new LibraryYoutubeVideoResource($video), 'Video created successfully.', 201);
+        return ApiResponse::success(new LibraryVideoResource($video), 'Video created successfully.', 201);
     }
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/youtube/{video}",
-     *     operationId="updateLibraryYoutubeVideo",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/{video}",
+     *     operationId="updateLibraryVideo",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -171,7 +171,7 @@ class LibraryYoutubeVideoController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Video updated successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/LibraryYoutubeVideo")
+     *             @OA\Property(property="data", ref="#/components/schemas/LibraryVideo")
      *         )
      *     ),
      *
@@ -180,20 +180,20 @@ class LibraryYoutubeVideoController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function update(UpdateLibraryYoutubeVideoRequest $request, LibraryYoutubeVideo $video): JsonResponse
+    public function update(UpdateLibraryVideoRequest $request, LibraryVideo $video): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $video), 403);
 
-        $video = $this->libraryYoutubeService->update($video, $request->validated());
+        $video = $this->libraryVideoService->update($video, $request->validated());
 
-        return ApiResponse::success(new LibraryYoutubeVideoResource($video), 'Video updated successfully.');
+        return ApiResponse::success(new LibraryVideoResource($video), 'Video updated successfully.');
     }
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/youtube/{video}",
-     *     operationId="destroyLibraryYoutubeVideo",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/{video}",
+     *     operationId="destroyLibraryVideo",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -220,20 +220,20 @@ class LibraryYoutubeVideoController
      *     @OA\Response(response=403, description="Unauthorized", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function destroy(Request $request, LibraryYoutubeVideo $video): JsonResponse
+    public function destroy(Request $request, LibraryVideo $video): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $video), 403);
 
-        $this->libraryYoutubeService->destroy($video);
+        $this->libraryVideoService->destroy($video);
 
         return ApiResponse::success(null, 'Video deleted successfully.');
     }
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/youtube/reorder",
-     *     operationId="reorderLibraryYoutubeVideos",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/reorder",
+     *     operationId="reorderLibraryVideos",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\RequestBody(
@@ -264,7 +264,7 @@ class LibraryYoutubeVideoController
     {
         $request->validate(['videos' => 'required|array', 'videos.*' => 'string']);
 
-        $this->libraryYoutubeService->reorder($request->user(), $request->input('videos'));
+        $this->libraryVideoService->reorder($request->user(), $request->input('videos'));
 
         return ApiResponse::success(null, 'Videos reordered successfully.');
     }

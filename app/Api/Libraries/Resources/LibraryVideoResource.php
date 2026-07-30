@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @OA\Schema(
- *     schema="LibraryYoutubeVideo",
+ *     schema="LibraryVideo",
  *
  *     @OA\Property(property="id", type="string"),
  *     @OA\Property(property="title", type="string"),
@@ -16,12 +16,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="cover", type="string", format="uri", nullable=true),
  *     @OA\Property(property="is_favorite", type="boolean"),
  *     @OA\Property(property="sort_order", type="integer"),
- *     @OA\Property(property="category", ref="#/components/schemas/LibraryYoutubeCategory", nullable=true),
+ *     @OA\Property(property="category", ref="#/components/schemas/LibraryVideoCategory", nullable=true),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
  */
-class LibraryYoutubeVideoResource extends JsonResource
+class LibraryVideoResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -38,7 +38,7 @@ class LibraryYoutubeVideoResource extends JsonResource
             'cover' => $this->cover_path,
             'is_favorite' => $this->is_favorite,
             'sort_order' => $this->sort_order,
-            'category' => $this->whenLoaded('category', fn () => new LibraryYoutubeCategoryResource($this->category)
+            'category' => $this->whenLoaded('category', fn () => new LibraryVideoCategoryResource($this->category)
             ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

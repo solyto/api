@@ -2,13 +2,13 @@
 
 namespace App\Api\Libraries\Factories;
 
-use App\Api\Libraries\Models\LibraryYoutubeCategory;
+use App\Api\Libraries\Models\LibraryVideoCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-class LibraryYoutubeCategoryFactory extends Factory
+class LibraryVideoCategoryFactory extends Factory
 {
-    protected $model = LibraryYoutubeCategory::class;
+    protected $model = LibraryVideoCategory::class;
 
     public function definition(): array
     {
