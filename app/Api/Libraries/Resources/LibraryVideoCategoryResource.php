@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @OA\Schema(
- *     schema="LibraryYoutubeCategory",
+ *     schema="LibraryVideoCategory",
  *
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="title", type="string"),
@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
  */
-class LibraryYoutubeCategoryResource extends JsonResource
+class LibraryVideoCategoryResource extends JsonResource
 {
     /**
      * Transform the resource into an array.

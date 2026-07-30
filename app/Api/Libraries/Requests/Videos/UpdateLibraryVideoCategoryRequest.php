@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Api\Libraries\Requests\Youtube;
+namespace App\Api\Libraries\Requests\Videos;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateLibraryYoutubeCategoryRequest extends FormRequest
+class UpdateLibraryVideoCategoryRequest extends FormRequest
 {
     public function rules(): array
     {

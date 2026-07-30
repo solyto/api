@@ -11,11 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('library_youtube_categories', function (Blueprint $table) {
-            $table->id();
+        Schema::create('library_videos', function (Blueprint $table) {
+            $table->uuid('id')->primary();
             $table->string('title');
-            $table->string('color')->nullable();
+            $table->string('video_id')->nullable();
+            $table->string('url', 1000);
+            $table->text('cover_path')->nullable();
+            $table->boolean('is_favorite')->default(false);
             $table->integer('sort_order')->default(0);
+
+            $table->foreignId('category_id')->nullable();
+            $table->foreign('category_id')
+                  ->references('id')
+                  ->on('library_videos_categories')
+                  ->onDelete('set null');
 
             $table->uuid('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
@@ -29,6 +38,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('library_youtube_categories');
+        Schema::dropIfExists('library_videos');
     }
 };

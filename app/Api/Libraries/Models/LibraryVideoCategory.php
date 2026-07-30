@@ -2,23 +2,23 @@
 
 namespace App\Api\Libraries\Models;
 
-use App\Api\Libraries\Factories\LibraryYoutubeCategoryFactory;
+use App\Api\Libraries\Factories\LibraryVideoCategoryFactory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class LibraryYoutubeCategory extends Model
+class LibraryVideoCategory extends Model
 {
     use HasFactory;
 
-    protected static function newFactory(): LibraryYoutubeCategoryFactory
+    protected static function newFactory(): LibraryVideoCategoryFactory
     {
-        return LibraryYoutubeCategoryFactory::new();
+        return LibraryVideoCategoryFactory::new();
     }
 
-    protected $table = 'library_youtube_categories';
+    protected $table = 'library_videos_categories';
 
     protected $fillable = [
         'title',
@@ -44,6 +44,6 @@ class LibraryYoutubeCategory extends Model
 
     public function videos(): HasMany
     {
-        return $this->hasMany(LibraryYoutubeVideo::class, 'category_id');
+        return $this->hasMany(LibraryVideo::class, 'category_id');
     }
 }

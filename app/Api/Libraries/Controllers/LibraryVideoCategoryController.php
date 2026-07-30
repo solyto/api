@@ -4,25 +4,25 @@ namespace App\Api\Libraries\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
-use App\Api\Libraries\Models\LibraryYoutubeCategory;
-use App\Api\Libraries\Requests\Youtube\StoreLibraryYoutubeCategoryRequest;
-use App\Api\Libraries\Requests\Youtube\UpdateLibraryYoutubeCategoryRequest;
-use App\Api\Libraries\Resources\LibraryYoutubeCategoryResource;
-use App\Api\Libraries\Services\LibraryYoutubeService;
+use App\Api\Libraries\Models\LibraryVideoCategory;
+use App\Api\Libraries\Requests\Videos\StoreLibraryVideoCategoryRequest;
+use App\Api\Libraries\Requests\Videos\UpdateLibraryVideoCategoryRequest;
+use App\Api\Libraries\Resources\LibraryVideoCategoryResource;
+use App\Api\Libraries\Services\LibraryVideoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class LibraryYoutubeCategoryController
+class LibraryVideoCategoryController
 {
     use HandlesApiAuth;
 
-    public function __construct(private readonly LibraryYoutubeService $libraryYoutubeService) {}
+    public function __construct(private readonly LibraryVideoService $libraryVideoService) {}
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/youtube/categories",
-     *     operationId="listLibraryYoutubeCategories",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/categories",
+     *     operationId="listLibraryVideoCategories",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Response(
@@ -33,7 +33,7 @@ class LibraryYoutubeCategoryController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Categories retrieved successfully."),
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryYoutubeCategory"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryVideoCategory"))
      *         )
      *     ),
      *
@@ -43,16 +43,16 @@ class LibraryYoutubeCategoryController
     public function index(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            LibraryYoutubeCategoryResource::collection($this->libraryYoutubeService->listCategories($request->user())),
+            LibraryVideoCategoryResource::collection($this->libraryVideoService->listCategories($request->user())),
             'Categories retrieved successfully.'
         );
     }
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/youtube/categories",
-     *     operationId="storeLibraryYoutubeCategory",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/categories",
+     *     operationId="storeLibraryVideoCategory",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\RequestBody(
@@ -74,7 +74,7 @@ class LibraryYoutubeCategoryController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Category created successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/LibraryYoutubeCategory")
+     *             @OA\Property(property="data", ref="#/components/schemas/LibraryVideoCategory")
      *         )
      *     ),
      *
@@ -82,18 +82,18 @@ class LibraryYoutubeCategoryController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function store(StoreLibraryYoutubeCategoryRequest $request): JsonResponse
+    public function store(StoreLibraryVideoCategoryRequest $request): JsonResponse
     {
-        $category = $this->libraryYoutubeService->createCategory($request->user(), $request->validated());
+        $category = $this->libraryVideoService->createCategory($request->user(), $request->validated());
 
-        return ApiResponse::success(new LibraryYoutubeCategoryResource($category), 'Category created successfully.', 201);
+        return ApiResponse::success(new LibraryVideoCategoryResource($category), 'Category created successfully.', 201);
     }
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/youtube/categories/{category}",
-     *     operationId="updateLibraryYoutubeCategory",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/categories/{category}",
+     *     operationId="updateLibraryVideoCategory",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -124,7 +124,7 @@ class LibraryYoutubeCategoryController
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Category updated successfully."),
-     *             @OA\Property(property="data", ref="#/components/schemas/LibraryYoutubeCategory")
+     *             @OA\Property(property="data", ref="#/components/schemas/LibraryVideoCategory")
      *         )
      *     ),
      *
@@ -133,20 +133,20 @@ class LibraryYoutubeCategoryController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function update(UpdateLibraryYoutubeCategoryRequest $request, LibraryYoutubeCategory $category): JsonResponse
+    public function update(UpdateLibraryVideoCategoryRequest $request, LibraryVideoCategory $category): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $category), 403);
 
-        $category = $this->libraryYoutubeService->updateCategory($category, $request->validated());
+        $category = $this->libraryVideoService->updateCategory($category, $request->validated());
 
-        return ApiResponse::success(new LibraryYoutubeCategoryResource($category), 'Category updated successfully.');
+        return ApiResponse::success(new LibraryVideoCategoryResource($category), 'Category updated successfully.');
     }
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/youtube/categories/{category}",
-     *     operationId="destroyLibraryYoutubeCategory",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/categories/{category}",
+     *     operationId="destroyLibraryVideoCategory",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -173,20 +173,20 @@ class LibraryYoutubeCategoryController
      *     @OA\Response(response=403, description="Unauthorized", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function destroy(Request $request, LibraryYoutubeCategory $category): JsonResponse
+    public function destroy(Request $request, LibraryVideoCategory $category): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $category), 403);
 
-        $this->libraryYoutubeService->destroyCategory($category);
+        $this->libraryVideoService->destroyCategory($category);
 
         return ApiResponse::success(null, 'Category deleted successfully.');
     }
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/youtube/categories/reorder",
-     *     operationId="reorderLibraryYoutubeCategories",
-     *     tags={"Libraries - YouTube"},
+     *     path="/api/libraries/videos/categories/reorder",
+     *     operationId="reorderLibraryVideoCategories",
+     *     tags={"Libraries - Videos"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\RequestBody(
@@ -217,7 +217,7 @@ class LibraryYoutubeCategoryController
     {
         $request->validate(['categories' => 'required|array', 'categories.*' => 'integer']);
 
-        $this->libraryYoutubeService->reorderCategories($request->user(), $request->input('categories'));
+        $this->libraryVideoService->reorderCategories($request->user(), $request->input('categories'));
 
         return ApiResponse::success(null, 'Categories reordered successfully.');
     }
