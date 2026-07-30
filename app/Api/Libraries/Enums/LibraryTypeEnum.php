@@ -12,6 +12,7 @@ enum LibraryTypeEnum: string
     case RECIPE = 'recipes';
     case LINK = 'links';
     case PLANT = 'plants';
+    case YOUTUBE_VIDEO = 'youtube';
 
     public function storageFolderName(): string
     {
@@ -24,6 +25,7 @@ enum LibraryTypeEnum: string
             self::RECIPE => 'recipes',
             self::LINK => 'links',
             self::PLANT => 'plants',
+            self::YOUTUBE_VIDEO => 'youtube',
         };
     }
 
@@ -31,7 +33,7 @@ enum LibraryTypeEnum: string
     {
         return match($this) {
             self::MUSIC, self::BOOK                                              => true,
-            self::MOVIE, self::GAME, self::QUOTE, self::RECIPE, self::LINK, self::PLANT => false,
+            self::MOVIE, self::GAME, self::QUOTE, self::RECIPE, self::LINK, self::PLANT, self::YOUTUBE_VIDEO => false,
         };
     }
 
@@ -46,6 +48,7 @@ enum LibraryTypeEnum: string
             self::RECIPE => \App\Api\Libraries\Models\LibraryRecipe::class,
             self::LINK => \App\Api\Libraries\Models\LibraryLink::class,
             self::PLANT => \App\Api\Libraries\Models\LibraryPlant::class,
+            self::YOUTUBE_VIDEO => \App\Api\Libraries\Models\LibraryYoutubeVideo::class,
         };
     }
 }

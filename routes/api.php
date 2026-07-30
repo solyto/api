@@ -27,6 +27,8 @@ use App\Api\Libraries\Controllers\LibraryMusicGenreController;
 use App\Api\Libraries\Controllers\LibraryPlantController;
 use App\Api\Libraries\Controllers\LibraryQuoteController;
 use App\Api\Libraries\Controllers\LibraryRecipeController;
+use App\Api\Libraries\Controllers\LibraryYoutubeCategoryController;
+use App\Api\Libraries\Controllers\LibraryYoutubeVideoController;
 use App\Api\Notes\Controllers\NoteCategoryController;
 use App\Api\Notes\Controllers\NoteController;
 use App\Api\Notes\Controllers\NotesImportExportController;
@@ -290,6 +292,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::prefix('plants')->name('plants.')->group(function () {
             Route::apiResource('/', LibraryPlantController::class)->parameters(['' => 'plant']);
             Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover'])->name('uploadCover');
+        });
+
+        Route::prefix('youtube')->name('youtube.')->group(function () {
+            Route::put('categories/reorder', [LibraryYoutubeCategoryController::class, 'reorder']);
+            Route::apiResource('categories', LibraryYoutubeCategoryController::class);
+
+            Route::put('reorder', [LibraryYoutubeVideoController::class, 'reorder']);
+            Route::apiResource('/', LibraryYoutubeVideoController::class)->parameters(['' => 'video']);
         });
     });
 
