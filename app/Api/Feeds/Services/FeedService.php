@@ -11,7 +11,9 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class FeedService
 {
@@ -19,6 +21,7 @@ class FeedService
     private const string CACHE_KEY_FEED_ITEMS = 'feed_items';
     private const int CACHE_TTL_USER_FEEDS = 86400;
     private const int CACHE_TTL_FEED_ITEMS = 3600;
+    private const int MAX_ERROR_LENGTH = 500;
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -261,7 +264,13 @@ class FeedService
         return trim(preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}\x{2060}]/u', '', $value));
     }
 
-    public function syncFeed(string $feedId): bool
+    /**
+     * Resolving an image can cost a full external page fetch per item, so it only
+     * happens for items being stored for the first time. Retrying items that are
+     * already stored but still have no image is opt-in via $backfillImages, since
+     * feeds whose items never carry an image would otherwise refetch every sync.
+     */
+    public function syncFeed(string $feedId, bool $backfillImages = false): bool
     {
         $feed = Feed::find($feedId);
 
@@ -272,6 +281,8 @@ class FeedService
         $items = $this->getFeedItemsFromRss($feed->url);
 
         if (!$items) {
+            $this->recordSyncFailure($feedId, 'Feed returned no items');
+
             return false;
         }
 
@@ -280,19 +291,28 @@ class FeedService
                 continue;
             }
 
-            $feedItem = FeedItem::firstOrCreate(
-                ['feed_item_id' => $item->get_id()],
-                [
-                    'title'        => $this->sanitizeText($item->get_title()),
-                    'description'  => $item->get_description(),
-                    'link'         => $item->get_link(),
-                    'image_url'    => $this->feedReader->extractImageUrl($item),
-                    'published_at' => Carbon::parse($item->get_date()),
-                    'feed_id'      => $feedId,
-                ]
-            );
+            $feedItem = FeedItem::firstOrNew([
+                'feed_id'      => $feedId,
+                'feed_item_id' => $item->get_id(),
+            ]);
 
-            if (!$feedItem->wasRecentlyCreated && $feedItem->image_url === null) {
+            if (!$feedItem->exists) {
+                try {
+                    $feedItem->fill([
+                        'title'        => $this->sanitizeText($item->get_title()),
+                        'description'  => $item->get_description(),
+                        'link'         => $item->get_link(),
+                        'image_url'    => $this->feedReader->extractImageUrl($item),
+                        'published_at' => $this->resolvePublishedAt($item),
+                    ])->save();
+                } catch (UniqueConstraintViolationException) {
+                    // A concurrent sync stored this item first, nothing left to do.
+                }
+
+                continue;
+            }
+
+            if ($backfillImages && $feedItem->image_url === null) {
                 $imageUrl = $this->feedReader->extractImageUrl($item);
                 if ($imageUrl) {
                     $feedItem->update(['image_url' => $imageUrl]);
@@ -300,8 +320,32 @@ class FeedService
             }
         }
 
-        $this->cache->forget([self::CACHE_KEY_FEED_ITEMS, $feedId]);
+        $feed->update(['last_synced_at' => Carbon::now(), 'last_error' => null]);
+
+        $this->forgetFeedItemsCache($feedId);
 
         return true;
+    }
+
+    public function recordSyncFailure(string $feedId, string $error): void
+    {
+        Feed::where('id', $feedId)->update(['last_error' => Str::limit($error, self::MAX_ERROR_LENGTH)]);
+    }
+
+    public function forgetFeedItemsCache(string $feedId): void
+    {
+        $this->cache->forget([self::CACHE_KEY_FEED_ITEMS, $feedId]);
+    }
+
+    /**
+     * Items without any date in the feed are treated as published at ingest time,
+     * since there is no better source. Being explicit here matters: the retention
+     * job prunes on published_at, and a null would exempt the item forever.
+     */
+    private function resolvePublishedAt(\SimplePie\Item $item): Carbon
+    {
+        $timestamp = $item->get_date('U');
+
+        return $timestamp ? Carbon::createFromTimestamp((int) $timestamp) : Carbon::now();
     }
 }
