@@ -26,11 +26,14 @@ class Feed extends Model
         'title',
         'url',
         'created_by',
+        'last_synced_at',
+        'last_error',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'last_synced_at' => 'datetime',
     ];
 
     public function subscriptions(): HasMany

@@ -3,7 +3,6 @@
 namespace App\Api\Feeds\Jobs;
 
 use App\Api\Feeds\Models\Feed;
-use App\Api\Feeds\Services\FeedService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -14,6 +13,10 @@ class SyncFeeds implements ShouldQueue
 {
     use Queueable, Dispatchable, InteractsWithQueue;
 
+    public int $tries = 1;
+
+    public int $timeout = 60;
+
     /**
      * Create a new job instance.
      */
@@ -23,17 +26,20 @@ class SyncFeeds implements ShouldQueue
     }
 
     /**
-     * Execute the job.
+     * Dispatch one job per feed so that a single slow or failing feed cannot
+     * starve the others. This job only enqueues work, it never fetches.
      */
     public function handle(): void
     {
-        $feedService = app(FeedService::class);
+        $dispatched = 0;
 
-        Feed::has('subscriptions')->chunk(100, function ($feeds) use ($feedService) {
+        Feed::has('subscriptions')->chunkById(100, function ($feeds) use (&$dispatched) {
             foreach ($feeds as $feed) {
-                Log::channel('queue')->info('Syncing items for feed ' . $feed->title);
-                $feedService->syncFeed($feed->id);
+                SyncFeed::dispatch($feed->id);
+                $dispatched++;
             }
         });
+
+        Log::channel('queue')->info('Dispatched feed sync jobs', ['feeds' => $dispatched]);
     }
 }

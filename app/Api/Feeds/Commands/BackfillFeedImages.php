@@ -20,7 +20,7 @@ class BackfillFeedImages extends Command
         $bar->start();
 
         foreach ($feeds as $feed) {
-            $feedService->syncFeed($feed->id);
+            $feedService->syncFeed($feed->id, backfillImages: true);
             $bar->advance();
         }
 
