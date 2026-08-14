@@ -7,18 +7,25 @@ use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMXPath;
+use Illuminate\Support\Facades\Http;
 
 class GoodreadsService
 {
     public function importFromUrl(string $url): ?BookReleaseDTO
     {
         try {
-            $html = file_get_contents($url);
-            if (!$html) {
+            $response = Http::get($url);
+
+            if ($response->failed()) {
                 return null;
             }
 
-            $dom = new DOMDocument();
+            $html = $response->body();
+            if (! $html) {
+                return null;
+            }
+
+            $dom = new DOMDocument;
             @$dom->loadHTML($html);
             $xpath = new DOMXPath($dom);
 
@@ -48,6 +55,7 @@ class GoodreadsService
         if ($titleNodes->length > 0) {
             return trim($titleNodes->item(0)->textContent);
         }
+
         return null;
     }
 
@@ -70,7 +78,7 @@ class GoodreadsService
                 }
             }
 
-            if (!empty($authorName)) {
+            if (! empty($authorName)) {
                 $authors[] = $authorName;
             }
         }
@@ -87,6 +95,7 @@ class GoodreadsService
                 return (int) $matches[1];
             }
         }
+
         return null;
     }
 
@@ -103,11 +112,12 @@ class GoodreadsService
                     return Carbon::parse($dateString);
                 } catch (\Exception $e) {
                     if (preg_match('/(\d{4})/', $dateString, $yearMatches)) {
-                        return Carbon::createFromFormat('Y-m-d', $yearMatches[1] . '-01-01');
+                        return Carbon::createFromFormat('Y-m-d', $yearMatches[1].'-01-01');
                     }
                 }
             }
         }
+
         return null;
     }
 
@@ -121,6 +131,7 @@ class GoodreadsService
                 return $src;
             }
         }
+
         return null;
     }
 }

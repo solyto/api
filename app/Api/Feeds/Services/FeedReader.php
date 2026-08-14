@@ -5,16 +5,17 @@ namespace App\Api\Feeds\Services;
 use Illuminate\Support\Facades\Http;
 use SimplePie\SimplePie;
 
-class FeedReader {
+class FeedReader
+{
     private SimplePie $pie;
 
-    public function __construct()
+    public function __construct(?SimplePie $pie = null)
     {
-        $this->pie = new SimplePie();
+        $this->pie = $pie ?? new SimplePie;
         $this->pie->enable_cache(false);
     }
 
-    public function getItems(string $url): array | bool
+    public function getItems(string $url): array|bool
     {
         $this->pie->set_feed_url($url);
         $this->pie->init();
@@ -28,7 +29,7 @@ class FeedReader {
         return $items;
     }
 
-    public function getFeedData(string $url): array | false
+    public function getFeedData(string $url): array|false
     {
         $this->pie->set_feed_url($url);
         $this->pie->init();
@@ -48,12 +49,12 @@ class FeedReader {
     public function extractImageUrl(\SimplePie\Item $item): ?string
     {
         $thumbnail = $item->get_item_tags('http://search.yahoo.com/mrss/', 'thumbnail');
-        if (!empty($thumbnail[0]['attribs']['']['url'])) {
+        if (! empty($thumbnail[0]['attribs']['']['url'])) {
             return $thumbnail[0]['attribs']['']['url'];
         }
 
         $content = $item->get_item_tags('http://search.yahoo.com/mrss/', 'content');
-        if (!empty($content)) {
+        if (! empty($content)) {
             foreach ($content as $mediaContent) {
                 $medium = $mediaContent['attribs']['']['medium'] ?? '';
                 $type = $mediaContent['attribs']['']['type'] ?? '';
@@ -83,7 +84,7 @@ class FeedReader {
 
     private function extractOgImage(?string $url): ?string
     {
-        if (!$url) {
+        if (! $url) {
             return null;
         }
 
@@ -92,7 +93,7 @@ class FeedReader {
                 'User-Agent' => 'Mozilla/5.0 (compatible; FeedBot/1.0)',
             ])->get($url);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
