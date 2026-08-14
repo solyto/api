@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Fixture Feed</title>
+    <link>https://fixture.example/</link>
+    <description>A feed used by tests</description>
+
+    <item>
+      <title>First Post</title>
+      <link>https://fixture.example/first</link>
+      <description><![CDATA[<p>Hello <img src="https://cdn.example/inline.jpg" alt="inline"></p>]]></description>
+      <media:thumbnail url="https://cdn.example/thumb.jpg"/>
+    </item>
+
+    <item>
+      <title>Second Post</title>
+      <link>https://fixture.example/second</link>
+      <description>No image here.</description>
+      <media:content url="https://cdn.example/media.jpg" type="image/jpeg" medium="image"/>
+    </item>
+  </channel>
+</rss>
