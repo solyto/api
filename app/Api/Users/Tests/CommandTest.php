@@ -1,7 +1,10 @@
 <?php
 
-use App\Api\Notifications\Commands\SendTestNotificationCommand;
-use App\Api\Users\Models\User;
+use App\Api\Users\Models\UserNotificationSettings;
+use App\Api\Users\Notifications\DailyCheckInReminderNotification;
+use App\Api\Users\Notifications\DailyDayReminderNotification;
+use App\Dav\Models\Principal;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Notification;
@@ -32,9 +35,22 @@ describe('User management commands', function () {
 
 describe('DAV commands', function () {
     it('creates principals for existing users', function () {
-        makeUser(['email' => 'principal@example.com']);
+        $user = makeUser(['email' => 'principal@example.com']);
 
         $this->artisan('app:dav:create-principals')->assertSuccessful();
+
+        $principal = Principal::where('email', $user->email)->first();
+        expect($principal)->not->toBeNull()
+            ->and($principal->uri)->toBe('principals/'.$user->email);
+    });
+
+    it('skips users that already have a principal', function () {
+        $user = makeUser(['email' => 'existing@example.com']);
+        Principal::create(['uri' => 'principals/'.$user->email, 'email' => $user->email]);
+
+        $this->artisan('app:dav:create-principals')->assertSuccessful();
+
+        expect(Principal::where('email', $user->email)->count())->toBe(1);
     });
 
     it('resets the dav data for a user', function () {
@@ -82,19 +98,59 @@ describe('Telegram bot commands', function () {
 });
 
 describe('Daily reminder commands', function () {
-    it('sends daily day reminders', function () {
-        Notification::fake();
-        $user = makeUser();
-        $user->settings()->update(['first_visit' => false]);
-
-        $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
+    afterEach(function () {
+        Carbon::setTestNow();
     });
 
-    it('sends daily check-in reminders', function () {
+    it('sends daily day reminders at 07:00', function () {
         Notification::fake();
+        Carbon::setTestNow('2026-08-14 07:00:00');
+
         $user = makeUser();
-        $user->settings()->update(['first_visit' => false]);
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
+
+        Notification::assertSentTo($user, DailyDayReminderNotification::class);
+    });
+
+    it('sends daily check-in reminders at 20:00', function () {
+        Notification::fake();
+        Carbon::setTestNow('2026-08-14 20:00:00');
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
 
         $this->artisan('app:send-daily-check-in-reminders')->assertSuccessful();
+
+        Notification::assertSentTo($user, DailyCheckInReminderNotification::class);
+    });
+
+    it('does not send day reminders outside 07:00', function () {
+        Notification::fake();
+        Carbon::setTestNow('2026-08-14 12:00:00');
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
+
+        Notification::assertNothingSent();
+    });
+
+    it('does not send check-in reminders outside 20:00', function () {
+        Notification::fake();
+        Carbon::setTestNow('2026-08-14 09:00:00');
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $this->artisan('app:send-daily-check-in-reminders')->assertSuccessful();
+
+        Notification::assertNothingSent();
     });
 });
