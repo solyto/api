@@ -2,6 +2,8 @@
 
 use App\Bots\DTOs\Keyboard;
 
+covers(Keyboard::class);
+
 describe('Keyboard DTO', function () {
     it('creates an empty keyboard', function () {
         $keyboard = Keyboard::make()->withRow([]);

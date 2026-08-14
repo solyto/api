@@ -5,6 +5,8 @@ use App\Bots\Messages\SolytoMessage;
 use App\Shared\Enums\AiUsageFeatureEnum;
 use App\Shared\Enums\AuthPlatformEnum;
 
+covers(AuthPlatformEnum::class, AiUsageFeatureEnum::class, QuickAddContentType::class, SolytoMessage::class);
+
 describe('AuthPlatformEnum', function () {
     it('has the expected cases', function () {
         expect(AuthPlatformEnum::WEB->value)->toBe('web');

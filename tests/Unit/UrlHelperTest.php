@@ -2,6 +2,8 @@
 
 use App\Shared\Helpers\UrlHelper;
 
+covers(UrlHelper::class);
+
 describe('UrlHelper::extractUrl', function () {
     it('extracts an http url from a text', function () {
         expect(UrlHelper::extractUrl('Check this out: https://example.com/page?q=1 now!'))

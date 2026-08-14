@@ -2,6 +2,8 @@
 
 use App\Dav\Helpers\ICalendarHelper;
 
+covers(ICalendarHelper::class);
+
 describe('ICalendarHelper::parseCalendarsFromXml', function () {
     it('parses calendars from a multistatus response', function () {
         $xml = <<<'XML'
@@ -70,7 +72,7 @@ ICS;
     <d:propstat>
       <d:prop>
         <d:getetag>"abc123"</d:getetag>
-        <c:calendar-data>' . htmlspecialchars($ical) . '</c:calendar-data>
+        <c:calendar-data>'.htmlspecialchars($ical).'</c:calendar-data>
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
     </d:propstat>
@@ -111,7 +113,7 @@ ICS;
     <d:href>/x.ics</d:href>
     <d:propstat>
       <d:prop>
-        <c:calendar-data>' . htmlspecialchars($ical) . '</c:calendar-data>
+        <c:calendar-data>'.htmlspecialchars($ical).'</c:calendar-data>
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
     </d:propstat>
@@ -144,7 +146,7 @@ ICS;
     <d:href>/r.ics</d:href>
     <d:propstat>
       <d:prop>
-        <c:calendar-data>' . htmlspecialchars($ical) . '</c:calendar-data>
+        <c:calendar-data>'.htmlspecialchars($ical).'</c:calendar-data>
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
     </d:propstat>

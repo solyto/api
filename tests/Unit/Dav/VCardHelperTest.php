@@ -2,6 +2,8 @@
 
 use App\Dav\Helpers\VCardHelper;
 
+covers(VCardHelper::class);
+
 describe('VCardHelper::parseAddressBooksFromXml', function () {
     it('parses address books from a multistatus response', function () {
         $xml = <<<'XML'
@@ -53,7 +55,7 @@ VCARD;
     <d:href>/c1.vcf</d:href>
     <d:propstat>
       <d:prop>
-        <card:address-data>' . htmlspecialchars($vcard) . '</card:address-data>
+        <card:address-data>'.htmlspecialchars($vcard).'</card:address-data>
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
     </d:propstat>

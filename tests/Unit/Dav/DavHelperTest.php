@@ -4,6 +4,8 @@ use App\Api\Users\Models\User;
 use App\Dav\Helpers\DavHelper;
 use App\Dav\Helpers\UrlHelper;
 
+covers(DavHelper::class, UrlHelper::class);
+
 describe('Dav UrlHelper', function () {
     it('extracts the scheme', function () {
         expect(UrlHelper::getScheme('https://example.com/dav'))->toBe('https');
