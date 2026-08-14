@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Fixture</title>
+  <id>urn:uuid:1234</id>
+  <link href="https://fixture.example/"/>
+  <entry>
+    <title>Atom Post</title>
+    <link href="https://fixture.example/atom-post"/>
+    <id>urn:uuid:5678</id>
+    <content type="html">With a link only.</content>
+  </entry>
+</feed>
