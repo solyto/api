@@ -3,6 +3,8 @@
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
 
+covers(DetectionResult::class);
+
 describe('DetectionResult DTO', function () {
     it('stores all constructor values', function () {
         $result = new DetectionResult(

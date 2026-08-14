@@ -13,7 +13,6 @@ use OpenApi\Generator as OpenApiGenerator;
  * meaningful: any NEW drift between the OpenAPI spec and the route table
  * will fail this test.
  */
-
 const OPENAPI_KNOWN_DRIFT = [
     'GET api/v1/calendars/widget/events',
     'PUT api/v1/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}',
@@ -101,13 +100,21 @@ it('documents a route for every OpenAPI path operation', function () {
     $silentLogger = new class implements \Psr\Log\LoggerInterface
     {
         public function emergency($message, array $context = []): void {}
+
         public function alert($message, array $context = []): void {}
+
         public function critical($message, array $context = []): void {}
+
         public function error($message, array $context = []): void {}
+
         public function warning($message, array $context = []): void {}
+
         public function notice($message, array $context = []): void {}
+
         public function info($message, array $context = []): void {}
+
         public function debug($message, array $context = []): void {}
+
         public function log($level, $message, array $context = []): void {}
     };
 

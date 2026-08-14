@@ -2,6 +2,8 @@
 
 use App\Shared\Helpers\DockerSecretHelper;
 
+covers(DockerSecretHelper::class);
+
 beforeEach(function () {
     $this->previous = [
         'APP_DEBUG' => getenv('APP_DEBUG'),

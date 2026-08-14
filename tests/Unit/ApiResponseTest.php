@@ -5,6 +5,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
+covers(ApiResponse::class);
+
 class ApiResponseTestResource extends JsonResource
 {
     public function toArray($request)
