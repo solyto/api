@@ -38,14 +38,14 @@ describe('Shortcut Factory', function () {
     it('creates a search engine shortcut', function () {
         $shortcut = Shortcut::factory()->searchEngine()->create();
 
-        expect($shortcut->title)->toContain('Google', 'Bing', 'DuckDuckGo');
-        expect($shortcut->url)->toContain('google.com', 'bing.com', 'duckduckgo.com');
+        expect($shortcut->title)->toBeIn(['Google', 'Bing', 'DuckDuckGo']);
+        expect($shortcut->url)->toBeIn(['https://www.google.com', 'https://www.bing.com', 'https://duckduckgo.com']);
     });
 
     it('creates a social media shortcut', function () {
         $shortcut = Shortcut::factory()->socialMedia()->create();
 
-        expect($shortcut->title)->toContain('Twitter', 'LinkedIn', 'Instagram');
+        expect($shortcut->title)->toBeIn(['Twitter', 'LinkedIn', 'Instagram']);
     });
 
     it('creates a shortcut for user', function () {

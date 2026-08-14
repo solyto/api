@@ -6,17 +6,17 @@ use App\Api\Users\Models\User;
 use App\Shared\Enums\AiUsageFeatureEnum;
 use App\Shared\Models\AiUsage;
 use OpenAI;
-use OpenAI\Client;
+use OpenAI\Contracts\ClientContract;
 
 class AiService
 {
-    private Client $client;
+    private ClientContract $client;
     private string $model;
     private int $inputTokens;
     private int $outputTokens;
     private int $totalTokens;
 
-    public function __construct()
+    public function __construct(?ClientContract $client = null)
     {
         $factory = OpenAI::factory()
             ->withApiKey(config('services.ai.api_key'));
@@ -26,7 +26,7 @@ class AiService
             $factory = $factory->withBaseUri($baseUrl);
         }
 
-        $this->client = $factory->make();
+        $this->client = $client ?? $factory->make();
         $this->model = config('services.ai.model');
     }
 

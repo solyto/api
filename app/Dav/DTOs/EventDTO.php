@@ -335,6 +335,11 @@ class EventDTO
         // Get transitions around event year ±1
         $transitions = $tz->getTransitions(strtotime("$year-01-01"), strtotime(($year + 1) . "-12-31"));
 
+        // Some timezones (e.g. UTC) have no transitions at all.
+        if ($transitions === false) {
+            return "BEGIN:VTIMEZONE\r\nTZID:{$tzName}\r\nEND:VTIMEZONE";
+        }
+
         $lines = ["BEGIN:VTIMEZONE", "TZID:$tzName"];
         $added = [];
 

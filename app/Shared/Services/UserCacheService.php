@@ -88,7 +88,7 @@ class UserCacheService
                 }
                 $redis->del($keys);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::channel('cache')->warning('Cache prefix delete failed', ['prefix' => $this->getKey($identifiers), 'error' => $e->getMessage()]);
         }
     }

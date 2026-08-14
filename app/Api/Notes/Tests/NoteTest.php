@@ -51,7 +51,7 @@ describe('Note Factory', function () {
 describe('NoteCategory Factory', function () {
     it('creates a valid category', function () {
         $user = User::factory()->create();
-        $category = NoteCategory::factory()->create();
+        $category = NoteCategory::factory()->forUser($user)->create();
 
         expect($category->title)->toBeString();
         expect($category->user_id)->toBe($user->id);
@@ -119,7 +119,7 @@ describe('Note Model', function () {
         Note::factory()->forUser($user1)->create();
         Note::factory()->forUser($user2)->create();
 
-        $notes = Note::forUser($user1)->get();
+        $notes = Note::forUser($user1->id)->get();
 
         expect($notes)->toHaveCount(1);
     });
@@ -147,28 +147,32 @@ describe('NoteCategory Model', function () {
         $child = NoteCategory::factory()->forUser($user)->withParent($parent)->create();
         NoteCategory::factory()->forUser($user)->withParent($child)->create();
 
-        expect($parent->descendants)->toHaveCount(2);
+        // `descendants` is a nested relationship: direct children, each
+        // with their own `descendants` loaded.
+        expect($parent->descendants)->toHaveCount(1);
+        expect($parent->descendants->first()->descendants)->toHaveCount(1);
     });
 
     it('returns full path', function () {
         $user = User::factory()->create();
-        $parent = NoteCategory::factory()->forUser($user)->create();
-        NoteCategory::factory()->forUser($user)->withParent($parent)->create([
+        $parent = NoteCategory::factory()->forUser($user)->withTitle('Parent')->create();
+        $child = NoteCategory::factory()->forUser($user)->withParent($parent)->create([
             'title' => 'Child',
         ]);
 
-        expect($parent->getFullPath())->toContain('Parent > Child');
+        expect($parent->getFullPath())->toBe('Parent');
+        expect($child->getFullPath())->toContain('Parent > Child');
     });
 
     it('scopes roots correctly', function () {
         $user = User::factory()->create();
-        $root1 = NoteCategory::factory()->forUser($user)->create();
+        NoteCategory::factory()->forUser($user)->create();
         NoteCategory::factory()->forUser($user)->create();
         $parent = NoteCategory::factory()->forUser($user)->create();
         NoteCategory::factory()->forUser($user)->withParent($parent)->create();
 
         $roots = NoteCategory::roots()->get();
 
-        expect($roots)->toHaveCount(2);
+        expect($roots)->toHaveCount(3);
     });
 });

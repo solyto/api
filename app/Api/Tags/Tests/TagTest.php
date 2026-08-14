@@ -52,7 +52,7 @@ describe('Tag Model', function () {
         Tag::factory()->forUser($user1)->create();
         Tag::factory()->forUser($user2)->create();
 
-        $tags = Tag::forUser($user1)->get();
+        $tags = Tag::forUser($user1->id)->get();
 
         expect($tags)->toHaveCount(1);
     });

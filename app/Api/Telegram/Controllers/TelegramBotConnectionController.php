@@ -76,7 +76,7 @@ class TelegramBotConnectionController
         $connection = TelegramBotConnection::forUser($request->user()->id)->first();
 
         return ApiResponse::success(
-            new TelegramBotConnectionResource($connection),
+            $connection ? new TelegramBotConnectionResource($connection) : null,
             'Token retrieved successfully.'
         );
     }

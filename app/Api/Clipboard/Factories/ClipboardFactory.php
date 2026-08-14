@@ -45,7 +45,6 @@ class ClipboardFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'content' => $this->faker->word().'.'.$this->faker->fileExtension(),
-            'type' => 'file',
             'file_path' => $this->faker->filePath(),
         ]);
     }
@@ -54,7 +53,6 @@ class ClipboardFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'content' => $this->faker->randomElement(['function example() { return true; }', 'const x = 42;', 'SELECT * FROM users;', '.class { color: red; }']),
-            'type' => 'code',
         ]);
     }
 }

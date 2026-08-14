@@ -21,7 +21,7 @@ uses(RefreshDatabase::class);
 describe('LibraryBook Factory', function () {
     it('creates a valid book', function () {
         $user = User::factory()->create();
-        $book = LibraryBook::factory()->create();
+        $book = LibraryBook::factory()->forUser($user)->create();
 
         expect($book->title)->toBeString();
         expect($book->author)->toBeString();
@@ -35,7 +35,7 @@ describe('LibraryBook Factory', function () {
         $user = User::factory()->create();
         $book = LibraryBook::factory()->forUser($user)->completed()->create();
 
-        expect($book->completed_at)->not()->toBeNull();
+        expect($book->finished_at)->not()->toBeNull();
     });
 
     it('creates an in progress book', function () {
@@ -103,7 +103,7 @@ describe('LibraryBook Factory', function () {
 describe('LibraryMusic Factory', function () {
     it('creates a valid music', function () {
         $user = User::factory()->create();
-        $music = LibraryMusic::factory()->create();
+        $music = LibraryMusic::factory()->forUser($user)->create();
 
         expect($music->title)->toBeString();
         expect($music->artist)->toBeString();
@@ -189,7 +189,7 @@ describe('LibraryMusic Factory', function () {
 describe('LibraryMovie Factory', function () {
     it('creates a valid movie', function () {
         $user = User::factory()->create();
-        $movie = LibraryMovie::factory()->create();
+        $movie = LibraryMovie::factory()->forUser($user)->create();
 
         expect($movie->title)->toBeString();
         expect($movie->rating)->toBeInt();
@@ -248,7 +248,7 @@ describe('LibraryMovie Factory', function () {
 describe('LibraryGame Factory', function () {
     it('creates a valid game', function () {
         $user = User::factory()->create();
-        $game = LibraryGame::factory()->create();
+        $game = LibraryGame::factory()->forUser($user)->create();
 
         expect($game->title)->toBeString();
         expect($game->rating)->toBeInt();
@@ -283,25 +283,25 @@ describe('LibraryGame Factory', function () {
             'playtime_hours' => 10,
         ]);
 
-        expect($game->playtime_hours)->toBe(10.0);
+        expect($game->playtime_hours)->toBe(10);
     });
 
     it('creates a PC game', function () {
-        $game = LibraryGame::factory()->withPlatform('PC')->create();
+        $game = LibraryGame::factory()->withPlatform('pc')->create();
 
-        expect($game->platform)->toBe('PC');
+        expect($game->platform)->toBe('pc');
     });
 
     it('creates a PlayStation game', function () {
-        $game = LibraryGame::factory()->withPlatform('PlayStation')->create();
+        $game = LibraryGame::factory()->withPlatform('playstation')->create();
 
-        expect($game->platform)->toBe('PlayStation');
+        expect($game->platform)->toBe('playstation');
     });
 
-    it('creates a Nintendo Switch game', function () {
-        $game = LibraryGame::factory()->withPlatform('Nintendo Switch')->create();
+    it('creates a Nintendo game', function () {
+        $game = LibraryGame::factory()->withPlatform('nintendo')->create();
 
-        expect($game->platform)->toBe('Nintendo Switch');
+        expect($game->platform)->toBe('nintendo');
     });
 
     it('creates a game for user', function () {
@@ -333,7 +333,7 @@ describe('LibraryGame Factory', function () {
 describe('LibraryQuote Factory', function () {
     it('creates a valid quote', function () {
         $user = User::factory()->create();
-        $quote = LibraryQuote::factory()->create();
+        $quote = LibraryQuote::factory()->forUser($user)->create();
 
         expect($quote->quote)->toBeString();
         expect($quote->author)->toBeString();
@@ -361,7 +361,13 @@ describe('LibraryQuote Factory', function () {
     it('creates an inspirational quote', function () {
         $quote = LibraryQuote::factory()->inspirational()->create();
 
-        expect($quote->quote)->toContain('great', 'change', 'believe');
+        expect($quote->quote)->toBeIn([
+            'The only way to do great work is to love what you do.',
+            'In the middle of difficulty lies opportunity.',
+            'Success is not final, failure is not fatal: it is the courage to continue that counts.',
+            'Believe you can and you\'re halfway there.',
+            'The best time to plant a tree was 20 years ago. The second best time is now.',
+        ]);
     });
 
     it('creates a quote for user', function () {
@@ -540,7 +546,7 @@ describe('LibraryGameGenre Factory', function () {
 describe('LibraryLinkCategory Factory', function () {
     it('creates a valid category', function () {
         $user = User::factory()->create();
-        $category = LibraryLinkCategory::factory()->create();
+        $category = LibraryLinkCategory::factory()->forUser($user)->create();
 
         expect($category->title)->toBeString();
         expect($category->color)->toBeString();

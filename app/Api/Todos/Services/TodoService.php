@@ -43,7 +43,7 @@ class TodoService
             [self::CACHE_KEY_DUE, $user->id],
             self::CACHE_TTL,
             fn() => Todo::forUser($user->id)
-                ->where('due_date', '>=', now()->subDays(30))
+                ->where('due_at', '>=', now()->subDays(30))
                 ->get()
         );
     }

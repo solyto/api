@@ -39,7 +39,7 @@ describe('CheckIn Factory', function () {
         $date = now()->subDays(5);
         $checkIn = CheckIn::factory()->forDate($date)->create();
 
-        expect($checkIn->date)->toEqual($date);
+        expect($checkIn->date->toDateString())->toEqual($date->toDateString());
     });
 
     it('creates a todays check-in', function () {

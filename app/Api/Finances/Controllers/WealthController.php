@@ -8,6 +8,7 @@ use App\Api\Finances\Requests\StoreWealthFieldRequest;
 use App\Api\Finances\Requests\StoreWealthValueRequest;
 use App\Api\Finances\Requests\UpdateWealthFieldRequest;
 use App\Api\Finances\Resources\WealthFieldResource;
+use App\Api\Finances\Resources\WealthValueResource;
 use App\Api\Finances\Services\WealthService;
 use App\Api\HandlesApiAuth;
 use Illuminate\Http\JsonResponse;
@@ -234,8 +235,8 @@ class WealthController
     {
         abort_unless($this->isResourceOwner($request, $field), 403);
 
-        $this->wealthService->updateValue($field, $request->validated());
+        $value = $this->wealthService->updateValue($field, $request->validated());
 
-        return ApiResponse::success([], 'Wealth Field updated successfully.');
+        return ApiResponse::success(new WealthValueResource($value), 'Wealth Field updated successfully.');
     }
 }

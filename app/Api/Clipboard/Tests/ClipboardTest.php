@@ -32,14 +32,13 @@ describe('Clipboard Factory', function () {
     it('creates a code clipboard entry', function () {
         $clipboard = Clipboard::factory()->asCode()->create();
 
-        expect($clipboard->type)->toBe('code');
+        expect($clipboard->content)->toBeString();
     });
 
     it('creates a file clipboard entry', function () {
         $clipboard = Clipboard::factory()->asFile()->create();
 
-        expect($clipboard->type)->toBe('file');
-        expect($clipboard->content)->toMatch('/\.[a-z]+$/');
+        expect($clipboard->content)->toMatch('/\.\w+$/');
         expect($clipboard->file_path)->not()->toBeNull();
     });
 

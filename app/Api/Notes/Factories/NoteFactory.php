@@ -3,6 +3,7 @@
 namespace App\Api\Notes\Factories;
 
 use App\Api\Notes\Models\Note;
+use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -13,7 +14,7 @@ class NoteFactory extends Factory
     public function definition(): array
     {
         return [
-            'title' => $this->faker->optional(0.9)->sentence(4),
+            'title' => $this->faker->sentence(4),
             'content' => $this->faker->paragraphs(rand(2, 5), true),
             'user_id' => User::factory(),
             'category_id' => null,
@@ -25,6 +26,13 @@ class NoteFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => $user->id,
+        ]);
+    }
+
+    public function forCategory(NoteCategory $category): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'category_id' => $category->id,
         ]);
     }
 

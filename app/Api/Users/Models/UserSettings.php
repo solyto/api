@@ -37,6 +37,8 @@ class UserSettings extends Model
 
     protected $casts = [
         'check_in_settings' => 'array',
+        'ai_enabled' => 'boolean',
+        'first_visit' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

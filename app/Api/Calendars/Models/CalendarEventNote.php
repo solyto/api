@@ -32,7 +32,7 @@ class CalendarEventNote extends Model
         return $query->where('user_id', $userId);
     }
 
-    public function scopeForEvent($query, int $calendarObjectId)
+    public function scopeForEvent($query, string $calendarObjectId)
     {
         return $query->where('calendar_object_id', $calendarObjectId);
     }

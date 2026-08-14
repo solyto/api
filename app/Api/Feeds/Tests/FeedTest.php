@@ -91,7 +91,7 @@ describe('FeedSubscription Factory', function () {
         $keywords = ['important', 'work'];
         $subscription = FeedSubscription::factory()->withWhitelist($keywords)->create();
 
-        expect($subscription->whitelist)->toBeArray();
+        expect($subscription->whitelist)->toBeString();
         expect($subscription->whitelist)->toContain('important');
         expect($subscription->whitelist)->toContain('work');
     });
@@ -100,7 +100,7 @@ describe('FeedSubscription Factory', function () {
         $keywords = ['spam', 'ads'];
         $subscription = FeedSubscription::factory()->withBlacklist($keywords)->create();
 
-        expect($subscription->blacklist)->toBeArray();
+        expect($subscription->blacklist)->toBeString();
         expect($subscription->blacklist)->toContain('spam');
         expect($subscription->blacklist)->toContain('ads');
     });
@@ -125,14 +125,14 @@ describe('Feed Model', function () {
 
     it('has subscriptions relationship', function () {
         $feed = Feed::factory()->create();
-        FeedSubscription::factory()->forFeed($feed)->create(3);
+        FeedSubscription::factory()->forFeed($feed)->count(3)->create();
 
         expect($feed->subscriptions)->toHaveCount(3);
     });
 
     it('has items relationship', function () {
         $feed = Feed::factory()->create();
-        FeedItem::factory()->forFeed($feed)->create(5);
+        FeedItem::factory()->forFeed($feed)->count(5)->create();
 
         expect($feed->items)->toHaveCount(5);
     });
@@ -185,6 +185,7 @@ describe('FeedSubscription Model', function () {
     });
 
     it('belongs to feed', function () {
+        $user = User::factory()->create();
         $feed = Feed::factory()->create();
         $subscription = FeedSubscription::factory()->forUserAndFeed($user, $feed)->create();
 

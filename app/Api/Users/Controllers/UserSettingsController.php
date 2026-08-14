@@ -53,7 +53,10 @@ class UserSettingsController
      */
     public function updateNavigation(UpdateNavigationSettingsRequest $request): JsonResponse
     {
-        $this->userSettingsService->updateNavigation($request->user(), $request->validated('navigation'));
+        $this->userSettingsService->updateNavigation(
+            $request->user(),
+            json_decode($request->validated('navigation'), true) ?? []
+        );
 
         return ApiResponse::success(null, 'Navigation updated successfully.');
     }

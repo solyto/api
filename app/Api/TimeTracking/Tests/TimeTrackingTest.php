@@ -42,18 +42,21 @@ describe('TimeTrackingEntry Factory', function () {
     });
 
     it('creates a short entry', function () {
+        $user = User::factory()->create();
         $entry = TimeTrackingEntry::factory()->forUser($user)->short()->create();
 
         expect($entry->duration_minutes)->toBeLessThan(60);
     });
 
     it('creates a long entry', function () {
+        $user = User::factory()->create();
         $entry = TimeTrackingEntry::factory()->forUser($user)->long()->create();
 
         expect($entry->duration_minutes)->toBeGreaterThan(60);
     });
 
     it('creates an entry with custom duration', function () {
+        $user = User::factory()->create();
         $entry = TimeTrackingEntry::factory()->forUser($user)->withDuration(120)->create();
 
         expect($entry->duration_minutes)->toBe(120);
@@ -110,7 +113,7 @@ describe('TimeTrackingProject Factory', function () {
     it('can have entries', function () {
         $user = User::factory()->create();
         $project = TimeTrackingProject::factory()->forUser($user)->create();
-        TimeTrackingEntry::factory()->forUser($user)->create(3);
+        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->count(3)->create();
 
         expect($project->entries)->toHaveCount(3);
     });
