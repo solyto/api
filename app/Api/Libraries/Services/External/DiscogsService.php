@@ -21,11 +21,16 @@ class DiscogsService
         return sprintf(self::RELEASE_URL, $id);
     }
 
-    public function __construct()
+    public function __construct(?DiscogsApiClient $client = null)
+    {
+        $this->client = $client ?? $this->createClient();
+    }
+
+    private function createClient(): DiscogsApiClient
     {
         $token = config('services.discogs.access_token');
 
-        $this->client = $token
+        return $token
             ? ClientFactory::createWithToken($token)
             : ClientFactory::create();
     }
@@ -35,7 +40,7 @@ class DiscogsService
         $releaseId = $this->getReleaseIdFromUrl($url);
         $result = $this->getRelease($releaseId);
 
-        if (!$result) {
+        if (! $result) {
             return null;
         }
 
@@ -68,15 +73,15 @@ class DiscogsService
 
         $items = $result['results'] ?? null;
 
-        if (!is_array($items)) {
+        if (! is_array($items)) {
             return null;
         }
 
-        return array_map(fn($item) => new MusicSearchResultDTO(
+        return array_map(fn ($item) => new MusicSearchResultDTO(
             id: (int) $item['id'],
             title: $item['title'],
             artist: null,
-            cover: !empty($item['cover_image']) ? $item['cover_image'] : (!empty($item['thumb']) ? $item['thumb'] : null),
+            cover: ! empty($item['cover_image']) ? $item['cover_image'] : (! empty($item['thumb']) ? $item['thumb'] : null),
             releaseYear: isset($item['year']) && $item['year'] !== '' ? (int) $item['year'] : null,
             provider: MusicServiceEnum::DISCOGS->value,
             url: self::getReleaseUrl((int) $item['id']),
@@ -91,6 +96,7 @@ class DiscogsService
     private function getReleaseIdFromUrl(string $url): int
     {
         preg_match('/release\/(\d+)/', $url, $matches);
+
         return (int) $matches[1];
     }
 }
