@@ -38,7 +38,7 @@ class CreateDavPrincipalsForExistingUsers extends Command
                 continue;
             }
 
-            $dav->principals()->create($user);
+            $dav->principals()->create($user->email);
         }
     }
 }
