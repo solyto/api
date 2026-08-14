@@ -47,7 +47,7 @@ class EventAttachmentController
      *     )
      * )
      */
-    public function getTodoAttachments(Request $request, int $eventId): JsonResponse
+    public function getTodoAttachments(Request $request, string $eventId): JsonResponse
     {
         return ApiResponse::success(
             TodoResource::collection($this->attachmentService->getTodoAttachments($request->user(), $eventId)),
@@ -84,7 +84,7 @@ class EventAttachmentController
      *     )
      * )
      */
-    public function getNoteAttachments(Request $request, int $eventId): JsonResponse
+    public function getNoteAttachments(Request $request, string $eventId): JsonResponse
     {
         return ApiResponse::success(
             NoteResource::collection($this->attachmentService->getNoteAttachments($request->user(), $eventId)),
@@ -131,7 +131,7 @@ class EventAttachmentController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function attachTodo(Request $request, int $eventId): JsonResponse
+    public function attachTodo(Request $request, string $eventId): JsonResponse
     {
         $request->validate(['todo_id' => 'required|uuid']);
 
@@ -181,7 +181,7 @@ class EventAttachmentController
      *     )
      * )
      */
-    public function detachTodo(Request $request, int $eventId, string $todoId): JsonResponse
+    public function detachTodo(Request $request, string $eventId, string $todoId): JsonResponse
     {
         $this->attachmentService->detachTodo($request->user(), $eventId, $todoId);
 
@@ -227,7 +227,7 @@ class EventAttachmentController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function attachNote(Request $request, int $eventId): JsonResponse
+    public function attachNote(Request $request, string $eventId): JsonResponse
     {
         $request->validate(['note_id' => 'required|uuid']);
 
@@ -277,7 +277,7 @@ class EventAttachmentController
      *     )
      * )
      */
-    public function detachNote(Request $request, int $eventId, string $noteId): JsonResponse
+    public function detachNote(Request $request, string $eventId, string $noteId): JsonResponse
     {
         $this->attachmentService->detachNote($request->user(), $eventId, $noteId);
 

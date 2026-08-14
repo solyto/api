@@ -33,6 +33,21 @@ class TimeTrackingEntryFactory extends Factory
         ]);
     }
 
+    public function forProject(TimeTrackingProject $project): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function running(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'stopped_at' => null,
+            'duration_minutes' => 0,
+        ]);
+    }
+
     public function withProject(TimeTrackingProject $project): static
     {
         return $this->state(fn (array $attributes) => [

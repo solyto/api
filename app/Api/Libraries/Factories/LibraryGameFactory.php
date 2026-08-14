@@ -16,7 +16,7 @@ class LibraryGameFactory extends Factory
             'title' => $this->faker->sentence(3),
             'rating' => $this->faker->numberBetween(1, 5),
             'publication_year' => $this->faker->numberBetween(1990, 2024),
-            'platform' => $this->faker->randomElement(['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile']),
+            'platform' => $this->faker->randomElement(['pc', 'playstation', 'xbox', 'nintendo', 'mobile', 'boardgame', 'other']),
             'developer' => $this->faker->company(),
             'publisher' => $this->faker->company(),
             'playtime_hours' => null,

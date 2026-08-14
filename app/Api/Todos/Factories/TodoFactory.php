@@ -3,6 +3,7 @@
 namespace App\Api\Todos\Factories;
 
 use App\Api\Todos\Models\Todo;
+use App\Api\Todos\Models\TodoCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -23,11 +24,11 @@ class TodoFactory extends Factory
             'description' => $this->faker->optional(0.7)->paragraph(),
             'is_completed' => $this->faker->boolean(30),
             'priority' => $this->faker->randomElement(['low', 'medium', 'high']),
-            'due_at' => $this->faker->optional(0.8)->date(),
+            'due_at' => $this->faker->date(),
             'user_id' => User::factory(),
             'effort' => $this->faker->optional(0.5)->numberBetween(1, 8),
             'progress' => $this->faker->optional(0.3)->numberBetween(0, 100),
-            'status' => $this->faker->optional(0.5)->randomElement(['backlog', 'in_progress', 'review', 'blocked']),
+            'status' => $this->faker->randomElement(['backlog', 'pending', 'in-progress', 'waiting', 'almost-done']),
         ];
     }
 
@@ -101,6 +102,13 @@ class TodoFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => $user->id,
+        ]);
+    }
+
+    public function forCategory(TodoCategory $category): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'category_id' => $category->id,
         ]);
     }
 }

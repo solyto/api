@@ -36,6 +36,20 @@ class LibraryLinkFactory extends Factory
         ]);
     }
 
+    public function notFavorite(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_favorite' => false,
+        ]);
+    }
+
+    public function forCategory(LibraryLinkCategory $category): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'category_id' => $category->id,
+        ]);
+    }
+
     public function withCategory(LibraryLinkCategory $category): static
     {
         return $this->state(fn (array $attributes) => [

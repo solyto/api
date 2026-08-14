@@ -27,11 +27,18 @@ class ResetDavForUser extends Command
      */
     public function handle()
     {
-        $user = User::where('email', 'leomuck@posteo.de')->first();
-        $dav = new DavService();
+        $email = $this->ask('Email');
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            $this->error("No user found with email: {$email}");
+            return;
+        }
+
+        $dav = app(DavService::class);
 
         foreach ($dav->calendars()->list($user) as $calendar) {
-            $dav->calendars()->delete($user, $calendar->instanceId);
+            $dav->calendars()->delete($calendar);
             $this->info('Deleted calendar ' . $calendar->instanceId);
         }
 

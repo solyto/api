@@ -32,6 +32,7 @@ class TelegramBotConnection extends Model
         'is_confirmed' => 'boolean',
         'your_day_alert' => 'boolean',
         'check_in_alert' => 'boolean',
+        'chat_id' => 'integer',
     ];
 
     public function user(): BelongsTo

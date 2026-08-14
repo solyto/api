@@ -91,7 +91,7 @@ describe('WealthValue Factory', function () {
             'date' => $date,
         ]);
 
-        expect($value->date)->toEqual($date);
+        expect($value->date->toDateString())->toEqual($date->toDateString());
     });
 
     it('creates a value with custom value', function () {
@@ -154,7 +154,7 @@ describe('WealthField Model', function () {
 
     it('has values relationship', function () {
         $field = WealthField::factory()->create();
-        WealthValue::factory()->forField($field)->create(3);
+        WealthValue::factory()->forField($field)->count(3)->create();
 
         expect($field->values)->toHaveCount(3);
     });
@@ -194,13 +194,14 @@ describe('WealthValue Model', function () {
     });
 
     it('casts value as float', function () {
-        $value = 1234.56;
+        $customValue = 1234.56;
         $field = WealthField::factory()->create();
-        WealthValue::factory()->forField($field)->create([
-            'value' => $value,
+        $value = WealthValue::factory()->forField($field)->create([
+            'value' => $customValue,
         ]);
 
         expect($value->value)->toBeFloat();
+        expect($value->value)->toBe($customValue);
     });
 
     it('belongs to field', function () {

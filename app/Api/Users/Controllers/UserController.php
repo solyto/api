@@ -4,6 +4,7 @@ namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\Users\Models\User;
+use App\Api\Users\Requests\ChangePasswordRequest;
 use App\Api\Users\Requests\UpdateProfileImageRequest;
 use App\Api\Users\Requests\UpdateUserRequest;
 use App\Api\Users\Resources\UserPublicProfileResource;
@@ -105,6 +106,13 @@ class UserController
         $this->userService->update($user, $request->validated());
 
         return ApiResponse::success(new UserResource($user), 'User updated successfully.');
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $this->userService->changePassword($request->user(), $request->validated('new_password'));
+
+        return ApiResponse::success(null, 'Password changed successfully.');
     }
 
     /**
