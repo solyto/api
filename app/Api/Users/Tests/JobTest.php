@@ -9,8 +9,12 @@ use App\Api\Libraries\Jobs\ScaleCovers;
 use App\Api\Users\Jobs\DeleteOldFriendRequests;
 use App\Api\Users\Jobs\ScaleProfileImage;
 use App\Api\Users\Models\FriendRequest;
+use App\Shared\Services\Images\ImageTransformationService;
+use App\Shared\Services\UserCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -84,14 +88,66 @@ describe('GenerateCoverPreview', function () {
 });
 
 describe('ScaleCovers', function () {
-    it('runs without error when no covers exist', function () {
-        Storage::fake('user_data');
+    beforeEach(function () {
+        $this->testStorage = sys_get_temp_dir().'/scalecovers-'.Str::uuid()->toString();
+        app()->useStoragePath($this->testStorage);
+    });
+
+    afterEach(function () {
+        if (isset($this->testStorage) && File::isDirectory($this->testStorage)) {
+            File::deleteDirectory($this->testStorage);
+        }
+    });
+
+    it('backs up and scales covers that lack an original sibling', function () {
+        $dir = $this->testStorage.'/app/public/user/'.Str::uuid()->toString().'/music';
+        File::ensureDirectoryExists($dir);
+        File::put($dir.'/cover.jpg', 'fake-jpeg');
+
+        $imageTransformation = Mockery::mock(ImageTransformationService::class);
+        $imageTransformation->shouldReceive('scaleToWidth')
+            ->once()
+            ->with($dir.'/cover.jpg', 400, 85)
+            ->andReturn(true);
 
         app(ScaleCovers::class)->handle(
-            app(\App\Shared\Services\UserCacheService::class),
-            app(\App\Shared\Services\Images\ImageTransformationService::class)
+            app(UserCacheService::class),
+            $imageTransformation
         );
 
-        expect(true)->toBeTrue();
+        expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
+    });
+
+    it('skips covers that already have an original sibling', function () {
+        $dir = $this->testStorage.'/app/public/user/'.Str::uuid()->toString().'/music';
+        File::ensureDirectoryExists($dir);
+        File::put($dir.'/cover.jpg', 'fake-jpeg');
+        File::put($dir.'/cover_original.jpg', 'fake-jpeg-original');
+
+        $imageTransformation = Mockery::mock(ImageTransformationService::class);
+        $imageTransformation->shouldReceive('scaleToWidth')->never();
+
+        app(ScaleCovers::class)->handle(
+            app(UserCacheService::class),
+            $imageTransformation
+        );
+
+        expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
+    });
+
+    it('ignores folders that are not user UUIDs', function () {
+        $dir = $this->testStorage.'/app/public/user/not-a-uuid/music';
+        File::ensureDirectoryExists($dir);
+        File::put($dir.'/cover.jpg', 'fake-jpeg');
+
+        $imageTransformation = Mockery::mock(ImageTransformationService::class);
+        $imageTransformation->shouldReceive('scaleToWidth')->never();
+
+        app(ScaleCovers::class)->handle(
+            app(UserCacheService::class),
+            $imageTransformation
+        );
+
+        expect(File::exists($dir.'/cover_original.jpg'))->toBeFalse();
     });
 });
