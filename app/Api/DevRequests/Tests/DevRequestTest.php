@@ -175,10 +175,11 @@ describe('DevRequest Model', function () {
     });
 
     it('can have votes', function () {
-        $user = User::factory()->create();
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
         $request = DevRequest::factory()->create();
-        DevRequestVote::factory()->forDevRequestAndUser($request, $user)->create();
-        DevRequestVote::factory()->forDevRequestAndUser($request, $user)->create();
+        DevRequestVote::factory()->forDevRequestAndUser($request, $user1)->create();
+        DevRequestVote::factory()->forDevRequestAndUser($request, $user2)->create();
 
         expect($request->votes)->toHaveCount(2);
     });

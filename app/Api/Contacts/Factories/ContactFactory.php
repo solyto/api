@@ -26,7 +26,7 @@ class ContactFactory extends Factory
             'city' => $this->faker->optional(0.4)->city(),
             'postal_code' => $this->faker->optional(0.4)->postcode(),
             'country' => $this->faker->optional(0.4)->country(),
-            'groups' => [],
+            'groups' => null,
             'photo' => null,
             'user_id' => User::factory(),
         ];
@@ -36,6 +36,13 @@ class ContactFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => $user->id,
+        ]);
+    }
+
+    public function forAddressBook(AddressBook $addressBook): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'address_book_id' => $addressBook->id,
         ]);
     }
 

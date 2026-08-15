@@ -56,7 +56,7 @@ class ClipboardService
         ]);
     }
 
-    public function getImagePath(int $userId, Clipboard $clipboard): ?string
+    public function getImagePath(string $userId, Clipboard $clipboard): ?string
     {
         if ($clipboard->type !== 'image' || !$clipboard->file_path) {
             return null;

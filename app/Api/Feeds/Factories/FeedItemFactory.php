@@ -42,4 +42,11 @@ class FeedItemFactory extends Factory
             'title' => $title,
         ]);
     }
+
+    public function forFeed(Feed $feed): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'feed_id' => $feed->id,
+        ]);
+    }
 }

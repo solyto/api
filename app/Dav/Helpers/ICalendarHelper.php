@@ -2,80 +2,25 @@
 
 namespace App\Dav\Helpers;
 
-use App\Models\NextcloudCalendarEntry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Sabre\VObject\Reader;
 
-
 class ICalendarHelper
 {
-
-    public function buildICalendarData(NextcloudCalendarEntry $entry): string
-    {
-        $uid = $entry->uid ?? $entry->id;
-        $created = $entry->created_at ? $entry->created_at->utc()->format('Ymd\THis\Z') : Carbon::now()->utc()->format('Ymd\THis\Z');
-        $modified = $entry->updated_at ? $entry->updated_at->utc()->format('Ymd\THis\Z') : Carbon::now()->utc()->format('Ymd\THis\Z');
-
-        // Format dates
-        if ($entry->is_all_day) {
-            $startDate = Carbon::parse($entry->start_date)->format('Ymd');
-            $endDate = Carbon::parse($entry->end_date)->format('Ymd');
-            $dateFormat = 'VALUE=DATE';
-        } else {
-            $startDate = Carbon::parse($entry->start_date)->utc()->format('Ymd\THis\Z');
-            $endDate = Carbon::parse($entry->end_date)->utc()->format('Ymd\THis\Z');
-            $dateFormat = '';
-        }
-
-        $ical = "BEGIN:VCALENDAR\r\n";
-        $ical .= "VERSION:2.0\r\n";
-        $ical .= "PRODID:-//SOLYTO//SOLYTO//EN\r\n";
-        $ical .= "BEGIN:VEVENT\r\n";
-        $ical .= "UID:{$uid}\r\n";
-        $ical .= "DTSTART" . ($dateFormat ? ";{$dateFormat}" : '') . ":{$startDate}\r\n";
-        $ical .= "DTEND" . ($dateFormat ? ";{$dateFormat}" : '') . ":{$endDate}\r\n";
-        $ical .= "SUMMARY:" . ($entry->title ?? '') . "\r\n";
-
-        if ($entry->description) {
-            $ical .= "DESCRIPTION:" . ($entry->description ?? '') . "\r\n";
-        }
-
-        if ($entry->location) {
-            $ical .= "LOCATION:" . ($entry->location ?? '') . "\r\n";
-        }
-
-        if ($entry->is_recurring && $entry->recurrence_rule) {
-            $ical .= "RRULE:" . $entry->recurrence_rule . "\r\n";
-        }
-
-        $ical .= "CREATED:{$created}\r\n";
-        $ical .= "LAST-MODIFIED:{$modified}\r\n";
-        $ical .= "DTSTAMP:" . Carbon::now()->utc()->format('Ymd\THis\Z') . "\r\n";
-        $ical .= "END:VEVENT\r\n";
-        $ical .= "END:VCALENDAR\r\n";
-
-        return $ical;
-    }
-
-    public function generateEventFilename(NextcloudCalendarEntry $entry): string
-    {
-        $uid = $entry->uid ?? $entry->id;
-        return $uid . '.ics';
-    }
-
     public function parseCalendarsFromXml(string $responseBody, string $baseUrl): array
     {
         $calendars = [];
 
         try {
-            $dom = new \DOMDocument();
+            $dom = new \DOMDocument;
 
-            if (!@$dom->loadXML($responseBody)) {
+            if (! @$dom->loadXML($responseBody)) {
                 Log::error('Failed to parse calendars XML', [
                     'body' => $responseBody,
-                    'libxml_errors' => libxml_get_errors()
+                    'libxml_errors' => libxml_get_errors(),
                 ]);
+
                 return [];
             }
 
@@ -99,14 +44,14 @@ class ICalendarHelper
                     }
 
                     $calendars[] = [
-                        'url' => UrlHelper::getBaseUrl($baseUrl) . $href->textContent,
+                        'url' => UrlHelper::getBaseUrl($baseUrl).$href->textContent,
                         'name' => $displayName ? $displayName->textContent : 'Unnamed Calendar',
-                        'color' => $color
+                        'color' => $color,
                     ];
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Error parsing calendars XML: ' . $e->getMessage());
+            Log::error('Error parsing calendars XML: '.$e->getMessage());
         }
 
         return $calendars;
@@ -117,13 +62,14 @@ class ICalendarHelper
         $events = [];
 
         try {
-            $dom = new \DOMDocument();
-            if (!@$dom->loadXML($responseBody)) {
+            $dom = new \DOMDocument;
+            if (! @$dom->loadXML($responseBody)) {
                 Log::error('Failed to parse calendar response XML', [
                     'body' => $responseBody,
                     'libxml_errors' => libxml_get_errors(),
-                    'calendar' => $calendarName
+                    'calendar' => $calendarName,
                 ]);
+
                 return [];
             }
 
@@ -146,7 +92,7 @@ class ICalendarHelper
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Error parsing calendar response: ' . $e->getMessage());
+            Log::error('Error parsing calendar response: '.$e->getMessage());
         }
 
         return $events;
@@ -207,7 +153,7 @@ class ICalendarHelper
                 $events[] = $event;
             }
         } catch (\Exception $e) {
-            Log::error('Error parsing iCal data: ' . $e->getMessage());
+            Log::error('Error parsing iCal data: '.$e->getMessage());
         }
 
         return $events;
@@ -215,28 +161,32 @@ class ICalendarHelper
 
     private function parseDateTime($dateTime): ?Carbon
     {
-        if (!$dateTime) return null;
+        if (! $dateTime) {
+            return null;
+        }
 
         try {
             return Carbon::parse($dateTime->getDateTime());
         } catch (\Exception $e) {
-            Log::error('Error parsing date: ' . $e->getMessage());
+            Log::error('Error parsing date: '.$e->getMessage());
+
             return null;
         }
     }
 
     private function isAllDayEvent($dtStart): bool
     {
-        return $dtStart && !$dtStart->hasTime();
+        return $dtStart && ! $dtStart->hasTime();
     }
 
     public function parseCalendarHomeFromXml(string $xml, string $baseUrl): array
     {
         try {
-            $dom = new \DOMDocument();
+            $dom = new \DOMDocument;
 
-            if (!@$dom->loadXML($xml)) {
+            if (! @$dom->loadXML($xml)) {
                 Log::error('Failed to parse calendar home XML', ['body' => $xml]);
+
                 return [];
             }
 
@@ -249,17 +199,17 @@ class ICalendarHelper
             $homes = [];
             foreach ($nodes as $node) {
                 $homes[] = [
-                    'url' => rtrim(UrlHelper::getBaseUrl($baseUrl), '/') . $node->textContent
+                    'url' => rtrim(UrlHelper::getBaseUrl($baseUrl), '/').$node->textContent,
                 ];
             }
 
             return $homes;
         } catch (\Exception $e) {
-            Log::error('Error parsing calendar home XML: ' . $e->getMessage());
+            Log::error('Error parsing calendar home XML: '.$e->getMessage());
+
             return [];
         }
     }
-
 
     public static function getCalendarsXml(): string
     {
@@ -291,7 +241,7 @@ class ICalendarHelper
                 <c:filter>
                     <c:comp-filter name="VCALENDAR">
                         <c:comp-filter name="VEVENT">
-                            <c:time-range start="' . $start . '" end="' . $end . '"/>
+                            <c:time-range start="'.$start.'" end="'.$end.'"/>
                         </c:comp-filter>
                     </c:comp-filter>
                 </c:filter>

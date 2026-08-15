@@ -77,4 +77,11 @@ class LibraryBookFactory extends Factory
             'rating' => $this->faker->numberBetween(4, 5),
         ]);
     }
+
+    public function withTitle(string $title): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'title' => $title,
+        ]);
+    }
 }

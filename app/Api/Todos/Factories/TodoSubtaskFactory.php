@@ -39,4 +39,11 @@ class TodoSubtaskFactory extends Factory
             'title' => $title,
         ]);
     }
+
+    public function forTodo(Todo $todo): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'todo_id' => $todo->id,
+        ]);
+    }
 }

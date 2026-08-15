@@ -51,7 +51,7 @@ describe('Todo Factory', function () {
     it('creates a todo due today', function () {
         $todo = Todo::factory()->dueToday()->create();
 
-        expect($todo->due_at)->toEqual(today()->format('Y-m-d'));
+        expect($todo->due_at->format('Y-m-d'))->toEqual(today()->format('Y-m-d'));
     });
 
     it('creates a todo with no due date', function () {
@@ -64,7 +64,7 @@ describe('Todo Factory', function () {
 describe('TodoCategory Factory', function () {
     it('creates a valid category', function () {
         $user = User::factory()->create();
-        $category = TodoCategory::factory()->create();
+        $category = TodoCategory::factory()->forUser($user)->create();
 
         expect($category->title)->toBeString();
         expect($category->user_id)->toBe($user->id);
@@ -109,7 +109,7 @@ describe('TodoSubtask Factory', function () {
 describe('TodoWorkspace Factory', function () {
     it('creates a valid workspace', function () {
         $user = User::factory()->create();
-        $workspace = TodoWorkspace::factory()->create();
+        $workspace = TodoWorkspace::factory()->forUser($user)->create();
 
         expect($workspace->title)->toBeString();
         expect($workspace->user_id)->toBe($user->id);
@@ -191,7 +191,7 @@ describe('Todo Model', function () {
         Todo::factory()->forUser($user1)->create();
         Todo::factory()->forUser($user2)->create();
 
-        $todos = Todo::forUser($user1)->get();
+        $todos = Todo::forUser($user1->id)->get();
 
         expect($todos)->toHaveCount(1);
     });

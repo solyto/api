@@ -43,6 +43,13 @@ class LibraryMusicFactory extends Factory
         ]);
     }
 
+    public function single(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => 'single',
+        ]);
+    }
+
     public function wishlist(): static
     {
         return $this->state(fn (array $attributes) => [

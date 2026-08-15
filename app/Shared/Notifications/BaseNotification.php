@@ -45,6 +45,9 @@ abstract class BaseNotification extends Notification
             $settings = UserNotificationSettings::firstOrCreate(
                 ['user_id' => $notifiable->id]
             );
+            // firstOrCreate() does not hydrate DB column defaults onto the
+            // returned model, so refresh it to read the actual channel flags.
+            $settings->refresh();
         }
 
         $uiKey       = "{$type}_ui";

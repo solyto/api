@@ -55,14 +55,14 @@ class LibraryRecipeFactory extends Factory
     public function quick(): static
     {
         return $this->state(fn (array $attributes) => [
-            'time_to_make' => $this->faker->numberBetween(15, 30),
+            'time_to_make' => $this->faker->numberBetween(15, 29),
         ]);
     }
 
     public function timeConsuming(): static
     {
         return $this->state(fn (array $attributes) => [
-            'time_to_make' => $this->faker->numberBetween(60, 180),
+            'time_to_make' => $this->faker->numberBetween(61, 180),
         ]);
     }
 

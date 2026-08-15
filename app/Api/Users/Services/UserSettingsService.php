@@ -52,7 +52,7 @@ class UserSettingsService
     {
         $user->settings()->update([
             'openai_api_key' => $key,
-            'ai_enabled'     => $key != '',
+            'ai_enabled'     => ! empty($key),
         ]);
     }
 

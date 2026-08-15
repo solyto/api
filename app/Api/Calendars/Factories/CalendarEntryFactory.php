@@ -38,6 +38,13 @@ class CalendarEntryFactory extends Factory
         ]);
     }
 
+    public function forCalendar(Calendar $calendar): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'calendar_id' => $calendar->id,
+        ]);
+    }
+
     public function allDay(): static
     {
         return $this->state(fn (array $attributes) => [

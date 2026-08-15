@@ -15,7 +15,7 @@ class UserSettingsFactory extends Factory
         return [
             'user_id' => User::factory(),
             'navigation' => $this->faker->randomElement(['sidebar', 'top']),
-            'timezone' => $this->faker->timezone(),
+            'timezone' => $this->faker->randomElement(['Europe/Berlin', 'UTC', 'America/New_York', 'Asia/Tokyo']),
             'date_format' => $this->faker->randomElement(['Y-m-d', 'd/m/Y', 'm/d/Y']),
             'time_format' => $this->faker->randomElement(['24h', '12h']),
             'language' => $this->faker->randomElement(['en', 'de', 'fr', 'es']),
