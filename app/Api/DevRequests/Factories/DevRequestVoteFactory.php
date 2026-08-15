@@ -33,4 +33,12 @@ class DevRequestVoteFactory extends Factory
             'vote_type' => 'down',
         ]);
     }
+
+    public function forDevRequestAndUser(DevRequest $request, User $user): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'dev_request_id' => $request->id,
+            'user_id' => $user->id,
+        ]);
+    }
 }

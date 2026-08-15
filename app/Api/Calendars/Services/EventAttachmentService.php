@@ -18,7 +18,7 @@ class EventAttachmentService
 
     public function __construct(private readonly UserCacheService $cache) {}
 
-    public function getTodoAttachments(User $user, int $eventId): Collection
+    public function getTodoAttachments(User $user, string $eventId): Collection
     {
         return $this->cache->remember(
             [self::CACHE_KEY_TODOS, $user->id, $eventId],
@@ -35,7 +35,7 @@ class EventAttachmentService
         );
     }
 
-    public function getNoteAttachments(User $user, int $eventId): Collection
+    public function getNoteAttachments(User $user, string $eventId): Collection
     {
         return $this->cache->remember(
             [self::CACHE_KEY_NOTES, $user->id, $eventId],
@@ -50,7 +50,7 @@ class EventAttachmentService
         );
     }
 
-    public function attachTodo(User $user, int $eventId, Todo $todo): bool
+    public function attachTodo(User $user, string $eventId, Todo $todo): bool
     {
         $exists = CalendarEventTodo::forUser($user->id)
             ->forEvent($eventId)
@@ -72,7 +72,7 @@ class EventAttachmentService
         return true;
     }
 
-    public function detachTodo(User $user, int $eventId, string $todoId): void
+    public function detachTodo(User $user, string $eventId, string $todoId): void
     {
         CalendarEventTodo::forUser($user->id)
             ->forEvent($eventId)
@@ -82,7 +82,7 @@ class EventAttachmentService
         $this->cache->forget([self::CACHE_KEY_TODOS, $user->id, $eventId]);
     }
 
-    public function attachNote(User $user, int $eventId, Note $note): bool
+    public function attachNote(User $user, string $eventId, Note $note): bool
     {
         $exists = CalendarEventNote::forUser($user->id)
             ->forEvent($eventId)
@@ -104,7 +104,7 @@ class EventAttachmentService
         return true;
     }
 
-    public function detachNote(User $user, int $eventId, string $noteId): void
+    public function detachNote(User $user, string $eventId, string $noteId): void
     {
         CalendarEventNote::forUser($user->id)
             ->forEvent($eventId)
@@ -114,7 +114,7 @@ class EventAttachmentService
         $this->cache->forget([self::CACHE_KEY_NOTES, $user->id, $eventId]);
     }
 
-    public function deleteAllForEvent(User $user, int $eventId): void
+    public function deleteAllForEvent(User $user, string $eventId): void
     {
         CalendarEventTodo::forEvent($eventId)->delete();
         CalendarEventNote::forEvent($eventId)->delete();

@@ -35,6 +35,13 @@ class LibraryQuoteFactory extends Factory
         ]);
     }
 
+    public function withQuote(string $quote): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'quote' => $quote,
+        ]);
+    }
+
     public function withSource(string $source): static
     {
         return $this->state(fn (array $attributes) => [

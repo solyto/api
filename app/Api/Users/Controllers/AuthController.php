@@ -324,10 +324,10 @@ class AuthController
      *     @OA\Response(response=404, description="Token not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function revokeToken(Request $request, $tokenId): JsonResponse
+    public function revokeToken(Request $request): JsonResponse
     {
         try {
-            $result = $this->authService->revokeToken($request->user(), (int) $tokenId);
+            $result = $this->authService->revokeToken($request->user(), (int) $request->input('token_id'));
         } catch (\RuntimeException $e) {
             report($e);
             return ApiResponse::error($e->getMessage(), 400);

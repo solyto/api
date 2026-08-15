@@ -30,4 +30,18 @@ class TagFactory extends Factory
             'user_id' => $user->id,
         ]);
     }
+
+    public function withName(string $name): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => $name,
+        ]);
+    }
+
+    public function withColor(string $color): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'color' => $color,
+        ]);
+    }
 }

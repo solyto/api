@@ -9,7 +9,7 @@ class UpdateTagRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => 'sometimes|string',
+            'name' => 'sometimes|string',
             'color' => 'sometimes|nullable|string|min:7|max:7',
         ];
     }

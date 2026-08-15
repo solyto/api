@@ -3,7 +3,6 @@
 namespace App\Dav\Services;
 
 use Sabre\DAV\MkCol;
-use Sabre\DAV\PropPatch;
 use Sabre\DAVACL\PrincipalBackend\PDO as SabreBackend;
 
 class Principals
@@ -27,16 +26,19 @@ class Principals
 
     public function create(string $email): string
     {
-        $uri = 'principals/' . $email;
+        $uri = 'principals/'.$email;
 
         if ($this->backend->getPrincipalByPath($uri)) {
             throw new \RuntimeException('Principal already exists');
         }
 
-        $this->backend->createPrincipal(
-            $uri,
-            new MkCol(['{DAV:}principal', '{DAV:}collection'], [])
+        $mkCol = new MkCol(
+            ['{DAV:}principal', '{DAV:}collection'],
+            ['{http://sabredav.org/ns}email-address' => $email]
         );
+
+        $this->backend->createPrincipal($uri, $mkCol);
+        $mkCol->commit();
 
         return $uri; // This is all you really need
     }

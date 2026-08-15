@@ -15,8 +15,8 @@ class FeedSubscriptionFactory extends Factory
     {
         return [
             'title' => $this->faker->randomElement(['Tech News', 'Personal Blog', 'News Updates']),
-            'whitelist' => [],
-            'blacklist' => [],
+            'whitelist' => null,
+            'blacklist' => null,
             'user_id' => User::factory(),
             'feed_id' => Feed::factory(),
         ];
@@ -26,6 +26,21 @@ class FeedSubscriptionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => $user->id,
+        ]);
+    }
+
+    public function forFeed(Feed $feed): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'feed_id' => $feed->id,
+        ]);
+    }
+
+    public function forUserAndFeed(User $user, Feed $feed): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'user_id' => $user->id,
+            'feed_id' => $feed->id,
         ]);
     }
 
@@ -39,14 +54,14 @@ class FeedSubscriptionFactory extends Factory
     public function withWhitelist(array $keywords): static
     {
         return $this->state(fn (array $attributes) => [
-            'whitelist' => $keywords,
+            'whitelist' => implode(',', $keywords),
         ]);
     }
 
     public function withBlacklist(array $keywords): static
     {
         return $this->state(fn (array $attributes) => [
-            'blacklist' => $keywords,
+            'blacklist' => implode(',', $keywords),
         ]);
     }
 }

@@ -27,7 +27,7 @@ class PasskeyController
         try {
             $platform = AuthPlatformEnum::tryFrom($request->input('platform') ?? '') ?? AuthPlatformEnum::WEB;
             $result = $this->passkeyService->authenticate(
-                $request->validated('response'),
+                $request->validated(),
                 $request->ip(),
                 $platform
             );
@@ -53,7 +53,7 @@ class PasskeyController
         try {
             $passkey = $this->passkeyService->register(
                 $request->user(),
-                $request->validated('response'),
+                $request->validated(),
                 $request->validated('name') ?? 'Passkey'
             );
         } catch (\RuntimeException $e) {

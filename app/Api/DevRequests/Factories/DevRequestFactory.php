@@ -38,6 +38,20 @@ class DevRequestFactory extends Factory
         ]);
     }
 
+    public function improvement(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => 'improvement',
+        ]);
+    }
+
+    public function rejected(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'rejected',
+        ]);
+    }
+
     public function open(): static
     {
         return $this->state(fn (array $attributes) => [
