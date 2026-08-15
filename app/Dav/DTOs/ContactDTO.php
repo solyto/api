@@ -170,8 +170,8 @@ class ContactDTO
         $lines = ["BEGIN:VCARD", "VERSION:3.0"];
 
         // Name
-        $lines[] = 'FN:' . $this->fullName;
-        $lines[] = 'N:' . $this->lastName . ';' . $this->firstName . ';' . ($this->middleName ?? '') . ';' . ($this->prefix ?? '') . ';' . ($this->suffix ?? '');
+        $lines[] = 'FN:' . self::escapeText($this->fullName);
+        $lines[] = 'N:' . self::escapeText($this->lastName) . ';' . self::escapeText($this->firstName) . ';' . self::escapeText($this->middleName ?? '') . ';' . self::escapeText($this->prefix ?? '') . ';' . self::escapeText($this->suffix ?? '');
 
         // Email
         if ($this->email) {
@@ -180,12 +180,12 @@ class ContactDTO
                 if (is_array($emailData)) {
                     foreach ($emailData as $entry) {
                         $type = strtoupper($entry['type'] ?? 'INTERNET');
-                        $value = preg_replace('/[^\P{C}\n]+/u', '', $entry['value']);
+                        $value = self::escapeText($entry['value']);
                         $lines[] = "EMAIL;TYPE={$type}:{$value}";
                     }
                 }
             } else {
-                $lines[] = 'EMAIL:' . preg_replace('/[^\P{C}\n]+/u', '', $this->email);
+                $lines[] = 'EMAIL:' . self::escapeText($this->email);
             }
         }
 
@@ -196,33 +196,33 @@ class ContactDTO
                 if (is_array($phoneData)) {
                     foreach ($phoneData as $entry) {
                         $type = strtoupper($entry['type'] ?? 'VOICE');
-                        $value = preg_replace('/[^\P{C}\n]+/u', '', $entry['value']);
+                        $value = self::escapeText($entry['value']);
                         $lines[] = "TEL;TYPE={$type}:{$value}";
                     }
                 }
             } else {
-                $lines[] = 'TEL:' . preg_replace('/[^\P{C}\n]+/u', '', $this->phone);
+                $lines[] = 'TEL:' . self::escapeText($this->phone);
             }
         }
 
         // Organization
-        if ($this->organization) $lines[] = 'ORG:' . preg_replace('/[^\P{C}\n]+/u', '', $this->organization);
+        if ($this->organization) $lines[] = 'ORG:' . self::escapeText($this->organization);
 
         // Groups
         if ($this->groups) {
             $decoded = json_decode($this->groups, true);
             $groupNames = is_array($decoded) ? $decoded : [$this->groups];
-            $lines[] = 'CATEGORIES:' . implode(',', array_map(fn($g) => preg_replace('/[^\P{C}\n]+/u', '', $g), $groupNames));
+            $lines[] = 'CATEGORIES:' . implode(',', array_map(fn($g) => self::escapeText($g), $groupNames));
         }
 
         // Address
         if ($this->street || $this->city || $this->state || $this->postalCode || $this->country) {
             $lines[] = 'ADR:;;' .
-                ($this->street ?? '') . ';' .
-                ($this->city ?? '') . ';' .
-                ($this->state ?? '') . ';' .
-                ($this->postalCode ?? '') . ';' .
-                ($this->country ?? '');
+                self::escapeText($this->street ?? '') . ';' .
+                self::escapeText($this->city ?? '') . ';' .
+                self::escapeText($this->state ?? '') . ';' .
+                self::escapeText($this->postalCode ?? '') . ';' .
+                self::escapeText($this->country ?? '');
         }
 
         // Photo
@@ -231,20 +231,47 @@ class ContactDTO
         }
 
         // Note
-        if ($this->note) $lines[] = 'NOTE:' . preg_replace('/[^\P{C}\n]+/u', '', $this->note);
+        if ($this->note) $lines[] = 'NOTE:' . self::escapeText($this->note);
 
         // URI
-        if ($this->uri) $lines[] = 'uri:' . preg_replace('/[^\P{C}\n]+/u', '', $this->uri);
+        if ($this->uri) $lines[] = 'uri:' . self::escapeText($this->uri);
 
         // UID
-        if ($this->uid) $lines[] = 'UID:' . preg_replace('/[^\P{C}\n]+/u', '', $this->uid);
+        if ($this->uid) $lines[] = 'UID:' . self::escapeText($this->uid);
 
         $lines[] = "END:VCARD";
 
         return implode("\r\n", $lines);
     }
 
+    private static function escapeText(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
 
+        // Strip control characters (but keep newlines, which are escaped below)
+        $value = preg_replace('/[^\P{C}\n]+/u', '', $value);
+        $value = str_replace(["\r\n", "\r"], "\n", $value);
+
+        return str_replace(
+            ['\\', ',', ';', "\n"],
+            ['\\\\', '\,', '\;', '\n'],
+            $value
+        );
+    }
+
+    private static function unescapeText(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return preg_replace_callback('/\\\\(.)/', static fn(array $m) => match ($m[1]) {
+            'n', 'N' => "\n",
+            default => $m[1],
+        }, $value);
+    }
 
     public static function parseVCard(string $vcard, bool $includePhoto = true): array
     {
@@ -302,38 +329,38 @@ class ContactDTO
                 $isPhoto = false;
             }
 
-            if (str_starts_with($line, 'FN:')) $result['full_name'] = substr($line, 3);
+            if (str_starts_with($line, 'FN:')) $result['full_name'] = self::unescapeText(substr($line, 3));
             elseif (str_starts_with($line, 'N:')) {
                 $parts = explode(';', substr($line, 2));
-                $result['last_name'] = $parts[0] ?? '';
-                $result['first_name'] = $parts[1] ?? '';
-                $result['middle_name'] = $parts[2] ?? '';
-                $result['prefix'] = $parts[3] ?? '';
-                $result['suffix'] = $parts[4] ?? '';
+                $result['last_name'] = self::unescapeText($parts[0] ?? '');
+                $result['first_name'] = self::unescapeText($parts[1] ?? '');
+                $result['middle_name'] = self::unescapeText($parts[2] ?? '');
+                $result['prefix'] = self::unescapeText($parts[3] ?? '');
+                $result['suffix'] = self::unescapeText($parts[4] ?? '');
             }
             elseif (str_starts_with($line, 'TEL')) {
                 if (preg_match('/TEL(;TYPE=([^:]+))?:(.*)$/i', $line, $matches)) {
                     $type = $matches[2] ?? 'VOICE';
-                    $value = $matches[3];
+                    $value = self::unescapeText($matches[3]);
                     $result['phone'][] = ['type' => strtolower($type), 'value' => $value];
                 }
             }
             elseif (str_starts_with($line, 'EMAIL')) {
                 if (preg_match('/EMAIL(;TYPE=([^:]+))?:(.*)$/i', $line, $matches)) {
                     $type = $matches[2] ?? 'INTERNET';
-                    $value = $matches[3];
+                    $value = self::unescapeText($matches[3]);
                     $result['email'][] = ['type' => strtolower($type), 'value' => $value];
                 }
             }
-            elseif (str_starts_with($line, 'ORG:')) $result['organization'] = substr($line, 4);
+            elseif (str_starts_with($line, 'ORG:')) $result['organization'] = self::unescapeText(substr($line, 4));
             elseif (str_starts_with($line, 'CATEGORIES:')) {
-                $cats = array_map('trim', explode(',', substr($line, 11)));
+                $cats = array_map(fn($c) => self::unescapeText(trim($c)), preg_split('/(?<!\\\\),/', substr($line, 11)));
                 $result['groups'] = json_encode(array_values(array_filter($cats)));
             }
-            elseif (str_starts_with($line, 'NOTE:')) $result['note'] = substr($line, 5);
+            elseif (str_starts_with($line, 'NOTE:')) $result['note'] = self::unescapeText(substr($line, 5));
             elseif (str_starts_with($line, 'ADR')) {
                 $adrValue = preg_replace('/^ADR[^:]*:/', '', $line);
-                $parts = explode(';', $adrValue);
+                $parts = array_map(fn($p) => self::unescapeText($p), explode(';', $adrValue));
                 // vCard ADR: POBox;ExtAddr;Street;City;State;PostalCode;Country (7 parts)
                 // Legacy format written by old code: ;Street;City;State;PostalCode;Country (6 parts)
                 $offset = count($parts) >= 7 ? 2 : 1;
@@ -343,8 +370,8 @@ class ContactDTO
                 $result['postal_code'] = $parts[$offset + 3] ?? null;
                 $result['country'] = $parts[$offset + 4] ?? null;
             }
-            elseif (str_starts_with($line, 'uri:')) $result['uri'] = substr($line, 4);
-            elseif (str_starts_with($line, 'UID:')) $result['uid'] = substr($line, 4);
+            elseif (str_starts_with($line, 'uri:')) $result['uri'] = self::unescapeText(substr($line, 4));
+            elseif (str_starts_with($line, 'UID:')) $result['uid'] = self::unescapeText(substr($line, 4));
         }
 
         // Catch photo if it's the last field
