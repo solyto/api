@@ -13,6 +13,7 @@ use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
+use App\Api\Libraries\Controllers\AuthorController;
 use App\Api\Libraries\Controllers\LibraryBookController;
 use App\Api\Libraries\Controllers\LibraryBookGenreController;
 use App\Api\Libraries\Controllers\LibraryCoverController;
@@ -245,6 +246,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('books')->name('books.')->group(function () {
             Route::apiResource('genres', LibraryBookGenreController::class);
+            Route::apiResource('authors', AuthorController::class);
+            Route::post('authors/{author}/photo', [AuthorController::class, 'uploadPhoto']);
+            Route::post('authors/{author}/resync', [AuthorController::class, 'resync']);
             Route::get('recommend/{type}', [LibraryBookController::class, 'recommend']);
             Route::get('releases', [LibraryBookController::class, 'releases']);
             Route::get('search/{service}/{query}', [LibraryBookController::class, 'search']);

@@ -25,6 +25,7 @@ class LibraryBook extends Model
     protected $fillable = [
         'title',
         'author',
+        'author_id',
         'series',
         'volume',
         'rating',

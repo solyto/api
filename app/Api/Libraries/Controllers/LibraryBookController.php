@@ -202,6 +202,7 @@ class LibraryBookController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="author", type="string", maxLength=255),
+     *             @OA\Property(property="author_id", type="integer", nullable=true),
      *             @OA\Property(property="series", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="volume", type="integer", nullable=true),
      *             @OA\Property(property="pages", type="integer", nullable=true),
@@ -266,6 +267,7 @@ class LibraryBookController
      *         @OA\JsonContent(
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="author", type="string", maxLength=255),
+     *             @OA\Property(property="author_id", type="integer", nullable=true),
      *             @OA\Property(property="series", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="volume", type="integer", nullable=true),
      *             @OA\Property(property="pages", type="integer", nullable=true),
@@ -439,7 +441,7 @@ class LibraryBookController
     {
         $data = $request->validate(['url' => 'required|string|url']);
 
-        $book = $this->libraryBookService->import($service, $data['url']);
+        $book = $this->libraryBookService->import($request->user(), $service, $data['url']);
 
         if (!$book) {
             return ApiResponse::error('Book not found.', 404);

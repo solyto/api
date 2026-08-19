@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Books;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLibraryBookRequest extends FormRequest
 {
@@ -11,6 +12,12 @@ class UpdateLibraryBookRequest extends FormRequest
         return [
             'title' => 'sometimes|required|string',
             'author' => 'sometimes|required|string',
+            'author_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('authors', 'id')->where(fn ($query) => $query->where('user_id', $this->user()->id)),
+            ],
             'series' => 'sometimes|nullable|string',
             'volume' => 'sometimes|nullable|integer',
             'pages' => 'sometimes|nullable|integer',

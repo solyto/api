@@ -17,6 +17,7 @@ readonly class BookReleaseDTO
         private ?int    $pageCount = null,
         private ?string $cover = null,
         private ?Carbon $releaseDate = null,
+        private ?string $authorPhoto = null,
     )
     {}
 
@@ -35,7 +36,7 @@ readonly class BookReleaseDTO
         return $this->url;
     }
 
-    public function getId(): int
+    public function getId(): ?int
     {
         return $this->id;
     }
@@ -45,9 +46,36 @@ readonly class BookReleaseDTO
         return $this->description;
     }
 
-    public function getAuthorId(): int
+    /**
+     * Set by the external service (e.g. Hardcover's own contributor id) until
+     * LibraryBookService::import() resolves/creates the local Author record and
+     * rewrites this to that Author's local id via withAuthorId().
+     */
+    public function getAuthorId(): ?int
     {
         return $this->authorId;
+    }
+
+    public function getAuthorPhoto(): ?string
+    {
+        return $this->authorPhoto;
+    }
+
+    public function withAuthorId(?int $authorId): self
+    {
+        return new self(
+            title: $this->title,
+            author: $this->author,
+            url: $this->url,
+            provider: $this->provider,
+            id: $this->id,
+            description: $this->description,
+            authorId: $authorId,
+            pageCount: $this->pageCount,
+            cover: $this->cover,
+            releaseDate: $this->releaseDate,
+            authorPhoto: $this->authorPhoto,
+        );
     }
 
     public function getPageCount(): ?int

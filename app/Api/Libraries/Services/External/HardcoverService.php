@@ -36,7 +36,7 @@ class HardcoverService
 
         return new BookReleaseDTO(
             title: $book['title'],
-            author: $book['contributions'][0]['author']['name'] ?? null,
+            author: $book['contributions'][0]['author']['name'] ?? '',
             url: self::getReleaseUrl($book['slug']),
             provider: BookServiceEnum::HARDCOVER->value,
             id: $book['id'],
@@ -44,8 +44,29 @@ class HardcoverService
             authorId: $book['contributions'][0]['author']['id'] ?? null,
             pageCount: $book['pages'],
             cover: $book['default_cover_edition']['image']['url'] ?? $book['image']['url'] ?? null,
-            releaseDate: $book['release_date'] ? Carbon::createFromFormat('Y-m-d', $book['release_date']) : null
+            releaseDate: $book['release_date'] ? Carbon::createFromFormat('Y-m-d', $book['release_date']) : null,
+            authorPhoto: $book['contributions'][0]['author']['image']['url'] ?? null,
         );
+    }
+
+    public function getAuthor(int $id): ?array
+    {
+        $response = $this->post('
+            query GetAuthor($id: Int!) {
+                authors(where: { id: { _eq: $id } }, limit: 1) {
+                    id
+                    name
+                    bio
+                    image {
+                        url
+                    }
+                }
+            }
+        ', ['id' => $id]);
+
+        $authors = $response['data']['authors'] ?? [];
+
+        return !empty($authors) ? $authors[0] : null;
     }
 
     public function searchBooks(string $query): ?array
@@ -167,6 +188,9 @@ class HardcoverService
                         author {
                             id
                             name
+                            image {
+                                url
+                            }
                         }
                     }
                 }
