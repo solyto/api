@@ -6,12 +6,14 @@ use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\BookServiceEnum;
+use App\Api\Libraries\Models\Author;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Services\External\GoodreadsService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 
 class LibraryBookService
@@ -48,6 +50,7 @@ class LibraryBookService
     public function create(User $user, array $data): LibraryBook
     {
         $data['user_id'] = $user->id;
+        $data = $this->applyLinkedAuthor($user->id, $data);
 
         if (!empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($data['user_id'], $data['cover_path'], LibraryTypeEnum::BOOK);
@@ -75,6 +78,12 @@ class LibraryBookService
 
     public function update(LibraryBook $book, array $data): LibraryBook
     {
+        if (!array_key_exists('author_id', $data) && $book->author_id) {
+            $data['author_id'] = $book->author_id;
+        }
+
+        $data = $this->applyLinkedAuthor($book->user_id, $data);
+
         if (!empty($data['cover_path'])) {
             $save = $this->coverService->saveCover($book->user_id, $data['cover_path'], LibraryTypeEnum::BOOK);
             if ($save) {
@@ -154,12 +163,20 @@ class LibraryBookService
         };
     }
 
-    public function import(BookServiceEnum $service, string $url): ?BookReleaseDTO
+    public function import(User $user, BookServiceEnum $service, string $url): ?BookReleaseDTO
     {
-        return match ($service) {
+        $release = match ($service) {
             BookServiceEnum::HARDCOVER  => $this->hardcoverService->importFromUrl($url),
             BookServiceEnum::GOODREADS  => $this->goodreadsService->importFromUrl($url),
         };
+
+        if (!$release) {
+            return null;
+        }
+
+        $author = $this->findOrCreateAuthorFromHardcover($user, $release);
+
+        return $release->withAuthorId($author?->id);
     }
 
     public function listGenres(User $user): Collection
@@ -200,5 +217,176 @@ class LibraryBookService
         $genre->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function listAuthors(User $user): Collection
+    {
+        return Author::forUser($user->id)->withCount('books')->orderBy('name')->get();
+    }
+
+    public function findAuthor(Author $author): Author
+    {
+        $author->load('books');
+
+        return $author;
+    }
+
+    public function createAuthor(User $user, array $data): Author
+    {
+        $data['user_id'] = $user->id;
+        $data['is_favorite'] ??= false;
+
+        try {
+            $author = Author::create($data);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() !== '23000') {
+                throw $e;
+            }
+
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'hardcover_id' => 'This Hardcover ID is already linked to another author.',
+            ]);
+        }
+
+        $this->cache->forget([self::CACHE_KEY, $user->id]);
+
+        return $author;
+    }
+
+    public function updateAuthor(Author $author, array $data): Author
+    {
+        if (array_key_exists('is_favorite', $data) && $data['is_favorite'] === null) {
+            $data['is_favorite'] = false;
+        }
+
+        $nameChanged = array_key_exists('name', $data) && $data['name'] !== $author->name;
+
+        $author->update($data);
+
+        if ($nameChanged) {
+            LibraryBook::where('author_id', $author->id)->update(['author' => $author->name]);
+        }
+
+        $this->cache->forget([self::CACHE_KEY, $author->user_id]);
+
+        return $author;
+    }
+
+    public function destroyAuthor(Author $author): void
+    {
+        $userId = $author->user_id;
+        $author->delete();
+
+        $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function uploadAuthorPhoto(Author $author, UploadedFile $file): Author | false
+    {
+        $filename = $this->coverService->uploadCover($author->user_id, $file, LibraryTypeEnum::AUTHOR);
+        if (!$filename) {
+            return false;
+        }
+
+        $oldPhoto = $author->photo;
+        $author->update(['photo' => $filename]);
+
+        if (!empty($oldPhoto)) {
+            $this->coverService->deleteCover($author->user_id, LibraryTypeEnum::AUTHOR, $oldPhoto);
+        }
+
+        return $author;
+    }
+
+    public function resyncAuthorFromHardcover(Author $author): Author | false
+    {
+        if (!$author->hardcover_id) {
+            return false;
+        }
+
+        $data = $this->hardcoverService->getAuthor($author->hardcover_id);
+        if (!$data) {
+            return false;
+        }
+
+        $oldPhoto = $author->photo;
+        $photo = $oldPhoto;
+
+        $photoUrl = $data['image']['url'] ?? null;
+        if ($photoUrl) {
+            $save = $this->coverService->saveCover($author->user_id, $photoUrl, LibraryTypeEnum::AUTHOR);
+            if ($save) {
+                $photo = $save;
+            }
+        }
+
+        $author->update([
+            'name' => $data['name'] ?? $author->name,
+            'bio' => $data['bio'] ?? $author->bio,
+            'photo' => $photo,
+        ]);
+
+        if (!empty($oldPhoto) && $photo !== $oldPhoto) {
+            $this->coverService->deleteCover($author->user_id, LibraryTypeEnum::AUTHOR, $oldPhoto);
+        }
+
+        return $author;
+    }
+
+    private function findOrCreateAuthorFromHardcover(User $user, BookReleaseDTO $release): ?Author
+    {
+        $hardcoverAuthorId = $release->getAuthorId();
+        if (!$hardcoverAuthorId) {
+            return null;
+        }
+
+        $author = Author::forUser($user->id)->where('hardcover_id', $hardcoverAuthorId)->first();
+        if ($author) {
+            return $author;
+        }
+
+        $photo = null;
+        if ($release->getAuthorPhoto()) {
+            $save = $this->coverService->saveCover($user->id, $release->getAuthorPhoto(), LibraryTypeEnum::AUTHOR);
+            if ($save) {
+                $photo = $save;
+            }
+        }
+
+        try {
+            return Author::create([
+                'name' => $release->getAuthor(),
+                'hardcover_id' => $hardcoverAuthorId,
+                'photo' => $photo,
+                'user_id' => $user->id,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() !== '23000') {
+                throw $e;
+            }
+
+            if ($photo) {
+                $this->coverService->deleteCover($user->id, LibraryTypeEnum::AUTHOR, $photo);
+            }
+
+            return Author::forUser($user->id)->where('hardcover_id', $hardcoverAuthorId)->first();
+        }
+    }
+
+    private function applyLinkedAuthor(string $userId, array $data): array
+    {
+        if (!array_key_exists('author_id', $data) || !$data['author_id']) {
+            return $data;
+        }
+
+        $author = Author::forUser($userId)->find($data['author_id']);
+        if (!$author) {
+            $data['author_id'] = null;
+
+            return $data;
+        }
+
+        $data['author'] = $author->name;
+
+        return $data;
     }
 }

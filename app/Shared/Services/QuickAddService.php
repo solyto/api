@@ -164,8 +164,8 @@ class QuickAddService
         $service = app(LibraryBookService::class);
 
         $dto = Str::contains($url, BookServiceEnum::GOODREADS->baseUrl())
-            ? $service->import(BookServiceEnum::GOODREADS, $url)
-            : $service->import(BookServiceEnum::HARDCOVER, $url);
+            ? $service->import($user, BookServiceEnum::GOODREADS, $url)
+            : $service->import($user, BookServiceEnum::HARDCOVER, $url);
 
         if ($dto === null) {
             return null;
@@ -174,6 +174,7 @@ class QuickAddService
         $data = [
             'title' => $dto->getTitle(),
             'author' => $dto->getAuthor(),
+            'author_id' => $dto->getAuthorId(),
             'pages' => $dto->getPageCount(),
             'cover_path' => $dto->getCover(),
             'link' => $dto->getUrl(),
