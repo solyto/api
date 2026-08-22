@@ -34,6 +34,10 @@ use App\Api\Notifications\Controllers\NotificationSettingsController;
 use App\Api\Notifications\Controllers\PushNotificationController;
 use App\Api\Shortcuts\Controllers\ShortcutController;
 use App\Api\Statistics\Controllers\StatisticsController;
+use App\Api\Tables\Controllers\TableColumnController;
+use App\Api\Tables\Controllers\TableController;
+use App\Api\Tables\Controllers\TableImageController;
+use App\Api\Tables\Controllers\TableRowController;
 use App\Api\Tags\Controllers\TagController;
 use App\Api\Telegram\Controllers\TelegramBotConnectionController;
 use App\Api\TimeTracking\Controllers\TimeTrackingCategoryController;
@@ -141,6 +145,27 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('newest', [NoteController::class, 'newest']);
 
         Route::apiResource('/', NoteController::class)->parameters(['' => 'note']);
+    });
+
+    Route::prefix('tables')->name('tables.')->group(function () {
+        Route::put('reorder', [TableController::class, 'reorder']);
+
+        Route::prefix('{table}')->group(function () {
+            Route::get('images/{fileName}', [TableImageController::class, 'show']);
+            Route::post('images', [TableImageController::class, 'store']);
+
+            Route::put('columns/reorder', [TableColumnController::class, 'reorder']);
+            Route::post('columns', [TableColumnController::class, 'store']);
+            Route::put('columns/{column}', [TableColumnController::class, 'update']);
+            Route::delete('columns/{column}', [TableColumnController::class, 'destroy']);
+
+            Route::put('rows/reorder', [TableRowController::class, 'reorder']);
+            Route::post('rows', [TableRowController::class, 'store']);
+            Route::put('rows/{row}', [TableRowController::class, 'update']);
+            Route::delete('rows/{row}', [TableRowController::class, 'destroy']);
+        });
+
+        Route::apiResource('/', TableController::class)->parameters(['' => 'table'])->only(['index', 'store', 'show', 'update', 'destroy']);
     });
 
     Route::prefix('check-in')->group(function () {
