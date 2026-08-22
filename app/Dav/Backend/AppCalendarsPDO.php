@@ -246,19 +246,54 @@ SQL
                 $endOrig   = isset($vevent->DTEND) ? $vevent->DTEND->getDateTime() : $startOrig;
                 $isAllDay = $vevent->DTSTART->getValueType() === 'DATE';
 
+                // All-day events are stored as floating DATE values (the user's
+                // local dates), which VObject parses as UTC. Rebase their
+                // boundaries onto the query window's wall clock so midnight
+                // boundaries line up for users outside UTC. Per RFC 5545 an
+                // all-day event without DTEND spans exactly one day.
+                if ($isAllDay) {
+                    $queryTz = $start->getTimezone();
+                    if (!isset($vevent->DTEND)) {
+                        $endOrig = $endOrig->modify('+1 day');
+                    }
+                    $endOrig = new \DateTimeImmutable($endOrig->format('Y-m-d H:i:s'), $queryTz);
+                }
+
                 if (isset($vevent->RRULE)) {
                     $rrule = (string) $vevent->RRULE;
                     $rruleEnd = isset($vevent->RRULE['UNTIL']) ? $vevent->RRULE['UNTIL']->getDateTime() : null;
 
-                    $iterator = new \Sabre\VObject\Recur\EventIterator($vObj, (string)$vevent->UID);
-                    $iterator->fastForward(new \DateTimeImmutable($start->format('Y-m-d H:i:s'), $start->getTimezone()));
+                    // Compare wall-clock to wall-clock on both sides of the
+                    // window for all-day events: their floating DATE values
+                    // are parsed as UTC by VObject, while the window bounds
+                    // live in the query timezone. Rebase the bounds onto the
+                    // UTC wall clock so the boundary behavior is identical
+                    // for users east and west of UTC: an occurrence ending
+                    // exactly at the window start is skipped, and one
+                    // starting exactly at the window end is not emitted.
+                    $windowStart = $start;
+                    $windowEnd = $end;
+                    if ($isAllDay) {
+                        $utc = new \DateTimeZone('UTC');
+                        $windowStart = new \DateTimeImmutable($start->format('Y-m-d H:i:s'), $utc);
+                        $windowEnd = new \DateTimeImmutable($end->format('Y-m-d H:i:s'), $utc);
+                    }
 
-                    while ($iterator->valid() && $iterator->getDtStart() < $end) {
+                    $iterator = new \Sabre\VObject\Recur\EventIterator($vObj, (string)$vevent->UID);
+                    $iterator->fastForward($windowStart);
+
+                    while ($iterator->valid() && $iterator->getDtStart() < $windowEnd) {
                         $occStart = clone $iterator->getDtStart();
                         $occEnd = $iterator->getDtEnd() ? clone $iterator->getDtEnd() : null;
+                        if ($isAllDay) {
+                            $occStart = new \DateTimeImmutable($occStart->format('Y-m-d H:i:s'), $queryTz);
+                            if ($occEnd) {
+                                $occEnd = new \DateTimeImmutable($occEnd->format('Y-m-d H:i:s'), $queryTz);
+                            }
+                        }
 
                         // Skip occurrences outside requested range
-                        if ($occEnd && $occEnd < $start) {
+                        if ($occEnd && $occEnd <= $start) {
                             $iterator->next();
                             continue;
                         }
@@ -284,8 +319,10 @@ SQL
                         $iterator->next();
                     }
                 } else if (!isset($vevent->{'RECURRENCE-ID'})) {
-                    // Skip single-instance events outside the requested range
-                    if ($endOrig < $start || $startOrig > $end) {
+                    // Skip single-instance events outside the requested range.
+                    // An event ending exactly at the window start does not
+                    // overlap it (exclusive end, RFC 4791/5545).
+                    if ($endOrig <= $start || $startOrig > $end) {
                         continue;
                     }
 
