@@ -95,8 +95,10 @@ class CalendarService
 
     public function listWidgetEvents(User $user): array
     {
+        $timezone = new \DateTimeZone($user->settings->timezone ?? 'UTC');
+        $today = (new \DateTime('today', $timezone))->format('Y-m-d');
+
         $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
-        $today = date('Y-m-d');
         $events = [];
 
         foreach ($calendars as $calendar) {
@@ -105,8 +107,8 @@ class CalendarService
                 self::CACHE_TTL_EVENTS_FUTURE,
                 fn() => $this->dav->calendars()->events()->listExpanded(
                     $calendar,
-                    new \DateTime('today'),
-                    new \DateTime('today')->modify('+ 3 days')
+                    new \DateTime('today', $timezone),
+                    new \DateTime('today', $timezone)->modify('+ 3 days')
                 )
             ));
         }
