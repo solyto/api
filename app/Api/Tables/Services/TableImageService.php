@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class TableImageService
 {
-    private const string DISK = 'private_user_data';
+    private const string DISK = 'user_data';
 
     public function load(string $userId, Table $table, string $fileName): string|false
     {
