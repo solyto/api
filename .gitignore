@@ -41,4 +41,4 @@ Thumbs.db
 app/Console/Commands/Dav/TestCalendarImport.php
 app/Console/Commands/Dav/TestAddressBookImport.php
 app/Console/Commands/Dav/TestDav.php
-.gitignore
+.manigot/
