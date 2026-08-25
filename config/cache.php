@@ -51,6 +51,16 @@ return [
             'lock_connection' => env('CACHE_REDIS_LOCK_CONNECTION', 'default'),
         ],
 
+        // Long-term cache store for data that must survive a deployment. It
+        // lives on its own Redis DB ('persistent_cache' connection /
+        // REDIS_PERSISTENT_CACHE_DB), so deployment tooling can flush only the
+        // ephemeral 'cache' DB without losing this data.
+        'longterm' => [
+            'driver' => 'redis',
+            'connection' => 'persistent_cache',
+            'lock_connection' => env('CACHE_REDIS_LOCK_CONNECTION', 'default'),
+        ],
+
         'redis' => [
             'driver' => 'redis',
             'connection' => env('CACHE_REDIS_CONNECTION', 'cache'),
