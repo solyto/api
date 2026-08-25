@@ -10,23 +10,34 @@ class UserCacheService
 {
     private const string STORE_NAME = 'user_data';
 
+    public function __construct(private readonly string $storeName = self::STORE_NAME) {}
+
     public function store(array $identifiers, int $ttl, $data): bool
     {
-        return Cache::store(self::STORE_NAME)->put($this->getKey($identifiers), $data, $ttl);
+        $store = Cache::store($this->storeName);
+
+        // A non-positive TTL means "keep forever" (Laravel's Repository::put
+        // would otherwise delete the key), used for long-lived dedup state.
+        if ($ttl <= 0) {
+            return $store->forever($this->getKey($identifiers), $data);
+        }
+
+        return $store->put($this->getKey($identifiers), $data, $ttl);
     }
 
     public function get(array $identifiers): mixed
     {
         try {
-            $item = Cache::store(self::STORE_NAME)->get($this->getKey($identifiers));
+            $item = Cache::store($this->storeName)->get($this->getKey($identifiers));
 
-            if (!$item) {
+            if (! $item) {
                 return null;
             }
 
             return $item;
         } catch (InvalidArgumentException $e) {
             Log::channel('cache')->warning('Cache get failed', ['key' => $this->getKey($identifiers), 'error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -34,9 +45,10 @@ class UserCacheService
     public function has(array $identifiers): bool
     {
         try {
-            return Cache::store(self::STORE_NAME)->has($this->getKey($identifiers));
+            return Cache::store($this->storeName)->has($this->getKey($identifiers));
         } catch (InvalidArgumentException $e) {
             Log::channel('cache')->warning('Cache has failed', ['key' => $this->getKey($identifiers), 'error' => $e->getMessage()]);
+
             return false;
         }
     }
@@ -67,7 +79,7 @@ class UserCacheService
     public function forget(array $identifiers): void
     {
         try {
-            Cache::store(self::STORE_NAME)->delete($this->getKey($identifiers));
+            Cache::store($this->storeName)->delete($this->getKey($identifiers));
         } catch (InvalidArgumentException $e) {
             Log::channel('cache')->warning('Cache delete failed', ['key' => $this->getKey($identifiers), 'error' => $e->getMessage()]);
         }
@@ -76,15 +88,15 @@ class UserCacheService
     public function forgetByPrefix(array $identifiers): void
     {
         try {
-            $store = Cache::store(self::STORE_NAME);
-            $prefix = $store->getPrefix() . $this->getKey($identifiers) . '_';
+            $store = Cache::store($this->storeName);
+            $prefix = $store->getPrefix().$this->getKey($identifiers).'_';
             $redis = $store->connection();
-            $keys = $redis->keys($prefix . '*');
+            $keys = $redis->keys($prefix.'*');
 
-            if (!empty($keys)) {
+            if (! empty($keys)) {
                 $redisPrefix = $redis->getOption(\Redis::OPT_PREFIX) ?? '';
                 if ($redisPrefix !== '') {
-                    $keys = array_map(fn($k) => substr($k, strlen($redisPrefix)), $keys);
+                    $keys = array_map(fn ($k) => substr($k, strlen($redisPrefix)), $keys);
                 }
                 $redis->del($keys);
             }
