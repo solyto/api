@@ -14,15 +14,21 @@ use Illuminate\Support\Facades\Log;
 
 class GrabBookReleases implements ShouldQueue
 {
-    use Queueable, Dispatchable, InteractsWithQueue;
+    use Dispatchable, InteractsWithQueue, Queueable;
 
     private const string CACHE_KEY_RELEASES = 'book_releases';
-    private const string CACHE_KEY_LAST_NOTIFICATION = 'book_release_last_notification';
+
+    private const string CACHE_KEY_NOTIFIED = 'book_release_notified';
+
     private const int CACHE_TTL_RELEASES = 604800;
 
     public function handle(UserCacheService $cache): void
     {
         Log::channel('queue')->info('Grabbing new book releases for all users..');
+
+        // The notified-set lives in the long-term cache store so it survives
+        // deploys (the ephemeral cache DB may be flushed on deployment).
+        $notifiedCache = new UserCacheService('longterm');
 
         $users = User::all();
 
@@ -31,22 +37,26 @@ class GrabBookReleases implements ShouldQueue
             $releases = $service->getBookReleases();
             $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
 
-            $lastNotification = $cache->get([self::CACHE_KEY_LAST_NOTIFICATION, $user->id]);
+            $notified = $notifiedCache->get([self::CACHE_KEY_NOTIFIED, $user->id]) ?? [];
 
-            if ($lastNotification) {
-                foreach ($releases as $release) {
-                    if ($release->getReleaseDate() > $lastNotification) {
-                        $user->notify(new BookReleaseNotification(
-                            author: $release->getAuthor(),
-                            title: $release->getTitle()
-                        ));
-                    }
+            foreach ($releases as $release) {
+                $id = $release->getId();
+
+                if (in_array($id, $notified, true)) {
+                    continue;
                 }
+
+                $user->notify(new BookReleaseNotification(
+                    author: $release->getAuthor(),
+                    title: $release->getTitle()
+                ));
+
+                $notified[] = $id;
             }
 
-            $cache->store([self::CACHE_KEY_LAST_NOTIFICATION, $user->id], self::CACHE_TTL_RELEASES, now());
+            $notifiedCache->store([self::CACHE_KEY_NOTIFIED, $user->id], 0, $notified);
 
-            Log::channel('queue')->info('Cached ' . count($releases) . ' book releases for user ' . $user->id);
+            Log::channel('queue')->info('Cached '.count($releases).' book releases for user '.$user->id);
         }
 
         Log::channel('queue')->info('Done.');
