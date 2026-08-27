@@ -370,4 +370,28 @@ describe('Library search endpoints', function () {
             ->assertJsonPath('data.id', '4aawyAB9vmqN3uQ7FjRGTy')
             ->assertJsonPath('data.artist_id', '5K4W6rqBFWDnAN6FQUkS6x');
     });
+
+    it('lists configured music integrations', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/integrations')
+            ->assertStatus(200)
+            ->assertJsonPath('data.integrations', ['deezer']);
+    });
+
+    it('includes discogs and spotify when their credentials are configured', function () {
+        config([
+            'services.discogs.access_token' => 'test-token',
+            'services.spotify.client_id' => 'test-client-id',
+            'services.spotify.client_secret' => 'test-client-secret',
+        ]);
+
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/integrations')
+            ->assertStatus(200)
+            ->assertJsonPath('data.integrations', ['deezer', 'discogs', 'spotify']);
+    });
 });
