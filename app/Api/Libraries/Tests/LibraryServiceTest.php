@@ -194,6 +194,51 @@ describe('LibraryReleases', function () {
         expect($service->getMusicReleases())->toBe([]);
     });
 
+    it('collects spotify music releases for favorite artists', function () {
+        $user = makeUser();
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
+
+        $spotify = $this->mock(\App\Api\Libraries\Services\External\SpotifyService::class);
+        $spotify->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => '5K4W6rqBFWDnAN6FQUkS6x']]);
+        $spotify->shouldReceive('getNewReleases')->with('5K4W6rqBFWDnAN6FQUkS6x')->andReturn([[
+            'id' => '4aawyAB9vmqN3uQ7FjRGTy',
+            'name' => 'Fresh Album',
+            'images' => [['url' => 'https://cover.example/fresh.jpg']],
+            'release_date' => now()->toDateString(),
+            'release_date_precision' => 'day',
+        ]]);
+
+        $service = app()->makeWith(LibraryReleases::class, [
+            'user' => $user,
+            'spotifyService' => $spotify,
+        ]);
+
+        $releases = $service->getSpotifyMusicReleases();
+
+        expect($releases)->toHaveCount(1);
+        expect($releases[0]->getTitle())->toBe('Fresh Album');
+        expect($releases[0]->getArtist())->toBe('Radiohead');
+        expect($releases[0]->getProvider())->toBe(\App\Api\Libraries\Enums\MusicServiceEnum::SPOTIFY->value);
+        expect($releases[0]->getId())->toBe('4aawyAB9vmqN3uQ7FjRGTy');
+        expect($releases[0]->getArtistId())->toBe('5K4W6rqBFWDnAN6FQUkS6x');
+    });
+
+    it('skips artists with no spotify releases', function () {
+        $user = makeUser();
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
+
+        $spotify = $this->mock(\App\Api\Libraries\Services\External\SpotifyService::class);
+        $spotify->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => '5K4W6rqBFWDnAN6FQUkS6x']]);
+        $spotify->shouldReceive('getNewReleases')->with('5K4W6rqBFWDnAN6FQUkS6x')->andReturn(null);
+
+        $service = app()->makeWith(LibraryReleases::class, [
+            'user' => $user,
+            'spotifyService' => $spotify,
+        ]);
+
+        expect($service->getSpotifyMusicReleases())->toBe([]);
+    });
+
     it('collects book releases from hardcover for favorite authors', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert']);

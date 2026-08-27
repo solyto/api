@@ -11,6 +11,7 @@ use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
+use App\Api\Libraries\Services\External\SpotifyService;
 use App\Api\Libraries\Services\External\TmdbService;
 use App\Api\Users\Models\User;
 use Carbon\Carbon;
@@ -20,12 +21,23 @@ class LibraryReleases
 {
     public function __construct(
         private readonly DeezerService $deezerService,
+        private readonly SpotifyService $spotifyService,
         private readonly HardcoverService $hardcoverService,
         private readonly TmdbService $tmdbService,
         private readonly User $user
     ) {}
 
     public function getMusicReleases(): array
+    {
+        // SWITCH (deferred decision, see docs/jobs/post_spotify-integration):
+        // the Spotify releases path is built and tested but dormant. To serve
+        // Spotify releases, replace the call below with getSpotifyMusicReleases()
+        // (replace Deezer), merge both arrays (run both), or gate it behind a
+        // feature toggle.
+        return $this->getDeezerMusicReleases();
+    }
+
+    private function getDeezerMusicReleases(): array
     {
         $favorites = LibraryMusic::forUser($this->user->id)->where('rating', '>=', 4)->get();
         $processedArtists = [];
@@ -62,6 +74,58 @@ class LibraryReleases
                     cover: $release['cover_big'],
                     provider: MusicServiceEnum::DEEZER->value,
                     releaseDate: Carbon::createFromFormat('Y-m-d', $release['release_date'])
+                );
+            }
+        }
+
+        usort($releases, fn ($a, $b) => $b->getReleaseDate()->timestamp <=> $a->getReleaseDate()->timestamp);
+
+        return $releases;
+    }
+
+    /**
+     * Dormant Spotify releases path: mirrors getDeezerMusicReleases() but
+     * resolves favorite artists via Spotify and maps simplified album objects
+     * (string ids, precision-aware release dates) into MusicReleaseDTOs with
+     * provider=spotify. Not wired into getMusicReleases() yet.
+     */
+    public function getSpotifyMusicReleases(): array
+    {
+        $favorites = LibraryMusic::forUser($this->user->id)->where('rating', '>=', 4)->get();
+        $processedArtists = [];
+        $releases = [];
+
+        foreach ($favorites as $favorite) {
+            $artist = Str::contains($favorite->artist, ',') ? explode(',', $favorite->artist)[0] : $favorite->artist;
+
+            if (in_array($artist, $processedArtists)) {
+                continue;
+            }
+
+            $processedArtists[] = $artist;
+            $search = $this->spotifyService->searchArtists($artist);
+
+            if (! $search) {
+                continue;
+            }
+
+            $artistId = $search[0]['id'];
+            $artistReleases = $this->spotifyService->getNewReleases($artistId);
+
+            if (! $artistReleases || count($artistReleases) === 0) {
+                continue;
+            }
+
+            foreach ($artistReleases as $release) {
+                $releases[] = new MusicReleaseDTO(
+                    id: $release['id'],
+                    artist: $artist,
+                    artistId: $artistId,
+                    title: $release['name'],
+                    url: sprintf('https://open.spotify.com/album/%s', $release['id']),
+                    cover: $release['images'][0]['url'] ?? null,
+                    provider: MusicServiceEnum::SPOTIFY->value,
+                    releaseDate: SpotifyService::parseReleaseDate($release['release_date'] ?? null, $release['release_date_precision'] ?? null)
                 );
             }
         }

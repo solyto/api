@@ -56,6 +56,13 @@ abstract class TestCase extends BaseTestCase
             'serialize' => false,
         ]);
 
+        // The 'longterm' cache store is redis-backed in production; keep it on
+        // an in-memory array store in tests as well.
+        $app['config']->set('cache.stores.longterm', [
+            'driver' => 'array',
+            'serialize' => false,
+        ]);
+
         // ConversationState hard-codes the 'conversation_state' cache store.
         $app['config']->set('cache.stores.conversation_state', [
             'driver' => 'array',

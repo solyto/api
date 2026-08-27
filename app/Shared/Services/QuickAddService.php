@@ -50,7 +50,7 @@ class QuickAddService
     {
         $content = UrlHelper::extractUrl($content) ?? $content;
 
-        if (Str::contains($content, [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl()])) {
+        if (Str::contains($content, [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl(), MusicServiceEnum::SPOTIFY->baseUrl()])) {
             return $this->makeResult($content, QuickAddContentType::Music, 0.95);
         }
 
@@ -141,9 +141,11 @@ class QuickAddService
     {
         $service = app(LibraryMusicService::class);
 
-        $dto = Str::contains($url, MusicServiceEnum::DISCOGS->baseUrl())
-            ? $service->import(MusicServiceEnum::DISCOGS, $url)
-            : $service->import(MusicServiceEnum::DEEZER, $url);
+        $dto = match (true) {
+            Str::contains($url, MusicServiceEnum::DISCOGS->baseUrl()) => $service->import(MusicServiceEnum::DISCOGS, $url),
+            Str::contains($url, MusicServiceEnum::SPOTIFY->baseUrl()) => $service->import(MusicServiceEnum::SPOTIFY, $url),
+            default => $service->import(MusicServiceEnum::DEEZER, $url),
+        };
 
         if ($dto === null) {
             return null;

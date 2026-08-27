@@ -129,6 +129,17 @@ return [
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_SESSION_DB', '2'),
         ],
+
+        // Persistent cache connection. Holds data that must survive a deployment
+        // which flushes only the ephemeral cache DB (see 'longterm' store in
+        // config/cache.php). Configure its DB index via REDIS_PERSISTENT_CACHE_DB.
+        'persistent_cache' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_PERSISTENT_CACHE_DB', '3'),
+        ],
     ],
 
 ];

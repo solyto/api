@@ -9,6 +9,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\DiscogsService;
+use App\Api\Libraries\Services\External\SpotifyService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -25,6 +26,7 @@ class LibraryMusicService
         private readonly LibraryCoverService $coverService,
         private readonly DeezerService $deezerService,
         private readonly DiscogsService $discogsService,
+        private readonly SpotifyService $spotifyService,
         private readonly UserCacheService $cache,
     ) {}
 
@@ -142,6 +144,7 @@ class LibraryMusicService
         return match ($service) {
             MusicServiceEnum::DEEZER  => $this->deezerService->searchAlbum($query),
             MusicServiceEnum::DISCOGS => $this->discogsService->search($query),
+            MusicServiceEnum::SPOTIFY => $this->spotifyService->searchAlbum($query),
         };
     }
 
@@ -150,6 +153,7 @@ class LibraryMusicService
         return match ($service) {
             MusicServiceEnum::DEEZER  => $this->deezerService->importFromUrl($url),
             MusicServiceEnum::DISCOGS => $this->discogsService->importFromUrl($url),
+            MusicServiceEnum::SPOTIFY => $this->spotifyService->importFromUrl($url),
         };
     }
 
