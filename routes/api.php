@@ -237,6 +237,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::apiResource('genres', LibraryMusicGenreController::class);
             Route::get('recommend/{type}', [LibraryMusicController::class, 'recommend']);
             Route::get('releases', [LibraryMusicController::class, 'releases']);
+            Route::get('integrations', [LibraryMusicController::class, 'integrations']);
             Route::get('search/{service}/{query}', [LibraryMusicController::class, 'search']);
             Route::post('import/{service}', [LibraryMusicController::class, 'import']);
 

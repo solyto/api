@@ -495,4 +495,34 @@ class LibraryMusicController
 
         return ApiResponse::success(new MusicReleaseResource($album), 'Album imported successfully.');
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/libraries/music/integrations",
+     *     operationId="musicIntegrations",
+     *     tags={"Libraries - Music"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Available music integrations retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Available music integrations retrieved successfully."),
+     *             @OA\Property(property="data", type="object", @OA\Property(property="integrations", type="array", @OA\Items(type="string", enum={"deezer", "discogs", "spotify"})))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function integrations(): JsonResponse
+    {
+        return ApiResponse::success(
+            ['integrations' => $this->libraryMusicService->availableIntegrations()],
+            'Available music integrations retrieved successfully.'
+        );
+    }
 }

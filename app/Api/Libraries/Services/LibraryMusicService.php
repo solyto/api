@@ -46,6 +46,15 @@ class LibraryMusicService
         return $music;
     }
 
+    public function availableIntegrations(): array
+    {
+        return collect(MusicServiceEnum::cases())
+            ->filter(fn (MusicServiceEnum $service) => $service->isConfigured())
+            ->values()
+            ->map(fn (MusicServiceEnum $service) => $service->value)
+            ->all();
+    }
+
     public function create(User $user, array $data): LibraryMusic
     {
         $data['user_id'] = $user->id;
