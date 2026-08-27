@@ -9,9 +9,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @OA\Schema(
  *     schema="MusicReleaseImport",
  *
- *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="id", oneOf={@OA\Schema(type="integer"), @OA\Schema(type="string")}),
  *     @OA\Property(property="artist", type="string"),
- *     @OA\Property(property="artist_id", type="integer"),
+ *     @OA\Property(property="artist_id", oneOf={@OA\Schema(type="integer"), @OA\Schema(type="string")}, nullable=true),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="url", type="string", format="uri"),
  *     @OA\Property(property="cover", type="string", format="uri"),

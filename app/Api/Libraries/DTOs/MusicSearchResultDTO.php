@@ -5,7 +5,7 @@ namespace App\Api\Libraries\DTOs;
 readonly class MusicSearchResultDTO
 {
     public function __construct(
-        private int     $id,
+        private int|string $id,
         private string  $title,
         private ?string $artist,
         private ?string $cover,
@@ -14,7 +14,7 @@ readonly class MusicSearchResultDTO
         private string  $url,
     ) {}
 
-    public function getId(): int
+    public function getId(): int|string
     {
         return $this->id;
     }

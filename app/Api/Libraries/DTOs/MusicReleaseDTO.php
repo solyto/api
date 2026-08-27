@@ -7,9 +7,9 @@ use Carbon\Carbon;
 readonly class MusicReleaseDTO
 {
     public function __construct(
-        private int     $id,
+        private int|string $id,
         private ?string $artist,
-        private ?int    $artistId,
+        private int|string|null $artistId,
         private string  $title,
         private string  $url,
         private ?string $cover,
@@ -29,7 +29,7 @@ readonly class MusicReleaseDTO
         return $this->genres;
     }
 
-    public function getId(): int
+    public function getId(): int|string
     {
         return $this->id;
     }
@@ -39,7 +39,7 @@ readonly class MusicReleaseDTO
         return $this->artist;
     }
 
-    public function getArtistId(): ?int
+    public function getArtistId(): int|string|null
     {
         return $this->artistId;
     }

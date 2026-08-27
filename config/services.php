@@ -68,6 +68,11 @@ return [
         'access_token' => \App\Shared\Helpers\DockerSecretHelper::get('DISCOGS_ACCESS_TOKEN'),
     ],
 
+    'spotify' => [
+        'client_id' => \App\Shared\Helpers\DockerSecretHelper::get('SPOTIFY_CLIENT_ID'),
+        'client_secret' => \App\Shared\Helpers\DockerSecretHelper::get('SPOTIFY_CLIENT_SECRET'),
+    ],
+
     'imgproxy' => [
         'url'  => env('IMGPROXY_URL', 'http://imgproxy:8080'),
         'key'  => \App\Shared\Helpers\DockerSecretHelper::get('IMGPROXY_KEY'),

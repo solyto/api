@@ -401,9 +401,9 @@ class LibraryMusicController
      *          name="service",
      *          in="path",
      *          required=true,
-     *          description="Search service (deezer, discogs)",
+     *          description="Search service (deezer, discogs, spotify)",
      *
-     *          @OA\Schema(type="string", enum={"deezer", "discogs"})
+     *          @OA\Schema(type="string", enum={"deezer", "discogs", "spotify"})
      *      ),
      *
      *     @OA\Parameter(
@@ -451,9 +451,9 @@ class LibraryMusicController
      *         name="service",
      *         in="path",
      *         required=true,
-     *         description="Import service (deezer, discogs)",
+     *         description="Import service (deezer, discogs, spotify)",
      *
-     *         @OA\Schema(type="string", enum={"deezer", "discogs"})
+     *         @OA\Schema(type="string", enum={"deezer", "discogs", "spotify"})
      *     ),
      *
      *     @OA\RequestBody(
