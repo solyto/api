@@ -307,4 +307,67 @@ describe('Library search endpoints', function () {
             ->assertStatus(200)
             ->assertJsonPath('data.0.title', 'Kid A');
     });
+
+    it('searches music via spotify', function () {
+        config([
+            'services.spotify.client_id' => 'test-client-id',
+            'services.spotify.client_secret' => 'test-client-secret',
+        ]);
+
+        Http::fake([
+            'https://accounts.spotify.com/api/token' => Http::response(['access_token' => 'tok123', 'token_type' => 'Bearer', 'expires_in' => 3600]),
+            'https://api.spotify.com/v1/search*' => Http::response([
+                'albums' => ['items' => [[
+                    'id' => '4aawyAB9vmqN3uQ7FjRGTy',
+                    'name' => 'Kid A',
+                    'artists' => [['name' => 'Radiohead']],
+                    'images' => [['url' => null]],
+                    'release_date' => '2000-10-02',
+                    'release_date_precision' => 'day',
+                ]]],
+            ]),
+        ]);
+
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/search/spotify/Kid%20A')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.title', 'Kid A')
+            ->assertJsonPath('data.0.provider', 'spotify')
+            ->assertJsonPath('data.0.id', '4aawyAB9vmqN3uQ7FjRGTy');
+    });
+
+    it('imports music via spotify', function () {
+        config([
+            'services.spotify.client_id' => 'test-client-id',
+            'services.spotify.client_secret' => 'test-client-secret',
+        ]);
+
+        Http::fake([
+            'https://accounts.spotify.com/api/token' => Http::response(['access_token' => 'tok123', 'token_type' => 'Bearer', 'expires_in' => 3600]),
+            'https://api.spotify.com/v1/albums/4aawyAB9vmqN3uQ7FjRGTy' => Http::response([
+                'id' => '4aawyAB9vmqN3uQ7FjRGTy',
+                'name' => 'OK Computer',
+                'artists' => [['id' => '5K4W6rqBFWDnAN6FQUkS6x', 'name' => 'Radiohead']],
+                'images' => [['url' => 'https://cover.example/ok.jpg']],
+                'release_date' => '1997-05-21',
+                'release_date_precision' => 'day',
+                'album_type' => 'album',
+                'genres' => ['alternative rock'],
+            ]),
+        ]);
+
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/music/import/spotify', [
+                'url' => 'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.title', 'OK Computer')
+            ->assertJsonPath('data.provider', 'spotify')
+            ->assertJsonPath('data.id', '4aawyAB9vmqN3uQ7FjRGTy')
+            ->assertJsonPath('data.artist_id', '5K4W6rqBFWDnAN6FQUkS6x');
+    });
 });

@@ -65,6 +65,39 @@ describe('GrabMusicReleases', function () {
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
     });
+
+    it('tolerates string release ids (spotify) in the notified set', function () {
+        Notification::fake();
+
+        // Replace the beforeEach deezer mock: the DTO built from this raw
+        // release carries a Spotify-style 22-char string id (TASK-2 widened
+        // MusicReleaseDTO::id to int|string). The job's strict in_array dedup
+        // must store and compare it as a string.
+        $deezer = $this->mock(DeezerService::class);
+        $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
+        $deezer->shouldReceive('getNewReleases')->with(6)->andReturn([[
+            'id' => '4aawyAB9vmqN3uQ7FjRGTy',
+            'title' => 'Fresh Album',
+            'link' => 'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy',
+            'cover_big' => null,
+            'release_date' => now()->toDateString(),
+        ]]);
+
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+
+        Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+
+        $notified = Cache::store('longterm')->get('music_release_notified_'.$this->user->id);
+        expect($notified)->toBe(['4aawyAB9vmqN3uQ7FjRGTy']);
+
+        // Re-fake so the assertion below only counts notifications from the
+        // second run (the dedup must suppress the already-notified string id).
+        Notification::fake();
+
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+
+        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+    });
 });
 
 describe('GrabBookReleases', function () {

@@ -1,10 +1,12 @@
 <?php
 
 use App\Api\Dashboard\Enums\QuickAddContentType;
+use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 use App\Shared\Services\QuickAddService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
@@ -24,6 +26,14 @@ describe('QuickAddService::detect', function () {
 
     it('detects music from a deezer url', function () {
         $result = app(QuickAddService::class)->detect('https://www.deezer.com/album/12345');
+
+        expect($result->contentType)->toBe(QuickAddContentType::Music);
+        expect($result->confidence)->toBe(0.95);
+        expect($result->needsConfirmation)->toBeFalse();
+    });
+
+    it('detects music from a spotify url', function () {
+        $result = app(QuickAddService::class)->detect('https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy');
 
         expect($result->contentType)->toBe(QuickAddContentType::Music);
         expect($result->confidence)->toBe(0.95);
@@ -85,6 +95,42 @@ describe('QuickAddService::commit', function () {
 
         expect($note)->toBeInstanceOf(Note::class);
         expect(Note::where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('commits a spotify url as music', function () {
+        $user = makeUser();
+
+        config([
+            'services.spotify.client_id' => 'test-client-id',
+            'services.spotify.client_secret' => 'test-client-secret',
+        ]);
+
+        Http::fake([
+            'https://accounts.spotify.com/api/token' => Http::response(['access_token' => 'tok123', 'token_type' => 'Bearer', 'expires_in' => 3600]),
+            'https://api.spotify.com/v1/albums/4aawyAB9vmqN3uQ7FjRGTy' => Http::response([
+                'id' => '4aawyAB9vmqN3uQ7FjRGTy',
+                'name' => 'OK Computer',
+                'artists' => [['id' => '5K4W6rqBFWDnAN6FQUkS6x', 'name' => 'Radiohead']],
+                'images' => [],
+                'release_date' => '1997-05-21',
+                'release_date_precision' => 'day',
+                'album_type' => 'album',
+                'genres' => ['alternative rock'],
+            ]),
+        ]);
+
+        $music = app(QuickAddService::class)->commit(
+            $user,
+            'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy',
+            QuickAddContentType::Music,
+            []
+        );
+
+        expect($music)->toBeInstanceOf(LibraryMusic::class);
+        expect($music->title)->toBe('OK Computer');
+        expect($music->artist)->toBe('Radiohead');
+        expect($music->publication_year)->toBe(1997);
+        expect(LibraryMusic::where('user_id', $user->id)->count())->toBe(1);
     });
 });
 
