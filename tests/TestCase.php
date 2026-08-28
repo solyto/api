@@ -20,9 +20,16 @@ abstract class TestCase extends BaseTestCase
         $app = require __DIR__ . '/../bootstrap/app.php';
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-        // Fresh per-process file for the DAV database (see below).
+        // Fresh per-process file for the DAV database (see below). The
+        // storage/framework/testing directory is not part of a fresh
+        // checkout (the .gitkeep files are untracked), so create it here
+        // instead of relying on pre-existing working-tree state.
         $davDatabase = storage_path('framework/testing/dav.sqlite');
         if (! static::$davDatabaseInitialized) {
+            $davDirectory = dirname($davDatabase);
+            if (! is_dir($davDirectory)) {
+                mkdir($davDirectory, 0755, true);
+            }
             if (file_exists($davDatabase)) {
                 unlink($davDatabase);
             }
@@ -61,6 +68,14 @@ abstract class TestCase extends BaseTestCase
             'driver' => 'array',
             'serialize' => true,
         ]);
+
+        // The app key and the AI service key are read from Docker secrets at
+        // runtime (DockerSecretHelper), which do not exist in tests. Use a
+        // fixed test key so encryption and the password reset broker work;
+        // the AI client is always replaced by a mock in the tests that
+        // exercise AiService.
+        $app['config']->set('app.key', 'base64:AoYoKps+wlm4si7c1Q8IijIzpTPDxuZds9MS6/cHPlE=');
+        $app['config']->set('services.ai.api_key', 'test-key');
 
         // The image transformation service relies on Imagick/imgproxy which
         // are not available in the test environment; use a no-op double that
