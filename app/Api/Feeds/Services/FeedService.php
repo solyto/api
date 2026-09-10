@@ -22,6 +22,7 @@ class FeedService
     private const int CACHE_TTL_USER_FEEDS = 86400;
     private const int CACHE_TTL_FEED_ITEMS = 3600;
     private const int MAX_ERROR_LENGTH = 500;
+    private const int MAX_DESCRIPTION_LENGTH = 1000;
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -265,6 +266,17 @@ class FeedService
     }
 
     /**
+     * Some feeds (e.g. F-Droid's "This Week in F-Droid") ship the entire
+     * newsletter as the item description. That overflows the feed_items TEXT
+     * column and fails the whole sync, and the client only ever renders a
+     * short preview — so descriptions are cut to a fixed length at ingest.
+     */
+    private function truncateDescription(?string $value): ?string
+    {
+        return $value === null ? null : Str::limit($value, self::MAX_DESCRIPTION_LENGTH);
+    }
+
+    /**
      * Resolving an image can cost a full external page fetch per item, so it only
      * happens for items being stored for the first time. Retrying items that are
      * already stored but still have no image is opt-in via $backfillImages, since
@@ -300,7 +312,7 @@ class FeedService
                 try {
                     $feedItem->fill([
                         'title'        => $this->sanitizeText($item->get_title()),
-                        'description'  => $item->get_description(),
+                        'description'  => $this->truncateDescription($item->get_description()),
                         'link'         => $item->get_link(),
                         'image_url'    => $this->feedReader->extractImageUrl($item),
                         'published_at' => $this->resolvePublishedAt($item),
