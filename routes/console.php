@@ -18,7 +18,10 @@ Schedule::job(\App\Api\DevRequests\Jobs\DeleteOldDevRequests::class)->dailyAt(2)
  */
 Schedule::job(\App\Api\Libraries\Jobs\GrabMusicReleases::class)->dailyAt(5);
 Schedule::job(\App\Api\Libraries\Jobs\GrabBookReleases::class)->weekly();
-Schedule::job(\App\Api\Libraries\Jobs\GrabMovieReleases::class)->weekly();
+// Temporarily deactivated: movie release notifications are not working
+// properly (job elect / deactivate-movie-release-notifications). Re-enable
+// by uncommenting once fixed.
+// Schedule::job(\App\Api\Libraries\Jobs\GrabMovieReleases::class)->weekly();
 Schedule::job(\App\Api\Libraries\Jobs\ScaleCovers::class)->dailyAt(3);
 
 /*
