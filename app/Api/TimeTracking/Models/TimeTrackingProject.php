@@ -25,6 +25,7 @@ class TimeTrackingProject extends Model
     protected $fillable = [
         'title',
         'description',
+        'color',
         'user_id',
     ];
 
