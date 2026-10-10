@@ -60,9 +60,10 @@ class TimeTrackingEntryController
      *             required={"started_at", "stopped_at", "duration_minutes", "project_id"},
      *
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="started_at", type="string", format="date-time"),
-     *             @OA\Property(property="stopped_at", type="string", format="date-time"),
-     *             @OA\Property(property="duration_minutes", type="integer", minimum=1),
+     *             @OA\Property(property="started_at", type="string", format="date-time", description="Day anchor when has_exact_times is false."),
+     *             @OA\Property(property="stopped_at", type="string", format="date-time", description="Informational when has_exact_times is false."),
+     *             @OA\Property(property="duration_minutes", type="integer", minimum=1, description="Authoritative value for duration-only entries."),
+     *             @OA\Property(property="has_exact_times", type="boolean", nullable=true, description="False makes the entry duration-only; started_at's date then anchors it."),
      *             @OA\Property(property="project_id", type="integer")
      *         )
      *     ),
@@ -121,9 +122,10 @@ class TimeTrackingEntryController
      *         @OA\JsonContent(
      *
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="started_at", type="string", format="date-time"),
-     *             @OA\Property(property="stopped_at", type="string", format="date-time", nullable=true),
-     *             @OA\Property(property="duration_minutes", type="integer", minimum=0),
+     *             @OA\Property(property="started_at", type="string", format="date-time", description="Day anchor when has_exact_times is false."),
+     *             @OA\Property(property="stopped_at", type="string", format="date-time", nullable=true, description="Informational when has_exact_times is false."),
+     *             @OA\Property(property="duration_minutes", type="integer", minimum=0, description="Authoritative value for duration-only entries."),
+     *             @OA\Property(property="has_exact_times", type="boolean", nullable=true, description="Set or clear the exact-times flag; false makes the entry duration-only."),
      *             @OA\Property(property="project_id", type="integer")
      *         )
      *     ),
@@ -158,6 +160,7 @@ class TimeTrackingEntryController
             'started_at' => 'sometimes|date',
             'stopped_at' => 'sometimes|nullable|date',
             'duration_minutes' => 'sometimes|integer|min:0',
+            'has_exact_times' => 'sometimes|boolean',
             'project_id' => 'sometimes|exists:time_tracking_projects,id',
         ]);
 
@@ -250,7 +253,7 @@ class TimeTrackingEntryController
      *     ),
      *     @OA\Response(
      *         response=409,
-     *         description="A timer is already running"
+     *         description="A timer is already running (only one active timer per user; stop it first)"
      *     ),
      *     @OA\Response(
      *         response=422,
@@ -342,6 +345,7 @@ class TimeTrackingEntryController
      *         name="from",
      *         in="query",
      *         required=true,
+     *         description="Inclusive range start (day granularity, evaluated in the app timezone).",
      *
      *         @OA\Schema(type="string", format="date")
      *     ),
@@ -350,13 +354,23 @@ class TimeTrackingEntryController
      *         name="to",
      *         in="query",
      *         required=true,
+     *         description="Inclusive range end (day granularity, evaluated in the app timezone); running timers (stopped_at null) are excluded.",
      *
      *         @OA\Schema(type="string", format="date")
      *     ),
      *
+     *     @OA\Parameter(
+     *         name="category_id",
+     *         in="query",
+     *         required=false,
+     *         description="Restrict statistics to projects tagged with this category (optional).",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
-     *         description="Statistics retrieved successfully",
+     *         description="Statistics retrieved successfully. total_minutes is scoped to the requested range, while a project's total_duration is all-time.",
      *
      *         @OA\JsonContent(
      *
@@ -376,12 +390,13 @@ class TimeTrackingEntryController
         $validated = $request->validate([
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
+            'category_id' => 'nullable|exists:time_tracking_categories,id',
         ]);
 
         $from = Carbon::parse($validated['from'])->startOfDay();
         $to = Carbon::parse($validated['to'])->endOfDay();
 
-        $stats = $this->timeTrackingService->getStatistics($request->user(), $from, $to);
+        $stats = $this->timeTrackingService->getStatistics($request->user(), $from, $to, $validated['category_id'] ?? null);
 
         return ApiResponse::success(array_merge($stats, [
             'from' => $validated['from'],
