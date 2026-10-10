@@ -16,7 +16,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="navigation", type="object", nullable=true),
  *     @OA\Property(property="ai_enabled", type="boolean"),
  *     @OA\Property(property="openai_api_key", type="string", nullable=true),
- *     @OA\Property(property="first_visit", type="boolean")
+ *     @OA\Property(property="first_visit", type="boolean"),
+ *     @OA\Property(property="journal_enabled", type="boolean"),
+ *     @OA\Property(property="journal_calendar_mark", type="boolean"),
+ *     @OA\Property(property="check_in_calendar_mark", type="boolean")
  * )
  */
 class UserSettingsResource extends JsonResource
@@ -37,7 +40,10 @@ class UserSettingsResource extends JsonResource
             'ai_enabled' => $this->ai_enabled,
             'openai_api_key' => $this->openai_api_key,
             'first_visit' => $this->first_visit,
-            'temperature_unit' => $this->temperature_unit ?? 'c'
+            'journal_enabled' => $this->journal_enabled,
+            'journal_calendar_mark' => $this->journal_calendar_mark,
+            'check_in_calendar_mark' => $this->check_in_calendar_mark,
+            'temperature_unit' => $this->temperature_unit ?? 'c',
         ];
     }
 }

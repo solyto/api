@@ -1,6 +1,5 @@
 <?php
 
-use App\Api\Users\Models\User;
 use App\Api\Users\Services\UserSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -282,6 +281,74 @@ describe('User settings endpoints', function () {
             ->assertJsonPath('success', true);
 
         expect($user->fresh()->settings->first_visit)->toBeFalse();
+    });
+
+    it('toggles the journal', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/journal', ['enabled' => true])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        expect($user->fresh()->settings->journal_enabled)->toBeTrue();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/journal', ['enabled' => false])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->journal_enabled)->toBeFalse();
+    });
+
+    it('requires a boolean when updating the journal', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/journal', [])
+            ->assertStatus(422);
+    });
+
+    it('toggles the journal calendar mark', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/journal-calendar-mark', ['enabled' => true])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->journal_calendar_mark)->toBeTrue();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/journal-calendar-mark', ['enabled' => false])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->journal_calendar_mark)->toBeFalse();
+    });
+
+    it('toggles the check-in calendar mark', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/check-in-calendar-mark', ['enabled' => true])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->check_in_calendar_mark)->toBeTrue();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/check-in-calendar-mark', ['enabled' => false])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->check_in_calendar_mark)->toBeFalse();
+    });
+
+    it('returns the journal and calendar mark settings off by default', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200)
+            ->assertJsonPath('data.settings.journal_enabled', false)
+            ->assertJsonPath('data.settings.journal_calendar_mark', false)
+            ->assertJsonPath('data.settings.check_in_calendar_mark', false);
     });
 
     it('shows check-in settings with defaults', function () {
