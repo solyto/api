@@ -11,6 +11,7 @@ class UpdateTimeTrackingProjectRequest extends FormRequest
         return [
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|nullable|string|max:1000',
+            'color' => 'sometimes|nullable|string|max:7',
             'category_ids' => 'sometimes|nullable|array',
             'category_ids.*' => 'exists:time_tracking_categories,id'
         ];

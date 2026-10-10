@@ -94,6 +94,12 @@ describe('TimeTrackingProject Factory', function () {
         expect($project->description)->toBe('My project description');
     });
 
+    it('creates a project with custom color', function () {
+        $project = TimeTrackingProject::factory()->withColor('#123456')->create();
+
+        expect($project->color)->toBe('#123456');
+    });
+
     it('creates a project for user', function () {
         $user = User::factory()->create();
         $project = TimeTrackingProject::factory()->forUser($user)->create();
