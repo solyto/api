@@ -223,6 +223,84 @@ describe('Note category visibility', function () {
     });
 });
 
+describe('Journal marks endpoint', function () {
+    it('returns journal entry dates within the range, even while the folder is hidden', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+
+        expect($journal->is_hidden)->toBeTrue();
+
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-06')->create();
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-08')->create();
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-11-01')->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data', ['2026-10-06', '2026-10-08']);
+    });
+
+    it('ignores notes outside the journal folder and non-date titles', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+        $other = NoteCategory::factory()->forUser($user)->create();
+
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-05')->create();
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-15-notes')->create();
+        Note::factory()->forUser($user)->forCategory($other)->withTitle('2026-10-07')->create();
+        Note::factory()->forUser($user)->withTitle('2026-10-09')->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('data', ['2026-10-05']);
+    });
+
+    it('scopes marks to the authenticated user', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $journal = NoteCategory::where('user_id', $other->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+
+        Note::factory()->forUser($other)->forCategory($journal)->withTitle('2026-10-06')->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('data', []);
+    });
+
+    it('rejects a missing or malformed range', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-09-01')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=01.10.2026&to=31.10.2026')
+            ->assertStatus(422);
+    });
+
+    it('rejects a range longer than 366 days', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2025-01-01&to=2026-10-01')
+            ->assertStatus(422);
+    });
+});
+
 describe('Note import', function () {
     it('imports a markdown file', function () {
         $user = makeUser();
@@ -241,7 +319,7 @@ describe('Note import', function () {
         $user = makeUser();
 
         $zipPath = tempnam(sys_get_temp_dir(), 'notes');
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($zipPath, ZipArchive::CREATE);
         $zip->addFromString('note.md', '# Note content');
         $zip->close();

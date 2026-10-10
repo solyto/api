@@ -7,8 +7,10 @@ use App\Api\CheckIn\Requests\StoreCheckInRequest;
 use App\Api\CheckIn\Resources\CheckInResource;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\HandlesApiAuth;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CheckInController
 {
@@ -40,6 +42,50 @@ class CheckInController
         return ApiResponse::success(
             CheckInResource::collection($this->checkInService->list($request->user())),
             'Check-in data retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/v1/check-in/marks",
+     *     operationId="checkInMarks",
+     *     summary="List dates with a check-in",
+     *     tags={"Check-In"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="from", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Check-in marks retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(type="string", format="date"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function marks(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => 'required|date_format:Y-m-d',
+            'to' => 'required|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if (Carbon::parse($validated['from'])->diffInDays(Carbon::parse($validated['to'])) > 366) {
+            throw ValidationException::withMessages([
+                'to' => 'The date range must not exceed 366 days.',
+            ]);
+        }
+
+        return ApiResponse::success(
+            $this->checkInService->marks($request->user(), $validated['from'], $validated['to']),
+            'Check-in marks retrieved successfully.'
         );
     }
 

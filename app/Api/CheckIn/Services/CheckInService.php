@@ -5,11 +5,13 @@ namespace App\Api\CheckIn\Services;
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class CheckInService
 {
     private const string CACHE_KEY = 'checkin';
+
     private const int CACHE_TTL = 86400;
 
     public function __construct(private readonly UserCacheService $cache) {}
@@ -27,7 +29,25 @@ class CheckInService
 
     public function find(User $user, string $date): ?CheckIn
     {
-        return CheckIn::forUser($user->id)->where('date', $date . ' 00:00:00')->first();
+        return CheckIn::forUser($user->id)->where('date', $date.' 00:00:00')->first();
+    }
+
+    /**
+     * Dates (Y-m-d) within [$from, $to] that the user has a check-in for.
+     *
+     * @return array<int, string>
+     */
+    public function marks(User $user, string $from, string $to): array
+    {
+        return CheckIn::forUser($user->id)
+            ->whereDate('date', '>=', $from)
+            ->whereDate('date', '<=', $to)
+            ->orderBy('date')
+            ->pluck('date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function create(User $user, array $data): CheckIn
