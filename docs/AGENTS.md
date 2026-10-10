@@ -50,6 +50,9 @@ frontend repository. AGPL-3.0.
 - Secrets and third-party API keys (Hardcover, TMDB, Discogs, Mailgun, imgproxy, AI, bot tokens, ...) are read at runtime from Docker secrets via `App\Shared\Helpers\DockerSecretHelper`, not from `.env`.
 - Tests are Pest: co-located in `app/Api/<Module>/Tests` plus `tests/Feature` and `tests/Unit`; they run against in-memory SQLite (see `tests/TestCase.php`). UI copy is localized in `resources/lang/{en,de,fr,es}`.
 
+## Conventions
+New or AI-generated code should follow this repo's conventions instead of generic Laravel patterns — see the policy set starting at [docs/API-CONVENTIONS.md](./API-CONVENTIONS.md) (golden rules, module anatomy, and one doc per topic: controllers, services, requests/responses, models/database, resources/OpenAPI, auth/security, jobs/queues, testing/style).
+
 ## Commands
 - `composer test` (or `php artisan test`) — run the Pest suite (Unit, Feature, Api)
 - `composer audit` — check dependencies for vulnerabilities
