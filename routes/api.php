@@ -143,12 +143,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::patch('categories/{category}/hidden', [NoteCategoryController::class, 'updateHidden']);
         Route::apiResource('categories', NoteCategoryController::class);
         Route::get('newest', [NoteController::class, 'newest']);
+        Route::get('journal/marks', [NoteController::class, 'journalMarks']);
 
         Route::apiResource('/', NoteController::class)->parameters(['' => 'note']);
     });
 
     Route::prefix('check-in')->group(function () {
         Route::get('', [CheckInController::class, 'index']);
+        Route::get('marks', [CheckInController::class, 'marks']);
         Route::post('', [CheckInController::class, 'store']);
     });
 

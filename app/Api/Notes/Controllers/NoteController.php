@@ -9,8 +9,10 @@ use App\Api\Notes\Requests\StoreNoteRequest;
 use App\Api\Notes\Requests\UpdateNoteRequest;
 use App\Api\Notes\Resources\NoteResource;
 use App\Api\Notes\Services\NoteService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class NoteController
 {
@@ -71,6 +73,50 @@ class NoteController
         return ApiResponse::success(
             NoteResource::collection($this->noteService->newest($request->user())),
             'Notes retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/v1/notes/journal/marks",
+     *     operationId="noteJournalMarks",
+     *     summary="List dates with a journal entry",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(name="from", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Journal marks retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(type="string", format="date"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function journalMarks(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => 'required|date_format:Y-m-d',
+            'to' => 'required|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if (Carbon::parse($validated['from'])->diffInDays(Carbon::parse($validated['to'])) > 366) {
+            throw ValidationException::withMessages([
+                'to' => 'The date range must not exceed 366 days.',
+            ]);
+        }
+
+        return ApiResponse::success(
+            $this->noteService->journalMarks($request->user(), $validated['from'], $validated['to']),
+            'Journal marks retrieved successfully.'
         );
     }
 
