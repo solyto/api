@@ -109,8 +109,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::put('weather-temperature-unit', [UserSettingsController::class, 'updateWeatherTemperatureUnit']);
             Route::put('openai-api-key', [UserSettingsController::class, 'updateOpenaiApiKey']);
             Route::put('complete-onboarding', [UserSettingsController::class, 'completeOnboarding']);
+            Route::put('journal', [UserSettingsController::class, 'updateJournal']);
+            Route::put('journal-calendar-mark', [UserSettingsController::class, 'updateJournalCalendarMark']);
             Route::get('check-in', [UserSettingsController::class, 'showCheckIn']);
             Route::put('check-in', [UserSettingsController::class, 'updateCheckIn']);
+            Route::put('check-in-calendar-mark', [UserSettingsController::class, 'updateCheckInCalendarMark']);
         });
     });
     Route::apiResource('users', UserController::class)->only(['index', 'update']);

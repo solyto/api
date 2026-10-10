@@ -35,8 +35,8 @@ class UserSettingsService
     public function updateWeatherCity(User $user, array $data): void
     {
         $user->settings()->update([
-            'weather_city'      => $data['city'],
-            'weather_latitude'  => $data['latitude'],
+            'weather_city' => $data['city'],
+            'weather_latitude' => $data['latitude'],
             'weather_longitude' => $data['longitude'],
         ]);
     }
@@ -44,7 +44,7 @@ class UserSettingsService
     public function updateWeatherTemperatureUnit(User $user, array $data): void
     {
         $user->settings()->update([
-            'temperature_unit'   => $data['temperature_unit'] ?? 'c'
+            'temperature_unit' => $data['temperature_unit'] ?? 'c',
         ]);
     }
 
@@ -52,13 +52,28 @@ class UserSettingsService
     {
         $user->settings()->update([
             'openai_api_key' => $key,
-            'ai_enabled'     => ! empty($key),
+            'ai_enabled' => ! empty($key),
         ]);
     }
 
     public function completeOnboarding(User $user): void
     {
         $user->settings()->update(['first_visit' => false]);
+    }
+
+    public function updateJournal(User $user, bool $enabled): void
+    {
+        $user->settings()->update(['journal_enabled' => $enabled]);
+    }
+
+    public function updateJournalCalendarMark(User $user, bool $enabled): void
+    {
+        $user->settings()->update(['journal_calendar_mark' => $enabled]);
+    }
+
+    public function updateCheckInCalendarMark(User $user, bool $enabled): void
+    {
+        $user->settings()->update(['check_in_calendar_mark' => $enabled]);
     }
 
     public function getCheckInSettings(User $user): UserSettings
