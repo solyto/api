@@ -104,6 +104,7 @@ class TimeTrackingProjectController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="description", type="string", maxLength=1000, nullable=true),
+     *             @OA\Property(property="color", type="string", maxLength=7, nullable=true),
      *             @OA\Property(property="category_ids", type="array", @OA\Items(type="integer"), nullable=true)
      *         )
      *     ),
@@ -158,6 +159,7 @@ class TimeTrackingProjectController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="description", type="string", maxLength=1000, nullable=true),
+     *             @OA\Property(property="color", type="string", maxLength=7, nullable=true),
      *             @OA\Property(property="category_ids", type="array", @OA\Items(type="integer"), nullable=true)
      *         )
      *     ),

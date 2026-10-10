@@ -15,6 +15,7 @@ class TimeTrackingProjectFactory extends Factory
         return [
             'title' => $this->faker->randomElement(['Website Redesign', 'Mobile App', 'API Development', 'Database Migration']),
             'description' => $this->faker->optional(0.7)->paragraph(),
+            'color' => $this->faker->hexColor(),
             'user_id' => User::factory(),
         ];
     }
@@ -37,6 +38,13 @@ class TimeTrackingProjectFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'description' => $description,
+        ]);
+    }
+
+    public function withColor(string $color): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'color' => $color,
         ]);
     }
 }

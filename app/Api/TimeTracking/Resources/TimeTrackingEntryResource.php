@@ -11,10 +11,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="description", type="string", nullable=true),
- *     @OA\Property(property="started_at", type="string", format="date-time"),
- *     @OA\Property(property="stopped_at", type="string", format="date-time", nullable=true),
- *     @OA\Property(property="duration_minutes", type="integer"),
- *     @OA\Property(property="project", ref="#/components/schemas/TimeTrackingProject", nullable=true),
+ *     @OA\Property(property="started_at", type="string", format="date-time", description="Day anchor for the entry: when has_exact_times is false, its date is where the entry is placed and only the day is significant."),
+ *     @OA\Property(property="stopped_at", type="string", format="date-time", nullable=true, description="Informational when has_exact_times is false; duration_minutes is the authoritative value."),
+ *     @OA\Property(property="duration_minutes", type="integer", description="Authoritative duration in minutes, also for duration-only entries (has_exact_times = false)."),
+ *     @OA\Property(property="has_exact_times", type="boolean", description="False for duration-only entries, true when exact start/stop times are recorded."),
+ *     @OA\Property(property="project", ref="#/components/schemas/TimeTrackingProject", description="The project the entry belongs to. Entries are cascade-deleted with their project, so this is never null."),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )

@@ -39,6 +39,7 @@ class TimeTrackingService
         $entry->load(['project']);
 
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $user->id]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $user->id]);
 
         return $entry;
     }
@@ -49,6 +50,7 @@ class TimeTrackingService
         $entry->load(['project']);
 
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $entry->user_id]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $entry->user_id]);
 
         return $entry;
     }
@@ -59,6 +61,7 @@ class TimeTrackingService
         $entry->delete();
 
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $userId]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
     }
 
     public function startTimer(User $user, array $data): TimeTrackingEntry
@@ -76,6 +79,7 @@ class TimeTrackingService
         $entry->load(['project']);
 
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $user->id]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $user->id]);
 
         return $entry;
     }
@@ -98,17 +102,19 @@ class TimeTrackingService
         $entry->load(['project']);
 
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $entry->user_id]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $entry->user_id]);
 
         return $entry;
     }
 
-    public function getStatistics(User $user, Carbon $from, Carbon $to): array
+    public function getStatistics(User $user, Carbon $from, Carbon $to, ?int $categoryId = null): array
     {
         $entries = TimeTrackingEntry::forUser($user->id)
             ->whereNotNull('stopped_at')
             ->where('started_at', '>=', $from)
             ->where('started_at', '<=', $to)
-            ->with(['project.categories'])
+            ->when($categoryId, fn ($query) => $query->whereHas('project.categories', fn ($q) => $q->where('time_tracking_categories.id', $categoryId)))
+            ->with(['project'])
             ->get();
 
         $byProject = [];
@@ -121,7 +127,7 @@ class TimeTrackingService
                 $byProject[$projectId] = [
                     'project_id'    => $projectId,
                     'project_title' => $entry->project->title,
-                    'color'         => $entry->project->categories->first()?->color,
+                    'color'         => $entry->project->color,
                     'total_minutes' => 0,
                 ];
             }
