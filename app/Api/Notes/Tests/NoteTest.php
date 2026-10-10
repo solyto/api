@@ -69,6 +69,25 @@ describe('NoteCategory Factory', function () {
 
         expect($category->sort_order)->toBe(10);
     });
+
+    it('defaults categories to visible and non-system', function () {
+        $category = NoteCategory::factory()->create();
+
+        expect($category->is_system)->toBeFalse();
+        expect($category->is_hidden)->toBeFalse();
+    });
+
+    it('creates a system category', function () {
+        $category = NoteCategory::factory()->system()->create();
+
+        expect($category->is_system)->toBeTrue();
+    });
+
+    it('creates a hidden category', function () {
+        $category = NoteCategory::factory()->hidden()->create();
+
+        expect($category->is_hidden)->toBeTrue();
+    });
 });
 
 describe('Note Model', function () {
@@ -173,6 +192,7 @@ describe('NoteCategory Model', function () {
 
         $roots = NoteCategory::roots()->get();
 
-        expect($roots)->toHaveCount(3);
+        // Two plain roots, the parent, and the user's provisioned journal folder.
+        expect($roots)->toHaveCount(4);
     });
 });

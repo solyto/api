@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Observers;
 
+use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserProfile;
 use App\Api\Users\Models\UserSettings;
@@ -14,6 +15,7 @@ class UserObserver
         $this->createProfile($user);
         $this->createSettings($user);
         $this->createDav($user);
+        $this->createJournalCategory($user);
     }
 
     private function createProfile(User $user): void
@@ -35,5 +37,10 @@ class UserObserver
         $dav = app(DavService::class);
         $dav->calendars()->createDefaultCalendar($user);
         $dav->addressBooks()->createDefaultAddressBook($user);
+    }
+
+    private function createJournalCategory(User $user): void
+    {
+        NoteCategory::provisionJournal($user);
     }
 }

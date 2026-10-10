@@ -12,7 +12,10 @@ class NoteCategoryService
     private const string CACHE_KEY = 'note_categories';
     private const int CACHE_TTL = 86400;
 
-    public function __construct(private readonly UserCacheService $cache) {}
+    public function __construct(
+        private readonly UserCacheService $cache,
+        private readonly NoteService $noteService,
+    ) {}
 
     public function listRoots(User $user): Collection
     {
@@ -59,5 +62,16 @@ class NoteCategoryService
         $category->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    public function updateHidden(NoteCategory $category, bool $hidden): NoteCategory
+    {
+        $userId = $category->user_id;
+        $category->update(['is_hidden' => $hidden]);
+
+        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->noteService->forgetNewest($userId);
+
+        return $category->fresh(['user']);
     }
 }

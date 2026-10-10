@@ -13,6 +13,11 @@ class NoteCategory extends Model
 {
     use HasFactory;
 
+    /**
+     * Title of the server-managed personal journal folder.
+     */
+    public const JOURNAL_TITLE = '.journal';
+
     protected static function newFactory(): NoteCategoryFactory
     {
         return NoteCategoryFactory::new();
@@ -23,12 +28,41 @@ class NoteCategory extends Model
         'user_id',
         'parent_id',
         'sort_order',
+        'is_system',
+        'is_hidden',
+    ];
+
+    protected $attributes = [
+        'is_system' => false,
+        'is_hidden' => false,
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'is_system' => 'boolean',
+        'is_hidden' => 'boolean',
     ];
+
+    /**
+     * Provision the root-level journal folder for a user, unless that user
+     * already owns one. Shared by the new-user observer and the backfill
+     * migration so the journal definition lives in one place.
+     */
+    public static function provisionJournal(User $user): self
+    {
+        return static::firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'title' => self::JOURNAL_TITLE,
+                'parent_id' => null,
+            ],
+            [
+                'is_system' => true,
+                'is_hidden' => true,
+            ]
+        );
+    }
 
     public function user(): BelongsTo
     {

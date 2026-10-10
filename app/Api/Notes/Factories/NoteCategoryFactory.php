@@ -17,7 +17,23 @@ class NoteCategoryFactory extends Factory
             'user_id' => User::factory(),
             'parent_id' => null,
             'sort_order' => $this->faker->numberBetween(0, 100),
+            'is_system' => false,
+            'is_hidden' => false,
         ];
+    }
+
+    public function system(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_system' => true,
+        ]);
+    }
+
+    public function hidden(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_hidden' => true,
+        ]);
     }
 
     public function forUser(User $user): static
