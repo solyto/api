@@ -13,6 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="parent_id", type="integer", nullable=true),
  *     @OA\Property(property="sort_order", type="integer"),
+ *     @OA\Property(property="is_system", type="boolean"),
+ *     @OA\Property(property="is_hidden", type="boolean"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time"),
  *     @OA\Property(property="children", type="array", @OA\Items(ref="#/components/schemas/NoteCategory"), nullable=true)
@@ -32,6 +34,8 @@ class NoteCategoryResource extends JsonResource
             'title' => $this->title,
             'parent_id' => $this->parent_id,
             'sort_order' => $this->sort_order,
+            'is_system' => $this->is_system,
+            'is_hidden' => $this->is_hidden,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'children' => NoteCategoryResource::collection($this->whenLoaded('descendants')),

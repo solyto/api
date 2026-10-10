@@ -29,7 +29,11 @@ class NoteService
         return $this->cache->remember(
             [self::CACHE_KEY_NEWEST, $user->id],
             self::CACHE_TTL,
-            fn() => Note::forUser($user->id)->orderBy('created_at', 'desc')->limit(5)->get()
+            fn() => Note::forUser($user->id)
+                ->whereDoesntHave('category', fn ($query) => $query->where('is_hidden', true))
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get()
         );
     }
 
@@ -77,6 +81,11 @@ class NoteService
         $note->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
+    }
+
+    public function forgetNewest(string $userId): void
+    {
         $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
     }
 }

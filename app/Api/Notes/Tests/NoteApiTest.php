@@ -82,7 +82,7 @@ describe('Note categories CRUD', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/notes/categories')
             ->assertStatus(200)
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(2, 'data');
 
         $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/notes/categories/'.$categoryId, ['title' => 'Private'])
@@ -93,7 +93,133 @@ describe('Note categories CRUD', function () {
             ->deleteJson('/api/v1/notes/categories/'.$categoryId)
             ->assertStatus(200);
 
-        expect(NoteCategory::count())->toBe(0);
+        // Only the provisioned journal folder remains.
+        expect(NoteCategory::count())->toBe(1);
+    });
+});
+
+describe('Journal folder', function () {
+    it('provisions a system, hidden, root-level journal folder per user', function () {
+        $user = makeUser();
+
+        $journal = NoteCategory::where('user_id', $user->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+
+        expect($journal)->not->toBeNull();
+        expect($journal->is_system)->toBeTrue();
+        expect($journal->is_hidden)->toBeTrue();
+        expect($journal->parent_id)->toBeNull();
+    });
+
+    it('does not provision a second journal folder for the same user', function () {
+        $user = makeUser();
+        $before = NoteCategory::where('user_id', $user->id)->count();
+
+        NoteCategory::provisionJournal($user);
+
+        expect(NoteCategory::where('user_id', $user->id)->count())->toBe($before);
+    });
+
+    it('rejects renaming and deleting a system folder', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/categories/'.$journal->id, ['title' => 'Renamed'])
+            ->assertStatus(403);
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/notes/categories/'.$journal->id)
+            ->assertStatus(403);
+
+        expect($journal->fresh()->title)->toBe(NoteCategory::JOURNAL_TITLE);
+        expect(NoteCategory::whereKey($journal->id)->exists())->toBeTrue();
+    });
+
+    it('never lets the API set is_system', function () {
+        $user = makeUser();
+
+        $store = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes/categories', ['title' => 'Work', 'is_system' => true])
+            ->assertStatus(201)
+            ->assertJsonPath('data.is_system', false);
+
+        $categoryId = $store->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/categories/'.$categoryId, ['title' => 'Work 2', 'is_system' => true])
+            ->assertStatus(200)
+            ->assertJsonPath('data.is_system', false);
+
+        expect(NoteCategory::whereKey($categoryId)->value('is_system'))->toBeFalsy();
+    });
+});
+
+describe('Note category visibility', function () {
+    it('toggles a folder hidden state', function () {
+        $user = makeUser();
+        $category = NoteCategory::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true])
+            ->assertStatus(200)
+            ->assertJsonPath('data.is_hidden', true);
+
+        expect($category->fresh()->is_hidden)->toBeTrue();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => false])
+            ->assertStatus(200)
+            ->assertJsonPath('data.is_hidden', false);
+    });
+
+    it('allows toggling hidden on a system folder', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)
+            ->where('title', NoteCategory::JOURNAL_TITLE)
+            ->first();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$journal->id.'/hidden', ['hidden' => false])
+            ->assertStatus(200)
+            ->assertJsonPath('data.is_hidden', false);
+    });
+
+    it('validates the hidden flag', function () {
+        $user = makeUser();
+        $category = NoteCategory::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', [])
+            ->assertStatus(422);
+    });
+
+    it('forbids toggling hidden on another user folder', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $category = NoteCategory::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true])
+            ->assertStatus(403);
+    });
+
+    it('excludes notes in hidden folders from newest but keeps uncategorized notes', function () {
+        $user = makeUser();
+        $hidden = NoteCategory::factory()->forUser($user)->hidden()->create();
+        $visible = NoteCategory::factory()->forUser($user)->create();
+
+        Note::factory()->forUser($user)->forCategory($hidden)->create();
+        Note::factory()->forUser($user)->forCategory($visible)->create();
+        Note::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/newest')
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
     });
 });
 

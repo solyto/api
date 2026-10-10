@@ -6,6 +6,7 @@ use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\Notes\Requests\StoreNoteCategoryRequest;
+use App\Api\Notes\Requests\UpdateNoteCategoryHiddenRequest;
 use App\Api\Notes\Requests\UpdateNoteCategoryRequest;
 use App\Api\Notes\Resources\NoteCategoryResource;
 use App\Api\Notes\Services\NoteCategoryService;
@@ -169,6 +170,7 @@ class NoteCategoryController
     public function update(UpdateNoteCategoryRequest $request, NoteCategory $category): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $category), 403);
+        abort_if($category->is_system, 403, 'System categories cannot be modified.');
 
         $category = $this->noteCategoryService->update($category, $request->validated());
 
@@ -209,9 +211,61 @@ class NoteCategoryController
     public function destroy(Request $request, NoteCategory $category): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $category), 403);
+        abort_if($category->is_system, 403, 'System categories cannot be deleted.');
 
         $this->noteCategoryService->destroy($category);
 
         return ApiResponse::success(null, 'Category deleted successfully.');
+    }
+
+    /**
+     * @OA\Patch(
+     *     path="/v1/notes/categories/{category}/hidden",
+     *     operationId="noteCategoryUpdateHidden",
+     *     summary="Toggle the hidden state of a note category",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="category",
+     *         in="path",
+     *         description="Category ID",
+     *         required=true,
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"hidden"},
+     *
+     *             @OA\Property(property="hidden", type="boolean")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category visibility updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", ref="#/components/schemas/NoteCategory")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function updateHidden(UpdateNoteCategoryHiddenRequest $request, NoteCategory $category): JsonResponse
+    {
+        abort_unless($this->isResourceOwner($request, $category), 403);
+
+        $category = $this->noteCategoryService->updateHidden($category, $request->boolean('hidden'));
+
+        return ApiResponse::success(new NoteCategoryResource($category), 'Category visibility updated successfully.');
     }
 }
