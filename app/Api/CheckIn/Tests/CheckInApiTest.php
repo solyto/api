@@ -112,6 +112,51 @@ describe('GET /api/v1/check-in/marks', function () {
     });
 });
 
+describe('GET /api/v1/check-in range', function () {
+    it('filters check-ins by date range', function () {
+        $user = makeUser();
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-06']);
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-08']);
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-11-01']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200);
+
+        expect($response->json('data'))->toHaveCount(2);
+    });
+
+    it('returns the full list when no range is given', function () {
+        $user = makeUser();
+        CheckIn::factory()->forUser($user)->count(3)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in')
+            ->assertStatus(200)
+            ->assertJsonCount(3, 'data');
+    });
+
+    it('rejects malformed or reversed ranges', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in?from=01.10.2026&to=31.10.2026')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in?from=2026-10-10&to=2026-10-01')
+            ->assertStatus(422);
+    });
+
+    it('rejects a span longer than 366 days', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in?from=2025-01-01&to=2026-10-01')
+            ->assertStatus(422);
+    });
+});
+
 describe('CheckInService', function () {
     it('find returns null for a date without a check-in', function () {
         $user = makeUser();

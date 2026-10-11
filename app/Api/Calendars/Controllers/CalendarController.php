@@ -16,8 +16,10 @@ use App\Api\Calendars\Services\EventAttachmentService;
 use App\Api\HandlesApiAuth;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CalendarController
 {
@@ -229,6 +231,53 @@ class CalendarController
     {
         return ApiResponse::success(
             EventResource::collection($this->calendarService->listEvents($request->user(), $yearMonth)),
+            'Calendar events retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/calendars/events",
+     *     operationId="listEventsRange",
+     *     summary="List calendar events in a date range",
+     *     tags={"Calendars"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(name="from", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", required=true, @OA\Schema(type="string", format="date")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Calendar events retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Calendar events retrieved successfully."),
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
+    public function listEventsRange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => 'required|date_format:Y-m-d',
+            'to' => 'required|date_format:Y-m-d|after_or_equal:from',
+        ]);
+
+        if (Carbon::parse($validated['from'])->diffInDays(Carbon::parse($validated['to'])) > 366) {
+            throw ValidationException::withMessages([
+                'to' => 'The date range must not exceed 366 days.',
+            ]);
+        }
+
+        return ApiResponse::success(
+            EventResource::collection(
+                $this->calendarService->listEventsRange($request->user(), $validated['from'], $validated['to'])
+            ),
             'Calendar events retrieved successfully.'
         );
     }

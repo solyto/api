@@ -19,7 +19,7 @@ class TodoService
 
     public function __construct(private readonly UserCacheService $cache) {}
 
-    public function list(User $user): Collection
+    public function list(User $user, ?string $dueFrom = null, ?string $dueTo = null): Collection
     {
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
@@ -34,7 +34,29 @@ class TodoService
                 })
                 ->with(['category', 'tags', 'subtasks'])
                 ->get()
-        );
+        )
+            ->filter(function (Todo $todo) use ($dueFrom, $dueTo) {
+                if ($dueFrom === null && $dueTo === null) {
+                    return true;
+                }
+
+                if ($todo->due_at === null) {
+                    return false;
+                }
+
+                $due = $todo->due_at->toDateString();
+
+                if ($dueFrom !== null && $due < $dueFrom) {
+                    return false;
+                }
+
+                if ($dueTo !== null && $due > $dueTo) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
     }
 
     public function listDueDate(User $user): Collection

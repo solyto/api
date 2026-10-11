@@ -206,6 +206,73 @@ describe('Todo subtasks', function () {
     });
 });
 
+describe('GET /api/v1/todos with due range', function () {
+    it('filters todos by due date range', function () {
+        $user = makeUser();
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-10-10']);
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-10-12']);
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-10-20']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_from=2026-10-01&due_to=2026-10-18')
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+
+        expect(collect($response->json('data'))->pluck('due_at'))
+            ->toContain('2026-10-10T00:00:00.000000Z')
+            ->toContain('2026-10-12T00:00:00.000000Z');
+    });
+
+    it('supports an overdue bucket with only due_to', function () {
+        $user = makeUser();
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-10-01']);
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-11-01']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+
+        expect($response->json('data.0.due_at'))->toBe('2026-10-01T00:00:00.000000Z');
+    });
+
+    it('excludes todos without a due date when a range is given but keeps them otherwise', function () {
+        $user = makeUser();
+        Todo::factory()->forUser($user)->create(['due_at' => '2026-10-12']);
+        Todo::factory()->forUser($user)->noDueDate()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_from=2026-10-01&due_to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos')
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+    });
+
+    it('rejects malformed or reversed ranges', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_from=01.10.2026&due_to=31.10.2026')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_from=2026-10-10&due_to=2026-10-01')
+            ->assertStatus(422);
+    });
+
+    it('rejects a span longer than 366 days', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos?due_from=2025-01-01&due_to=2026-10-01')
+            ->assertStatus(422);
+    });
+});
+
 describe('TodoService::parse', function () {
     it('extracts #tags from the title and creates missing tags', function () {
         $user = makeUser();

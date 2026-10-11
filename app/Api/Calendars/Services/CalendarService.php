@@ -116,6 +116,33 @@ class CalendarService
         return $events;
     }
 
+    public function listEventsRange(User $user, string $from, string $to): array
+    {
+        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
+        $toMonth = substr($to, 0, 7);
+        $now = date('Y-m');
+        $ttl = match (true) {
+            $toMonth < $now   => self::CACHE_TTL_EVENTS_PAST,
+            $toMonth === $now => self::CACHE_TTL_EVENTS_CURRENT,
+            default           => self::CACHE_TTL_EVENTS_FUTURE,
+        };
+
+        $events = [];
+        foreach ($calendars as $calendar) {
+            $events = array_merge($events, $this->cache->remember(
+                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'range', $from, $to],
+                $ttl,
+                fn() => $this->dav->calendars()->events()->listExpanded(
+                    $calendar,
+                    new \DateTime($from . ' 00:00:00'),
+                    new \DateTime($to . ' 23:59:59')
+                )
+            ));
+        }
+
+        return $events;
+    }
+
     public function getEvent(CalendarDTO $calendar, string $eventUri): ?EventDTO
     {
         return $this->dav->calendars()->events()->get($calendar, $eventUri);
