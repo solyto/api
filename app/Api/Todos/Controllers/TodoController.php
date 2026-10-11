@@ -11,8 +11,10 @@ use App\Api\Todos\Requests\UpdateTodoRequest;
 use App\Api\Todos\Resources\TodoResource;
 use App\Api\Todos\Resources\TodoSubtaskResource;
 use App\Api\Todos\Services\TodoService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class TodoController
 {
@@ -42,8 +44,30 @@ class TodoController
      */
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'due_from' => 'sometimes|date_format:Y-m-d',
+            'due_to' => 'sometimes|date_format:Y-m-d',
+        ]);
+
+        $dueFrom = $validated['due_from'] ?? null;
+        $dueTo = $validated['due_to'] ?? null;
+
+        if ($dueFrom !== null && $dueTo !== null) {
+            if (Carbon::parse($dueTo)->lt(Carbon::parse($dueFrom))) {
+                throw ValidationException::withMessages([
+                    'due_to' => 'The due_to date must be on or after due_from.',
+                ]);
+            }
+
+            if (Carbon::parse($dueFrom)->diffInDays(Carbon::parse($dueTo)) > 366) {
+                throw ValidationException::withMessages([
+                    'due_to' => 'The date range must not exceed 366 days.',
+                ]);
+            }
+        }
+
         return ApiResponse::success(
-            TodoResource::collection($this->todoService->list($request->user())),
+            TodoResource::collection($this->todoService->list($request->user(), $dueFrom, $dueTo)),
             'Todos retrieved successfully.'
         );
     }

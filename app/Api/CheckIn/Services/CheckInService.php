@@ -16,7 +16,7 @@ class CheckInService
 
     public function __construct(private readonly UserCacheService $cache) {}
 
-    public function list(User $user): Collection
+    public function list(User $user, ?string $from = null, ?string $to = null): Collection
     {
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
@@ -24,7 +24,25 @@ class CheckInService
             function () use ($user) {
                 return CheckIn::forUser($user->id)->get();
             }
-        );
+        )
+            ->filter(function (CheckIn $checkIn) use ($from, $to) {
+                if ($from === null && $to === null) {
+                    return true;
+                }
+
+                $date = $checkIn->date->toDateString();
+
+                if ($from !== null && $date < $from) {
+                    return false;
+                }
+
+                if ($to !== null && $date > $to) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values();
     }
 
     public function find(User $user, string $date): ?CheckIn

@@ -39,8 +39,30 @@ class CheckInController
      */
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'from' => 'sometimes|date_format:Y-m-d',
+            'to' => 'sometimes|date_format:Y-m-d',
+        ]);
+
+        $from = $validated['from'] ?? null;
+        $to = $validated['to'] ?? null;
+
+        if ($from !== null && $to !== null) {
+            if (Carbon::parse($to)->lt(Carbon::parse($from))) {
+                throw ValidationException::withMessages([
+                    'to' => 'The to date must be on or after from.',
+                ]);
+            }
+
+            if (Carbon::parse($from)->diffInDays(Carbon::parse($to)) > 366) {
+                throw ValidationException::withMessages([
+                    'to' => 'The date range must not exceed 366 days.',
+                ]);
+            }
+        }
+
         return ApiResponse::success(
-            CheckInResource::collection($this->checkInService->list($request->user())),
+            CheckInResource::collection($this->checkInService->list($request->user(), $from, $to)),
             'Check-in data retrieved successfully.'
         );
     }

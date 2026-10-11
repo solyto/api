@@ -32,6 +32,7 @@ use App\Api\Notes\Controllers\NoteController;
 use App\Api\Notes\Controllers\NotesImportExportController;
 use App\Api\Notifications\Controllers\NotificationSettingsController;
 use App\Api\Notifications\Controllers\PushNotificationController;
+use App\Api\Planner\Controllers\PlannerEntryController;
 use App\Api\Shortcuts\Controllers\ShortcutController;
 use App\Api\Statistics\Controllers\StatisticsController;
 use App\Api\Tags\Controllers\TagController;
@@ -154,6 +155,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('', [CheckInController::class, 'store']);
     });
 
+    Route::prefix('planner')->name('planner.')->group(function () {
+        Route::get('entries', [PlannerEntryController::class, 'index'])->name('entries.index');
+        Route::post('entries', [PlannerEntryController::class, 'store'])->name('entries.store');
+        Route::patch('entries/{entry}', [PlannerEntryController::class, 'update'])->name('entries.update');
+        Route::delete('entries/{entry}', [PlannerEntryController::class, 'destroy'])->name('entries.destroy');
+    });
+
     Route::prefix('calendars')->group(function () {
         Route::get('', [CalendarController::class, 'listCalendars']);
         Route::post('', [CalendarController::class, 'storeCalendar']);
@@ -171,6 +179,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         });
 
         Route::prefix('events')->group(function () {
+            Route::get('', [CalendarController::class, 'listEventsRange']);
             Route::get('widget', [CalendarController::class, 'listWidgetEvents']);
             Route::get('{yearMonth}', [CalendarController::class, 'listEvents']);
 

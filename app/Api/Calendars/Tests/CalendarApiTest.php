@@ -268,6 +268,74 @@ describe('Calendar events', function () {
     });
 });
 
+describe('Calendar events range', function () {
+    it('rejects a missing, malformed or reversed range', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events?from=01.10.2026&to=31.10.2026')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events?from=2026-10-01&to=2026-09-01')
+            ->assertStatus(422);
+    });
+
+    it('rejects a span longer than 366 days', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events?from=2025-01-01&to=2026-10-01')
+            ->assertStatus(422);
+    });
+
+    it('lists events and expanded occurrences within the range', function () {
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+
+        $instanceId = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $storeEvent = function (array $payload) use ($user, $instanceId) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge($payload, [
+                    'calendar_id' => $instanceId,
+                ]))
+                ->assertStatus(201)
+                ->assertJsonPath('success', true);
+        };
+
+        $today = today('UTC')->toDateString();
+        $tomorrow = today('UTC')->addDay()->toDateString();
+
+        $storeEvent(['title' => 'Range Single', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Range Daily Recurring', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true, 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
+
+        $data = collect(
+            $this->actingAs($user, 'sanctum')
+                ->getJson('/api/v1/calendars/events?from='.$today.'&to='.$tomorrow)
+                ->assertStatus(200)
+                ->assertJsonPath('success', true)
+                ->json('data')
+        );
+
+        $titles = $data->pluck('title');
+
+        expect($titles)->toContain('Range Single');
+        expect($titles)->toContain('Range Daily Recurring');
+
+        $recurrenceStarts = $data->where('title', 'Range Daily Recurring')->pluck('original_start_date');
+
+        expect($recurrenceStarts)->toContain($today.'T00:00:00');
+        expect($recurrenceStarts)->toContain($tomorrow.'T00:00:00');
+    });
+});
+
 describe('Event attachments', function () {
     it('attaches and detaches a todo', function () {
         $user = makeUser();
