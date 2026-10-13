@@ -9,11 +9,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @OA\Schema(
  *     schema="LibraryRecipe",
  *
- *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="id", type="string", format="uuid"),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="rating", type="number", nullable=true),
  *     @OA\Property(property="calories", type="integer", nullable=true),
- *     @OA\Property(property="time_to_make", type="string", nullable=true),
+ *     @OA\Property(property="time_to_make", type="integer", nullable=true),
  *     @OA\Property(property="servings", type="integer", nullable=true),
  *     @OA\Property(property="cover", type="string", format="uri", nullable=true),
  *     @OA\Property(property="link", type="string", format="uri", nullable=true),
@@ -21,7 +21,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(
  *         property="ingredients",
  *         type="array",
- *         nullable=true,
  *
  *         @OA\Items(
  *
@@ -30,7 +29,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *             @OA\Property(property="unit", type="string", nullable=true)
  *         )
  *     ),
- *     @OA\Property(property="steps", type="array", nullable=true, @OA\Items(type="string")),
+ *     @OA\Property(property="steps", type="array", @OA\Items(type="string")),
  *     @OA\Property(property="type", type="string", nullable=true),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")

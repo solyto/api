@@ -2,7 +2,10 @@
 
 use App\Api\Export\Jobs\DeleteExpiredExports;
 use App\Api\Export\Jobs\ProcessExport;
+use App\Api\Export\Services\FinanceWealthExportService;
 use App\Api\Export\Services\TodoExportService;
+use App\Api\Finances\Models\WealthField;
+use App\Api\Finances\Models\WealthValue;
 use App\Api\Todos\Models\Todo;
 use App\Shared\Models\ExportJob;
 use Illuminate\Support\Facades\Queue;
@@ -117,6 +120,22 @@ describe('ExportService feature services', function () {
         $content = file_get_contents($path);
         expect($content)->toContain('Export me');
         expect($content)->toContain('Title');
+    });
+
+    it('FinanceWealthExportService writes one row per field value', function () {
+        $user = makeUser();
+        $field = WealthField::factory()->forUser($user)->withTitle('Savings')->create();
+        WealthValue::factory()->forField($field)->withValue(1234.5)->create(['date' => '2026-01-15']);
+        WealthValue::factory()->forField($field)->withValue(99.0)->create(['date' => '2026-02-15']);
+
+        $path = storage_path('app/public/user/finances_wealth.csv');
+        @unlink($path);
+        app(FinanceWealthExportService::class)->export($user, $path);
+
+        $lines = array_values(array_filter(explode("\n", file_get_contents($path))));
+        expect($lines[0])->toBe('Field,Date,Value');
+        expect($lines)->toContain('Savings,2026-01-15,1234.5');
+        expect($lines)->toHaveCount(3);
     });
 });
 

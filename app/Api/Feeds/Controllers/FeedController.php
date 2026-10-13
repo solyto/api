@@ -125,7 +125,7 @@ class FeedController
         abort_unless($this->isResourceOwner($request, $feedSubscription), 403);
 
         return ApiResponse::success(
-            new FeedSubscriptionResource($feedSubscription),
+            new FeedSubscriptionResource($this->feedService->findSubscription($feedSubscription)),
             'Feed retrieved successfully.'
         );
     }

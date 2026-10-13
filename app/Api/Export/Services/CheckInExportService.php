@@ -4,6 +4,7 @@ namespace App\Api\Export\Services;
 
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Users\Models\User;
+use App\Shared\Helpers\CsvHelper;
 
 class CheckInExportService
 {
@@ -11,30 +12,23 @@ class CheckInExportService
     {
         $checkIns = CheckIn::forUser($user->id)->orderBy('date')->get();
 
-        $handle = fopen($path, 'w');
-        fputcsv($handle, [
+        CsvHelper::write($path, [
             'Date', 'Mood', 'Water', 'Sports', 'Sleep', 'Dreams',
             'Work', 'Food Quality', 'Food Amount', 'Menstruation', 'Alcohol', 'Smoking', 'Social Life',
-        ]);
-
-        foreach ($checkIns as $checkIn) {
-            fputcsv($handle, [
-                $checkIn->date?->format('Y-m-d'),
-                $checkIn->mood,
-                $checkIn->water,
-                $checkIn->sports,
-                $checkIn->sleep,
-                $checkIn->dreams,
-                $checkIn->work,
-                $checkIn->food_quality,
-                $checkIn->food_amount,
-                $checkIn->menstruation,
-                $checkIn->alcohol,
-                $checkIn->smoking,
-                $checkIn->social_life,
-            ]);
-        }
-
-        fclose($handle);
+        ], $checkIns->map(fn ($checkIn) => [
+            $checkIn->date?->format('Y-m-d'),
+            $checkIn->mood,
+            $checkIn->water,
+            $checkIn->sports,
+            $checkIn->sleep,
+            $checkIn->dreams,
+            $checkIn->work,
+            $checkIn->food_quality,
+            $checkIn->food_amount,
+            $checkIn->menstruation,
+            $checkIn->alcohol,
+            $checkIn->smoking,
+            $checkIn->social_life,
+        ]));
     }
 }

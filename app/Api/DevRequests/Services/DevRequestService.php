@@ -15,7 +15,7 @@ class DevRequestService
 
     public function list(): Collection
     {
-        return DevRequest::with(['votes', 'comments'])->get();
+        return DevRequest::with('votes')->withCount('comments')->get();
     }
 
     public function create(array $data): DevRequest
@@ -31,7 +31,7 @@ class DevRequestService
             $devRequest->update(['screenshot' => $this->screenshotService->getFileName($screenshotName)]);
         }
 
-        $devRequest->load(['votes', 'comments']);
+        $devRequest->load('votes')->loadCount('comments');
 
         return $devRequest;
     }
@@ -39,7 +39,7 @@ class DevRequestService
     public function update(DevRequest $devRequest, array $data): DevRequest
     {
         $devRequest->update($data);
-        $devRequest->load(['votes', 'comments']);
+        $devRequest->load('votes')->loadCount('comments');
 
         return $devRequest;
     }
@@ -67,7 +67,7 @@ class DevRequestService
             ]);
         }
 
-        $devRequest->load(['votes', 'comments']);
+        $devRequest->load('votes')->loadCount('comments');
 
         return $devRequest;
     }

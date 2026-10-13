@@ -10,6 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     schema="DailyWeatherForecast",
  *
  *     @OA\Property(property="city", type="string"),
+ *     @OA\Property(property="temperature_unit", type="string", enum={"c","f"}, nullable=true),
  *     @OA\Property(property="configured", type="boolean"),
  *     @OA\Property(property="today", type="object",
  *         @OA\Property(property="code", type="integer"),

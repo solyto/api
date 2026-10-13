@@ -4,6 +4,7 @@ namespace App\Api\Export\Services;
 
 use App\Api\Libraries\Models\LibraryRecipe;
 use App\Api\Users\Models\User;
+use App\Shared\Helpers\CsvHelper;
 
 class RecipeExportService
 {
@@ -11,27 +12,20 @@ class RecipeExportService
     {
         $recipes = LibraryRecipe::forUser($user->id)->get();
 
-        $handle = fopen($path, 'w');
-        fputcsv($handle, [
+        CsvHelper::write($path, [
             'Title', 'Description', 'Ingredients', 'Steps', 'Type', 'Time To Make', 'Servings', 'Calories', 'Rating', 'Link',
-        ]);
-
-        foreach ($recipes as $recipe) {
-            fputcsv($handle, [
-                $recipe->title,
-                $recipe->description,
-                $this->formatIngredients($recipe->ingredients),
-                collect($recipe->steps ?? [])->implode("\n"),
-                $recipe->type,
-                $recipe->time_to_make,
-                $recipe->servings,
-                $recipe->calories,
-                $recipe->rating,
-                $recipe->link,
-            ]);
-        }
-
-        fclose($handle);
+        ], $recipes->map(fn ($recipe) => [
+            $recipe->title,
+            $recipe->description,
+            $this->formatIngredients($recipe->ingredients),
+            collect($recipe->steps ?? [])->implode("\n"),
+            $recipe->type,
+            $recipe->time_to_make,
+            $recipe->servings,
+            $recipe->calories,
+            $recipe->rating,
+            $recipe->link,
+        ]));
     }
 
     /**

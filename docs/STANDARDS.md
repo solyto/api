@@ -402,12 +402,11 @@ Check: `grep -rn 'call_user_func\|\$this->{\$' app` → 0.
 
 ### 4.4 Repeated housekeeping lines become one private method
 
-The pair `forget([CACHE_KEY, $id]); forget([CACHE_KEY_DUE, $id]);` appears
-seven times in `TodoService.php` (`:170-171, 208-209, 255-256, 264-265,
-275-276, 286-287, 297-298`); `TimeTrackingService` has 19 `forget` calls for
-18 methods. Rule: when the same two or more statements appear in a third
-method of one class, they are a `private function forgetUser(string $userId): void`.
-This is the owner's own pattern and the owner's own fix to make (OQ-3).
+The pair `forget([CACHE_KEY, $id]); forget([CACHE_KEY_DUE, $id]);` appeared
+seven times in `TodoService.php`; it is now `forgetUser()` (`TodoService`,
+`TimeTrackingService`, `NoteService`). Rule: when the same two or more
+statements appear in a third method of one class, they are a `private function forgetUser(string $userId): void`.
+This applies to the reference module too (OQ-3, 2026-10-13).
 
 Check: `grep -c 'cache->forget' app/Api/*/Services/*.php` — a service with
 more `forget` lines than public methods has copies.
@@ -869,6 +868,8 @@ translated (Decisions).
 - **422 validation errors reference `ValidationErrorResponse`** (OQ-2,
   2026-10-13): the schema stays because `errors` is always filled on a
   validation 422; `ErrorResponse` is for other errors (rule 2.4).
+- **Rule 4.4 applies to the reference module** (OQ-3, 2026-10-13):
+  `TodoService` has `forgetUser()` like every other service.
 - **Dependabot stays composer-only until the owner adds npm**; tooling
   additions (Pint config, Larastan, CI) are backlog items needing approval
   (package rule), not rules.
@@ -897,7 +898,7 @@ translated (Decisions).
     `tests/Feature/` contains only `Pest.php`; corrected in `TESTING.md`.
   - "The `cache->forget` repetition in `create()`/`update()` is the accepted
     pattern because the two paths differ in the details" — the lines are
-    byte-identical; rule 4.4 says extract (OQ-3 for the reference module).
+    byte-identical; rule 4.4 says extract (OQ-3: the reference module too).
   - "`IntegrationGateway` guards every call with `checkAuth()`" —
     `detect()` is deliberately unauthenticated (content detection needs no
     user); 12.8 says "every user-bound method".
@@ -912,9 +913,6 @@ translated (Decisions).
 
 ## Open questions
 
-- **OQ-3 — `forgetUser()` helper in `TodoService`.** The reference module
-  has the 7× pair; rule 4.4 says extract. Owner to confirm the rule applies
-  to the reference, then it is a backlog item.
 - **OQ-4 — the four Libraries genre CRUDs.** Four services + four
   controllers + eight requests + four resources, identical after renaming.
   One parameterised `LibraryGenreService` is a new abstraction (hard rule

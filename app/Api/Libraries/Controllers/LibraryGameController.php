@@ -279,7 +279,7 @@ class LibraryGameController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/GameSearchResult"))
      *         )
      *     ),
      *

@@ -133,13 +133,17 @@ class TodoController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="description", type="string", maxLength=1000, nullable=true),
+     *             @OA\Property(property="link", type="string", maxLength=2048, nullable=true),
      *             @OA\Property(property="priority", type="string", enum={"low","medium","high"}),
      *             @OA\Property(property="due_at", type="string", format="date-time", nullable=true),
      *             @OA\Property(property="status", type="string", enum={"backlog","pending","in-progress","waiting","almost-done"}),
      *             @OA\Property(property="progress", type="integer", minimum=0, maximum=100, nullable=true),
      *             @OA\Property(property="effort", type="string", enum={"low","medium","high"}, nullable=true),
      *             @OA\Property(property="category_id", type="integer", nullable=true),
-     *             @OA\Property(property="tags", type="array", @OA\Items(type="integer"), nullable=true)
+     *             @OA\Property(property="tags", type="array", @OA\Items(type="integer"), nullable=true),
+     *             @OA\Property(property="recurrence_frequency", type="string", enum={"daily","weekly","monthly","yearly"}, nullable=true),
+     *             @OA\Property(property="recurrence_interval", type="integer", minimum=1, maximum=365),
+     *             @OA\Property(property="recurrence_ends_at", type="string", nullable=true)
      *         )
      *     ),
      *
@@ -188,6 +192,7 @@ class TodoController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="description", type="string", maxLength=1000, nullable=true),
+     *             @OA\Property(property="link", type="string", maxLength=2048, nullable=true),
      *             @OA\Property(property="priority", type="string", enum={"low","medium","high"}),
      *             @OA\Property(property="due_at", type="string", format="date-time", nullable=true),
      *             @OA\Property(property="status", type="string", enum={"backlog","pending","in-progress","waiting","almost-done"}),
@@ -195,7 +200,10 @@ class TodoController
      *             @OA\Property(property="effort", type="string", enum={"low","medium","high"}, nullable=true),
      *             @OA\Property(property="is_completed", type="boolean"),
      *             @OA\Property(property="category_id", type="integer", nullable=true),
-     *             @OA\Property(property="tags", type="array", @OA\Items(type="integer"), nullable=true)
+     *             @OA\Property(property="tags", type="array", @OA\Items(type="integer"), nullable=true),
+     *             @OA\Property(property="recurrence_frequency", type="string", enum={"daily","weekly","monthly","yearly"}, nullable=true),
+     *             @OA\Property(property="recurrence_interval", type="integer", minimum=1, maximum=365),
+     *             @OA\Property(property="recurrence_ends_at", type="string", nullable=true)
      *         )
      *     ),
      *

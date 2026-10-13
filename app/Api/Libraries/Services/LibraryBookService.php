@@ -111,19 +111,20 @@ class LibraryBookService
     {
         $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
 
-        if ($type === LibraryRecommendationEnum::NEW) {
-            return $recommender->new();
-        }
-
-        return call_user_func([$recommender, $type->value]);
+        return match ($type) {
+            LibraryRecommendationEnum::FAVORITE => $recommender->favorite(),
+            LibraryRecommendationEnum::RANDOM => $recommender->random(),
+            LibraryRecommendationEnum::UNRATED => $recommender->unrated(),
+            LibraryRecommendationEnum::NEW => $this->recommendNew($recommender, $user),
+        };
     }
 
-    public function recommendNew(User $user): mixed
+    private function recommendNew(LibraryRecommender $recommender, User $user): mixed
     {
         $stack = $this->cache->get([self::CACHE_KEY_RECOMMENDATIONS, $user->id]) ?? [];
 
         if (empty($stack)) {
-            $result = $this->recommend($user, LibraryRecommendationEnum::NEW);
+            $result = $recommender->new();
             $stack = $result['recommendations'] ?? [];
         }
 
@@ -165,11 +166,6 @@ class LibraryBookService
     public function listGenres(User $user): Collection
     {
         return LibraryBookGenre::forUser($user->id)->get();
-    }
-
-    public function findGenre(LibraryBookGenre $genre): LibraryBookGenre
-    {
-        return $genre;
     }
 
     public function createGenre(User $user, array $data): LibraryBookGenre

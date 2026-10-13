@@ -127,19 +127,6 @@ class LibraryBookController
      */
     public function recommend(Request $request, LibraryRecommendationEnum $type): JsonResponse
     {
-        if ($type === LibraryRecommendationEnum::NEW) {
-            $recommendation = $this->libraryBookService->recommendNew($request->user());
-
-            if (! $recommendation) {
-                return ApiResponse::error('No recommendation found.', 404);
-            }
-
-            return ApiResponse::success(
-                new LibraryRecommendationResource($recommendation),
-                'Recommendation retrieved successfully.'
-            );
-        }
-
         $recommendation = $this->libraryBookService->recommend($request->user(), $type);
 
         if (! $recommendation) {
@@ -368,7 +355,7 @@ class LibraryBookController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/BookSearchResult"))
      *         )
      *     ),
      *
