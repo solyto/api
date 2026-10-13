@@ -43,7 +43,7 @@ composer audit    # check for vulnerabilities
 php artisan test  # run tests
 ```
 
-Contributing code? Read the repo conventions first: [docs/API-CONVENTIONS.md](docs/API-CONVENTIONS.md) — how modules, controllers, services, requests/responses, models, OpenAPI, auth, jobs and tests are structured in this repository.
+Contributing code? Read the coding standards first: [docs/STANDARDS.md](docs/STANDARDS.md) — numbered, checkable rules for controllers, OpenAPI annotations, requests, services, models, resources, errors, caching, jobs and formatting, each with examples from this repository — and [docs/TESTING.md](docs/TESTING.md) for how tests are written here.
 
 ## 
 
