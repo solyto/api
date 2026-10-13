@@ -70,4 +70,16 @@ class AddressBooks
     {
         $this->backend->deleteAddressBookCustom($addressBookId);
     }
+
+    public function deleteForUser(User $user): int
+    {
+        $deleted = 0;
+
+        foreach ($this->list($user) as $addressBook) {
+            $this->delete($addressBook->id);
+            $deleted++;
+        }
+
+        return $deleted;
+    }
 }

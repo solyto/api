@@ -9,6 +9,7 @@ use App\Dav\Services\CalendarSharing;
 use App\Dav\Services\DavService;
 use App\Dav\Services\VCardPhotoProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -139,6 +140,66 @@ describe('CalendarSharing', function () {
 
         $accepted = $sharing->listAcceptedShares($recipient);
         expect($accepted)->toHaveCount(1);
+    });
+});
+
+describe('per-user DAV deletion', function () {
+    it('keeps the owner calendar and objects when deleting the sharee', function () {
+        $owner = makeUser();
+        $sharee = makeUser();
+        $dav = app(DavService::class);
+        $dav->principals()->create($owner->email);
+        $dav->principals()->create($sharee->email);
+
+        $calendar = $dav->calendars()->list($owner)[0];
+        $dav->calendars()->events()->create($calendar, EventDTO::fromRequest([
+            'title' => 'Owner event',
+            'start_date' => now()->addDay()->format('Y-m-d H:i:s'),
+            'end_date' => now()->addDay()->addHour()->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+        ], $calendar, $owner));
+
+        $dav->calendars()->sharing()->inviteUser($calendar, $owner, $sharee);
+        $invite = $dav->calendars()->sharing()->listInvites($sharee)->first();
+        $dav->calendars()->sharing()->acceptInvite($invite->shareToken);
+
+        $summary = $dav->deleteForUser($sharee);
+
+        expect($summary['shared_instances'])->toBe(1)
+            ->and($summary['owned_calendars'])->toBe(1)
+            ->and($summary['principal'])->toBeTrue();
+
+        $pgsql = DB::connection('pgsql');
+        expect($pgsql->table('calendarinstances')->where('calendarid', $calendar->calendarId)->count())->toBe(1)
+            ->and($pgsql->table('calendarobjects')->where('calendarid', $calendar->calendarId)->count())->toBe(1)
+            ->and($pgsql->table('calendars')->where('id', $calendar->calendarId)->count())->toBe(1)
+            ->and($pgsql->table('calendarinstances')->where('principaluri', 'principals/'.$sharee->email)->count())->toBe(0)
+            ->and($pgsql->table('principals')->where('uri', 'like', 'principals/'.$sharee->email.'%')->count())->toBe(0)
+            ->and($pgsql->table('principals')->where('uri', 'principals/'.$owner->email)->count())->toBe(1);
+
+        expect($dav->calendars()->list($owner))->toHaveCount(1);
+    });
+
+    it('removes the sharee instance too when deleting the owner', function () {
+        $owner = makeUser();
+        $sharee = makeUser();
+        $dav = app(DavService::class);
+
+        $calendar = $dav->calendars()->list($owner)[0];
+        $dav->calendars()->sharing()->inviteUser($calendar, $owner, $sharee);
+        $invite = $dav->calendars()->sharing()->listInvites($sharee)->first();
+        $dav->calendars()->sharing()->acceptInvite($invite->shareToken);
+
+        $summary = $dav->deleteForUser($owner);
+
+        expect($summary['owned_calendars'])->toBe(1);
+
+        $pgsql = DB::connection('pgsql');
+        expect($pgsql->table('calendarinstances')->where('calendarid', $calendar->calendarId)->count())->toBe(0)
+            ->and($pgsql->table('calendarobjects')->where('calendarid', $calendar->calendarId)->count())->toBe(0)
+            ->and($pgsql->table('calendars')->where('id', $calendar->calendarId)->count())->toBe(0);
+
+        expect($dav->calendars()->list($sharee))->toHaveCount(1);
     });
 });
 
