@@ -62,6 +62,56 @@ describe('POST /api/v1/check-in', function () {
     });
 });
 
+describe('GET /api/v1/check-in/marks', function () {
+    it('returns check-in dates within the range', function () {
+        $user = makeUser();
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-06']);
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-08']);
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-11-01']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data', ['2026-10-06', '2026-10-08']);
+    });
+
+    it('scopes marks to the authenticated user', function () {
+        $user = makeUser();
+        $other = makeUser();
+        CheckIn::factory()->forUser($other)->create(['date' => '2026-10-06']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('data', []);
+    });
+
+    it('rejects a missing or malformed range', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-09-01')
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=01.10.2026&to=31.10.2026')
+            ->assertStatus(422);
+    });
+
+    it('rejects a range longer than 366 days', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2025-01-01&to=2026-10-01')
+            ->assertStatus(422);
+    });
+});
+
 describe('CheckInService', function () {
     it('find returns null for a date without a check-in', function () {
         $user = makeUser();

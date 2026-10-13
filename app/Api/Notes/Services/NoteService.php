@@ -3,14 +3,18 @@
 namespace App\Api\Notes\Services;
 
 use App\Api\Notes\Models\Note;
+use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class NoteService
 {
     private const string CACHE_KEY = 'notes';
+
     private const string CACHE_KEY_NEWEST = 'notes_newest';
+
     private const int CACHE_TTL = 86400;
 
     public function __construct(private readonly UserCacheService $cache) {}
@@ -20,7 +24,7 @@ class NoteService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => Note::forUser($user->id)->with(['tags'])->orderBy('title', 'asc')->get()
+            fn () => Note::forUser($user->id)->with(['tags'])->orderBy('title', 'asc')->get()
         );
     }
 
@@ -29,7 +33,7 @@ class NoteService
         return $this->cache->remember(
             [self::CACHE_KEY_NEWEST, $user->id],
             self::CACHE_TTL,
-            fn() => Note::forUser($user->id)
+            fn () => Note::forUser($user->id)
                 ->whereDoesntHave('category', fn ($query) => $query->where('is_hidden', true))
                 ->orderBy('created_at', 'desc')
                 ->limit(5)
@@ -40,6 +44,32 @@ class NoteService
     public function find(Note $note): Note
     {
         return $note;
+    }
+
+    /**
+     * Dates (Y-m-d) within [$from, $to] that the user has a journal entry for.
+     * The journal folder is identified by is_system, not title, and is read
+     * even while hidden.
+     */
+    public function journalMarks(User $user, string $from, string $to): array
+    {
+        $journalCategoryIds = NoteCategory::forUser($user->id)
+            ->where('is_system', true)
+            ->pluck('id');
+
+        if ($journalCategoryIds->isEmpty()) {
+            return [];
+        }
+
+        return Note::forUser($user->id)
+            ->whereIn('category_id', $journalCategoryIds)
+            ->whereBetween('title', [$from, $to])
+            ->orderBy('title')
+            ->pluck('title')
+            ->filter(fn (string $title) => Carbon::hasFormat($title, 'Y-m-d'))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function create(User $user, array $data): Note

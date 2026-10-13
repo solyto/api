@@ -109,8 +109,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             Route::put('weather-temperature-unit', [UserSettingsController::class, 'updateWeatherTemperatureUnit']);
             Route::put('openai-api-key', [UserSettingsController::class, 'updateOpenaiApiKey']);
             Route::put('complete-onboarding', [UserSettingsController::class, 'completeOnboarding']);
+            Route::put('journal', [UserSettingsController::class, 'updateJournal']);
+            Route::put('journal-calendar-mark', [UserSettingsController::class, 'updateJournalCalendarMark']);
             Route::get('check-in', [UserSettingsController::class, 'showCheckIn']);
             Route::put('check-in', [UserSettingsController::class, 'updateCheckIn']);
+            Route::put('check-in-calendar-mark', [UserSettingsController::class, 'updateCheckInCalendarMark']);
         });
     });
     Route::apiResource('users', UserController::class)->only(['index', 'update']);
@@ -140,12 +143,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::patch('categories/{category}/hidden', [NoteCategoryController::class, 'updateHidden']);
         Route::apiResource('categories', NoteCategoryController::class);
         Route::get('newest', [NoteController::class, 'newest']);
+        Route::get('journal/marks', [NoteController::class, 'journalMarks']);
 
         Route::apiResource('/', NoteController::class)->parameters(['' => 'note']);
     });
 
     Route::prefix('check-in')->group(function () {
         Route::get('', [CheckInController::class, 'index']);
+        Route::get('marks', [CheckInController::class, 'marks']);
         Route::post('', [CheckInController::class, 'store']);
     });
 
