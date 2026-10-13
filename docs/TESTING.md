@@ -21,7 +21,7 @@ directories plus two more for Pest's own discovery:
 
 | Suite (`phpunit.xml`) | Path | What lives there |
 | --- | --- | --- |
-| `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, the OpenAPI drift test |
+| `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, the OpenAPI drift test, the resource-schema drift test (`ResourceSchemaDriftTest`, rule 2.6) |
 | `Feature` | `tests/Feature/` | **empty** (only `.gitkeep`); keep it empty — feature tests are co-located |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
 | — (Pest only) | `app/Bots/Tests/`, `app/Dav/Tests/` | bot state machine, DAV service |
