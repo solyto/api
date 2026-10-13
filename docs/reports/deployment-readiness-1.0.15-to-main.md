@@ -2,6 +2,7 @@
 
 date: 2026-10-13
 scope: All commits in `6bdedcd` (tag 1.0.15) .. `1bee6fa` (tip of `main` when job `hide` was created). Question: can the API be deployed without a matching frontend release, and how does the user-deletion commit `1bee6fa` reach production while the unfinished features stay unpublished? Written for the maintainer deciding on the next deploy.
+read: true
 
 ## Summary
 
