@@ -264,9 +264,10 @@ documents 9 (`link`, `recurrence_*` missing); `TodoResource::toArray` emits
 (`:93,181,240`) while `todos.id` is a UUID. Nine other resources drift
 (`docs/jobs/dawn_standards/findings-data.md` §3).
 
-Check: no grep; the reviewer diffs `rules()`, `@OA\RequestBody`, `toArray()`
-and `@OA\Schema` of the touched resource. A script that compares
-`property="x"` with `toArray` keys is in the backlog.
+Check: `php artisan test tests/Unit/ResourceSchemaDriftTest.php` compares
+each resource's top-level `@OA\Schema` properties with its `toArray()` keys
+(known drift is allow-listed in the test). `rules()` vs `@OA\RequestBody` has
+no check; the reviewer diffs them for the touched endpoint.
 
 ## 3. Requests and validation
 
@@ -870,9 +871,11 @@ translated (Decisions).
   validation 422; `ErrorResponse` is for other errors (rule 2.4).
 - **Rule 4.4 applies to the reference module** (OQ-3, 2026-10-13):
   `TodoService` has `forgetUser()` like every other service.
-- **Dependabot stays composer-only until the owner adds npm**; tooling
-  additions (Pint config, Larastan, CI) are backlog items needing approval
-  (package rule), not rules.
+- **Dependabot stays composer-only until the owner adds npm**. Tooling
+  (2026-10-13): Larastan is adopted (level 5, `phpstan.neon`, `app/Dav`
+  excluded, existing errors in `phpstan-baseline.neon`; run
+  `./vendor/bin/phpstan analyse`). A Pint config, CI, npm in Dependabot and
+  a coverage driver were not approved.
 - **The old policy set** (`docs/API-CONVENTIONS.md` + eight
   `docs/CONVENTIONS-*.md`, AI-written 2026-10-10) is folded into section 12
   and deleted; where it and this document disagree, this document wins.

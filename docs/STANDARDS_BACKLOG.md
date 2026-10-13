@@ -211,16 +211,18 @@ go-ahead first (package rule in `docs/AGENTS.md`).
 - [ ] **(approval)** `pint.json` with `"preset": "laravel"` + `composer lint`
       script, then one repo-wide `./vendor/bin/pint` commit (OQ-6, rule 11.1).
       No new package.
-- [ ] **(approval)** `composer require --dev larastan/larastan`, level 5,
+- [x] **(approval)** `composer require --dev larastan/larastan`, level 5,
       `phpstan.neon` with `paths: [app]` and `app/Dav` excluded at first
-      (tooling report §3). New package.
+      (tooling report §3). New package. Done in job `love`, with
+      `phpstan-baseline.neon`.
 - [ ] **(approval)** `.github/workflows/tests.yml`: PHP 8.4, `composer install`,
       `php artisan test` on push/PR; no Docker, no coverage gate to start
       (the `4f7deeb`/`703d82a` history). Infrastructure, no package.
 - [ ] **(approval)** `.github/dependabot.yml`: add `package-ecosystem: "npm"`.
 - [ ] **(approval, later)** coverage driver (`pcov`) in the CI image only,
       `--min` once a baseline exists.
-- [ ] A small script (`scripts/` or a Pest test) that compares each
+- [x] A small script (`scripts/` or a Pest test) that compares each
       resource's `@OA\Schema` properties with its `toArray()` keys, so rule
       2.6 has a check. The throwaway version used for this job is described
-      in `docs/jobs/dawn_standards/findings-data.md` §3.
+      in `docs/jobs/dawn_standards/findings-data.md` §3. Done in job `love`:
+      `tests/Unit/ResourceSchemaDriftTest.php`.

@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+    excludePaths:
+        - app/Dav
+        # Empty stub methods (`export()` / `confirmToken()` have no body), which
+        # PHPStan reports as non-ignorable `return.missing` errors that cannot
+        # be baselined. Remove these once the stubs are fixed.
+        - app/Api/Notes/Controllers/NotesImportExportController.php
+        - app/Api/Telegram/Controllers/TelegramBotConnectionController.php
