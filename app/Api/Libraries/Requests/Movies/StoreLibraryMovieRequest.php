@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Movies;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLibraryMovieRequest extends FormRequest
 {
@@ -19,9 +20,9 @@ class StoreLibraryMovieRequest extends FormRequest
             'category' => 'string|in:movie,series',
             'wishlist' => 'nullable|boolean',
             'genres' => 'nullable|array',
-            'genres.*' => 'exists:library_movies_genres,id',
+            'genres.*' => [Rule::exists('library_movies_genres', 'id')->where('user_id', $this->user()->id)],
             'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

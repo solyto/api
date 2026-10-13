@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Quotes;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLibraryQuoteRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreLibraryQuoteRequest extends FormRequest
             'quote' => 'required|string',
             'source' => 'nullable|string|max:500',
             'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

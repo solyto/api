@@ -1,9 +1,11 @@
 <?php
 
 use App\Api\Libraries\Models\LibraryGame;
+use App\Api\Libraries\Models\LibraryGameGenre;
 use App\Api\Libraries\Models\LibraryLink;
 use App\Api\Libraries\Models\LibraryLinkCategory;
 use App\Api\Libraries\Models\LibraryMovie;
+use App\Api\Libraries\Models\LibraryMovieGenre;
 use App\Api\Libraries\Models\LibraryPlant;
 use App\Api\Libraries\Models\LibraryQuote;
 use App\Api\Libraries\Models\LibraryRecipe;
@@ -12,6 +14,7 @@ use App\Api\Libraries\Services\External\ChefkochService;
 use App\Api\Libraries\Services\External\ImdbService;
 use App\Api\Libraries\Services\External\SteamService;
 use App\Api\Libraries\Services\External\TmdbService;
+use App\Api\Tags\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -64,6 +67,26 @@ describe('Library games', function () {
             ->assertStatus(200)
             ->assertJsonPath('data.0.title', 'Hollow Knight');
     });
+
+    it('rejects another user\'s genres on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $game = LibraryGame::factory()->forUser($user)->create();
+        $foreignGenre = LibraryGameGenre::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/games', ['title' => 'Hollow Knight', 'platform' => 'pc', 'genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/games/'.$game->id, ['genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        expect(LibraryGame::count())->toBe(1);
+        expect($game->fresh()->genres)->toHaveCount(0);
+    });
 });
 
 describe('Library movies', function () {
@@ -87,6 +110,26 @@ describe('Library movies', function () {
             ->assertStatus(200);
 
         expect(LibraryMovie::count())->toBe(0);
+    });
+
+    it('rejects another user\'s genres on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $movie = LibraryMovie::factory()->forUser($user)->create();
+        $foreignGenre = LibraryMovieGenre::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/movies', ['title' => 'Dune Part Two', 'category' => 'movie', 'genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/movies/'.$movie->id, ['genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        expect(LibraryMovie::count())->toBe(1);
+        expect($movie->fresh()->genres)->toHaveCount(0);
     });
 });
 
@@ -137,6 +180,33 @@ describe('Library links', function () {
 
         expect(LibraryLinkCategory::count())->toBe(0);
     });
+
+    it('rejects another user\'s tags and category on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $link = LibraryLink::factory()->forUser($user)->create();
+        $foreignTag = Tag::factory()->forUser($other)->create();
+        $foreignCategory = LibraryLinkCategory::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['url' => 'https://example.com/article', 'tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/links/'.$link->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/links/'.$link->id, ['category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        expect(LibraryLink::count())->toBe(1);
+        expect($link->fresh()->category_id)->toBeNull();
+        expect($link->fresh()->tags)->toHaveCount(0);
+    });
 });
 
 describe('Library quotes', function () {
@@ -168,6 +238,26 @@ describe('Library quotes', function () {
             ->assertStatus(200);
 
         expect(LibraryQuote::count())->toBe(0);
+    });
+
+    it('rejects another user\'s tags on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $quote = LibraryQuote::factory()->forUser($user)->create();
+        $foreignTag = Tag::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/quotes', ['quote' => 'Be the change', 'tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/quotes/'.$quote->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        expect(LibraryQuote::count())->toBe(1);
+        expect($quote->fresh()->tags)->toHaveCount(0);
     });
 });
 

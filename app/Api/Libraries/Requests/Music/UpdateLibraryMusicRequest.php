@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Music;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLibraryMusicRequest extends FormRequest
 {
@@ -22,7 +23,7 @@ class UpdateLibraryMusicRequest extends FormRequest
             'wishlist' => 'sometimes|nullable|boolean',
             'link' => 'sometimes|nullable|url',
             'genres' => 'sometimes|nullable|array',
-            'genres.*' => 'exists:library_music_genres,id'
+            'genres.*' => [Rule::exists('library_music_genres', 'id')->where('user_id', $this->user()->id)]
         ];
     }
 }

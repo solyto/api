@@ -8,6 +8,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
+use App\Api\Tags\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -81,6 +82,39 @@ describe('Library book CRUD', function () {
 
         expect(LibraryBookGenre::count())->toBe(0);
     });
+
+    it('rejects another user\'s genres and tags on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $book = LibraryBook::factory()->forUser($user)->create();
+        $foreignGenre = LibraryBookGenre::factory()->forUser($other)->create();
+        $foreignTag = Tag::factory()->forUser($other)->create();
+        $payload = ['title' => 'Dune', 'author' => 'Frank Herbert', 'pages' => 412];
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/books', $payload + ['genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/books', $payload + ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/books/'.$book->id, ['genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/books/'.$book->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        expect(LibraryBook::count())->toBe(1);
+        expect($book->fresh()->genres)->toHaveCount(0);
+        expect($book->fresh()->tags)->toHaveCount(0);
+    });
 });
 
 describe('Library music CRUD', function () {
@@ -129,6 +163,31 @@ describe('Library music CRUD', function () {
             ->assertStatus(200);
 
         expect(LibraryMusicGenre::count())->toBe(0);
+    });
+
+    it('rejects another user\'s genres on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $music = LibraryMusic::factory()->forUser($user)->create();
+        $foreignGenre = LibraryMusicGenre::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/music', [
+                'title' => 'OK Computer',
+                'artist' => 'Radiohead',
+                'type' => 'album',
+                'genres' => [$foreignGenre->id],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/music/'.$music->id, ['genres' => [$foreignGenre->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('genres.0');
+
+        expect(LibraryMusic::count())->toBe(1);
+        expect($music->fresh()->genres)->toHaveCount(0);
     });
 });
 

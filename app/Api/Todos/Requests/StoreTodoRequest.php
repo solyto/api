@@ -3,6 +3,7 @@
 namespace App\Api\Todos\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTodoRequest extends FormRequest
 {
@@ -17,9 +18,9 @@ class StoreTodoRequest extends FormRequest
             'status' => 'sometimes|in:backlog,pending,in-progress,waiting,almost-done',
             'progress' => 'sometimes|nullable|integer|min:0|max:100',
             'effort' => 'sometimes|nullable|in:low,medium,high',
-            'category_id' => 'nullable|exists:todo_categories,id',
+            'category_id' => ['nullable', Rule::exists('todo_categories', 'id')->where('user_id', $this->user()->id)],
             'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
             'recurrence_frequency' => 'nullable|in:daily,weekly,monthly,yearly',
             'recurrence_interval' => 'sometimes|integer|min:1|max:365',
             'recurrence_ends_at' => 'nullable|string',
