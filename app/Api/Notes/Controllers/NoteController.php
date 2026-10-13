@@ -22,7 +22,7 @@ class NoteController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes",
+     *     path="/notes",
      *     operationId="noteIndex",
      *     summary="List notes",
      *     tags={"Notes"},
@@ -50,7 +50,7 @@ class NoteController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/newest",
+     *     path="/notes/newest",
      *     operationId="noteNewest",
      *     summary="List newest notes",
      *     tags={"Notes"},
@@ -78,7 +78,7 @@ class NoteController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/journal/marks",
+     *     path="/notes/journal/marks",
      *     operationId="noteJournalMarks",
      *     summary="List dates with a journal entry",
      *     tags={"Notes"},
@@ -98,7 +98,7 @@ class NoteController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function journalMarks(Request $request): JsonResponse
@@ -122,7 +122,7 @@ class NoteController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/{note}",
+     *     path="/notes/{note}",
      *     operationId="noteShow",
      *     summary="Get note by ID",
      *     tags={"Notes"},
@@ -134,7 +134,7 @@ class NoteController
      *         description="Note ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -160,7 +160,7 @@ class NoteController
 
     /**
      * @OA\Post(
-     *     path="/v1/notes",
+     *     path="/notes",
      *     operationId="noteStore",
      *     summary="Create a new note",
      *     tags={"Notes"},
@@ -190,7 +190,7 @@ class NoteController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreNoteRequest $request): JsonResponse
@@ -202,7 +202,7 @@ class NoteController
 
     /**
      * @OA\Put(
-     *     path="/v1/notes/{note}",
+     *     path="/notes/{note}",
      *     operationId="noteUpdate",
      *     summary="Update a note",
      *     tags={"Notes"},
@@ -214,7 +214,7 @@ class NoteController
      *         description="Note ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -242,7 +242,7 @@ class NoteController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateNoteRequest $request, Note $note): JsonResponse
@@ -256,7 +256,7 @@ class NoteController
 
     /**
      * @OA\Delete(
-     *     path="/v1/notes/{note}",
+     *     path="/notes/{note}",
      *     operationId="noteDestroy",
      *     summary="Delete a note",
      *     tags={"Notes"},
@@ -268,7 +268,7 @@ class NoteController
      *         description="Note ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

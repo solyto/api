@@ -23,7 +23,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/api/feeds",
+     *     path="/feeds",
      *     operationId="listFeedSubscriptions",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -33,9 +33,8 @@ class FeedController
      *         description="Feeds retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feeds retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/FeedSubscription"))
      *         )
      *     ),
@@ -55,7 +54,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/api/feeds/items",
+     *     path="/feeds/items",
      *     operationId="listFeedItems",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -65,9 +64,8 @@ class FeedController
      *         description="Feed items retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed items retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/FeedItem"))
      *         )
      *     ),
@@ -92,7 +90,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/api/feeds/{feedSubscription}",
+     *     path="/feeds/{feedSubscription}",
      *     operationId="showFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -111,9 +109,8 @@ class FeedController
      *         description="Feed retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/FeedSubscription")
      *         )
      *     ),
@@ -135,7 +132,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/api/feeds/available",
+     *     path="/feeds/available",
      *     operationId="listAvailableFeeds",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -154,9 +151,8 @@ class FeedController
      *         description="Feeds retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feeds retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Feed"))
      *         )
      *     ),
@@ -176,7 +172,7 @@ class FeedController
 
     /**
      * @OA\Post(
-     *     path="/api/feeds/search",
+     *     path="/feeds/search",
      *     operationId="searchFeeds",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -196,9 +192,8 @@ class FeedController
      *         description="Feeds retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feeds retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Feed"))
      *         )
      *     ),
@@ -221,7 +216,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/api/feeds/friends",
+     *     path="/feeds/friends",
      *     operationId="listFriendFeeds",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -231,9 +226,8 @@ class FeedController
      *         description="Friend feeds retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Friend feeds retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),
@@ -250,7 +244,7 @@ class FeedController
 
     /**
      * @OA\Post(
-     *     path="/api/feeds/test",
+     *     path="/feeds/test",
      *     operationId="testFeed",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -270,9 +264,8 @@ class FeedController
      *         description="Feed items retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed items retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),
@@ -301,7 +294,7 @@ class FeedController
 
     /**
      * @OA\Post(
-     *     path="/api/feeds",
+     *     path="/feeds",
      *     operationId="storeFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -324,9 +317,8 @@ class FeedController
      *         description="Feed created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/FeedSubscription")
      *         )
      *     ),
@@ -364,7 +356,7 @@ class FeedController
 
     /**
      * @OA\Put(
-     *     path="/api/feeds/{feedSubscription}",
+     *     path="/feeds/{feedSubscription}",
      *     operationId="updateFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -393,9 +385,8 @@ class FeedController
      *         description="Feed updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/FeedSubscription")
      *         )
      *     ),
@@ -419,7 +410,7 @@ class FeedController
 
     /**
      * @OA\Delete(
-     *     path="/api/feeds/{feedSubscription}",
+     *     path="/feeds/{feedSubscription}",
      *     operationId="destroyFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -438,9 +429,9 @@ class FeedController
      *         description="Feed deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Feed deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

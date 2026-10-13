@@ -13,7 +13,7 @@ class LibraryCoverController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/covers/{type}/{fileName}",
+     *     path="/libraries/covers/{type}/{fileName}",
      *     operationId="showLibraryCover",
      *     tags={"Libraries - Covers"},
      *     security={{"sanctum": {}}},

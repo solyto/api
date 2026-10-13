@@ -21,7 +21,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Get(
-     *     path="/api/time-tracking-entries",
+     *     path="/time-tracking-entries",
      *     operationId="timeTrackingEntryIndex",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -48,7 +48,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/api/time-tracking-entries",
+     *     path="/time-tracking-entries",
      *     operationId="timeTrackingEntryStore",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -103,7 +103,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Put(
-     *     path="/api/time-tracking-entries/{entry}",
+     *     path="/time-tracking-entries/{entry}",
      *     operationId="timeTrackingEntryUpdate",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -113,7 +113,7 @@ class TimeTrackingEntryController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -179,7 +179,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Delete(
-     *     path="/api/time-tracking-entries/{entry}",
+     *     path="/time-tracking-entries/{entry}",
      *     operationId="timeTrackingEntryDestroy",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -189,7 +189,7 @@ class TimeTrackingEntryController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -220,7 +220,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/api/time-tracking-entries/start",
+     *     path="/time-tracking-entries/start",
      *     operationId="timeTrackingEntryStart",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -287,7 +287,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/api/time-tracking-entries/{entry}/stop",
+     *     path="/time-tracking-entries/{entry}/stop",
      *     operationId="timeTrackingEntryStop",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -297,7 +297,7 @@ class TimeTrackingEntryController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -336,7 +336,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Get(
-     *     path="/api/time-tracking-entries/statistics",
+     *     path="/time-tracking-entries/statistics",
      *     operationId="timeTrackingEntryStatistics",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},

@@ -20,7 +20,7 @@ class EventAttachmentController
 
     /**
      * @OA\Get(
-     *     path="/v1/calendars/events/{eventId}/attachments/todos",
+     *     path="/calendars/events/{eventId}/attachments/todos",
      *     operationId="getEventTodoAttachments",
      *     summary="Get todos attached to a calendar event",
      *     tags={"Calendar Attachments"},
@@ -57,7 +57,7 @@ class EventAttachmentController
 
     /**
      * @OA\Get(
-     *     path="/v1/calendars/events/{eventId}/attachments/notes",
+     *     path="/calendars/events/{eventId}/attachments/notes",
      *     operationId="getEventNoteAttachments",
      *     summary="Get notes attached to a calendar event",
      *     tags={"Calendar Attachments"},
@@ -94,7 +94,7 @@ class EventAttachmentController
 
     /**
      * @OA\Post(
-     *     path="/v1/calendars/events/{eventId}/attachments/todos",
+     *     path="/calendars/events/{eventId}/attachments/todos",
      *     operationId="attachTodoToEvent",
      *     summary="Attach a todo to a calendar event",
      *     tags={"Calendar Attachments"},
@@ -128,7 +128,7 @@ class EventAttachmentController
      *
      *     @OA\Response(response=404, description="Todo not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=409, description="Todo already attached", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function attachTodo(Request $request, string $eventId): JsonResponse
@@ -149,7 +149,7 @@ class EventAttachmentController
 
     /**
      * @OA\Delete(
-     *     path="/v1/calendars/events/{eventId}/attachments/todos/{todoId}",
+     *     path="/calendars/events/{eventId}/attachments/todos/{todoId}",
      *     operationId="detachTodoFromEvent",
      *     summary="Detach a todo from a calendar event",
      *     tags={"Calendar Attachments"},
@@ -190,7 +190,7 @@ class EventAttachmentController
 
     /**
      * @OA\Post(
-     *     path="/v1/calendars/events/{eventId}/attachments/notes",
+     *     path="/calendars/events/{eventId}/attachments/notes",
      *     operationId="attachNoteToEvent",
      *     summary="Attach a note to a calendar event",
      *     tags={"Calendar Attachments"},
@@ -224,7 +224,7 @@ class EventAttachmentController
      *
      *     @OA\Response(response=404, description="Note not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=409, description="Note already attached", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function attachNote(Request $request, string $eventId): JsonResponse
@@ -245,7 +245,7 @@ class EventAttachmentController
 
     /**
      * @OA\Delete(
-     *     path="/v1/calendars/events/{eventId}/attachments/notes/{noteId}",
+     *     path="/calendars/events/{eventId}/attachments/notes/{noteId}",
      *     operationId="detachNoteFromEvent",
      *     summary="Detach a note from a calendar event",
      *     tags={"Calendar Attachments"},

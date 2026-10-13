@@ -5,11 +5,8 @@ use App\Api\Export\Jobs\ProcessExport;
 use App\Api\Export\Services\TodoExportService;
 use App\Api\Todos\Models\Todo;
 use App\Shared\Models\ExportJob;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-
-uses(RefreshDatabase::class);
 
 describe('Export endpoints', function () {
     it('starts an export and reports status', function () {

@@ -25,7 +25,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/register",
+     *     path="/auth/register",
      *     operationId="authRegister",
      *     summary="Register a new user",
      *     tags={"Auth"},
@@ -70,7 +70,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/login",
+     *     path="/auth/login",
      *     operationId="authLogin",
      *     summary="Login user",
      *     tags={"Auth"},
@@ -124,7 +124,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/logout",
+     *     path="/auth/logout",
      *     operationId="authLogout",
      *     summary="Logout user",
      *     tags={"Auth"},
@@ -151,7 +151,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/logoutAll",
+     *     path="/auth/logoutAll",
      *     operationId="authLogoutAll",
      *     summary="Logout from all devices",
      *     tags={"Auth"},
@@ -178,7 +178,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/refresh",
+     *     path="/auth/refresh",
      *     operationId="authRefresh",
      *     summary="Refresh authentication token",
      *     tags={"Auth"},
@@ -213,7 +213,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/verify",
+     *     path="/auth/verify",
      *     operationId="authVerify",
      *     summary="Verify user email",
      *     tags={"Auth"},
@@ -262,7 +262,7 @@ class AuthController
 
     /**
      * @OA\Get(
-     *     path="/v1/auth/tokens",
+     *     path="/auth/tokens",
      *     operationId="authTokens",
      *     summary="List user tokens",
      *     tags={"Auth"},
@@ -294,7 +294,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/v1/auth/revokeToken",
+     *     path="/auth/revokeToken",
      *     operationId="authRevokeToken",
      *     summary="Revoke a token",
      *     tags={"Auth"},

@@ -21,7 +21,7 @@ class ClipboardController
 
     /**
      * @OA\Get(
-     *     path="/api/clipboards",
+     *     path="/clipboards",
      *     operationId="clipboardList",
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},
@@ -48,7 +48,7 @@ class ClipboardController
 
     /**
      * @OA\Post(
-     *     path="/api/clipboards",
+     *     path="/clipboards",
      *     operationId="clipboardStore",
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},
@@ -91,7 +91,7 @@ class ClipboardController
 
     /**
      * @OA\Post(
-     *     path="/api/clipboards/image",
+     *     path="/clipboards/image",
      *     operationId="clipboardStoreImage",
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},
@@ -143,7 +143,7 @@ class ClipboardController
 
     /**
      * @OA\Get(
-     *     path="/api/clipboards/{clipboard}/image",
+     *     path="/clipboards/{clipboard}/image",
      *     operationId="clipboardGetImage",
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},
@@ -185,7 +185,7 @@ class ClipboardController
 
     /**
      * @OA\Delete(
-     *     path="/api/clipboards/{clipboard}",
+     *     path="/clipboards/{clipboard}",
      *     operationId="clipboardDestroy",
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},

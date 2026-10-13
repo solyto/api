@@ -4,10 +4,7 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\FriendRequest;
 use App\Api\Users\Notifications\FriendRequestNotification;
 use App\Api\Users\Services\FriendService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-
-uses(RefreshDatabase::class);
 
 describe('GET /api/v1/friends', function () {
     it('lists the authenticated users friends', function () {

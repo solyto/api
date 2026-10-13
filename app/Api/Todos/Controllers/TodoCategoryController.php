@@ -20,7 +20,7 @@ class TodoCategoryController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/categories",
+     *     path="/todos/categories",
      *     operationId="todoCategoryIndex",
      *     summary="List todo categories",
      *     tags={"Todos"},
@@ -48,7 +48,7 @@ class TodoCategoryController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/categories/{category}",
+     *     path="/todos/categories/{category}",
      *     operationId="todoCategoryShow",
      *     summary="Get todo category by ID",
      *     tags={"Todos"},
@@ -86,7 +86,7 @@ class TodoCategoryController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos/categories",
+     *     path="/todos/categories",
      *     operationId="todoCategoryStore",
      *     summary="Create a new todo category",
      *     tags={"Todos"},
@@ -113,7 +113,7 @@ class TodoCategoryController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTodoCategoryRequest $request): JsonResponse
@@ -125,7 +125,7 @@ class TodoCategoryController
 
     /**
      * @OA\Put(
-     *     path="/v1/todos/categories/{category}",
+     *     path="/todos/categories/{category}",
      *     operationId="todoCategoryUpdate",
      *     summary="Update a todo category",
      *     tags={"Todos"},
@@ -162,7 +162,7 @@ class TodoCategoryController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTodoCategoryRequest $request, TodoCategory $category): JsonResponse
@@ -176,7 +176,7 @@ class TodoCategoryController
 
     /**
      * @OA\Delete(
-     *     path="/v1/todos/categories/{category}",
+     *     path="/todos/categories/{category}",
      *     operationId="todoCategoryDestroy",
      *     summary="Delete a todo category",
      *     tags={"Todos"},

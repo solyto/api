@@ -2,9 +2,6 @@
 
 use App\Api\Tags\Models\Tag;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Tag Factory', function () {
     it('creates a valid tag', function () {

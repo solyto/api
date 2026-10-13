@@ -24,7 +24,7 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies",
+     *     path="/libraries/movies",
      *     operationId="listLibraryMovies",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -34,9 +34,8 @@ class LibraryMovieController
      *         description="Movies retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movies retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMovie"))
      *         )
      *     ),
@@ -54,7 +53,7 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/{movie}",
+     *     path="/libraries/movies/{movie}",
      *     operationId="showLibraryMovie",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -73,9 +72,8 @@ class LibraryMovieController
      *         description="Movie retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovie")
      *         )
      *     ),
@@ -96,7 +94,7 @@ class LibraryMovieController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/movies",
+     *     path="/libraries/movies",
      *     operationId="storeLibraryMovie",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -126,9 +124,8 @@ class LibraryMovieController
      *         description="Movie created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovie")
      *         )
      *     ),
@@ -146,7 +143,7 @@ class LibraryMovieController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/movies/{movie}",
+     *     path="/libraries/movies/{movie}",
      *     operationId="updateLibraryMovie",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -185,9 +182,8 @@ class LibraryMovieController
      *         description="Movie updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovie")
      *         )
      *     ),
@@ -208,7 +204,7 @@ class LibraryMovieController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/movies/{movie}",
+     *     path="/libraries/movies/{movie}",
      *     operationId="destroyLibraryMovie",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -227,9 +223,9 @@ class LibraryMovieController
      *         description="Movie deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -248,7 +244,7 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/releases",
+     *     path="/libraries/movies/releases",
      *     operationId="listLibraryMovieReleases",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -258,9 +254,8 @@ class LibraryMovieController
      *         description="Releases retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Releases retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMovieRelease"))
      *         )
      *     ),
@@ -280,7 +275,7 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/{movie}/trailers",
+     *     path="/libraries/movies/{movie}/trailers",
      *     operationId="listLibraryMovieTrailers",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -299,9 +294,8 @@ class LibraryMovieController
      *         description="Trailers retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Trailers retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(
      *                 @OA\Property(property="key", type="string"),
      *                 @OA\Property(property="name", type="string")
@@ -327,8 +321,8 @@ class LibraryMovieController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/movies/import/{service}",
-     *     operationId="import",
+     *     path="/libraries/movies/import/{service}",
+     *     operationId="importLibraryMovie",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
      *
@@ -356,9 +350,8 @@ class LibraryMovieController
      *         description="Movie imported successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Movie imported successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/MovieReleaseImport")
      *         )
      *     ),
@@ -383,8 +376,8 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/search/{service}/{query}",
-     *     operationId="search",
+     *     path="/libraries/movies/search/{service}/{query}",
+     *     operationId="searchLibraryMovies",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
      *
@@ -411,9 +404,8 @@ class LibraryMovieController
      *         description="Search results retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),

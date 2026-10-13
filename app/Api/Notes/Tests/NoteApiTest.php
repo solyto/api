@@ -5,10 +5,7 @@ use App\Api\Notes\Models\NoteCategory;
 use App\Api\Notes\Services\NoteImportService;
 use App\Api\Notes\Services\NoteService;
 use App\Api\Tags\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-
-uses(RefreshDatabase::class);
 
 describe('Note CRUD', function () {
     it('lists, stores, shows, updates and deletes notes', function () {

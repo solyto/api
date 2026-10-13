@@ -2,9 +2,6 @@
 
 use App\Api\Shortcuts\Models\Shortcut;
 use App\Api\Shortcuts\Services\ShortcutService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Shortcut CRUD', function () {
     it('lists, stores, shows, updates and deletes shortcuts', function () {

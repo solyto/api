@@ -15,13 +15,10 @@ use App\Api\Libraries\Services\External\ImdbService;
 use App\Api\Libraries\Services\External\SteamService;
 use App\Api\Libraries\Services\External\TmdbService;
 use App\Api\Tags\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-
-uses(RefreshDatabase::class);
 
 describe('Library games', function () {
     it('lists, stores, updates and deletes games', function () {

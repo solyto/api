@@ -23,7 +23,7 @@ class LibraryGameController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/games",
+     *     path="/libraries/games",
      *     operationId="listLibraryGames",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
@@ -33,9 +33,8 @@ class LibraryGameController
      *         description="Games retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Games retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryGame"))
      *         )
      *     ),
@@ -53,7 +52,7 @@ class LibraryGameController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/games/{game}",
+     *     path="/libraries/games/{game}",
      *     operationId="showLibraryGame",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
@@ -72,9 +71,8 @@ class LibraryGameController
      *         description="Game retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryGame")
      *         )
      *     ),
@@ -95,7 +93,7 @@ class LibraryGameController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/games",
+     *     path="/libraries/games",
      *     operationId="storeLibraryGame",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
@@ -129,9 +127,8 @@ class LibraryGameController
      *         description="Game created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryGame")
      *         )
      *     ),
@@ -149,7 +146,7 @@ class LibraryGameController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/games/{game}",
+     *     path="/libraries/games/{game}",
      *     operationId="updateLibraryGame",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
@@ -190,9 +187,8 @@ class LibraryGameController
      *         description="Game updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryGame")
      *         )
      *     ),
@@ -213,7 +209,7 @@ class LibraryGameController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/games/{game}",
+     *     path="/libraries/games/{game}",
      *     operationId="destroyLibraryGame",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
@@ -232,9 +228,9 @@ class LibraryGameController
      *         description="Game deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -253,8 +249,8 @@ class LibraryGameController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/games/search/{service}/{query}",
-     *     operationId="search",
+     *     path="/libraries/games/search/{service}/{query}",
+     *     operationId="searchLibraryGames",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
      *
@@ -281,9 +277,8 @@ class LibraryGameController
      *         description="Search results retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),
@@ -303,8 +298,8 @@ class LibraryGameController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/games/import/{service}",
-     *     operationId="import",
+     *     path="/libraries/games/import/{service}",
+     *     operationId="importLibraryGame",
      *     tags={"Libraries - Games"},
      *     security={{"sanctum": {}}},
      *
@@ -332,9 +327,8 @@ class LibraryGameController
      *         description="Game imported successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Game imported successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/GameReleaseImport")
      *         )
      *     ),

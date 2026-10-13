@@ -5,7 +5,6 @@ namespace App\Api\Notes\Services;
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class NoteImportService
@@ -56,11 +55,8 @@ class NoteImportService
 
     private function processZipEntry(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId = null, &$processed): void
     {
-        Log::info('Processing entry: ' . $path);
         $isDirectory = str_ends_with($path, '/');
         $parentPath = substr($path, 0, strrpos($path, '/', -2) + 1);
-
-        Log::info('Parent path: ' . $parentPath);
 
         if (isset($processed[$parentPath])) {
             $parentCategoryId = $processed[$parentPath];
@@ -78,7 +74,6 @@ class NoteImportService
         $dirname = rtrim($path, '/');
 
         if ($dirname !== '.') {
-            Log::info('Processing directory: ' . $dirname . ' with parent category ID: ' . $parentCategoryId);
             $category = new NoteCategory([
                 'title'      => basename($dirname),
                 'user_id'   => $userId,
@@ -86,13 +81,11 @@ class NoteImportService
             ]);
             $category->save();
             $processed[$path] = $category->id;
-            Log::info('Processed path: ' . $path . ' with Category ID ' . $category->id);
         }
     }
 
     private function processFile(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId = null): void
     {
-        Log::info('Processing note ' . $path . ' with parent category ID: ' . $parentCategoryId);
         $contents = $zip->getFromName($path);
         $note     = new Note([
             'title'       => str_replace('.md', '', basename($path)),

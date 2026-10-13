@@ -21,7 +21,7 @@ class NoteCategoryController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/categories",
+     *     path="/notes/categories",
      *     operationId="noteCategoryIndex",
      *     summary="List note categories",
      *     tags={"Notes"},
@@ -49,7 +49,7 @@ class NoteCategoryController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/categories/{category}",
+     *     path="/notes/categories/{category}",
      *     operationId="noteCategoryShow",
      *     summary="Get note category by ID",
      *     tags={"Notes"},
@@ -87,7 +87,7 @@ class NoteCategoryController
 
     /**
      * @OA\Post(
-     *     path="/v1/notes/categories",
+     *     path="/notes/categories",
      *     operationId="noteCategoryStore",
      *     summary="Create a new note category",
      *     tags={"Notes"},
@@ -115,7 +115,7 @@ class NoteCategoryController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreNoteCategoryRequest $request): JsonResponse
@@ -127,7 +127,7 @@ class NoteCategoryController
 
     /**
      * @OA\Put(
-     *     path="/v1/notes/categories/{category}",
+     *     path="/notes/categories/{category}",
      *     operationId="noteCategoryUpdate",
      *     summary="Update a note category",
      *     tags={"Notes"},
@@ -164,7 +164,7 @@ class NoteCategoryController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateNoteCategoryRequest $request, NoteCategory $category): JsonResponse
@@ -179,7 +179,7 @@ class NoteCategoryController
 
     /**
      * @OA\Delete(
-     *     path="/v1/notes/categories/{category}",
+     *     path="/notes/categories/{category}",
      *     operationId="noteCategoryDestroy",
      *     summary="Delete a note category",
      *     tags={"Notes"},
@@ -220,7 +220,7 @@ class NoteCategoryController
 
     /**
      * @OA\Patch(
-     *     path="/v1/notes/categories/{category}/hidden",
+     *     path="/notes/categories/{category}/hidden",
      *     operationId="noteCategoryUpdateHidden",
      *     summary="Toggle the hidden state of a note category",
      *     tags={"Notes"},
@@ -257,7 +257,7 @@ class NoteCategoryController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function updateHidden(UpdateNoteCategoryHiddenRequest $request, NoteCategory $category): JsonResponse

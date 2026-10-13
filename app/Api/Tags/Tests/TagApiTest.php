@@ -1,9 +1,6 @@
 <?php
 
 use App\Api\Tags\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Tag CRUD', function () {
     it('lists, stores, shows, updates and deletes tags', function () {

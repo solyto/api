@@ -7,10 +7,7 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Feeds\Services\FeedService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-
-uses(RefreshDatabase::class);
 
 describe('SyncFeed', function () {
     it('syncs the feed through the service', function () {

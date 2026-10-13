@@ -24,7 +24,7 @@ class ContactController
 
     /**
      * @OA\Get(
-     *     path="/api/contacts/address-books",
+     *     path="/contacts/address-books",
      *     operationId="listAddressBooks",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -34,9 +34,8 @@ class ContactController
      *         description="Address books retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Address books retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AddressBook"))
      *         )
      *     ),
@@ -54,7 +53,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/address-books",
+     *     path="/contacts/address-books",
      *     operationId="storeAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -74,9 +73,8 @@ class ContactController
      *         description="Address Book created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Address Book created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/AddressBook")
      *         )
      *     ),
@@ -106,7 +104,7 @@ class ContactController
 
     /**
      * @OA\Put(
-     *     path="/api/contacts/address-books/{addressBookId}",
+     *     path="/contacts/address-books/{addressBookId}",
      *     operationId="updateAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -134,9 +132,8 @@ class ContactController
      *         description="Address book updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Address book updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/AddressBook")
      *         )
      *     ),
@@ -162,7 +159,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/api/contacts/address-books/{addressBookId}",
+     *     path="/contacts/address-books/{addressBookId}",
      *     operationId="destroyAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -181,9 +178,9 @@ class ContactController
      *         description="Address Book deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Address Book deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -206,7 +203,7 @@ class ContactController
 
     /**
      * @OA\Get(
-     *     path="/api/contacts",
+     *     path="/contacts",
      *     operationId="listContacts",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -216,9 +213,8 @@ class ContactController
      *         description="Contacts retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contacts retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Contact"))
      *         )
      *     ),
@@ -236,7 +232,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/photos",
+     *     path="/contacts/photos",
      *     operationId="getContactPhotos",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -266,9 +262,8 @@ class ContactController
      *         description="Contact photos retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact photos retrieved successfully."),
      *             @OA\Property(property="data", type="object", @OA\AdditionalProperties(type="string", format="uri"))
      *         )
      *     ),
@@ -286,7 +281,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/address-books/{addressBookId}",
+     *     path="/contacts/address-books/{addressBookId}",
      *     operationId="storeContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -333,9 +328,8 @@ class ContactController
      *         description="Contact created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Contact")
      *         )
      *     ),
@@ -365,7 +359,7 @@ class ContactController
 
     /**
      * @OA\Put(
-     *     path="/api/contacts/address-books/{addressBookId}/{contactUri}",
+     *     path="/contacts/address-books/{addressBookId}/{contactUri}",
      *     operationId="updateContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -421,9 +415,8 @@ class ContactController
      *         description="Contact updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Contact")
      *         )
      *     ),
@@ -463,7 +456,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/api/contacts/address-books/{addressBookId}/{contactUri}",
+     *     path="/contacts/address-books/{addressBookId}/{contactUri}",
      *     operationId="destroyContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -491,9 +484,9 @@ class ContactController
      *         description="Contact deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -529,7 +522,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/address-books/{addressBookId}/{contactUri}/photo",
+     *     path="/contacts/address-books/{addressBookId}/{contactUri}/photo",
      *     operationId="updateContactPhoto",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -571,9 +564,8 @@ class ContactController
      *         description="Contact photo updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact photo updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Contact")
      *         )
      *     ),
@@ -617,7 +609,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/api/contacts/address-books/{addressBookId}/{contactUri}/photo",
+     *     path="/contacts/address-books/{addressBookId}/{contactUri}/photo",
      *     operationId="removeContactPhoto",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -645,9 +637,8 @@ class ContactController
      *         description="Contact updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Contact updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Contact")
      *         )
      *     ),

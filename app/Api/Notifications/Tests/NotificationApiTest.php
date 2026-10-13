@@ -3,10 +3,7 @@
 use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Users\Models\User;
 use App\Shared\Notifications\TestNotification;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
-
-uses(RefreshDatabase::class);
 
 describe('Notification endpoints', function () {
     it('lists, marks read and marks all read', function () {

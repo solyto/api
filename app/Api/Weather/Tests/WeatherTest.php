@@ -2,10 +2,7 @@
 
 use App\Api\Users\Models\UserSettings;
 use App\Api\Weather\Services\WeatherService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-
-uses(RefreshDatabase::class);
 
 describe('GET /api/v1/weather/today', function () {
     it('returns not configured when the user has no weather location', function () {

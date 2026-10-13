@@ -16,7 +16,7 @@ class StatisticsController
 
     /**
      * @OA\Get(
-     *     path="/api/statistics/overview",
+     *     path="/statistics/overview",
      *     operationId="statisticsOverview",
      *     tags={"Statistics"},
      *     security={{"sanctum":{}}},

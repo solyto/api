@@ -4,9 +4,6 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Feed Factory', function () {
     it('creates a valid feed', function () {
@@ -53,7 +50,7 @@ describe('FeedItem Factory', function () {
     it('creates a recent item', function () {
         $item = FeedItem::factory()->recent()->create();
 
-        expect($item->published_at)->greaterThan(now()->subDays(7));
+        expect($item->published_at)->toBeGreaterThan(now()->subDays(7));
     });
 
     it('creates a todays item', function () {

@@ -5,11 +5,8 @@ use App\Api\Users\Notifications\DailyCheckInReminderNotification;
 use App\Api\Users\Notifications\DailyDayReminderNotification;
 use App\Dav\Models\Principal;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Notification;
-
-uses(RefreshDatabase::class);
 
 describe('User management commands', function () {
     it('lists users', function () {

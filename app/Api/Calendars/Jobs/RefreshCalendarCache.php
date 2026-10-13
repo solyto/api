@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Support\Facades\Log;
 
 class RefreshCalendarCache implements ShouldQueue
 {
@@ -22,8 +21,6 @@ class RefreshCalendarCache implements ShouldQueue
     public function handle(): void
     {
         $service = app(CalendarService::class);
-
-        Log::info('Refreshing calendar cache for user ' . $this->user->id . ' after invalidation');
 
         $service->list($this->user);
         $service->listEvents($this->user, date('Y-m'));

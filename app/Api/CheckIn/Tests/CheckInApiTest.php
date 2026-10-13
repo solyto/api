@@ -2,9 +2,6 @@
 
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Services\CheckInService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('GET /api/v1/check-in', function () {
     it('lists the users check-ins', function () {

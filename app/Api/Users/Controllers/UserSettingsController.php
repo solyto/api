@@ -26,7 +26,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/navigation",
+     *     path="/user-settings/navigation",
      *     operationId="userSettingsUpdateNavigation",
      *     summary="Update navigation settings",
      *     tags={"User Settings"},
@@ -66,7 +66,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/language",
+     *     path="/user-settings/language",
      *     operationId="userSettingsUpdateLanguage",
      *     summary="Update language setting",
      *     tags={"User Settings"},
@@ -103,7 +103,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/timezone",
+     *     path="/user-settings/timezone",
      *     operationId="userSettingsUpdateTimezone",
      *     summary="Update timezone setting",
      *     tags={"User Settings"},
@@ -140,7 +140,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/date-format",
+     *     path="/user-settings/date-format",
      *     operationId="userSettingsUpdateDateFormat",
      *     summary="Update date format setting",
      *     tags={"User Settings"},
@@ -177,7 +177,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/time-format",
+     *     path="/user-settings/time-format",
      *     operationId="userSettingsUpdateTimeFormat",
      *     summary="Update time format setting",
      *     tags={"User Settings"},
@@ -214,7 +214,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/weather-city",
+     *     path="/user-settings/weather-city",
      *     operationId="userSettingsUpdateWeatherCity",
      *     summary="Update weather city setting",
      *     tags={"User Settings"},
@@ -253,7 +253,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/weather-temperature-unit",
+     *     path="/user-settings/weather-temperature-unit",
      *     operationId="userSettingsUpdateTemperatureUnit",
      *     summary="Update temperature unit setting",
      *     tags={"User Settings"},
@@ -290,7 +290,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/openai-api-key",
+     *     path="/user-settings/openai-api-key",
      *     operationId="userSettingsUpdateOpenaiApiKey",
      *     summary="Update OpenAI API key",
      *     tags={"User Settings"},
@@ -326,7 +326,7 @@ class UserSettingsController
 
     /**
      * @OA\Post(
-     *     path="/v1/user-settings/complete-onboarding",
+     *     path="/user-settings/complete-onboarding",
      *     operationId="userSettingsCompleteOnboarding",
      *     summary="Complete onboarding",
      *     tags={"User Settings"},
@@ -353,7 +353,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/users/me/settings/journal",
+     *     path="/users/me/settings/journal",
      *     operationId="userSettingsUpdateJournal",
      *     summary="Enable or disable the journal",
      *     tags={"User Settings"},
@@ -390,7 +390,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/users/me/settings/journal-calendar-mark",
+     *     path="/users/me/settings/journal-calendar-mark",
      *     operationId="userSettingsUpdateJournalCalendarMark",
      *     summary="Show or hide the journal mark in the calendar",
      *     tags={"User Settings"},
@@ -427,7 +427,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/users/me/settings/check-in-calendar-mark",
+     *     path="/users/me/settings/check-in-calendar-mark",
      *     operationId="userSettingsUpdateCheckInCalendarMark",
      *     summary="Show or hide the check-in mark in the calendar",
      *     tags={"User Settings"},
@@ -464,7 +464,7 @@ class UserSettingsController
 
     /**
      * @OA\Get(
-     *     path="/v1/user-settings/check-in",
+     *     path="/user-settings/check-in",
      *     operationId="userSettingsShowCheckIn",
      *     summary="Get check-in settings",
      *     tags={"User Settings"},
@@ -494,7 +494,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/user-settings/check-in",
+     *     path="/user-settings/check-in",
      *     operationId="userSettingsUpdateCheckIn",
      *     summary="Update check-in settings",
      *     tags={"User Settings"},

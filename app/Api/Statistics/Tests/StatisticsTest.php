@@ -3,9 +3,6 @@
 use App\Api\Statistics\Services\StatisticsService;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('GET /api/v1/statistics/overview', function () {
     it('returns the overview for admins', function () {

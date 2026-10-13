@@ -5,9 +5,6 @@ use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Models\TodoSubtask;
 use App\Api\Todos\Models\TodoWorkspace;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Todo Factory', function () {
     it('creates a valid todo', function () {
@@ -45,7 +42,7 @@ describe('Todo Factory', function () {
         $todo = Todo::factory()->overdue()->create();
 
         expect($todo->due_at)->not()->toBeNull();
-        expect($todo->due_at)->lessThan(now());
+        expect($todo->due_at)->toBeLessThan(now());
     });
 
     it('creates a todo due today', function () {
@@ -146,7 +143,7 @@ describe('Todo Model', function () {
     it('casts attributes correctly', function () {
         $todo = Todo::factory()->create();
 
-        expect($todo->is_completed)->toBeBoolean();
+        expect($todo->is_completed)->toBeBool();
         expect($todo->due_at)->toBeInstanceOf(\Carbon\Carbon::class);
     });
 

@@ -3,9 +3,6 @@
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\DevRequests\Models\DevRequestVote;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('DevRequest CRUD', function () {
     it('lists, stores, updates and deletes dev requests', function () {

@@ -14,7 +14,7 @@ class PushNotificationController
 
     /**
      * @OA\Get(
-     *     path="/v1/notifications/push/public-key",
+     *     path="/notifications/push/public-key",
      *     operationId="pushNotificationGetPublicKey",
      *     summary="Get VAPID public key",
      *     tags={"Notifications"},
@@ -42,7 +42,7 @@ class PushNotificationController
 
     /**
      * @OA\Post(
-     *     path="/v1/notifications/push/subscribe",
+     *     path="/notifications/push/subscribe",
      *     operationId="pushNotificationSubscribe",
      *     summary="Subscribe to push notifications",
      *     tags={"Notifications"},
@@ -92,7 +92,7 @@ class PushNotificationController
 
     /**
      * @OA\Post(
-     *     path="/v1/notifications/push/unsubscribe",
+     *     path="/notifications/push/unsubscribe",
      *     operationId="pushNotificationUnsubscribe",
      *     summary="Unsubscribe from push notifications",
      *     tags={"Notifications"},

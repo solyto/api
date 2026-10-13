@@ -22,7 +22,7 @@ class DevRequestController
 
     /**
      * @OA\Get(
-     *     path="/api/dev-requests",
+     *     path="/dev-requests",
      *     operationId="devRequestIndex",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},
@@ -49,7 +49,7 @@ class DevRequestController
 
     /**
      * @OA\Post(
-     *     path="/api/dev-requests",
+     *     path="/dev-requests",
      *     operationId="devRequestStore",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},
@@ -101,7 +101,7 @@ class DevRequestController
 
     /**
      * @OA\Put(
-     *     path="/api/dev-requests/{devRequest}",
+     *     path="/dev-requests/{devRequest}",
      *     operationId="devRequestUpdate",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},
@@ -161,7 +161,7 @@ class DevRequestController
 
     /**
      * @OA\Post(
-     *     path="/api/dev-requests/{devRequest}/vote",
+     *     path="/dev-requests/{devRequest}/vote",
      *     operationId="devRequestVote",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},
@@ -212,7 +212,7 @@ class DevRequestController
 
     /**
      * @OA\Get(
-     *     path="/api/dev-requests/{devRequest}/comments",
+     *     path="/dev-requests/{devRequest}/comments",
      *     operationId="devRequestListComments",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},
@@ -249,7 +249,7 @@ class DevRequestController
 
     /**
      * @OA\Post(
-     *     path="/api/dev-requests/{devRequest}/comments",
+     *     path="/dev-requests/{devRequest}/comments",
      *     operationId="devRequestStoreComment",
      *     tags={"Dev Requests"},
      *     security={{"sanctum":{}}},

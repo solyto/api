@@ -1,38 +1,20 @@
 <?php
 
 use App\Api\Users\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests');
-
-/*
-|--------------------------------------------------------------------------
-| Expectations
-|--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
-*/
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
+uses(RefreshDatabase::class)->in('../app/Api');
 
 /*
 |--------------------------------------------------------------------------
 | Additional Expectations
 |--------------------------------------------------------------------------
 |
-| The pre-existing suite relies on a few convenience expectations that are
-| not part of Pest 4 out of the box. They are registered here so that both
-| the existing factory/model tests and the newly added tests can use them.
+| Convenience expectations that are not part of Pest 4 out of the box.
 |
 */
-
-expect()->extend('toBeBoolean', function () {
-    return $this->toBeBool();
-});
 
 expect()->extend('toBeEmail', function () {
     return $this->toBeString()
@@ -43,30 +25,6 @@ expect()->extend('toBeEmail', function () {
             ));
         });
 });
-
-expect()->extend('greaterThan', function ($expected) {
-    return $this->toBeGreaterThan($expected);
-});
-
-expect()->extend('lessThan', function ($expected) {
-    return $this->toBeLessThan($expected);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Functions
-|--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
-*/
-
-function something()
-{
-    // ..
-}
 
 /*
 |--------------------------------------------------------------------------

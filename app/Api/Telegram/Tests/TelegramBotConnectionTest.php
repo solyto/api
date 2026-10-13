@@ -2,19 +2,16 @@
 
 use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('TelegramBotConnection Factory', function () {
     it('creates a valid connection', function () {
         $connection = TelegramBotConnection::factory()->create();
 
         expect($connection->token)->not()->toBeEmpty();
-        expect($connection->is_confirmed)->toBeBoolean();
+        expect($connection->is_confirmed)->toBeBool();
         expect($connection->chat_id)->toBeNull();
-        expect($connection->your_day_alert)->toBeBoolean();
-        expect($connection->check_in_alert)->toBeBoolean();
+        expect($connection->your_day_alert)->toBeBool();
+        expect($connection->check_in_alert)->toBeBool();
         expect($connection->user_id)->not()->toBeNull();
     });
 
@@ -77,9 +74,9 @@ describe('TelegramBotConnection Model', function () {
     it('casts boolean fields correctly', function () {
         $connection = TelegramBotConnection::factory()->create();
 
-        expect($connection->is_confirmed)->toBeBoolean();
-        expect($connection->your_day_alert)->toBeBoolean();
-        expect($connection->check_in_alert)->toBeBoolean();
+        expect($connection->is_confirmed)->toBeBool();
+        expect($connection->your_day_alert)->toBeBool();
+        expect($connection->check_in_alert)->toBeBool();
     });
 
     it('belongs to user', function () {

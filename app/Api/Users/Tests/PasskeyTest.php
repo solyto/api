@@ -3,10 +3,7 @@
 use App\Api\Users\Models\Passkey;
 use App\Api\Users\Services\PasskeyService;
 use App\Shared\Enums\AuthPlatformEnum;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-
-uses(RefreshDatabase::class);
 
 /**
  * Encode an integer as a single-byte CBOR value (only small values used here).

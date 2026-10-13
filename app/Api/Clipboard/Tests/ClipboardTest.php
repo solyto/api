@@ -2,9 +2,6 @@
 
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Clipboard Factory', function () {
     it('creates a valid clipboard entry', function () {

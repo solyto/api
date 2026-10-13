@@ -4,6 +4,7 @@ namespace App\Api\TimeTracking\Models;
 
 
 use App\Api\Users\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -49,7 +50,7 @@ class TimeTrackingProject extends Model
         return $this->hasMany(TimeTrackingEntry::class, 'project_id');
     }
 
-    public function scopeForUser($query, $userId)
+    public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);
     }

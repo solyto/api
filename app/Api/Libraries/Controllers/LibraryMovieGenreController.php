@@ -20,7 +20,7 @@ class LibraryMovieGenreController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/genres",
+     *     path="/libraries/movies/genres",
      *     operationId="listLibraryMovieGenres",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class LibraryMovieGenreController
      *         description="Genres retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genres retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMovieGenre"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class LibraryMovieGenreController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/movies/genres/{genre}",
+     *     path="/libraries/movies/genres/{genre}",
      *     operationId="showLibraryMovieGenre",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -69,9 +68,8 @@ class LibraryMovieGenreController
      *         description="Genre retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovieGenre")
      *         )
      *     ),
@@ -90,7 +88,7 @@ class LibraryMovieGenreController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/movies/genres",
+     *     path="/libraries/movies/genres",
      *     operationId="storeLibraryMovieGenre",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -110,9 +108,8 @@ class LibraryMovieGenreController
      *         description="Genre created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovieGenre")
      *         )
      *     ),
@@ -130,7 +127,7 @@ class LibraryMovieGenreController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/movies/genres/{genre}",
+     *     path="/libraries/movies/genres/{genre}",
      *     operationId="updateLibraryMovieGenre",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -159,9 +156,8 @@ class LibraryMovieGenreController
      *         description="Genre updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMovieGenre")
      *         )
      *     ),
@@ -182,7 +178,7 @@ class LibraryMovieGenreController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/movies/genres/{genre}",
+     *     path="/libraries/movies/genres/{genre}",
      *     operationId="destroyLibraryMovieGenre",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -201,9 +197,9 @@ class LibraryMovieGenreController
      *         description="Genre deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

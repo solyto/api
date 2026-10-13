@@ -1,9 +1,6 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
-
-uses(RefreshDatabase::class);
 
 describe('Generate example notifications command', function () {
     it('generates 3 unread notifications of different types for the given email', function () {

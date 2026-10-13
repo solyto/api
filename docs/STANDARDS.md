@@ -179,23 +179,20 @@ config exists).
 
 The spec is generated from `@OA` docblocks on every action (268 operations)
 and `@OA\Schema` on 64 of 68 resources. `tests/Unit/OpenApiSpecTest.php`
-checks every documented path against the route table but normalises the
-prefix away and pins 80 stale paths as `OPENAPI_KNOWN_DRIFT`.
+checks every documented path (server URL + operation path) against the
+route table and pins 80 stale paths as `OPENAPI_KNOWN_DRIFT`.
 
-### 2.1 One path prefix, the one `@OA\Server` does not already provide
+### 2.1 Operation paths are relative to `@OA\Server`
 
-`app/OpenApi/OpenApiSpec.php:12` declares `@OA\Server(url="/api/v1")`.
-Operation paths are therefore relative to that: `path="/todos"`. Today 186
-operations say `path="/api/libraries/books"` and 82 say `path="/v1/todos"`;
-both generate wrong URLs (`/api/v1/api/…`, `/api/v1/v1/…`). The target
-spelling is an open question (OQ-1) because it touches 268 lines; the rule
-is: **one spelling, and the test must stop normalising it.**
+`app/OpenApi/OpenApiSpec.php:12` declares `@OA\Server(url="/api/v1")`, so
+operation paths carry no prefix: `path="/todos"`, never `/api/todos` or
+`/v1/todos` (those generate `/api/v1/api/…` and `/api/v1/v1/…`). All 268
+operations follow this since OQ-1 was decided (2026-10-13), and
+`OpenApiSpecTest` prepends the server URL instead of normalising prefixes.
 
-Bad: `app/Api/Libraries/Controllers/LibraryBookController.php:29` `path="/api/libraries/books"`
-vs `app/Api/Todos/Controllers/TodoController.php:25` `path="/v1/todos"`.
+Good: `app/Api/Todos/Controllers/TodoController.php:25` `path="/todos"`.
 
-Check: `grep -rc 'path="/api/' app/Api/*/Controllers` and `path="/v1/'` —
-one of them must be 0 everywhere.
+Check: `grep -rcE 'path="/(api|v1)/' app/Api/*/Controllers` → all 0.
 
 ### 2.2 The path in the annotation is the path in `routes/api.php`
 
@@ -211,7 +208,7 @@ Check: `OPENAPI_KNOWN_DRIFT` length (80 → 0).
 ### 2.3 Responses reference the envelope, never redefine it
 
 Success bodies are `allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")}`
-plus one `data` property; errors are `@OA\JsonContent(ref="#/components/schemas/ErrorResponse")`.
+plus one `data` property; errors are `@OA\JsonContent(ref="#/components/schemas/ErrorResponse")` (validation 422s: `ValidationErrorResponse`, rule 2.4).
 
 Good (`TodoController.php:35-39`):
 
@@ -236,17 +233,15 @@ Bad (`LibraryBookController.php:37-42`, 137 times in 20 files):
 
 Check: `grep -rn '@OA\\Property(property="success"' app/Api/*/Controllers` → 0.
 
-### 2.4 One schema for 422
+### 2.4 422 validation errors use `ValidationErrorResponse`
 
-`OpenApiSpec.php:33-61` defines `ErrorResponse` and `ValidationErrorResponse`
-with the same four properties. The reference module uses `ErrorResponse`
-for 422 (`TodoController.php:157`); 54 annotations in 21 files use
-`ValidationErrorResponse`. Keep `ErrorResponse` (the response really is
-`ApiResponse::error(..., 422, $errors)`, `app/Api/ApiResponse.php:59-62`) and
-delete the duplicate schema — unless the owner wants the distinct example
-text (OQ-2).
+A FormRequest or `validate()` failure always returns per-field `errors`
+(`bootstrap/app.php` → `ApiResponse::validationError()`), so its 422 response
+references `ValidationErrorResponse`. `ErrorResponse` is for 422s the code
+raises itself without field errors (`FeedController::testFeed`,
+`storeSubscription`: "Feed URL doesn't seem valid"). Owner decision OQ-2.
 
-Check: `grep -rn 'ValidationErrorResponse' app` → only the definition, then 0.
+Check: `grep -rn 'response=422, description="Validation error"' app/Api/*/Controllers | grep -c 'schemas/ErrorResponse'` → 0.
 
 ### 2.5 `operationId` is `<resource><Action>`, unique
 
@@ -494,9 +489,8 @@ Check: `grep -rnE 'public function [a-zA-Z]+\(\)$' app/Api/*/Models` → 0.
 
 37 of 37 user-owned models have it; every `list()` in every service starts
 with `Model::forUser($user->id)`. Keep it that way. The signature is
-`scopeForUser($query, $userId)` in 35 models and `string $userId` in 2 —
-type new ones `Builder $query, string $userId` (OQ-5 for the old ones; a
-mechanical pass).
+`scopeForUser(Builder $query, string $userId)` (Eloquent `Builder`; user ids
+are UUID strings) in all 37 models (OQ-5, decided 2026-10-13).
 
 Check: `grep -rn '::where(' app/Api/*/Services | grep -v forUser` — each
 hit must be a non-user-owned table.
@@ -836,7 +830,7 @@ entry point adds a gateway method.
 ### 12.9 Tests
 
 Pest 4, three PHPUnit suites plus the Bots/DAV directories, in-memory
-SQLite, `RefreshDatabase` applied to all module tests by `app/Api/Pest.php`.
+SQLite, `RefreshDatabase` applied to all module tests by `tests/Pest.php`.
 What gets a test and how: `docs/TESTING.md`.
 
 ### 12.10 Localisation
@@ -870,6 +864,11 @@ translated (Decisions).
   repositories.
 - **`SerializesModels`**: default for new jobs is ids in the constructor (as
   `ProcessExport`); the trait is the fallback when a model must be passed.
+- **`@OA` operation paths are relative to the server URL `/api/v1`**
+  (OQ-1, 2026-10-13): `path="/todos"` (rule 2.1).
+- **422 validation errors reference `ValidationErrorResponse`** (OQ-2,
+  2026-10-13): the schema stays because `errors` is always filled on a
+  validation 422; `ErrorResponse` is for other errors (rule 2.4).
 - **Dependabot stays composer-only until the owner adds npm**; tooling
   additions (Pint config, Larastan, CI) are backlog items needing approval
   (package rule), not rules.
@@ -890,7 +889,7 @@ translated (Decisions).
     takes the `User`" — the example contradicted the rule; 9.1 is the rule
     and the four `User`-carrying jobs are backlog.
   - "`@OA` `path` is `/v1/<route>`" — stated as if settled; 186 of 268
-    operations use `/api/`, and neither matches `@OA\Server`. Now OQ-1.
+    operations use `/api/`, and neither matches `@OA\Server`. Was OQ-1; decided: relative to `/api/v1` (rule 2.1).
   - "Pint is the style enforcer; run `./vendor/bin/pint --dirty`" — Pint has
     never been run on this tree (`tooling-report.md`); now OQ-6 and 11.1.
   - "Repo-wide suites live in `tests/Unit` and `tests/Feature`" and
@@ -913,12 +912,6 @@ translated (Decisions).
 
 ## Open questions
 
-- **OQ-1 — `@OA` path prefix.** `@OA\Server(url="/api/v1")` + `path="/todos"`
-  (spec-correct, 268 edits, test stops normalising) or keep `/v1/…` as the
-  reference module does and change the server URL to `/api`? The owner's
-  own Todos code uses `/v1/`, so this cannot be decided from the code.
-- **OQ-2 — delete `ValidationErrorResponse`** (54 refs → `ErrorResponse`,
-  as Todos does) or keep both schemas for the distinct example text?
 - **OQ-3 — `forgetUser()` helper in `TodoService`.** The reference module
   has the 7× pair; rule 4.4 says extract. Owner to confirm the rule applies
   to the reference, then it is a backlog item.
@@ -926,8 +919,6 @@ translated (Decisions).
   controllers + eight requests + four resources, identical after renaming.
   One parameterised `LibraryGenreService` is a new abstraction (hard rule
   says ask); leaving it means every genre change is made four times.
-- **OQ-5 — retype `scopeForUser($query, $userId)` to `Builder $query, string $userId`**
-  across 35 models in one mechanical commit?
 - **OQ-6 — Pint.** Commit `pint.json` (preset `laravel`) and run it once
   over the tree (large diff, ends the `!$`/`fn()`/alignment mix), or remove
   `laravel/pint` from `require-dev`? The frontend removed its formatter

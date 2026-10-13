@@ -4,9 +4,6 @@ use App\Api\Calendars\Models\Calendar;
 use App\Api\Calendars\Models\CalendarEntry;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Calendar CRUD', function () {
     it('lists calendars including the default one', function () {
