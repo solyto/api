@@ -478,6 +478,16 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $stmt->execute([$calendarId, $principalUri]);
     }
 
+    public function deleteSharedInstancesCustom(string $principalUri): int
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1'
+        );
+        $stmt->execute([$principalUri]);
+
+        return $stmt->rowCount();
+    }
+
     public function getCalendarSharees(int $calendarId): array
     {
         $stmt = $this->pdo->prepare(

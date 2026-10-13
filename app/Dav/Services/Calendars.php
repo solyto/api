@@ -91,4 +91,25 @@ class Calendars
     {
         $this->backend->deleteCalendarCustom($calendar);
     }
+
+    public function deleteForUser(User $user): array
+    {
+        // A shared calendar must never reach delete(): Sabre's
+        // deleteCalendar removes the calendar and every instance, which
+        // would destroy the owner's data. The sharee's instance rows go
+        // first, the isShared check below is the second guard.
+        $shared = $this->backend->deleteSharedInstancesCustom(DavHelper::getPrincipalUri($user));
+
+        $owned = 0;
+        foreach ($this->list($user) as $calendar) {
+            if ($calendar->isShared) {
+                continue;
+            }
+
+            $this->delete($calendar);
+            $owned++;
+        }
+
+        return ['owned' => $owned, 'shared' => $shared];
+    }
 }
