@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Api\Libraries\DTOs\MusicReleaseDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\MusicServiceEnum;
@@ -28,6 +29,8 @@ class LibraryMusicService
         private readonly DiscogsService $discogsService,
         private readonly SpotifyService $spotifyService,
         private readonly UserCacheService $cache,
+        private readonly LibraryRecommender $recommender,
+        private readonly LibraryReleases $libraryReleases,
     ) {}
 
     public function list(User $user): Collection
@@ -111,22 +114,20 @@ class LibraryMusicService
 
     public function recommend(User $user, LibraryRecommendationEnum $type): ?array
     {
-        $recommender = new LibraryRecommender(LibraryTypeEnum::MUSIC, $user);
-
         return match ($type) {
-            LibraryRecommendationEnum::FAVORITE => $recommender->favorite(),
-            LibraryRecommendationEnum::RANDOM => $recommender->random(),
-            LibraryRecommendationEnum::UNRATED => $recommender->unrated(),
-            LibraryRecommendationEnum::NEW => $this->recommendNew($recommender, $user),
+            LibraryRecommendationEnum::FAVORITE => $this->recommender->favorite(LibraryTypeEnum::MUSIC, $user),
+            LibraryRecommendationEnum::RANDOM => $this->recommender->random(LibraryTypeEnum::MUSIC, $user),
+            LibraryRecommendationEnum::UNRATED => $this->recommender->unrated(LibraryTypeEnum::MUSIC, $user),
+            LibraryRecommendationEnum::NEW => $this->recommendNew($user),
         };
     }
 
-    private function recommendNew(LibraryRecommender $recommender, User $user): mixed
+    private function recommendNew(User $user): ?array
     {
         $stack = $this->cache->get([self::CACHE_KEY_RECOMMENDATIONS, $user->id]) ?? [];
 
         if (empty($stack)) {
-            $result = $recommender->new();
+            $result = $this->recommender->new(LibraryTypeEnum::MUSIC, $user);
             $stack = $result['recommendations'] ?? [];
         }
 
@@ -142,14 +143,11 @@ class LibraryMusicService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            function () use ($user) {
-                $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
-                return $service->getMusicReleases();
-            }
+            fn () => $this->libraryReleases->getMusicReleases($user)
         );
     }
 
-    public function search(MusicServiceEnum $service, string $query): mixed
+    public function search(MusicServiceEnum $service, string $query): ?array
     {
         return match ($service) {
             MusicServiceEnum::DEEZER  => $this->deezerService->searchAlbum($query),
@@ -158,7 +156,7 @@ class LibraryMusicService
         };
     }
 
-    public function import(MusicServiceEnum $service, string $url): mixed
+    public function import(MusicServiceEnum $service, string $url): ?MusicReleaseDTO
     {
         return match ($service) {
             MusicServiceEnum::DEEZER  => $this->deezerService->importFromUrl($url),

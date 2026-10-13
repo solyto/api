@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Api\Libraries\DTOs\MovieReleaseDTO;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\MovieServiceEnum;
 use App\Api\Libraries\Models\LibraryMovie;
@@ -27,6 +28,7 @@ class LibraryMovieService
         private readonly ImdbService $imdbService,
         private readonly TmdbService $tmdbService,
         private readonly UserCacheService $cache,
+        private readonly LibraryReleases $libraryReleases,
     ) {}
 
     public function list(User $user): Collection
@@ -112,11 +114,7 @@ class LibraryMovieService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            function () use ($user) {
-                $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
-
-                return $service->getMovieReleases();
-            }
+            fn () => $this->libraryReleases->getMovieReleases($user)
         );
     }
 
@@ -150,7 +148,7 @@ class LibraryMovieService
         };
     }
 
-    public function import(MovieServiceEnum $service, string $url): mixed
+    public function import(MovieServiceEnum $service, string $url): ?MovieReleaseDTO
     {
         return match ($service) {
             MovieServiceEnum::IMDB => $this->imdbService->importFromUrl($url),

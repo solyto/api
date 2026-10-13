@@ -2,6 +2,7 @@
 
 use App\Api\Calendars\Models\Calendar;
 use App\Api\Calendars\Models\CalendarEntry;
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 
@@ -28,6 +29,34 @@ describe('Calendar CRUD', function () {
             ->json('data');
 
         expect(collect($calendars)->pluck('name'))->toContain('Work');
+    });
+
+    it('rejects a calendar with an existing name with 409', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars', ['name' => 'Work'])
+            ->assertStatus(201);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars', ['name' => 'Work'])
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Calendar already exists.');
+    });
+
+    it('renders a service failure through the central 500 handler', function () {
+        $user = makeUser();
+
+        $this->mock(CalendarService::class)
+            ->shouldReceive('create')
+            ->andThrow(new \RuntimeException('DAV write failed'));
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars', ['name' => 'Work'])
+            ->assertStatus(500)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'An unexpected error occurred.');
     });
 
     it('deletes a calendar', function () {

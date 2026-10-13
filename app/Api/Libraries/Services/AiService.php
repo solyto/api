@@ -19,7 +19,7 @@ class AiService
     public function __construct(?ClientContract $client = null)
     {
         $factory = OpenAI::factory()
-            ->withApiKey(config('services.ai.api_key'));
+            ->withApiKey((string) config('services.ai.api_key'));
 
         $baseUrl = config('services.ai.base_url');
         if ($baseUrl) {

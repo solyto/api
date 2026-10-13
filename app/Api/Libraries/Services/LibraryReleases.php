@@ -23,23 +23,22 @@ class LibraryReleases
         private readonly DeezerService $deezerService,
         private readonly SpotifyService $spotifyService,
         private readonly HardcoverService $hardcoverService,
-        private readonly TmdbService $tmdbService,
-        private readonly User $user
+        private readonly TmdbService $tmdbService
     ) {}
 
-    public function getMusicReleases(): array
+    public function getMusicReleases(User $user): array
     {
         // SWITCH (deferred decision, see docs/jobs/post_spotify-integration):
         // the Spotify releases path is built and tested but dormant. To serve
         // Spotify releases, replace the call below with getSpotifyMusicReleases()
         // (replace Deezer), merge both arrays (run both), or gate it behind a
         // feature toggle.
-        return $this->getDeezerMusicReleases();
+        return $this->getDeezerMusicReleases($user);
     }
 
-    private function getDeezerMusicReleases(): array
+    private function getDeezerMusicReleases(User $user): array
     {
-        $favorites = LibraryMusic::forUser($this->user->id)->where('rating', '>=', 4)->get();
+        $favorites = LibraryMusic::forUser($user->id)->where('rating', '>=', 4)->get();
         $processedArtists = [];
         $releases = [];
 
@@ -89,9 +88,9 @@ class LibraryReleases
      * (string ids, precision-aware release dates) into MusicReleaseDTOs with
      * provider=spotify. Not wired into getMusicReleases() yet.
      */
-    public function getSpotifyMusicReleases(): array
+    public function getSpotifyMusicReleases(User $user): array
     {
-        $favorites = LibraryMusic::forUser($this->user->id)->where('rating', '>=', 4)->get();
+        $favorites = LibraryMusic::forUser($user->id)->where('rating', '>=', 4)->get();
         $processedArtists = [];
         $releases = [];
 
@@ -135,9 +134,9 @@ class LibraryReleases
         return $releases;
     }
 
-    public function getBookReleases(): array
+    public function getBookReleases(User $user): array
     {
-        $favorites = LibraryBook::forUser($this->user->id)->where('rating', '>=', 4)->get();
+        $favorites = LibraryBook::forUser($user->id)->where('rating', '>=', 4)->get();
         $processedAuthors = [];
         $releases = [];
 
@@ -176,9 +175,9 @@ class LibraryReleases
         return $releases;
     }
 
-    public function getMovieReleases(): array
+    public function getMovieReleases(User $user): array
     {
-        $favorites = LibraryMovie::forUser($this->user->id)->where('rating', '>=', 4)->with('genres')->get();
+        $favorites = LibraryMovie::forUser($user->id)->where('rating', '>=', 4)->with('genres')->get();
 
         $genreNames = $favorites
             ->flatMap(fn ($m) => $m->genres->pluck('title'))

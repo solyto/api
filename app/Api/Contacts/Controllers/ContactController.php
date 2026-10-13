@@ -88,16 +88,7 @@ class ContactController
     {
         $data = $request->validated();
 
-        if ($this->contactService->getAddressBookByName($request->user(), $data['name']) !== null) {
-            return ApiResponse::error('Address Book already exists', 409);
-        }
-
-        try {
-            $addressBook = $this->contactService->createAddressBook($request->user(), $data);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error creating Address Book', 500);
-        }
+        $addressBook = $this->contactService->createAddressBook($request->user(), $data);
 
         return ApiResponse::success(new AddressBookResource($addressBook), 'Address Book created successfully.', 201);
     }
@@ -347,12 +338,7 @@ class ContactController
             return ApiResponse::error('Address Book does not exist', 404);
         }
 
-        try {
-            $contact = $this->contactService->createContact($request->user(), $addressBook, $request->validated());
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error creating contact', 500);
-        }
+        $contact = $this->contactService->createContact($request->user(), $addressBook, $request->validated());
 
         return ApiResponse::success(new ContactResource($contact), 'Contact created successfully.', 201);
     }
@@ -440,12 +426,7 @@ class ContactController
             return ApiResponse::error('Contact does not exist', 404);
         }
 
-        try {
-            $contact = $this->contactService->updateContact($request->user(), $addressBook, $contact, $request->validated());
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error updating contact', 500);
-        }
+        $contact = $this->contactService->updateContact($request->user(), $addressBook, $contact, $request->validated());
 
         if ($contact === null) {
             return ApiResponse::error('Error updating contact', 500);
@@ -508,12 +489,7 @@ class ContactController
             return ApiResponse::error('Contact does not exist', 404);
         }
 
-        try {
-            if (! $this->contactService->destroyContact($request->user(), $addressBook, $contact)) {
-                return ApiResponse::error('Error deleting contact', 500);
-            }
-        } catch (\Exception $e) {
-            report($e);
+        if (! $this->contactService->destroyContact($request->user(), $addressBook, $contact)) {
             return ApiResponse::error('Error deleting contact', 500);
         }
 
@@ -593,12 +569,7 @@ class ContactController
             return ApiResponse::error('No photo uploaded', 400);
         }
 
-        try {
-            $contact = $this->contactService->updateContactPhoto($request->user(), $addressBook, $contact, $request->file('photo'));
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error updating contact', 500);
-        }
+        $contact = $this->contactService->updateContactPhoto($request->user(), $addressBook, $contact, $request->file('photo'));
 
         if ($contact === null) {
             return ApiResponse::error('Error updating contact', 500);
@@ -661,12 +632,7 @@ class ContactController
             return ApiResponse::error('Contact does not exist', 404);
         }
 
-        try {
-            $contact = $this->contactService->removeContactPhoto($request->user(), $addressBook, $contact);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error updating contact', 500);
-        }
+        $contact = $this->contactService->removeContactPhoto($request->user(), $addressBook, $contact);
 
         if ($contact === null) {
             return ApiResponse::error('Error updating contact', 500);

@@ -2,6 +2,7 @@
 
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
+use App\Api\Notes\Services\NoteCategoryService;
 use App\Api\Users\Models\User;
 
 describe('Note Factory', function () {
@@ -176,8 +177,10 @@ describe('NoteCategory Model', function () {
             'title' => 'Child',
         ]);
 
-        expect($parent->getFullPath())->toBe('Parent');
-        expect($child->getFullPath())->toContain('Parent > Child');
+        $service = app(NoteCategoryService::class);
+
+        expect($service->getFullPath($parent))->toBe('Parent');
+        expect($service->getFullPath($child))->toContain('Parent > Child');
     });
 
     it('scopes roots correctly', function () {

@@ -27,6 +27,8 @@ class LibraryBookService
         private readonly HardcoverService $hardcoverService,
         private readonly GoodreadsService $goodreadsService,
         private readonly UserCacheService $cache,
+        private readonly LibraryRecommender $recommender,
+        private readonly LibraryReleases $libraryReleases,
     ) {}
 
     public function list(User $user): Collection
@@ -109,22 +111,20 @@ class LibraryBookService
 
     public function recommend(User $user, LibraryRecommendationEnum $type): ?array
     {
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
-
         return match ($type) {
-            LibraryRecommendationEnum::FAVORITE => $recommender->favorite(),
-            LibraryRecommendationEnum::RANDOM => $recommender->random(),
-            LibraryRecommendationEnum::UNRATED => $recommender->unrated(),
-            LibraryRecommendationEnum::NEW => $this->recommendNew($recommender, $user),
+            LibraryRecommendationEnum::FAVORITE => $this->recommender->favorite(LibraryTypeEnum::BOOK, $user),
+            LibraryRecommendationEnum::RANDOM => $this->recommender->random(LibraryTypeEnum::BOOK, $user),
+            LibraryRecommendationEnum::UNRATED => $this->recommender->unrated(LibraryTypeEnum::BOOK, $user),
+            LibraryRecommendationEnum::NEW => $this->recommendNew($user),
         };
     }
 
-    private function recommendNew(LibraryRecommender $recommender, User $user): mixed
+    private function recommendNew(User $user): ?array
     {
         $stack = $this->cache->get([self::CACHE_KEY_RECOMMENDATIONS, $user->id]) ?? [];
 
         if (empty($stack)) {
-            $result = $recommender->new();
+            $result = $this->recommender->new(LibraryTypeEnum::BOOK, $user);
             $stack = $result['recommendations'] ?? [];
         }
 
@@ -140,10 +140,7 @@ class LibraryBookService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            function () use ($user) {
-                $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
-                return $service->getBookReleases();
-            }
+            fn () => $this->libraryReleases->getBookReleases($user)
         );
     }
 

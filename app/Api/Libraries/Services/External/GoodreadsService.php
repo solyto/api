@@ -5,8 +5,10 @@ namespace App\Api\Libraries\Services\External;
 use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use DOMDocument;
 use DOMXPath;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class GoodreadsService
@@ -44,7 +46,7 @@ class GoodreadsService
                 cover: $coverImage,
                 releaseDate: $publicationDate ?? null
             );
-        } catch (\Exception $e) {
+        } catch (ConnectionException $e) {
             return null;
         }
     }
@@ -110,7 +112,7 @@ class GoodreadsService
 
                 try {
                     return Carbon::parse($dateString);
-                } catch (\Exception $e) {
+                } catch (InvalidFormatException $e) {
                     if (preg_match('/(\d{4})/', $dateString, $yearMatches)) {
                         return Carbon::createFromFormat('Y-m-d', $yearMatches[1].'-01-01');
                     }

@@ -7,6 +7,7 @@ use App\Api\HandlesApiAuth;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\TimeTracking\Requests\StoreTimeTrackingEntryRequest;
+use App\Api\TimeTracking\Requests\UpdateTimeTrackingEntryRequest;
 use App\Api\TimeTracking\Resources\TimeTrackingEntryResource;
 use App\Api\TimeTracking\Services\TimeTrackingService;
 use Carbon\Carbon;
@@ -151,18 +152,11 @@ class TimeTrackingEntryController
      *     )
      * )
      */
-    public function update(Request $request, TimeTrackingEntry $entry): JsonResponse
+    public function update(UpdateTimeTrackingEntryRequest $request, TimeTrackingEntry $entry): JsonResponse
     {
         abort_unless($this->isResourceOwner($request, $entry), 403);
 
-        $validated = $request->validate([
-            'description' => 'sometimes|nullable|string|max:255',
-            'started_at' => 'sometimes|date',
-            'stopped_at' => 'sometimes|nullable|date',
-            'duration_minutes' => 'sometimes|integer|min:0',
-            'has_exact_times' => 'sometimes|boolean',
-            'project_id' => 'sometimes|exists:time_tracking_projects,id',
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['project_id'])) {
             $project = TimeTrackingProject::find($validated['project_id']);

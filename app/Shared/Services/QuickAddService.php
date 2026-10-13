@@ -11,6 +11,11 @@ use App\Api\Libraries\Enums\GameServiceEnum;
 use App\Api\Libraries\Enums\MovieServiceEnum;
 use App\Api\Libraries\Enums\MusicServiceEnum;
 use App\Api\Libraries\Enums\RecipeServiceEnum;
+use App\Api\Libraries\Models\LibraryBook;
+use App\Api\Libraries\Models\LibraryGame;
+use App\Api\Libraries\Models\LibraryMovie;
+use App\Api\Libraries\Models\LibraryMusic;
+use App\Api\Libraries\Models\LibraryRecipe;
 use App\Api\Libraries\Services\LibraryBookService;
 use App\Api\Libraries\Services\LibraryGameService;
 use App\Api\Libraries\Services\LibraryLinkService;
@@ -20,9 +25,11 @@ use App\Api\Libraries\Services\LibraryPlantService;
 use App\Api\Libraries\Services\LibraryQuoteService;
 use App\Api\Libraries\Services\LibraryRecipeService;
 use App\Api\Notes\Services\NoteService;
+use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
 use App\Shared\Helpers\UrlHelper;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class QuickAddService
@@ -78,7 +85,7 @@ class QuickAddService
         return new DetectionResult($content, $type, $confidence, $confidence < self::CONFIRMATION_THRESHOLD);
     }
 
-    public function commit(User $user, string $content, QuickAddContentType $contentType, ?array $metadata): mixed
+    public function commit(User $user, string $content, QuickAddContentType $contentType, ?array $metadata): ?Model
     {
         $metadata ??= [];
 
@@ -130,14 +137,14 @@ class QuickAddService
         };
     }
 
-    private function commitTodo(User $user, string $content, ?array $metadata): mixed
+    private function commitTodo(User $user, string $content, ?array $metadata): Todo
     {
         $todoService = app(TodoService::class);
 
         return $todoService->create($user, $todoService->parse($user, ['title' => $metadata['title'] ?? $content]));
     }
 
-    private function commitMusic(User $user, string $url): mixed
+    private function commitMusic(User $user, string $url): ?LibraryMusic
     {
         $service = app(LibraryMusicService::class);
 
@@ -161,7 +168,7 @@ class QuickAddService
         ]);
     }
 
-    private function commitBook(User $user, string $url): mixed
+    private function commitBook(User $user, string $url): ?LibraryBook
     {
         $service = app(LibraryBookService::class);
 
@@ -189,7 +196,7 @@ class QuickAddService
         return $service->create($user, $data);
     }
 
-    private function commitMovie(User $user, string $url): mixed
+    private function commitMovie(User $user, string $url): ?LibraryMovie
     {
         $service = app(LibraryMovieService::class);
 
@@ -208,7 +215,7 @@ class QuickAddService
         ]);
     }
 
-    private function commitGame(User $user, string $url): mixed
+    private function commitGame(User $user, string $url): ?LibraryGame
     {
         $service = app(LibraryGameService::class);
 
@@ -234,7 +241,7 @@ class QuickAddService
         ]);
     }
 
-    private function commitRecipe(User $user, string $content, ?array $metadata): mixed
+    private function commitRecipe(User $user, string $content, ?array $metadata): ?LibraryRecipe
     {
         $service = app(LibraryRecipeService::class);
 

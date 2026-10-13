@@ -115,7 +115,7 @@ class ImportController
 
         $this->dav->import()->calendars()->selectCalendars($request->user(), $dto, $request->validated()['calendars']);
 
-        ImportCalendars::dispatch($request->user());
+        ImportCalendars::dispatch($request->user()->id);
 
         return ApiResponse::success([], 'Import calendars selected successfully.');
     }

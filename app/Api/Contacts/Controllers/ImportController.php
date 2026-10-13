@@ -115,7 +115,7 @@ class ImportController
 
         $this->dav->import()->addressBooks()->selectAddressBooks($request->user(), $dto, $request->validated()['address_books']);
 
-        ImportContacts::dispatch($request->user());
+        ImportContacts::dispatch($request->user()->id);
 
         return ApiResponse::success([], 'Address books selected successfully.');
     }

@@ -38,9 +38,6 @@ class SolytoBot implements BotInterface
         ['/todos', 'List todos'],
         ['/help', 'Show Help'],
     ];
-    public array $routes = [
-        SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value => 'handleQuickAddTypeSelection',
-    ];
     public string $defaultErrorMessage = SolytoMessage::ERROR->value; // translation key, resolved at send time
 
     private ?TelegramBotConnection $connection = null;
@@ -162,6 +159,22 @@ class SolytoBot implements BotInterface
             ->withRow([Keyboard::button('Cancel')]);
 
         $this->replyWithTextAndKeyboard(SolytoMessage::CHOOSE_TYPE->trans(), $keyboard);
+    }
+
+    public function routeAction(string $name): bool
+    {
+        $handler = match (SolytoBotEvent::tryFrom($name)) {
+            SolytoBotEvent::QUICK_ADD_AWAITING_TYPE => $this->handleQuickAddTypeSelection(...),
+            default => null,
+        };
+
+        if ($handler === null) {
+            return false;
+        }
+
+        $handler();
+
+        return true;
     }
 
     public function handleQuickAddTypeSelection(): void

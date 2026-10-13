@@ -58,12 +58,7 @@ class AuthController
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-        try {
-            $this->authService->register($request->validated());
-        } catch (\RuntimeException $e) {
-            report($e);
-            return ApiResponse::serverError($e->getMessage());
-        }
+        $this->authService->register($request->validated());
 
         return ApiResponse::success([], 'User registered successfully.', 201);
     }
