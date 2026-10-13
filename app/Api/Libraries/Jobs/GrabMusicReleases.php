@@ -22,7 +22,7 @@ class GrabMusicReleases implements ShouldQueue
 
     private const int CACHE_TTL_RELEASES = 86400;
 
-    public function handle(UserCacheService $cache): void
+    public function handle(UserCacheService $cache, LibraryReleases $libraryReleases): void
     {
         Log::channel('queue')->info('Grabbing new music releases for all users..');
 
@@ -33,8 +33,7 @@ class GrabMusicReleases implements ShouldQueue
         $users = User::all();
 
         foreach ($users as $user) {
-            $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
-            $releases = $service->getMusicReleases();
+            $releases = $libraryReleases->getMusicReleases($user);
             $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
 
             $notified = $notifiedCache->get([self::CACHE_KEY_NOTIFIED, $user->id]) ?? [];

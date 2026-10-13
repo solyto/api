@@ -6,6 +6,7 @@ use App\Api\Libraries\DTOs\MovieReleaseDTO;
 use App\Api\Libraries\DTOs\MovieSearchResultDTO;
 use App\Api\Libraries\Enums\MovieServiceEnum;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -262,7 +263,7 @@ class TmdbService
                 cover: isset($item['poster_path']) ? self::IMAGE_BASE_URL.$item['poster_path'] : null,
                 releaseYear: Carbon::createFromFormat('Y-m-d', $item['release_date'])?->year,
             );
-        } catch (\Exception) {
+        } catch (InvalidFormatException) {
             return null;
         }
     }
@@ -284,7 +285,7 @@ class TmdbService
                 cover: isset($item['poster_path']) ? self::IMAGE_BASE_URL.$item['poster_path'] : null,
                 releaseYear: Carbon::createFromFormat('Y-m-d', $item['first_air_date'])?->year,
             );
-        } catch (\Exception) {
+        } catch (InvalidFormatException) {
             return null;
         }
     }

@@ -158,13 +158,7 @@ trait IsTelegramBot
             return false;
         }
 
-        try {
-            $this->{$this->routes[$action->getName()]}();
-
-            return true;
-        } catch (\Exception $e) {
-            return false;
-        }
+        return $this->routeAction($action->getName());
     }
 
     public function replyWithText(string $text): bool

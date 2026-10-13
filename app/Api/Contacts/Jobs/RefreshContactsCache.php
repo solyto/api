@@ -17,16 +17,17 @@ class RefreshContactsCache implements ShouldQueue
     use Queueable, Dispatchable, InteractsWithQueue;
 
     public function __construct(
-        public User $user,
+        public string $userId,
     ) {}
 
     public function handle(): void
     {
+        $user = User::findOrFail($this->userId);
         $service = app(ContactService::class);
 
-        Log::info('Refreshing contacts cache for user ' . $this->user->id . ' after invalidation');
+        Log::info('Refreshing contacts cache for user ' . $user->id . ' after invalidation');
 
-        $service->listAddressBooks($this->user);
-        $service->listContacts($this->user);
+        $service->listAddressBooks($user);
+        $service->listContacts($user);
     }
 }

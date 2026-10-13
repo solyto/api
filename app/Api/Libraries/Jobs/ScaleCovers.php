@@ -21,7 +21,7 @@ class ScaleCovers implements ShouldQueue
     private const string CACHE_KEY_RELEASES = 'music_releases';
     private const int CACHE_TTL_RELEASES = 86400;
 
-    public function handle(UserCacheService $cache, ImageTransformationService $imageTransformation): void
+    public function handle(UserCacheService $cache, ImageTransformationService $imageTransformation, LibraryReleases $libraryReleases): void
     {
         Log::channel('queue')->info('Looking for covers that are too big..');
 
@@ -67,8 +67,7 @@ class ScaleCovers implements ShouldQueue
         $users = User::all();
 
         foreach ($users as $user) {
-            $service = app()->makeWith(LibraryReleases::class, ['user' => $user]);
-            $releases = $service->getMusicReleases();
+            $releases = $libraryReleases->getMusicReleases($user);
             $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
 
             Log::channel('queue')->info('Cached ' . count($releases) . ' releases for user ' . $user->id);

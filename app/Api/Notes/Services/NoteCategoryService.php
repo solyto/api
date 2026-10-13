@@ -74,4 +74,25 @@ class NoteCategoryService
 
         return $category->fresh(['user']);
     }
+
+    public function getAncestors(NoteCategory $category): Collection
+    {
+        $ancestors = collect();
+        $parent = $category->parent;
+
+        while ($parent) {
+            $ancestors->prepend($parent);
+            $parent = $parent->parent;
+        }
+
+        return $ancestors;
+    }
+
+    public function getFullPath(NoteCategory $category, string $separator = ' > '): string
+    {
+        $path = $this->getAncestors($category)->pluck('title')->toArray();
+        $path[] = $category->title;
+
+        return implode($separator, $path);
+    }
 }

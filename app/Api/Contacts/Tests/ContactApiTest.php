@@ -27,6 +27,20 @@ describe('Address books (DAV-backed)', function () {
             ->assertStatus(200);
     });
 
+    it('rejects an address book with an existing name with 409', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
+            ->assertStatus(201);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Address Book already exists.');
+    });
+
     it('lists contacts from all address books', function () {
         $user = makeUser();
 

@@ -2,6 +2,7 @@
 
 namespace App\Api\Calendars\Services;
 
+use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
@@ -39,8 +40,15 @@ class CalendarService
         return $this->dav->calendars()->getByName($user, $name);
     }
 
+    /**
+     * @throws CalendarAlreadyExistsException
+     */
     public function create(User $user, array $data): CalendarDTO
     {
+        if ($this->getByName($user, $data['name']) !== null) {
+            throw new CalendarAlreadyExistsException();
+        }
+
         $calendar = $this->dav->calendars()->create($user, CalendarDTO::fromRequest($data));
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
         return $calendar;

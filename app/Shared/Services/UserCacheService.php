@@ -55,12 +55,10 @@ class UserCacheService
 
     public function remember(array $identifiers, int $ttl, callable $callback): mixed
     {
-        if ($this->has($identifiers)) {
-            $result = $this->get($identifiers);
+        $result = $this->get($identifiers);
 
-            if ($result !== null) {
-                return $this->get($identifiers);
-            }
+        if ($result !== null) {
+            return $result;
         }
 
         $results = $callback();

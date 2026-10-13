@@ -2,6 +2,7 @@
 
 namespace App\Api\Contacts\Services;
 
+use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\AddressBookDTO;
 use App\Dav\DTOs\ContactDTO;
@@ -39,8 +40,15 @@ class ContactService
         return $this->dav->addressBooks()->getByName($user, $name);
     }
 
+    /**
+     * @throws AddressBookAlreadyExistsException
+     */
     public function createAddressBook(User $user, array $data): AddressBookDTO
     {
+        if ($this->getAddressBookByName($user, $data['name']) !== null) {
+            throw new AddressBookAlreadyExistsException();
+        }
+
         $addressBook = $this->dav->addressBooks()->create($user, AddressBookDTO::fromRequest($data));
         $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $user->id]);
         return $addressBook;

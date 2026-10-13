@@ -57,6 +57,23 @@ describe('POST /v1/auth/register', function () {
 
         $response->assertStatus(422);
     });
+
+    it('renders a registration failure through the central 500 handler', function () {
+        $this->mock(AuthService::class)
+            ->shouldReceive('register')
+            ->andThrow(new \RuntimeException('Failed to create user.'));
+
+        $response = $this->postJson('/api/v1/auth/register', [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'password' => 'password1234',
+            'password_confirmation' => 'password1234',
+        ]);
+
+        $response->assertStatus(500)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'An unexpected error occurred.');
+    });
 });
 
 describe('POST /v1/auth/login', function () {

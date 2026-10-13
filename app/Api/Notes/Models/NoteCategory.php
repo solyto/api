@@ -95,19 +95,6 @@ class NoteCategory extends Model
         return $query->whereNull('parent_id');
     }
 
-    public function getAncestors()
-    {
-        $ancestors = collect();
-        $category = $this->parent;
-
-        while ($category) {
-            $ancestors->prepend($category);
-            $category = $category->parent;
-        }
-
-        return $ancestors;
-    }
-
     public function isRoot(): bool
     {
         return is_null($this->parent_id);
@@ -116,13 +103,5 @@ class NoteCategory extends Model
     public function hasChildren(): bool
     {
         return $this->children()->count() > 0;
-    }
-
-    public function getFullPath(string $separator = ' > '): string
-    {
-        $path = $this->getAncestors()->pluck('title')->toArray();
-        $path[] = $this->title;
-
-        return implode($separator, $path);
     }
 }

@@ -6,6 +6,7 @@ use App\Api\Libraries\DTOs\MusicReleaseDTO;
 use App\Api\Libraries\DTOs\MusicSearchResultDTO;
 use App\Api\Libraries\Enums\MusicServiceEnum;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -133,7 +134,7 @@ class SpotifyService
                 'month' => Carbon::createFromFormat('Y-m-d', $date.'-01'),
                 default => Carbon::createFromFormat('Y-m-d', $date),
             };
-        } catch (\Exception) {
+        } catch (InvalidFormatException) {
             return null;
         }
     }

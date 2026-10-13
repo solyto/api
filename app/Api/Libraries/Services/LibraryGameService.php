@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Api\Libraries\DTOs\GameReleaseDTO;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\GameServiceEnum;
 use App\Api\Libraries\Services\External\BggService;
@@ -110,7 +111,7 @@ class LibraryGameService
         };
     }
 
-    public function import(GameServiceEnum $service, string $url): mixed
+    public function import(GameServiceEnum $service, string $url): ?GameReleaseDTO
     {
         return match ($service) {
             GameServiceEnum::STEAM => $this->steamService->importFromUrl($url),

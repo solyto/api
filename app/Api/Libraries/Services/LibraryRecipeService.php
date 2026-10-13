@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Api\Libraries\DTOs\RecipeReleaseDTO;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\RecipeServiceEnum;
 use App\Api\Libraries\Models\LibraryRecipe;
@@ -80,7 +81,7 @@ class LibraryRecipeService
         $this->cache->forget([self::CACHE_KEY, $userId]);
     }
 
-    public function import(RecipeServiceEnum $service, string $url): mixed
+    public function import(RecipeServiceEnum $service, string $url): ?RecipeReleaseDTO
     {
         return match ($service) {
             RecipeServiceEnum::CHEFKOCH => $this->chefkochService->importFromUrl($url),

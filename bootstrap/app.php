@@ -1,6 +1,8 @@
 <?php
 
 use App\Api\ApiResponse;
+use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
+use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -84,6 +86,14 @@ return Application::configure(basePath: dirname(__DIR__))
                           return ApiResponse::error('CORS error occurred.', 500);
                       }
                       return ApiResponse::error($e->getMessage() ?: 'An error occurred.', $e->getStatusCode());
+                  }
+
+                  if ($e instanceof CalendarAlreadyExistsException) {
+                      return ApiResponse::error('Calendar already exists.', 409);
+                  }
+
+                  if ($e instanceof AddressBookAlreadyExistsException) {
+                      return ApiResponse::error('Address Book already exists.', 409);
                   }
 
                   return ApiResponse::serverError('An unexpected error occurred.');

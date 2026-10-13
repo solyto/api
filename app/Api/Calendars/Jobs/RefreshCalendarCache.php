@@ -15,14 +15,15 @@ class RefreshCalendarCache implements ShouldQueue
     use Queueable, Dispatchable, InteractsWithQueue;
 
     public function __construct(
-        public User $user,
+        public string $userId,
     ) {}
 
     public function handle(): void
     {
+        $user = User::findOrFail($this->userId);
         $service = app(CalendarService::class);
 
-        $service->list($this->user);
-        $service->listEvents($this->user, date('Y-m'));
+        $service->list($user);
+        $service->listEvents($user, date('Y-m'));
     }
 }

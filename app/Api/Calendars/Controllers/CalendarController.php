@@ -94,16 +94,7 @@ class CalendarController
     {
         $data = $request->validated();
 
-        if ($this->calendarService->getByName($request->user(), $data['name']) !== null) {
-            return ApiResponse::error('Calendar already exists', 409);
-        }
-
-        try {
-            $calendar = $this->calendarService->create($request->user(), $data);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error creating calendar', 500);
-        }
+        $calendar = $this->calendarService->create($request->user(), $data);
 
         return ApiResponse::success(new CalendarResource($calendar), 'Calendar created successfully.', 201);
     }
@@ -159,12 +150,7 @@ class CalendarController
 
         $calendar->color = $request->validated('color');
 
-        try {
-            $this->calendarService->update($request->user(), $instanceId, $calendar);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error updating calendar', 500);
-        }
+        $this->calendarService->update($request->user(), $instanceId, $calendar);
 
         return ApiResponse::success(new CalendarResource($calendar), 'Calendar updated successfully.');
     }
@@ -317,13 +303,8 @@ class CalendarController
             return ApiResponse::error('Calendar does not exist', 404);
         }
 
-        try {
-            $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
-            $event = $this->calendarService->createEvent($request->user(), $calendar, $dto);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error creating event', 500);
-        }
+        $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
+        $event = $this->calendarService->createEvent($request->user(), $calendar, $dto);
 
         return ApiResponse::success(new EventResource($event), 'Event created successfully.', 201);
     }
@@ -415,12 +396,7 @@ class CalendarController
 
             $event->updateFromRequest($request, $request->user());
 
-            try {
-                $newEvent = $this->calendarService->moveEvent($request->user(), $calendar, $targetCalendar, $event);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error moving event', 500);
-            }
+            $newEvent = $this->calendarService->moveEvent($request->user(), $calendar, $targetCalendar, $event);
 
             if ($newEvent === null) {
                 return ApiResponse::error('Unable to move event to new calendar', 500);
@@ -431,12 +407,7 @@ class CalendarController
 
         $event->updateFromRequest($request, $request->user());
 
-        try {
-            $event = $this->calendarService->updateEvent($request->user(), $calendar, $event);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error updating event', 500);
-        }
+        $event = $this->calendarService->updateEvent($request->user(), $calendar, $event);
 
         if ($event === null) {
             return ApiResponse::error('Unable to update event', 403);
@@ -804,13 +775,8 @@ class CalendarController
             return ApiResponse::error('User does not exist', 404);
         }
 
-        try {
-            $this->calendarService->share($calendar, $request->user(), $recipient);
-            $recipient->notify(new CalendarShareNotification($calendar->displayName, $request->user()->name));
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error sharing calendar', 500);
-        }
+        $this->calendarService->share($calendar, $request->user(), $recipient);
+        $recipient->notify(new CalendarShareNotification($calendar->displayName, $request->user()->name));
 
         return ApiResponse::success(null, 'Calendar shared successfully.');
     }
@@ -874,12 +840,7 @@ class CalendarController
             return ApiResponse::error('User does not exist', 404);
         }
 
-        try {
-            $this->calendarService->revokeShare($calendar, $recipient);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error revoking share', 500);
-        }
+        $this->calendarService->revokeShare($calendar, $recipient);
 
         return ApiResponse::success(null, 'Share revoked successfully.');
     }
@@ -928,12 +889,7 @@ class CalendarController
             return ApiResponse::error('You can only unsubscribe from shared calendars', 403);
         }
 
-        try {
-            $this->calendarService->unsubscribe($request->user(), $calendar);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error unsubscribing from calendar', 500);
-        }
+        $this->calendarService->unsubscribe($request->user(), $calendar);
 
         return ApiResponse::success(null, 'Unsubscribed from calendar successfully.');
     }
@@ -1000,12 +956,7 @@ class CalendarController
      */
     public function acceptInvite(Request $request, string $token): JsonResponse
     {
-        try {
-            $this->calendarService->acceptInvite($request->user(), $token);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error accepting invite', 500);
-        }
+        $this->calendarService->acceptInvite($request->user(), $token);
 
         return ApiResponse::success(null, 'Invite accepted successfully.');
     }
@@ -1043,12 +994,7 @@ class CalendarController
      */
     public function declineInvite(Request $request, string $token): JsonResponse
     {
-        try {
-            $this->calendarService->declineInvite($request->user(), $token);
-        } catch (\Exception $e) {
-            report($e);
-            return ApiResponse::error('Error declining invite', 500);
-        }
+        $this->calendarService->declineInvite($request->user(), $token);
 
         return ApiResponse::success(null, 'Invite declined successfully.');
     }

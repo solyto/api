@@ -15,13 +15,14 @@ class ImportContacts implements ShouldQueue
     use Queueable, Dispatchable, InteractsWithQueue;
 
     public function __construct(
-        public User $user,
+        public string $userId,
     ) {}
 
     public function handle(): void
     {
+        $user = User::findOrFail($this->userId);
         $dav = app(DavService::class);
-        $state = $dav->import()->addressBooks()->getState($this->user->id);
+        $state = $dav->import()->addressBooks()->getState($user->id);
         $start = time();
 
         if (!$state) {
@@ -31,14 +32,14 @@ class ImportContacts implements ShouldQueue
         while ($state->stage !== 'finished' && time() - $start < 1800) {
             if ($state->stage === 'address-books') {
                 Log::info('Importing Address Books');
-                $dav->import()->addressBooks()->importAddressBooks($this->user, $state);
+                $dav->import()->addressBooks()->importAddressBooks($user, $state);
             } else if ($state->stage === 'contacts') {
                 Log::info('Importing contacts');
-                $dav->import()->addressBooks()->importContacts($this->user, $state);
+                $dav->import()->addressBooks()->importContacts($user, $state);
             }
 
-            $dav->import()->addressBooks()->clearCache($this->user);
-            $state = $dav->import()->addressBooks()->getState($this->user->id);
+            $dav->import()->addressBooks()->clearCache($user);
+            $state = $dav->import()->addressBooks()->getState($user->id);
         }
     }
 }

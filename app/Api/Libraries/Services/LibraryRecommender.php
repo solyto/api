@@ -39,18 +39,14 @@ class LibraryRecommender
     private const MUSIC_PROMPT = 'You are a music recommendation service. Based on the user\'s favorites (including genres, type, and format), recommend music they are likely to enjoy.';
 
     public function __construct(
-        private readonly LibraryTypeEnum $type,
-        private readonly User $user
-    )
-    {
-        if (!$type->hasRecommender()) {
-            throw new \Exception('No recommender for type ' . $this->type->value);
-        }
-    }
+        private readonly AiService $aiService
+    ) {}
 
-    public function favorite(): array
+    public function favorite(LibraryTypeEnum $type, User $user): array
     {
-        $item = $this->type->getModel()::forUser($this->user->id)->where('rating', '>=', 4)->inRandomOrder()->first();
+        $this->assertType($type);
+
+        $item = $type->getModel()::forUser($user->id)->where('rating', '>=', 4)->inRandomOrder()->first();
 
         return [
             'id' => $item->id,
@@ -61,9 +57,11 @@ class LibraryRecommender
         ];
     }
 
-    public function unrated(): array
+    public function unrated(LibraryTypeEnum $type, User $user): array
     {
-        $item = $this->type->getModel()::forUser($this->user->id)->where('rating', null)->inRandomOrder()->first();
+        $this->assertType($type);
+
+        $item = $type->getModel()::forUser($user->id)->where('rating', null)->inRandomOrder()->first();
 
         return [
             'id' => $item->id,
@@ -74,9 +72,11 @@ class LibraryRecommender
         ];
     }
 
-    public function random(): ?array
+    public function random(LibraryTypeEnum $type, User $user): ?array
     {
-        $item =  $this->type->getModel()::forUser($this->user->id)->inRandomOrder()->first();
+        $this->assertType($type);
+
+        $item =  $type->getModel()::forUser($user->id)->inRandomOrder()->first();
 
         if (!$item) {
             return null;
@@ -91,12 +91,14 @@ class LibraryRecommender
         ];
     }
 
-    public function new(): ?array
+    public function new(LibraryTypeEnum $type, User $user): ?array
     {
-        $model = $this->type->getModel();
-        $isBook = $this->type === LibraryTypeEnum::BOOK;
+        $this->assertType($type);
 
-        $favorites = $model::forUser($this->user->id)
+        $model = $type->getModel();
+        $isBook = $type === LibraryTypeEnum::BOOK;
+
+        $favorites = $model::forUser($user->id)
             ->where('rating', '>=', 4)
             ->with('genres')
             ->orderByDesc('rating')
@@ -113,11 +115,17 @@ class LibraryRecommender
             ? $this->getBooksMessage($favorites)
             : $this->getMusicMessage($favorites);
 
-        $aiService = app(AiService::class);
-        $response = $aiService->respondStructured($prompt, $message, self::RESPONSE_SCHEMA);
-        $aiService->saveUsageForUser($this->user, AiUsageFeatureEnum::LIBRARY_RECOMMENDER);
+        $response = $this->aiService->respondStructured($prompt, $message, self::RESPONSE_SCHEMA);
+        $this->aiService->saveUsageForUser($user, AiUsageFeatureEnum::LIBRARY_RECOMMENDER);
 
         return $response;
+    }
+
+    private function assertType(LibraryTypeEnum $type): void
+    {
+        if (!$type->hasRecommender()) {
+            throw new \Exception('No recommender for type ' . $type->value);
+        }
     }
 
     private function getBooksMessage($favorites): string

@@ -15,13 +15,14 @@ class ImportCalendars implements ShouldQueue
     use Queueable, Dispatchable, InteractsWithQueue;
 
     public function __construct(
-        public User $user,
+        public string $userId,
     ) {}
 
     public function handle(): void
     {
+        $user = User::findOrFail($this->userId);
         $dav = app(DavService::class);
-        $state = $dav->import()->calendars()->getState($this->user->id);
+        $state = $dav->import()->calendars()->getState($user->id);
         $start = time();
 
         if (!$state) {
@@ -31,14 +32,14 @@ class ImportCalendars implements ShouldQueue
         while ($state->stage !== 'finished' && time() - $start < 1800) {
             if ($state->stage === 'calendars') {
                 Log::info('Importing Calendars');
-                $dav->import()->calendars()->importCalendars($this->user, $state);
+                $dav->import()->calendars()->importCalendars($user, $state);
             } else if ($state->stage === 'events') {
                 Log::info('Importing events');
-                $dav->import()->calendars()->importEvents($this->user, $state);
+                $dav->import()->calendars()->importEvents($user, $state);
             }
 
-            $dav->import()->calendars()->clearCache($this->user);
-            $state = $dav->import()->calendars()->getState($this->user->id);
+            $dav->import()->calendars()->clearCache($user);
+            $state = $dav->import()->calendars()->getState($user->id);
         }
     }
 }

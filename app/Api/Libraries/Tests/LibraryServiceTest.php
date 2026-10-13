@@ -44,7 +44,7 @@ function mockedOpenAiClient($response): \OpenAI\Contracts\ClientContract
 
 describe('AiService', function () {
     it('respond returns the chat message content and tracks usage', function () {
-        $service = app()->makeWith(AiService::class, ['client' => mockedOpenAiClient(fakeChatResponse('Hello there!'))]);
+        $service = new AiService(mockedOpenAiClient(fakeChatResponse('Hello there!')));
 
         $result = $service->respond('You are helpful', 'Hi');
 
@@ -52,7 +52,7 @@ describe('AiService', function () {
     });
 
     it('respond handles an array of messages', function () {
-        $service = app()->makeWith(AiService::class, ['client' => mockedOpenAiClient(fakeChatResponse('ok'))]);
+        $service = new AiService(mockedOpenAiClient(fakeChatResponse('ok')));
 
         $result = $service->respond('System', [
             ['role' => 'user', 'content' => 'one'],
@@ -63,7 +63,7 @@ describe('AiService', function () {
     });
 
     it('respondStructured decodes the json response', function () {
-        $service = app()->makeWith(AiService::class, ['client' => mockedOpenAiClient(fakeChatResponse(json_encode(['recommendations' => []])))]);
+        $service = new AiService(mockedOpenAiClient(fakeChatResponse(json_encode(['recommendations' => []]))));
 
         $result = $service->respondStructured('Prompt', 'input', ['type' => 'json_schema']);
 
@@ -72,7 +72,7 @@ describe('AiService', function () {
 
     it('saveUsageForUser persists the tracked usage', function () {
         $user = makeUser();
-        $service = app()->makeWith(AiService::class, ['client' => mockedOpenAiClient(fakeChatResponse('x'))]);
+        $service = new AiService(mockedOpenAiClient(fakeChatResponse('x')));
 
         $service->respond('Prompt', 'Input');
         $service->saveUsageForUser($user, AiUsageFeatureEnum::ASSISTANT_CHAT);
@@ -89,7 +89,9 @@ describe('AiService', function () {
 
 describe('LibraryRecommender', function () {
     it('throws for types without a recommender', function () {
-        expect(fn () => new LibraryRecommender(LibraryTypeEnum::MOVIE, makeUser()))
+        $this->mock(AiService::class);
+
+        expect(fn () => app(LibraryRecommender::class)->favorite(LibraryTypeEnum::MOVIE, makeUser()))
             ->toThrow(\Exception::class);
     });
 
@@ -97,9 +99,9 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert', 'title' => 'Dune']);
 
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
+        $this->mock(AiService::class);
 
-        $favorite = $recommender->favorite();
+        $favorite = app(LibraryRecommender::class)->favorite(LibraryTypeEnum::BOOK, $user);
 
         expect($favorite['title'])->toBe('Dune');
         expect($favorite['creator'])->toBe('Frank Herbert');
@@ -109,17 +111,17 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => null, 'title' => 'Unrated']);
 
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
+        $this->mock(AiService::class);
 
-        expect($recommender->unrated()['title'])->toBe('Unrated');
+        expect(app(LibraryRecommender::class)->unrated(LibraryTypeEnum::BOOK, $user)['title'])->toBe('Unrated');
     });
 
     it('returns null for random when the library is empty', function () {
         $user = makeUser();
 
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
+        $this->mock(AiService::class);
 
-        expect($recommender->random())->toBeNull();
+        expect(app(LibraryRecommender::class)->random(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 
     it('new() calls the AI service with favorites and saves usage', function () {
@@ -132,9 +134,7 @@ describe('LibraryRecommender', function () {
         ]);
         $ai->shouldReceive('saveUsageForUser')->once()->with($user, AiUsageFeatureEnum::LIBRARY_RECOMMENDER);
 
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
-
-        $result = $recommender->new();
+        $result = app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user);
 
         expect($result['recommendations'][0]['title'])->toBe('Children of Dune');
     });
@@ -142,9 +142,9 @@ describe('LibraryRecommender', function () {
     it('new() returns null without favorites', function () {
         $user = makeUser();
 
-        $recommender = new LibraryRecommender(LibraryTypeEnum::BOOK, $user);
+        $this->mock(AiService::class)->shouldNotReceive('respondStructured');
 
-        expect($recommender->new())->toBeNull();
+        expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 });
 
@@ -163,12 +163,9 @@ describe('LibraryReleases', function () {
             'release_date' => now()->toDateString(),
         ]]);
 
-        $service = app()->makeWith(LibraryReleases::class, [
-            'user' => $user,
-            'deezerService' => $deezer,
-        ]);
+        $service = app(LibraryReleases::class);
 
-        $releases = $service->getMusicReleases();
+        $releases = $service->getMusicReleases($user);
 
         expect($releases)->toHaveCount(1);
         expect($releases[0]->getTitle())->toBe('New Album');
@@ -183,12 +180,9 @@ describe('LibraryReleases', function () {
         $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
         $deezer->shouldReceive('getNewReleases')->with(6)->andReturn(null);
 
-        $service = app()->makeWith(LibraryReleases::class, [
-            'user' => $user,
-            'deezerService' => $deezer,
-        ]);
+        $service = app(LibraryReleases::class);
 
-        expect($service->getMusicReleases())->toBe([]);
+        expect($service->getMusicReleases($user))->toBe([]);
     });
 
     it('collects spotify music releases for favorite artists', function () {
@@ -205,12 +199,9 @@ describe('LibraryReleases', function () {
             'release_date_precision' => 'day',
         ]]);
 
-        $service = app()->makeWith(LibraryReleases::class, [
-            'user' => $user,
-            'spotifyService' => $spotify,
-        ]);
+        $service = app(LibraryReleases::class);
 
-        $releases = $service->getSpotifyMusicReleases();
+        $releases = $service->getSpotifyMusicReleases($user);
 
         expect($releases)->toHaveCount(1);
         expect($releases[0]->getTitle())->toBe('Fresh Album');
@@ -228,12 +219,9 @@ describe('LibraryReleases', function () {
         $spotify->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => '5K4W6rqBFWDnAN6FQUkS6x']]);
         $spotify->shouldReceive('getNewReleases')->with('5K4W6rqBFWDnAN6FQUkS6x')->andReturn(null);
 
-        $service = app()->makeWith(LibraryReleases::class, [
-            'user' => $user,
-            'spotifyService' => $spotify,
-        ]);
+        $service = app(LibraryReleases::class);
 
-        expect($service->getSpotifyMusicReleases())->toBe([]);
+        expect($service->getSpotifyMusicReleases($user))->toBe([]);
     });
 
     it('collects book releases from hardcover for favorite authors', function () {
@@ -252,12 +240,9 @@ describe('LibraryReleases', function () {
             'contributions' => [['author' => ['id' => 1, 'name' => 'Frank Herbert']]],
         ]]);
 
-        $service = app()->makeWith(LibraryReleases::class, [
-            'user' => $user,
-            'hardcoverService' => $hardcover,
-        ]);
+        $service = app(LibraryReleases::class);
 
-        $releases = $service->getBookReleases();
+        $releases = $service->getBookReleases($user);
 
         expect($releases)->toHaveCount(1);
         expect($releases[0]->getTitle())->toBe('Children of Dune');
