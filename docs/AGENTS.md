@@ -51,7 +51,7 @@ frontend repository. AGPL-3.0.
 - Tests are Pest: co-located in `app/Api/<Module>/Tests` plus `tests/Feature` and `tests/Unit`; they run against in-memory SQLite (see `tests/TestCase.php`). UI copy is localized in `resources/lang/{en,de,fr,es}`.
 
 ## Conventions
-New or AI-generated code should follow this repo's conventions instead of generic Laravel patterns — see the policy set starting at [docs/API-CONVENTIONS.md](./API-CONVENTIONS.md) (golden rules, module anatomy, and one doc per topic: controllers, services, requests/responses, models/database, resources/OpenAPI, auth/security, jobs/queues, testing/style).
+New or AI-generated code follows [docs/STANDARDS.md](./STANDARDS.md) instead of generic Laravel patterns: numbered, checkable rules (controllers and routing, OpenAPI annotations, requests and validation, services, models, resources, errors, caching, jobs, comments, formatting, architecture conventions), plus `## Decisions` and `## Open questions`. Tests follow [docs/TESTING.md](./TESTING.md). Known cleanups live in [docs/STANDARDS_BACKLOG.md](./STANDARDS_BACKLOG.md); how the standards are maintained is in [docs/STANDARDS_WORKFLOW.md](./STANDARDS_WORKFLOW.md). Where anything older disagrees with `STANDARDS.md`, `STANDARDS.md` wins.
 
 ## Commands
 - `composer test` (or `php artisan test`) — run the Pest suite (Unit, Feature, Api)
