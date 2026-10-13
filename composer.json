@@ -22,7 +22,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/telescope": "^5.11",
         "laravel/tinker": "^3.0.0",
-        "openai-php/client": "^0.17.1",
+        "openai-php/client": "^0.20.1",
         "sabre/dav": "^4.7",
         "simplepie/simplepie": "^1.9",
         "symfony/http-client": "^7.3",
