@@ -19,7 +19,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="first_visit", type="boolean"),
  *     @OA\Property(property="journal_enabled", type="boolean"),
  *     @OA\Property(property="journal_calendar_mark", type="boolean"),
- *     @OA\Property(property="check_in_calendar_mark", type="boolean")
+ *     @OA\Property(property="check_in_calendar_mark", type="boolean"),
+ *     @OA\Property(property="temperature_unit", type="string", enum={"c","f"})
  * )
  */
 class UserSettingsResource extends JsonResource

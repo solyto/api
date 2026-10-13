@@ -127,19 +127,6 @@ class LibraryMusicController
      */
     public function recommend(Request $request, LibraryRecommendationEnum $type): JsonResponse
     {
-        if ($type === LibraryRecommendationEnum::NEW) {
-            $recommendation = $this->libraryMusicService->recommendNew($request->user());
-
-            if (! $recommendation) {
-                return ApiResponse::error('No recommendation found.', 404);
-            }
-
-            return ApiResponse::success(
-                new LibraryRecommendationResource($recommendation),
-                'Recommendation retrieved successfully.'
-            );
-        }
-
         $recommendation = $this->libraryMusicService->recommend($request->user(), $type);
 
         if (! $recommendation) {
@@ -415,7 +402,7 @@ class LibraryMusicController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/MusicSearchResult"))
      *         )
      *     ),
      *

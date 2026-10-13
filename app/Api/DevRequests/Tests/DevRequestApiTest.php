@@ -80,5 +80,15 @@ describe('DevRequest comments', function () {
             ->assertJsonPath('data.content', 'I would love this feature!');
 
         expect(DevRequestComment::count())->toBe(2);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.comment_count', 2);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests/'.$request->id.'/vote', ['vote' => 'up'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.comment_count', 2);
     });
 });

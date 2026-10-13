@@ -7,6 +7,7 @@ use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\Users\Models\User;
+use App\Shared\Helpers\CsvHelper;
 
 class FinanceIncomeExportService
 {
@@ -14,16 +15,9 @@ class FinanceIncomeExportService
     {
         $incomes = Budget::forUser($user->id)->where('type', 'income')->get();
 
-        $handle = fopen($path, 'w');
-        fputcsv($handle, ['Title', 'Value']);
-
-        foreach ($incomes as $income) {
-            fputcsv($handle, [
-                $income->title,
-                $income->value,
-            ]);
-        }
-
-        fclose($handle);
+        CsvHelper::write($path, ['Title', 'Value'], $incomes->map(fn ($income) => [
+            $income->title,
+            $income->value,
+        ]));
     }
 }

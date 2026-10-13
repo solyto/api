@@ -92,11 +92,14 @@ go-ahead first (package rule in `docs/AGENTS.md`).
 
 ## Extract to helpers (small, each removes several copies)
 
-- [ ] `TodoService`: `private function forgetUser(string $userId): void`
-      for the 7× `forget`/`forget` pair (`:170-171, 208-209, 255-256,
-      264-265, 275-276, 286-287, 297-298`); same in `TimeTrackingService`
-      (19 calls), `CalendarService` (19), `ContactService` (9),
-      `NoteService` (7) (rule 4.4, after OQ-3).
+- [x] `TodoService`: `private function forgetUser(string $userId): void`
+      for the 7× `forget`/`forget` pair; same in `TimeTrackingService` (8
+      pairs) and `NoteService` (3 pairs) (rule 4.4, OQ-3 closed). Done in
+      job `northern`. `CalendarService` and `ContactService` are skipped
+      on purpose: their keys also carry a calendar / address-book id and
+      Calendar clears the share recipient's cache (`:182, 193-194`), so a
+      `forgetUser(string $userId)` does not fit; the few real pairs (3 in
+      Calendar, 1 in Contact) are not worth a differently-shaped helper.
 - [ ] `Export/Services/*`: `writeCsv(string $path, array $header, iterable $rows)`
       shared by the 10 CSV exporters (28–47 lines each); keep the five
       non-CSV ones as they are (findings-services §5).

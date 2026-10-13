@@ -61,7 +61,7 @@ class DevRequestResource extends JsonResource
             'downvotes' => $downvotes,
             'score' => $upvotes - $downvotes,
             'user_vote' => $userVote,
-            'comment_count' => $this->comments->count(),
+            'comment_count' => $this->comments_count,
         ];
     }
 }

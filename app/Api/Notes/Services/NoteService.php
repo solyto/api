@@ -83,8 +83,7 @@ class NoteService
 
         $note->load(['user', 'category', 'tags']);
 
-        $this->cache->forget([self::CACHE_KEY, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_NEWEST, $user->id]);
+        $this->forgetUser($user->id);
 
         return $note;
     }
@@ -99,8 +98,7 @@ class NoteService
 
         $note->load(['user', 'category', 'tags']);
 
-        $this->cache->forget([self::CACHE_KEY, $note->user_id]);
-        $this->cache->forget([self::CACHE_KEY_NEWEST, $note->user_id]);
+        $this->forgetUser($note->user_id);
 
         return $note;
     }
@@ -110,12 +108,17 @@ class NoteService
         $userId = $note->user_id;
         $note->delete();
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
+        $this->forgetUser($userId);
     }
 
     public function forgetNewest(string $userId): void
     {
+        $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
+    }
+
+    private function forgetUser(string $userId): void
+    {
+        $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
     }
 }

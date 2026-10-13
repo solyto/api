@@ -167,8 +167,7 @@ class TodoService
 
         $todo->load(['user', 'category', 'tags', 'subtasks']);
 
-        $this->cache->forget([self::CACHE_KEY, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $user->id]);
+        $this->forgetUser($user->id);
 
         return $todo;
     }
@@ -205,8 +204,7 @@ class TodoService
 
         $todo->load(['user', 'category', 'tags', 'subtasks']);
 
-        $this->cache->forget([self::CACHE_KEY, $todo->user_id]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $todo->user_id]);
+        $this->forgetUser($todo->user_id);
 
         return $todo;
     }
@@ -252,8 +250,7 @@ class TodoService
             $next->tags()->attach($todo->tags->pluck('id'));
         }
 
-        $this->cache->forget([self::CACHE_KEY, $todo->user_id]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $todo->user_id]);
+        $this->forgetUser($todo->user_id);
     }
 
     public function destroy(Todo $todo): void
@@ -261,8 +258,7 @@ class TodoService
         $userId = $todo->user_id;
         $todo->delete();
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $userId]);
+        $this->forgetUser($userId);
     }
 
     public function addSubtask(Todo $todo, string $title): TodoSubtask
@@ -272,8 +268,7 @@ class TodoService
             'title' => $title,
         ]);
 
-        $this->cache->forget([self::CACHE_KEY, $todo->user_id]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $todo->user_id]);
+        $this->forgetUser($todo->user_id);
 
         return $subtask;
     }
@@ -283,8 +278,7 @@ class TodoService
         $subtask->update($data);
 
         $userId = $subtask->todo->user_id;
-        $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->cache->forget([self::CACHE_KEY_DUE, $userId]);
+        $this->forgetUser($userId);
 
         return $subtask;
     }
@@ -294,6 +288,11 @@ class TodoService
         $userId = $subtask->todo->user_id;
         $subtask->delete();
 
+        $this->forgetUser($userId);
+    }
+
+    private function forgetUser(string $userId): void
+    {
         $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_DUE, $userId]);
     }

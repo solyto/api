@@ -31,7 +31,7 @@ class FeedSubscriptionResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'url' => $this->feed->url,
+            'url' => $this->whenLoaded('feed', fn ($feed) => $feed->url),
             'feed_id' => $this->feed_id,
             'keywords' => $this->keywords,
             'blacklist' => $this->blacklist,

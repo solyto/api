@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="status", type="string", enum={"pending","accepted","rejected"}),
  *     @OA\Property(property="direction", type="string", enum={"sent","received"}),
  *     @OA\Property(property="user", type="object",
- *         @OA\Property(property="id", type="integer"),
+ *         @OA\Property(property="id", type="string", format="uuid"),
  *         @OA\Property(property="name", type="string"),
  *         @OA\Property(property="profile_image_path", type="string", format="uri", nullable=true)
  *     ),

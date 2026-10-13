@@ -107,6 +107,7 @@ class FeedService
             'feed_id' => $feed->id,
             'user_id' => $userId,
         ]);
+        $subscription->load('feed');
 
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $userId]);
 
@@ -238,9 +239,17 @@ class FeedService
             ->get();
     }
 
+    public function findSubscription(FeedSubscription $subscription): FeedSubscription
+    {
+        $subscription->load('feed');
+
+        return $subscription;
+    }
+
     public function updateSubscription(FeedSubscription $subscription, array $data): FeedSubscription
     {
         $subscription->update($data);
+        $subscription->load('feed');
 
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $subscription->user_id]);
 

@@ -163,11 +163,6 @@ class LibraryMovieService
         return LibraryMovieGenre::forUser($user->id)->get();
     }
 
-    public function findGenre(LibraryMovieGenre $genre): LibraryMovieGenre
-    {
-        return $genre;
-    }
-
     public function createGenre(User $user, array $data): LibraryMovieGenre
     {
         $data['user_id'] = $user->id;

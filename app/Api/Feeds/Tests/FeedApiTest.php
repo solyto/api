@@ -16,16 +16,19 @@ describe('Feed subscriptions CRUD', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/feeds/subscriptions')
             ->assertStatus(200)
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.url', $feed->url);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/feeds/subscriptions/'.$subscription->id)
             ->assertStatus(200)
-            ->assertJsonPath('data.id', $subscription->id);
+            ->assertJsonPath('data.id', $subscription->id)
+            ->assertJsonPath('data.url', $feed->url);
 
         $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/feeds/subscriptions/'.$subscription->id, ['title' => 'Renamed Feed'])
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertJsonPath('data.url', $feed->url);
 
         $this->actingAs($user, 'sanctum')
             ->deleteJson('/api/v1/feeds/subscriptions/'.$subscription->id)
@@ -50,7 +53,8 @@ describe('Feed subscriptions CRUD', function () {
                 'url' => 'https://example.com/feed.xml',
             ])
             ->assertStatus(201)
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.url', 'https://example.com/feed.xml');
 
         expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(1);
         expect(Feed::where('url', 'https://example.com/feed.xml')->exists())->toBeTrue();

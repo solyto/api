@@ -451,3 +451,37 @@ describe('Library search endpoints', function () {
             ->assertJsonPath('data.integrations', ['deezer', 'discogs', 'spotify']);
     });
 });
+
+describe('Library recommend endpoints', function () {
+    it('recommends a random book and returns 404 without books', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/books/recommend/random')
+            ->assertStatus(404);
+
+        $book = LibraryBook::factory()->forUser($user)->create(['title' => 'Dune']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/books/recommend/random')
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $book->id)
+            ->assertJsonPath('data.title', 'Dune');
+    });
+
+    it('recommends a random music item and returns 404 without music', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/recommend/random')
+            ->assertStatus(404);
+
+        $music = LibraryMusic::factory()->forUser($user)->create(['title' => 'Kind of Blue']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/recommend/random')
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $music->id)
+            ->assertJsonPath('data.title', 'Kind of Blue');
+    });
+});

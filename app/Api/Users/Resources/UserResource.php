@@ -15,6 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="role", type="string", enum={"user","admin","super-admin"}),
  *     @OA\Property(property="profile", ref="#/components/schemas/UserProfile", nullable=true),
  *     @OA\Property(property="settings", ref="#/components/schemas/UserSettings", nullable=true),
+ *     @OA\Property(property="confirmed", type="boolean"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )

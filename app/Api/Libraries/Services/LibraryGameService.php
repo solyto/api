@@ -123,11 +123,6 @@ class LibraryGameService
         return LibraryGameGenre::forUser($user->id)->get();
     }
 
-    public function findGenre(LibraryGameGenre $genre): LibraryGameGenre
-    {
-        return $genre;
-    }
-
     public function createGenre(User $user, array $data): LibraryGameGenre
     {
         $data['user_id'] = $user->id;

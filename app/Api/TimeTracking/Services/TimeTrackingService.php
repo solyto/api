@@ -38,8 +38,7 @@ class TimeTrackingService
         $entry = TimeTrackingEntry::create($data);
         $entry->load(['project']);
 
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $user->id]);
+        $this->forgetUser($user->id);
 
         return $entry;
     }
@@ -49,8 +48,7 @@ class TimeTrackingService
         $entry->update($data);
         $entry->load(['project']);
 
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $entry->user_id]);
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $entry->user_id]);
+        $this->forgetUser($entry->user_id);
 
         return $entry;
     }
@@ -60,8 +58,7 @@ class TimeTrackingService
         $userId = $entry->user_id;
         $entry->delete();
 
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $userId]);
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
+        $this->forgetUser($userId);
     }
 
     public function startTimer(User $user, array $data): TimeTrackingEntry
@@ -78,8 +75,7 @@ class TimeTrackingService
 
         $entry->load(['project']);
 
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $user->id]);
+        $this->forgetUser($user->id);
 
         return $entry;
     }
@@ -101,8 +97,7 @@ class TimeTrackingService
 
         $entry->load(['project']);
 
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $entry->user_id]);
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $entry->user_id]);
+        $this->forgetUser($entry->user_id);
 
         return $entry;
     }
@@ -207,8 +202,7 @@ class TimeTrackingService
         $project->categories()->sync($categoryIds);
         $project->load(['categories', 'entries']);
 
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $user->id]);
+        $this->forgetUser($user->id);
 
         return $project;
     }
@@ -227,8 +221,7 @@ class TimeTrackingService
 
         $project->load(['categories', 'entries']);
 
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
-        $this->cache->forget([self::CACHE_KEY_ENTRIES, $userId]);
+        $this->forgetUser($userId);
 
         return $project;
     }
@@ -238,7 +231,12 @@ class TimeTrackingService
         $userId = $project->user_id;
         $project->delete();
 
-        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
+        $this->forgetUser($userId);
+    }
+
+    private function forgetUser(string $userId): void
+    {
         $this->cache->forget([self::CACHE_KEY_ENTRIES, $userId]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
     }
 }

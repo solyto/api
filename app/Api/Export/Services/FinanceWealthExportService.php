@@ -8,6 +8,7 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\WealthField;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\Users\Models\User;
+use App\Shared\Helpers\CsvHelper;
 
 class FinanceWealthExportService
 {
@@ -15,19 +16,10 @@ class FinanceWealthExportService
     {
         $fields = WealthField::forUser($user->id)->with('values')->get();
 
-        $handle = fopen($path, 'w');
-        fputcsv($handle, ['Field', 'Date', 'Value']);
-
-        foreach ($fields as $field) {
-            foreach ($field->values as $value) {
-                fputcsv($handle, [
-                    $field->title,
-                    $value->date?->format('Y-m-d'),
-                    $value->value,
-                ]);
-            }
-        }
-
-        fclose($handle);
+        CsvHelper::write($path, ['Field', 'Date', 'Value'], $fields->flatMap(fn ($field) => $field->values->map(fn ($value) => [
+            $field->title,
+            $value->date?->format('Y-m-d'),
+            $value->value,
+        ])));
     }
 }
