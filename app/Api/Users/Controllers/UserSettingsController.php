@@ -5,7 +5,10 @@ namespace App\Api\Users\Controllers;
 use App\Api\ApiResponse;
 use App\Api\CheckIn\Requests\UpdateCheckInSettingsRequest;
 use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\Users\Requests\UpdateCheckInCalendarMarkRequest;
 use App\Api\Users\Requests\UpdateDateFormatRequest;
+use App\Api\Users\Requests\UpdateJournalCalendarMarkRequest;
+use App\Api\Users\Requests\UpdateJournalRequest;
 use App\Api\Users\Requests\UpdateLanguageRequest;
 use App\Api\Users\Requests\UpdateNavigationSettingsRequest;
 use App\Api\Users\Requests\UpdateOpenaiApiKey;
@@ -346,6 +349,117 @@ class UserSettingsController
         $this->userSettingsService->completeOnboarding($request->user());
 
         return ApiResponse::success(null, 'Onboarding completed.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/v1/users/me/settings/journal",
+     *     operationId="userSettingsUpdateJournal",
+     *     summary="Enable or disable the journal",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"enabled"},
+     *
+     *             @OA\Property(property="enabled", type="boolean")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Journal setting updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateJournal(UpdateJournalRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateJournal($request->user(), $request->boolean('enabled'));
+
+        return ApiResponse::success(null, 'Journal setting updated successfully.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/v1/users/me/settings/journal-calendar-mark",
+     *     operationId="userSettingsUpdateJournalCalendarMark",
+     *     summary="Show or hide the journal mark in the calendar",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"enabled"},
+     *
+     *             @OA\Property(property="enabled", type="boolean")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Journal calendar mark setting updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateJournalCalendarMark(UpdateJournalCalendarMarkRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateJournalCalendarMark($request->user(), $request->boolean('enabled'));
+
+        return ApiResponse::success(null, 'Journal calendar mark setting updated successfully.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/v1/users/me/settings/check-in-calendar-mark",
+     *     operationId="userSettingsUpdateCheckInCalendarMark",
+     *     summary="Show or hide the check-in mark in the calendar",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"enabled"},
+     *
+     *             @OA\Property(property="enabled", type="boolean")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Check-in calendar mark setting updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateCheckInCalendarMark(UpdateCheckInCalendarMarkRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateCheckInCalendarMark($request->user(), $request->boolean('enabled'));
+
+        return ApiResponse::success(null, 'Check-in calendar mark setting updated successfully.');
     }
 
     /**
