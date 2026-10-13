@@ -2,9 +2,6 @@
 
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('CheckIn Factory', function () {
     it('creates a valid check-in', function () {
@@ -88,9 +85,9 @@ describe('CheckIn Model', function () {
             'smoking' => false,
         ]);
 
-        expect($checkIn->menstruation)->toBeBoolean();
-        expect($checkIn->alcohol)->toBeBoolean();
-        expect($checkIn->smoking)->toBeBoolean();
+        expect($checkIn->menstruation)->toBeBool();
+        expect($checkIn->alcohol)->toBeBool();
+        expect($checkIn->smoking)->toBeBool();
     });
 
     it('belongs to user', function () {

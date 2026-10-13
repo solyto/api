@@ -22,7 +22,7 @@ class TodoController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos",
+     *     path="/todos",
      *     operationId="todoIndex",
      *     summary="List todos",
      *     tags={"Todos"},
@@ -50,7 +50,7 @@ class TodoController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/due-date",
+     *     path="/todos/due-date",
      *     operationId="todoListDueDate",
      *     summary="List todos by due date",
      *     tags={"Todos"},
@@ -78,7 +78,7 @@ class TodoController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/{todo}",
+     *     path="/todos/{todo}",
      *     operationId="todoShow",
      *     summary="Get todo by ID",
      *     tags={"Todos"},
@@ -90,7 +90,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -119,7 +119,7 @@ class TodoController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos",
+     *     path="/todos",
      *     operationId="todoStore",
      *     summary="Create a new todo",
      *     tags={"Todos"},
@@ -154,7 +154,7 @@ class TodoController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTodoRequest $request): JsonResponse
@@ -166,7 +166,7 @@ class TodoController
 
     /**
      * @OA\Put(
-     *     path="/v1/todos/{todo}",
+     *     path="/todos/{todo}",
      *     operationId="todoUpdate",
      *     summary="Update a todo",
      *     tags={"Todos"},
@@ -178,7 +178,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -211,7 +211,7 @@ class TodoController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTodoRequest $request, Todo $todo): JsonResponse
@@ -225,7 +225,7 @@ class TodoController
 
     /**
      * @OA\Delete(
-     *     path="/v1/todos/{todo}",
+     *     path="/todos/{todo}",
      *     operationId="todoDestroy",
      *     summary="Delete a todo",
      *     tags={"Todos"},
@@ -237,7 +237,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -265,7 +265,7 @@ class TodoController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos/{todo}/subtasks",
+     *     path="/todos/{todo}/subtasks",
      *     operationId="todoAddSubtask",
      *     summary="Add a subtask to a todo",
      *     tags={"Todos"},
@@ -277,7 +277,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -302,7 +302,7 @@ class TodoController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function addSubtask(Request $request, Todo $todo): JsonResponse
@@ -318,7 +318,7 @@ class TodoController
 
     /**
      * @OA\Put(
-     *     path="/v1/todos/{todo}/subtasks/{subtask}",
+     *     path="/todos/{todo}/subtasks/{subtask}",
      *     operationId="todoUpdateSubtask",
      *     summary="Update a subtask",
      *     tags={"Todos"},
@@ -330,7 +330,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Parameter(
@@ -364,7 +364,7 @@ class TodoController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function updateSubtask(Request $request, Todo $todo, TodoSubtask $subtask): JsonResponse
@@ -384,7 +384,7 @@ class TodoController
 
     /**
      * @OA\Delete(
-     *     path="/v1/todos/{todo}/subtasks/{subtask}",
+     *     path="/todos/{todo}/subtasks/{subtask}",
      *     operationId="todoDestroySubtask",
      *     summary="Delete a subtask",
      *     tags={"Todos"},
@@ -396,7 +396,7 @@ class TodoController
      *         description="Todo ID",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Parameter(

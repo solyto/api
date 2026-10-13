@@ -17,13 +17,10 @@ use App\Dav\Models\Principal;
 use App\Dav\Services\DavService;
 use App\Shared\Notifications\TestNotification;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use NotificationChannels\WebPush\PushSubscription;
-
-uses(RefreshDatabase::class);
 
 describe('app:users:delete', function () {
     it('deletes the user and all their data', function () {

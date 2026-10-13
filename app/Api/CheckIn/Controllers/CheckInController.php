@@ -20,7 +20,7 @@ class CheckInController
 
     /**
      * @OA\Get(
-     *     path="/api/check-ins",
+     *     path="/check-ins",
      *     operationId="checkInIndex",
      *     tags={"Check-In"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class CheckInController
 
     /**
      * @OA\Get(
-     *     path="/v1/check-in/marks",
+     *     path="/check-in/marks",
      *     operationId="checkInMarks",
      *     summary="List dates with a check-in",
      *     tags={"Check-In"},
@@ -67,7 +67,7 @@ class CheckInController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function marks(Request $request): JsonResponse
@@ -91,7 +91,7 @@ class CheckInController
 
     /**
      * @OA\Post(
-     *     path="/api/check-ins",
+     *     path="/check-ins",
      *     operationId="checkInStore",
      *     tags={"Check-In"},
      *     security={{"sanctum":{}}},

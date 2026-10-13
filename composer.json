@@ -1,13 +1,13 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "solyto/api",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Backend API for solyto.app — a free, private, self-hostable all-in-one personal management app (REST API plus CalDAV/CardDAV server).",
     "keywords": [
         "laravel",
         "framework"
     ],
-    "license": "MIT",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": "^8.4",
         "ext-zip": "*",
@@ -34,8 +34,8 @@
         "laravel/pint": "^1.13",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "pestphp/pest": "*",
-        "pestphp/pest-plugin-laravel": "*"
+        "pestphp/pest": "^4.4",
+        "pestphp/pest-plugin-laravel": "^4.0"
     },
     "autoload": {
         "psr-4": {

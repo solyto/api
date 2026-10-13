@@ -4,9 +4,6 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Feeds\Services\FeedService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 function feedItemDouble(?string $description, string $id = 'https://example.com/post-1'): \Mockery\MockInterface
 {

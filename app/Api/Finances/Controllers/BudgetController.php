@@ -20,7 +20,7 @@ class BudgetController
 
     /**
      * @OA\Get(
-     *     path="/api/finances/budgets",
+     *     path="/finances/budgets",
      *     operationId="listBudgets",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class BudgetController
      *         description="Budgets retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Budgets retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Budget"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class BudgetController
 
     /**
      * @OA\Get(
-     *     path="/api/finances/budgets/{budget}",
+     *     path="/finances/budgets/{budget}",
      *     operationId="showBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -69,9 +68,8 @@ class BudgetController
      *         description="Budget retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Budget retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Budget")
      *         )
      *     ),
@@ -93,7 +91,7 @@ class BudgetController
 
     /**
      * @OA\Post(
-     *     path="/api/finances/budgets",
+     *     path="/finances/budgets",
      *     operationId="storeBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -115,9 +113,8 @@ class BudgetController
      *         description="Budget created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Budget created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Budget")
      *         )
      *     ),
@@ -139,7 +136,7 @@ class BudgetController
 
     /**
      * @OA\Put(
-     *     path="/api/finances/budgets/{budget}",
+     *     path="/finances/budgets/{budget}",
      *     operationId="updateBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -168,9 +165,8 @@ class BudgetController
      *         description="Budget updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Budget updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Budget")
      *         )
      *     ),
@@ -194,7 +190,7 @@ class BudgetController
 
     /**
      * @OA\Delete(
-     *     path="/api/finances/budgets/{budget}",
+     *     path="/finances/budgets/{budget}",
      *     operationId="destroyBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -213,9 +209,9 @@ class BudgetController
      *         description="Budget deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Budget deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

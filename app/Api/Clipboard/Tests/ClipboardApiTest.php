@@ -2,11 +2,8 @@
 
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Clipboard\Services\ClipboardService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-
-uses(RefreshDatabase::class);
 
 describe('Clipboard list and store', function () {
     it('lists the users clipboard entries newest first', function () {

@@ -22,7 +22,7 @@ class WealthController
 
     /**
      * @OA\Get(
-     *     path="/api/finances/wealth/fields",
+     *     path="/finances/wealth/fields",
      *     operationId="listWealthFields",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -32,9 +32,8 @@ class WealthController
      *         description="Wealth fields retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Wealth fields retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/WealthField"))
      *         )
      *     ),
@@ -52,7 +51,7 @@ class WealthController
 
     /**
      * @OA\Post(
-     *     path="/api/finances/wealth/fields",
+     *     path="/finances/wealth/fields",
      *     operationId="storeWealthField",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -72,9 +71,8 @@ class WealthController
      *         description="Wealth field created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Wealth field created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/WealthField")
      *         )
      *     ),
@@ -96,7 +94,7 @@ class WealthController
 
     /**
      * @OA\Put(
-     *     path="/api/finances/wealth/fields/{field}",
+     *     path="/finances/wealth/fields/{field}",
      *     operationId="updateWealthField",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -125,9 +123,8 @@ class WealthController
      *         description="Wealth Field updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Wealth Field updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/WealthField")
      *         )
      *     ),
@@ -151,7 +148,7 @@ class WealthController
 
     /**
      * @OA\Delete(
-     *     path="/api/finances/wealth/fields/{field}",
+     *     path="/finances/wealth/fields/{field}",
      *     operationId="destroyWealthField",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -170,9 +167,9 @@ class WealthController
      *         description="Wealth Field deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Wealth Field deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -191,7 +188,7 @@ class WealthController
 
     /**
      * @OA\Put(
-     *     path="/api/finances/wealth/fields/{field}/value",
+     *     path="/finances/wealth/fields/{field}/value",
      *     operationId="updateWealthFieldValue",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -220,9 +217,9 @@ class WealthController
      *         description="Wealth Field updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Wealth Field updated successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

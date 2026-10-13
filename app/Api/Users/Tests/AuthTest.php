@@ -5,11 +5,8 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Api\Users\Services\AuthService;
 use App\Shared\Enums\AuthPlatformEnum;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-
-uses(RefreshDatabase::class);
 
 describe('POST /v1/auth/register', function () {
     it('registers a user, creates a verification token and sends a mail', function () {

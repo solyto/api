@@ -34,6 +34,7 @@ storage/**
 !storage/framework/views/.gitkeep
 !storage/logs/.gitkeep
 /vendor
+bootstrap/cache/*.php
 docker/.env
 Homestead.json
 Homestead.yaml

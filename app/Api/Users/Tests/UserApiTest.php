@@ -1,13 +1,10 @@
 <?php
 
 use App\Api\Users\Services\UserSettingsService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-
-uses(RefreshDatabase::class);
 
 describe('GET /api/v1/users/me', function () {
     it('returns the authenticated user with profile and settings', function () {

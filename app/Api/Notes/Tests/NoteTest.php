@@ -3,9 +3,6 @@
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Note Factory', function () {
     it('creates a valid note', function () {
@@ -102,7 +99,7 @@ describe('Note Model', function () {
     it('casts favorite as boolean', function () {
         $note = Note::factory()->create();
 
-        expect($note->is_favorite)->toBeBoolean();
+        expect($note->is_favorite)->toBeBool();
     });
 
     it('belongs to a user', function () {

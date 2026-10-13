@@ -5,10 +5,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 use App\Shared\Services\QuickAddService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-
-uses(RefreshDatabase::class);
 
 describe('QuickAddService::detect', function () {
     it('detects a todo from todo keywords', function () {

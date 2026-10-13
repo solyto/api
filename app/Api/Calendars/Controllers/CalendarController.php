@@ -30,7 +30,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars",
+     *     path="/calendars",
      *     operationId="listCalendars",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -40,9 +40,8 @@ class CalendarController
      *         description="Calendars retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendars retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Calendar"))
      *         )
      *     ),
@@ -60,7 +59,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars",
+     *     path="/calendars",
      *     operationId="storeCalendar",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -80,9 +79,8 @@ class CalendarController
      *         description="Calendar created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Calendar")
      *         )
      *     ),
@@ -112,7 +110,7 @@ class CalendarController
 
     /**
      * @OA\Put(
-     *     path="/api/calendars/{instanceId}",
+     *     path="/calendars/{instanceId}",
      *     operationId="updateCalendarColor",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -140,9 +138,8 @@ class CalendarController
      *         description="Calendar updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Calendar")
      *         )
      *     ),
@@ -196,7 +193,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars/events/{yearMonth}",
+     *     path="/calendars/events/{yearMonth}",
      *     operationId="listEvents",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -215,9 +212,8 @@ class CalendarController
      *         description="Calendar events retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar events retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event"))
      *         )
      *     ),
@@ -235,7 +231,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars/widget/events",
+     *     path="/calendars/widget/events",
      *     operationId="listWidgetEvents",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -245,9 +241,8 @@ class CalendarController
      *         description="Calendar events retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar events retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event"))
      *         )
      *     ),
@@ -265,7 +260,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/{instanceId}/events",
+     *     path="/calendars/{instanceId}/events",
      *     operationId="storeEvent",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -303,9 +298,8 @@ class CalendarController
      *         description="Event created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Event created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Event")
      *         )
      *     ),
@@ -336,7 +330,7 @@ class CalendarController
 
     /**
      * @OA\Put(
-     *     path="/api/calendars/{instanceId}/events/{eventUri}",
+     *     path="/calendars/{instanceId}/events/{eventUri}",
      *     operationId="updateEvent",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -384,9 +378,8 @@ class CalendarController
      *         description="Event updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Event updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/Event")
      *         )
      *     ),
@@ -454,7 +447,7 @@ class CalendarController
 
     /**
      * @OA\Delete(
-     *     path="/api/calendars/{instanceId}/events/{eventUri}",
+     *     path="/calendars/{instanceId}/events/{eventUri}",
      *     operationId="destroyEvent",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -482,9 +475,9 @@ class CalendarController
      *         description="Event deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Event deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -517,7 +510,7 @@ class CalendarController
 
     /**
      * @OA\Delete(
-     *     path="/api/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
+     *     path="/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
      *     operationId="destroyEventOccurrence",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -554,9 +547,9 @@ class CalendarController
      *         description="Occurrence deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Occurrence deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -594,7 +587,7 @@ class CalendarController
 
     /**
      * @OA\Put(
-     *     path="/api/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
+     *     path="/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
      *     operationId="updateEventOccurrence",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -651,9 +644,9 @@ class CalendarController
      *         description="Occurrence updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Occurrence updated successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -693,7 +686,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars/{instanceId}/share",
+     *     path="/calendars/{instanceId}/share",
      *     operationId="listSharees",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -712,9 +705,8 @@ class CalendarController
      *         description="Sharees retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sharees retrieved successfully."),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
@@ -753,7 +745,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/{instanceId}/share",
+     *     path="/calendars/{instanceId}/share",
      *     operationId="shareCalendar",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -782,9 +774,9 @@ class CalendarController
      *         description="Calendar shared successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar shared successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -825,7 +817,7 @@ class CalendarController
 
     /**
      * @OA\Delete(
-     *     path="/api/calendars/{instanceId}/share/{userId}",
+     *     path="/calendars/{instanceId}/share/{userId}",
      *     operationId="revokeShare",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -853,9 +845,9 @@ class CalendarController
      *         description="Share revoked successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Share revoked successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -894,7 +886,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/{instanceId}/unsubscribe",
+     *     path="/calendars/{instanceId}/unsubscribe",
      *     operationId="unsubscribeFromCalendar",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -913,9 +905,9 @@ class CalendarController
      *         description="Unsubscribed from calendar successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Unsubscribed from calendar successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -948,7 +940,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars/invites",
+     *     path="/calendars/invites",
      *     operationId="listInvites",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -958,9 +950,8 @@ class CalendarController
      *         description="Calendar invites retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Calendar invites retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Calendar"))
      *         )
      *     ),
@@ -978,7 +969,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/invites/{token}/accept",
+     *     path="/calendars/invites/{token}/accept",
      *     operationId="acceptInvite",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -997,9 +988,9 @@ class CalendarController
      *         description="Invite accepted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Invite accepted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -1021,7 +1012,7 @@ class CalendarController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/invites/{token}/decline",
+     *     path="/calendars/invites/{token}/decline",
      *     operationId="declineInvite",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -1040,9 +1031,9 @@ class CalendarController
      *         description="Invite declined successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Invite declined successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

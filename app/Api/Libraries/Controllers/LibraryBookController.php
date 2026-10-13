@@ -26,7 +26,7 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books",
+     *     path="/libraries/books",
      *     operationId="listLibraryBooks",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -36,9 +36,8 @@ class LibraryBookController
      *         description="Books retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Books retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryBook"))
      *         )
      *     ),
@@ -56,7 +55,7 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/{book}",
+     *     path="/libraries/books/{book}",
      *     operationId="showLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -75,9 +74,8 @@ class LibraryBookController
      *         description="Book retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBook")
      *         )
      *     ),
@@ -98,7 +96,7 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/recommend/{type}",
+     *     path="/libraries/books/recommend/{type}",
      *     operationId="recommendLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -117,9 +115,8 @@ class LibraryBookController
      *         description="Recommendation retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recommendation retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryRecommendation")
      *         )
      *     ),
@@ -157,7 +154,7 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/releases",
+     *     path="/libraries/books/releases",
      *     operationId="listLibraryBookReleases",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -167,9 +164,8 @@ class LibraryBookController
      *         description="Releases retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Releases retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryBookRelease"))
      *         )
      *     ),
@@ -189,7 +185,7 @@ class LibraryBookController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/books",
+     *     path="/libraries/books",
      *     operationId="storeLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -226,9 +222,8 @@ class LibraryBookController
      *         description="Book created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBook")
      *         )
      *     ),
@@ -246,7 +241,7 @@ class LibraryBookController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/books/{book}",
+     *     path="/libraries/books/{book}",
      *     operationId="updateLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -290,9 +285,8 @@ class LibraryBookController
      *         description="Book updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBook")
      *         )
      *     ),
@@ -313,7 +307,7 @@ class LibraryBookController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/books/{book}",
+     *     path="/libraries/books/{book}",
      *     operationId="destroyLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -332,9 +326,9 @@ class LibraryBookController
      *         description="Book deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -353,8 +347,8 @@ class LibraryBookController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/search/{service}/{query}",
-     *     operationId="search",
+     *     path="/libraries/books/search/{service}/{query}",
+     *     operationId="searchLibraryBooks",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
      *
@@ -372,9 +366,8 @@ class LibraryBookController
      *         description="Search results retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),
@@ -394,8 +387,8 @@ class LibraryBookController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/books/import/{service}",
-     *     operationId="import",
+     *     path="/libraries/books/import/{service}",
+     *     operationId="importLibraryBook",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
      *
@@ -423,9 +416,8 @@ class LibraryBookController
      *         description="Book imported successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Book imported successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/BookReleaseImport")
      *         )
      *     ),

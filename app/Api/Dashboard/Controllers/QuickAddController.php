@@ -19,7 +19,7 @@ class QuickAddController
 
     /**
      * @OA\Post(
-     *     path="/api/dashboard/quick-add/detect",
+     *     path="/dashboard/quick-add/detect",
      *     operationId="dashboardQuickAddDetect",
      *     tags={"Dashboard"},
      *     security={{"sanctum":{}}},
@@ -63,7 +63,7 @@ class QuickAddController
 
     /**
      * @OA\Post(
-     *     path="/api/dashboard/quick-add/commit",
+     *     path="/dashboard/quick-add/commit",
      *     operationId="dashboardQuickAddCommit",
      *     tags={"Dashboard"},
      *     security={{"sanctum":{}}},

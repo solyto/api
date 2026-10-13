@@ -4,6 +4,7 @@ namespace App\Api\Contacts\Models;
 
 use App\Api\Contacts\Factories\AddressBookFactory;
 use App\Api\Users\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -35,7 +36,7 @@ class AddressBook extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function scopeForUser($query, $userId)
+    public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);
     }

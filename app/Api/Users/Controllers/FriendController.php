@@ -17,7 +17,7 @@ class FriendController
 
     /**
      * @OA\Get(
-     *     path="/v1/friends",
+     *     path="/friends",
      *     operationId="friendListFriends",
      *     summary="List friends",
      *     tags={"Friends"},
@@ -45,7 +45,7 @@ class FriendController
 
     /**
      * @OA\Get(
-     *     path="/v1/friends/requests",
+     *     path="/friends/requests",
      *     operationId="friendListFriendRequests",
      *     summary="List friend requests",
      *     tags={"Friends"},
@@ -73,7 +73,7 @@ class FriendController
 
     /**
      * @OA\Post(
-     *     path="/v1/friends/requests",
+     *     path="/friends/requests",
      *     operationId="friendStoreFriendRequest",
      *     summary="Send friend request",
      *     tags={"Friends"},
@@ -100,7 +100,7 @@ class FriendController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function storeFriendRequest(StoreFriendRequestRequest $request): JsonResponse
@@ -115,7 +115,7 @@ class FriendController
 
     /**
      * @OA\Post(
-     *     path="/v1/friends/requests/{id}/accept",
+     *     path="/friends/requests/{id}/accept",
      *     operationId="friendAcceptFriendRequest",
      *     summary="Accept friend request",
      *     tags={"Friends"},
@@ -156,7 +156,7 @@ class FriendController
 
     /**
      * @OA\Delete(
-     *     path="/v1/friends/requests/{id}",
+     *     path="/friends/requests/{id}",
      *     operationId="friendRejectFriendRequest",
      *     summary="Reject friend request",
      *     tags={"Friends"},

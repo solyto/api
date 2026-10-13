@@ -21,7 +21,7 @@ class LibraryPlantController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/plants",
+     *     path="/libraries/plants",
      *     operationId="listLibraryPlants",
      *     tags={"Libraries - Plants"},
      *     security={{"sanctum": {}}},
@@ -31,9 +31,8 @@ class LibraryPlantController
      *         description="Plants retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Plants retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryPlant"))
      *         )
      *     ),
@@ -51,7 +50,7 @@ class LibraryPlantController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/plants/{plant}",
+     *     path="/libraries/plants/{plant}",
      *     operationId="showLibraryPlant",
      *     tags={"Libraries - Plants"},
      *     security={{"sanctum": {}}},
@@ -70,9 +69,8 @@ class LibraryPlantController
      *         description="Plant retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Plant retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryPlant")
      *         )
      *     ),
@@ -91,7 +89,7 @@ class LibraryPlantController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/plants",
+     *     path="/libraries/plants",
      *     operationId="storeLibraryPlant",
      *     tags={"Libraries - Plants"},
      *     security={{"sanctum": {}}},
@@ -121,9 +119,8 @@ class LibraryPlantController
      *         description="Plant created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Plant created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryPlant")
      *         )
      *     ),
@@ -141,7 +138,7 @@ class LibraryPlantController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/plants/{plant}",
+     *     path="/libraries/plants/{plant}",
      *     operationId="updateLibraryPlant",
      *     tags={"Libraries - Plants"},
      *     security={{"sanctum": {}}},
@@ -178,9 +175,8 @@ class LibraryPlantController
      *         description="Plant updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Plant updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryPlant")
      *         )
      *     ),
@@ -201,7 +197,7 @@ class LibraryPlantController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/plants/{plant}",
+     *     path="/libraries/plants/{plant}",
      *     operationId="destroyLibraryPlant",
      *     tags={"Libraries - Plants"},
      *     security={{"sanctum": {}}},
@@ -220,9 +216,9 @@ class LibraryPlantController
      *         description="Plant deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Plant deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

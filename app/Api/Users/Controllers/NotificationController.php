@@ -14,7 +14,7 @@ class NotificationController
 
     /**
      * @OA\Get(
-     *     path="/v1/notifications",
+     *     path="/notifications",
      *     operationId="notificationList",
      *     summary="List notifications",
      *     tags={"Notifications"},
@@ -42,7 +42,7 @@ class NotificationController
 
     /**
      * @OA\Put(
-     *     path="/v1/notifications/{id}/mark-read",
+     *     path="/notifications/{id}/mark-read",
      *     operationId="notificationMarkRead",
      *     summary="Mark notification as read",
      *     tags={"Notifications"},
@@ -78,7 +78,7 @@ class NotificationController
 
     /**
      * @OA\Post(
-     *     path="/v1/notifications/read-all",
+     *     path="/notifications/read-all",
      *     operationId="notificationMarkAllRead",
      *     summary="Mark all notifications as read",
      *     tags={"Notifications"},

@@ -14,9 +14,6 @@ use App\Api\Libraries\Models\LibraryQuote;
 use App\Api\Libraries\Models\LibraryRecipe;
 use App\Api\Tags\Models\Tag;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('LibraryBook Factory', function () {
     it('creates a valid book', function () {

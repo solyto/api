@@ -7,9 +7,6 @@ use App\Api\Users\Models\UserNotificationSettings;
 use App\Api\Users\Models\UserProfile;
 use App\Api\Users\Models\UserSettings;
 use App\Api\Users\Models\VerificationToken;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('User Factory', function () {
     it('creates a valid user', function () {
@@ -186,8 +183,8 @@ describe('UserNotificationSettings Factory', function () {
         $settings = UserNotificationSettings::factory()->forUser($user)->create();
 
         expect($settings->user_id)->toBe($user->id);
-        expect($settings->music_release_ui)->toBeBoolean();
-        expect($settings->book_release_ui)->toBeBoolean();
+        expect($settings->music_release_ui)->toBeBool();
+        expect($settings->book_release_ui)->toBeBool();
     });
 
     it('creates telegram-only notification settings', function () {
@@ -222,13 +219,13 @@ describe('Friend Factory', function () {
     it('creates a recent friendship', function () {
         $friend = Friend::factory()->recent()->create();
 
-        expect($friend->friends_since)->greaterThan(now()->subDays(30));
+        expect($friend->friends_since)->toBeGreaterThan(now()->subDays(30));
     });
 
     it('creates a long-term friendship', function () {
         $friend = Friend::factory()->longTerm()->create();
 
-        expect($friend->friends_since)->lessThan(now()->subYears(2));
+        expect($friend->friends_since)->toBeLessThan(now()->subYears(2));
     });
 });
 
@@ -275,21 +272,21 @@ describe('VerificationToken Factory', function () {
     it('creates an expired token', function () {
         $token = VerificationToken::factory()->expired()->create();
 
-        expect($token->expires_at)->lessThan(now());
+        expect($token->expires_at)->toBeLessThan(now());
     });
 
     it('creates a token expiring soon', function () {
         $token = VerificationToken::factory()->expiresSoon()->create();
 
-        expect($token->expires_at)->greaterThan(now())
-            ->lessThan(now()->addHour());
+        expect($token->expires_at)->toBeGreaterThan(now())
+            ->toBeLessThan(now()->addHour());
     });
 
     it('creates a token expiring in 24 hours', function () {
         $token = VerificationToken::factory()->expiresInDay()->create();
 
-        expect($token->expires_at)->greaterThan(now())
-            ->lessThan(now()->addDay());
+        expect($token->expires_at)->toBeGreaterThan(now())
+            ->toBeLessThan(now()->addDay());
     });
 });
 

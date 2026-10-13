@@ -12,11 +12,8 @@ use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Libraries\Services\External\TmdbService;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
-
-uses(RefreshDatabase::class);
 
 describe('GrabMusicReleases', function () {
     beforeEach(function () {

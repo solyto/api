@@ -11,12 +11,9 @@ use App\Api\Users\Jobs\ScaleProfileImage;
 use App\Api\Users\Models\FriendRequest;
 use App\Shared\Services\Images\ImageTransformationService;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-
-uses(RefreshDatabase::class);
 
 describe('DeleteOldDevRequests', function () {
     it('deletes completed or cancelled requests older than 30 days', function () {

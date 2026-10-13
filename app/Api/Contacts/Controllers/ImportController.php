@@ -26,7 +26,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/import/start",
+     *     path="/contacts/import/start",
      *     operationId="startContactsImport",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -48,9 +48,8 @@ class ImportController
      *         description="Import started successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Import started successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items())
      *         )
      *     ),
@@ -75,7 +74,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/api/contacts/import/select",
+     *     path="/contacts/import/select",
      *     operationId="selectAddressBooksForImport",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -95,9 +94,8 @@ class ImportController
      *         description="Address books selected successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Address books selected successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items())
      *         )
      *     ),
@@ -124,7 +122,7 @@ class ImportController
 
     /**
      * @OA\Get(
-     *     path="/api/contacts/import/state",
+     *     path="/contacts/import/state",
      *     operationId="getContactsImportState",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -134,9 +132,8 @@ class ImportController
      *         description="Import state retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Import state retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/ContactsImportState")
      *         )
      *     ),

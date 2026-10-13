@@ -8,9 +8,6 @@ use App\Api\Libraries\Services\LibraryRecommender;
 use App\Api\Libraries\Services\LibraryReleases;
 use App\Shared\Enums\AiUsageFeatureEnum;
 use App\Shared\Models\AiUsage;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 /**
  * Build a fake chat completion response.

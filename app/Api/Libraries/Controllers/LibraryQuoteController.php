@@ -20,7 +20,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/quotes",
+     *     path="/libraries/quotes",
      *     operationId="listLibraryQuotes",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class LibraryQuoteController
      *         description="Quotes retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quotes retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryQuote"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/quotes/{quote}",
+     *     path="/libraries/quotes/{quote}",
      *     operationId="showLibraryQuote",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -69,9 +68,8 @@ class LibraryQuoteController
      *         description="Quote retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quote retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryQuote")
      *         )
      *     ),
@@ -92,7 +90,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/quotes/random",
+     *     path="/libraries/quotes/random",
      *     operationId="randomLibraryQuote",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -102,9 +100,8 @@ class LibraryQuoteController
      *         description="Random Quote entry retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Random Quote entry retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryQuote")
      *         )
      *     ),
@@ -126,7 +123,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/quotes",
+     *     path="/libraries/quotes",
      *     operationId="storeLibraryQuote",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -150,9 +147,8 @@ class LibraryQuoteController
      *         description="Quote created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quote created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryQuote")
      *         )
      *     ),
@@ -170,7 +166,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/quotes/{quote}",
+     *     path="/libraries/quotes/{quote}",
      *     operationId="updateLibraryQuote",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -201,9 +197,8 @@ class LibraryQuoteController
      *         description="Quote updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quote updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryQuote")
      *         )
      *     ),
@@ -224,7 +219,7 @@ class LibraryQuoteController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/quotes/{quote}",
+     *     path="/libraries/quotes/{quote}",
      *     operationId="destroyLibraryQuote",
      *     tags={"Libraries - Quotes"},
      *     security={{"sanctum": {}}},
@@ -243,9 +238,9 @@ class LibraryQuoteController
      *         description="Quote deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quote deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

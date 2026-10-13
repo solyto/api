@@ -12,7 +12,7 @@ Coverage needs a driver (`pcov` or Xdebug) that is not installed by
 default; see `docs/STANDARDS_BACKLOG.md` → Tooling.
 
 Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
-`tests/Pest.php`, `app/Api/Pest.php` and `pest.php` on 2026-10-13.
+`tests/Pest.php` and `pest.php` on 2026-10-13.
 
 ## Layout and suites
 
@@ -22,17 +22,18 @@ directories plus two more for Pest's own discovery:
 | Suite (`phpunit.xml`) | Path | What lives there |
 | --- | --- | --- |
 | `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, the OpenAPI drift test |
-| `Feature` | `tests/Feature/` | **empty** (only `Pest.php`); keep it empty — feature tests are co-located |
+| `Feature` | `tests/Feature/` | **empty** (only `.gitkeep`); keep it empty — feature tests are co-located |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
 | — (Pest only) | `app/Bots/Tests/`, `app/Dav/Tests/` | bot state machine, DAV service |
 
 Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
 `goodreads_book.html`).
 
-Binding: `tests/Pest.php:6` binds `Tests\TestCase` to all five directories;
-`app/Api/Pest.php` adds `RefreshDatabase` to everything under `app/Api`, so
-a module test does **not** need its own `uses(RefreshDatabase::class)` (43
-files still have it — harmless, backlog). `tests/Unit` and `tests/Bots|Dav`
+Binding: `tests/Pest.php` is the only Pest bootstrap file Pest loads
+(nested `Pest.php` files are ignored). It binds `Tests\TestCase` to all five
+directories and adds `RefreshDatabase` to everything under `app/Api`, so a
+module test does **not** declare its own `uses(RefreshDatabase::class)`
+(a duplicate is tolerated but redundant). `tests/Unit` and `app/Bots|Dav`
 tests have no database refresh unless they ask for it.
 
 ## The test environment (`tests/TestCase.php::createApplication`)

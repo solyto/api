@@ -42,12 +42,9 @@ class TodoResource extends JsonResource
             'status' => $this->status,
             'effort' => $this->effort,
             'progress' => $this->progress,
-            'category' => $this->whenLoaded('category', fn () => new TodoCategoryResource($this->category)
-            ),
-            'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)
-            ),
-            'subtasks' => $this->whenLoaded('subtasks', fn () => TodoSubtaskResource::collection($this->subtasks)
-            ),
+            'category' => $this->whenLoaded('category', fn () => new TodoCategoryResource($this->category)),
+            'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)),
+            'subtasks' => $this->whenLoaded('subtasks', fn () => TodoSubtaskResource::collection($this->subtasks)),
             'recurrence_frequency' => $this->recurrence_frequency,
             'recurrence_interval' => $this->recurrence_interval,
             'recurrence_ends_at' => $this->recurrence_ends_at,

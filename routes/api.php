@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\ApiResponse;
 use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
@@ -58,11 +59,10 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('v1')->group(function () {
     Route::get('health', function () {
-        return response()->json([
+        return ApiResponse::success([
             'status' => 'OK',
-            'timestamp' => now(),
             'app' => 'solyto',
-            'version' => env('API_VERSION', '1.0.7'),
+            'version' => config('app.version'),
         ]);
     });
 

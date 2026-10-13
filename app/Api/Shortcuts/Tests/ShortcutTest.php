@@ -2,9 +2,6 @@
 
 use App\Api\Shortcuts\Models\Shortcut;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Shortcut Factory', function () {
     it('creates a valid shortcut', function () {

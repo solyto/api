@@ -4,9 +4,6 @@ use App\Api\TimeTracking\Models\TimeTrackingCategory;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\TimeTracking\Services\TimeTrackingService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Time tracking categories and projects', function () {
     it('stores, lists and deletes categories', function () {

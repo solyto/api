@@ -4,9 +4,6 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Budget Factory', function () {
     it('creates a valid budget', function () {

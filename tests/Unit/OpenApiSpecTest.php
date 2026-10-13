@@ -125,16 +125,11 @@ it('documents a route for every OpenAPI path operation', function () {
 
     $routes = Route::getRoutes();
 
-    $normalize = function (string $path): string {
-        $path = ltrim($path, '/');
-        foreach (['api/v1/', 'api/', 'v1/'] as $prefix) {
-            if (str_starts_with($path, $prefix)) {
-                return 'api/v1/'.substr($path, strlen($prefix));
-            }
-        }
+    // Operation paths are relative to the server URL (`/api/v1`), so the
+    // Laravel route URI is the server URL plus the operation path.
+    expect($openApi->servers[0]->url)->toBe('/api/v1');
 
-        return 'api/v1/'.$path;
-    };
+    $normalize = fn (string $path): string => 'api/v1/'.ltrim($path, '/');
 
     $drift = [];
 

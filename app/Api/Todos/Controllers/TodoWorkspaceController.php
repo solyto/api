@@ -21,7 +21,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/workspaces",
+     *     path="/todos/workspaces",
      *     operationId="todoWorkspaceIndex",
      *     summary="List todo workspaces",
      *     tags={"Todos"},
@@ -49,7 +49,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Get(
-     *     path="/v1/todos/workspaces/{workspace}",
+     *     path="/todos/workspaces/{workspace}",
      *     operationId="todoWorkspaceShow",
      *     summary="Get todo workspace by ID",
      *     tags={"Todos"},
@@ -89,7 +89,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos/workspaces",
+     *     path="/todos/workspaces",
      *     operationId="todoWorkspaceStore",
      *     summary="Create a new todo workspace",
      *     tags={"Todos"},
@@ -117,7 +117,7 @@ class TodoWorkspaceController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTodoWorkspaceRequest $request): JsonResponse
@@ -129,7 +129,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Put(
-     *     path="/v1/todos/workspaces/{workspace}",
+     *     path="/todos/workspaces/{workspace}",
      *     operationId="todoWorkspaceUpdate",
      *     summary="Update a todo workspace",
      *     tags={"Todos"},
@@ -165,7 +165,7 @@ class TodoWorkspaceController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTodoWorkspaceRequest $request, TodoWorkspace $workspace): JsonResponse
@@ -179,7 +179,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Delete(
-     *     path="/v1/todos/workspaces/{workspace}",
+     *     path="/todos/workspaces/{workspace}",
      *     operationId="todoWorkspaceDestroy",
      *     summary="Delete a todo workspace",
      *     tags={"Todos"},
@@ -219,7 +219,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos/workspaces/{workspace}/categories/attach",
+     *     path="/todos/workspaces/{workspace}/categories/attach",
      *     operationId="todoWorkspaceAttachCategories",
      *     summary="Attach categories to a todo workspace",
      *     tags={"Todos"},
@@ -262,7 +262,7 @@ class TodoWorkspaceController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function attachCategories(Request $request, TodoWorkspace $workspace): JsonResponse
@@ -281,7 +281,7 @@ class TodoWorkspaceController
 
     /**
      * @OA\Post(
-     *     path="/v1/todos/workspaces/{workspace}/categories/detach",
+     *     path="/todos/workspaces/{workspace}/categories/detach",
      *     operationId="todoWorkspaceDetachCategories",
      *     summary="Detach categories from a todo workspace",
      *     tags={"Todos"},
@@ -324,7 +324,7 @@ class TodoWorkspaceController
      *     ),
      *
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function detachCategories(Request $request, TodoWorkspace $workspace): JsonResponse

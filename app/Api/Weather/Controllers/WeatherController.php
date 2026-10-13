@@ -17,7 +17,7 @@ class WeatherController
 
     /**
      * @OA\Get(
-     *     path="/api/weather/today",
+     *     path="/weather/today",
      *     operationId="weatherToday",
      *     tags={"Weather"},
      *     security={{"sanctum":{}}},

@@ -20,7 +20,7 @@ class LibraryLinkController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/links",
+     *     path="/libraries/links",
      *     operationId="listLibraryLinks",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class LibraryLinkController
      *         description="Links retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Links retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryLink"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class LibraryLinkController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/links/{link}",
+     *     path="/libraries/links/{link}",
      *     operationId="showLibraryLink",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -69,9 +68,8 @@ class LibraryLinkController
      *         description="Link retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Link retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryLink")
      *         )
      *     ),
@@ -92,7 +90,7 @@ class LibraryLinkController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/links/newest",
+     *     path="/libraries/links/newest",
      *     operationId="newestLibraryLinks",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -102,9 +100,8 @@ class LibraryLinkController
      *         description="Links retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Links retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryLink"))
      *         )
      *     ),
@@ -122,7 +119,7 @@ class LibraryLinkController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/links",
+     *     path="/libraries/links",
      *     operationId="storeLibraryLink",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -146,9 +143,8 @@ class LibraryLinkController
      *         description="Link created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Link created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryLink")
      *         )
      *     ),
@@ -166,7 +162,7 @@ class LibraryLinkController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/links/{link}",
+     *     path="/libraries/links/{link}",
      *     operationId="updateLibraryLink",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -199,9 +195,8 @@ class LibraryLinkController
      *         description="Link updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Link updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryLink")
      *         )
      *     ),
@@ -222,7 +217,7 @@ class LibraryLinkController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/links/{link}",
+     *     path="/libraries/links/{link}",
      *     operationId="destroyLibraryLink",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -241,9 +236,9 @@ class LibraryLinkController
      *         description="Link deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Link deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

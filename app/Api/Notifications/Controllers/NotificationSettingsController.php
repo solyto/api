@@ -15,7 +15,7 @@ class NotificationSettingsController
 
     /**
      * @OA\Get(
-     *     path="/v1/notifications/settings",
+     *     path="/notifications/settings",
      *     operationId="notificationSettingsShow",
      *     summary="Get notification settings",
      *     tags={"Notifications"},
@@ -48,7 +48,7 @@ class NotificationSettingsController
 
     /**
      * @OA\Put(
-     *     path="/v1/notifications/settings",
+     *     path="/notifications/settings",
      *     operationId="notificationSettingsUpdate",
      *     summary="Update notification settings",
      *     tags={"Notifications"},

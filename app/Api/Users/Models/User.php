@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
@@ -98,7 +99,7 @@ class User extends Authenticatable
         return $this->hasMany(Passkey::class);
     }
 
-    public function friends()
+    public function friends(): Collection
     {
         return Friend::where('user_id_1', $this->id)
             ->orWhere('user_id_2', $this->id)
@@ -111,19 +112,19 @@ class User extends Authenticatable
             });
     }
 
-    public function sentFriendRequests()
+    public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(FriendRequest::class, 'sender_id')
             ->with(['receiver.profile']);
     }
 
-    public function receivedFriendRequests()
+    public function receivedFriendRequests(): HasMany
     {
         return $this->hasMany(FriendRequest::class, 'receiver_id')
             ->with(['sender.profile']);
     }
 
-    public function allFriendRequests()
+    public function allFriendRequests(): Collection
     {
         $sent = FriendRequest::where('sender_id', $this->id)
             ->with(['receiver.profile'])

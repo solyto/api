@@ -4,6 +4,7 @@ namespace App\Api\Todos\Models;
 
 use App\Api\Todos\Factories\TodoCategoryFactory;
 use App\Api\Users\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,7 +35,7 @@ class TodoCategory extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function scopeForUser($query, $userId)
+    public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);
     }

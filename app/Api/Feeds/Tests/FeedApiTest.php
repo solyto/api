@@ -5,10 +5,7 @@ use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Users\Models\Friend;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-
-uses(RefreshDatabase::class);
 
 describe('Feed subscriptions CRUD', function () {
     it('lists, shows, updates and deletes subscriptions', function () {

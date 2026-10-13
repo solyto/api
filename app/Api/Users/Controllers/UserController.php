@@ -22,7 +22,7 @@ class UserController
 
     /**
      * @OA\Get(
-     *     path="/v1/users",
+     *     path="/users",
      *     operationId="userIndex",
      *     summary="List users",
      *     tags={"Users"},
@@ -62,7 +62,7 @@ class UserController
 
     /**
      * @OA\Get(
-     *     path="/v1/users/{id}",
+     *     path="/users/{id}",
      *     operationId="userShow",
      *     summary="Get user details",
      *     tags={"Users"},
@@ -117,7 +117,7 @@ class UserController
 
     /**
      * @OA\Post(
-     *     path="/v1/users/update-profile-image",
+     *     path="/users/update-profile-image",
      *     operationId="userUpdateProfileImage",
      *     summary="Update user profile image",
      *     tags={"Users"},
@@ -153,7 +153,7 @@ class UserController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function updateProfileImage(UpdateProfileImageRequest $request): JsonResponse
@@ -173,7 +173,7 @@ class UserController
 
     /**
      * @OA\Get(
-     *     path="/v1/users/{id}/public-profile",
+     *     path="/users/{id}/public-profile",
      *     operationId="userPublicProfile",
      *     summary="Get user public profile",
      *     tags={"Users"},

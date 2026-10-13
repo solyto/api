@@ -22,7 +22,7 @@ class LibraryRecipeController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/recipes",
+     *     path="/libraries/recipes",
      *     operationId="listLibraryRecipes",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
@@ -32,9 +32,8 @@ class LibraryRecipeController
      *         description="Recipes retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipes retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryRecipe"))
      *         )
      *     ),
@@ -52,7 +51,7 @@ class LibraryRecipeController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/recipes/{recipe}",
+     *     path="/libraries/recipes/{recipe}",
      *     operationId="showLibraryRecipe",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
@@ -71,9 +70,8 @@ class LibraryRecipeController
      *         description="Recipe retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipe retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryRecipe")
      *         )
      *     ),
@@ -92,7 +90,7 @@ class LibraryRecipeController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/recipes",
+     *     path="/libraries/recipes",
      *     operationId="storeLibraryRecipe",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
@@ -122,9 +120,8 @@ class LibraryRecipeController
      *         description="Recipe created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipe created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryRecipe")
      *         )
      *     ),
@@ -142,7 +139,7 @@ class LibraryRecipeController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/recipes/{recipe}",
+     *     path="/libraries/recipes/{recipe}",
      *     operationId="updateLibraryRecipe",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
@@ -180,9 +177,8 @@ class LibraryRecipeController
      *         description="Recipe updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipe updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryRecipe")
      *         )
      *     ),
@@ -203,7 +199,7 @@ class LibraryRecipeController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/recipes/{recipe}",
+     *     path="/libraries/recipes/{recipe}",
      *     operationId="destroyLibraryRecipe",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
@@ -222,9 +218,9 @@ class LibraryRecipeController
      *         description="Recipe deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipe deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -243,8 +239,8 @@ class LibraryRecipeController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/recipes/import/{service}",
-     *     operationId="import",
+     *     path="/libraries/recipes/import/{service}",
+     *     operationId="importLibraryRecipe",
      *     tags={"Libraries - Recipes"},
      *     security={{"sanctum": {}}},
      *
@@ -272,9 +268,8 @@ class LibraryRecipeController
      *         description="Recipe imported successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recipe imported successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/RecipeReleaseImport")
      *         )
      *     ),

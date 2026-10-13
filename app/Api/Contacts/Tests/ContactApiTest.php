@@ -1,8 +1,5 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Address books (DAV-backed)', function () {
     it('lists, stores, updates and deletes address books', function () {

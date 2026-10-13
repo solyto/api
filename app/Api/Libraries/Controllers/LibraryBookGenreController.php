@@ -20,7 +20,7 @@ class LibraryBookGenreController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/genres",
+     *     path="/libraries/books/genres",
      *     operationId="listLibraryBookGenres",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class LibraryBookGenreController
      *         description="Genres retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genres retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryBookGenre"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class LibraryBookGenreController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/books/genres/{genre}",
+     *     path="/libraries/books/genres/{genre}",
      *     operationId="showLibraryBookGenre",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -69,9 +68,8 @@ class LibraryBookGenreController
      *         description="Genre retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBookGenre")
      *         )
      *     ),
@@ -90,7 +88,7 @@ class LibraryBookGenreController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/books/genres",
+     *     path="/libraries/books/genres",
      *     operationId="storeLibraryBookGenre",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -110,9 +108,8 @@ class LibraryBookGenreController
      *         description="Genre created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBookGenre")
      *         )
      *     ),
@@ -130,7 +127,7 @@ class LibraryBookGenreController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/books/genres/{genre}",
+     *     path="/libraries/books/genres/{genre}",
      *     operationId="updateLibraryBookGenre",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -159,9 +156,8 @@ class LibraryBookGenreController
      *         description="Genre updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryBookGenre")
      *         )
      *     ),
@@ -182,7 +178,7 @@ class LibraryBookGenreController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/books/genres/{genre}",
+     *     path="/libraries/books/genres/{genre}",
      *     operationId="destroyLibraryBookGenre",
      *     tags={"Libraries - Books"},
      *     security={{"sanctum": {}}},
@@ -201,9 +197,9 @@ class LibraryBookGenreController
      *         description="Genre deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Genre deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

@@ -20,7 +20,7 @@ class LibraryLinkCategoryController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/links/categories",
+     *     path="/libraries/links/categories",
      *     operationId="listLibraryLinkCategories",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -30,9 +30,8 @@ class LibraryLinkCategoryController
      *         description="Categories retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Categories retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryLinkCategory"))
      *         )
      *     ),
@@ -50,7 +49,7 @@ class LibraryLinkCategoryController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/links/categories",
+     *     path="/libraries/links/categories",
      *     operationId="storeLibraryLinkCategory",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -71,9 +70,8 @@ class LibraryLinkCategoryController
      *         description="Category created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Category created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryLinkCategory")
      *         )
      *     ),
@@ -91,7 +89,7 @@ class LibraryLinkCategoryController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/links/categories/{category}",
+     *     path="/libraries/links/categories/{category}",
      *     operationId="updateLibraryLinkCategory",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -121,9 +119,8 @@ class LibraryLinkCategoryController
      *         description="Category updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Category updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryLinkCategory")
      *         )
      *     ),
@@ -144,7 +141,7 @@ class LibraryLinkCategoryController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/links/categories/{category}",
+     *     path="/libraries/links/categories/{category}",
      *     operationId="destroyLibraryLinkCategory",
      *     tags={"Libraries - Links"},
      *     security={{"sanctum": {}}},
@@ -163,9 +160,9 @@ class LibraryLinkCategoryController
      *         description="Category deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Category deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

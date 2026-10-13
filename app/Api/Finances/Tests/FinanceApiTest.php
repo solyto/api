@@ -4,9 +4,6 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use App\Api\Finances\Services\WealthService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Budget CRUD', function () {
     it('lists, stores, shows, updates and deletes budgets', function () {

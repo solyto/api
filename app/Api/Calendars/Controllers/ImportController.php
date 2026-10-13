@@ -26,7 +26,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/import/start",
+     *     path="/calendars/import/start",
      *     operationId="startCalendarsImport",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -48,9 +48,8 @@ class ImportController
      *         description="Import started successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Import started successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items())
      *         )
      *     ),
@@ -75,7 +74,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/api/calendars/import/select",
+     *     path="/calendars/import/select",
      *     operationId="selectCalendarsForImport",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -95,9 +94,8 @@ class ImportController
      *         description="Import calendars selected successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Import calendars selected successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items())
      *         )
      *     ),
@@ -124,7 +122,7 @@ class ImportController
 
     /**
      * @OA\Get(
-     *     path="/api/calendars/import/state",
+     *     path="/calendars/import/state",
      *     operationId="getCalendarsImportState",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -134,9 +132,8 @@ class ImportController
      *         description="Import state retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Import state retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/CalendarImportState")
      *         )
      *     ),

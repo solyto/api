@@ -20,7 +20,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Get(
-     *     path="/api/time-tracking-projects",
+     *     path="/time-tracking-projects",
      *     operationId="timeTrackingProjectIndex",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Get(
-     *     path="/api/time-tracking-projects/{project}",
+     *     path="/time-tracking-projects/{project}",
      *     operationId="timeTrackingProjectShow",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -57,7 +57,7 @@ class TimeTrackingProjectController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -91,7 +91,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Post(
-     *     path="/api/time-tracking-projects",
+     *     path="/time-tracking-projects",
      *     operationId="timeTrackingProjectStore",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -139,7 +139,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Put(
-     *     path="/api/time-tracking-projects/{project}",
+     *     path="/time-tracking-projects/{project}",
      *     operationId="timeTrackingProjectUpdate",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -149,7 +149,7 @@ class TimeTrackingProjectController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -199,7 +199,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Delete(
-     *     path="/api/time-tracking-projects/{project}",
+     *     path="/time-tracking-projects/{project}",
      *     operationId="timeTrackingProjectDestroy",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -209,7 +209,7 @@ class TimeTrackingProjectController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

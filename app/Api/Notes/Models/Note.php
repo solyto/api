@@ -5,6 +5,7 @@ namespace App\Api\Notes\Models;
 use App\Api\Notes\Factories\NoteFactory;
 use App\Api\Tags\Models\Tag;
 use App\Api\Users\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -50,7 +51,7 @@ class Note extends Model
             ->withTimestamps();
     }
 
-    public function scopeForUser($query, $userId)
+    public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);
     }

@@ -66,7 +66,8 @@ class ApiResponse
         return self::error($message, 401);
     }
 
-    public static function forbidden(string $message = 'Forbidden'): JsonResponse {
+    public static function forbidden(string $message = 'Forbidden'): JsonResponse
+    {
         return self::error($message, 403);
     }
 
@@ -101,7 +102,6 @@ class ApiResponse
     {
         return $data instanceof LengthAwarePaginator;
     }
-
 
     private static function getPaginationMeta($data): array
     {

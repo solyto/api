@@ -26,7 +26,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music",
+     *     path="/libraries/music",
      *     operationId="listLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -36,9 +36,8 @@ class LibraryMusicController
      *         description="Music list retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Music list retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMusic"))
      *         )
      *     ),
@@ -56,7 +55,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/{music}",
+     *     path="/libraries/music/{music}",
      *     operationId="showLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -75,9 +74,8 @@ class LibraryMusicController
      *         description="Music entry retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Music entry retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMusic")
      *         )
      *     ),
@@ -98,7 +96,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/recommend/{type}",
+     *     path="/libraries/music/recommend/{type}",
      *     operationId="recommendLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -117,9 +115,8 @@ class LibraryMusicController
      *         description="Recommendation retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Recommendation retrieved successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryRecommendation")
      *         )
      *     ),
@@ -157,7 +154,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/releases",
+     *     path="/libraries/music/releases",
      *     operationId="listLibraryMusicReleases",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -167,9 +164,8 @@ class LibraryMusicController
      *         description="Releases retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Releases retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/LibraryMusicRelease"))
      *         )
      *     ),
@@ -189,7 +185,7 @@ class LibraryMusicController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/music",
+     *     path="/libraries/music",
      *     operationId="storeLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -221,9 +217,8 @@ class LibraryMusicController
      *         description="Music entry created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Music entry created successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMusic")
      *         )
      *     ),
@@ -241,7 +236,7 @@ class LibraryMusicController
 
     /**
      * @OA\Put(
-     *     path="/api/libraries/music/{music}",
+     *     path="/libraries/music/{music}",
      *     operationId="updateLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -282,9 +277,8 @@ class LibraryMusicController
      *         description="Music entry updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Music entry updated successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/LibraryMusic")
      *         )
      *     ),
@@ -305,7 +299,7 @@ class LibraryMusicController
 
     /**
      * @OA\Delete(
-     *     path="/api/libraries/music/{music}",
+     *     path="/libraries/music/{music}",
      *     operationId="destroyLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -324,9 +318,9 @@ class LibraryMusicController
      *         description="Music entry deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Music entry deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -345,7 +339,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/search/deezer/{artist}/{album}",
+     *     path="/libraries/music/search/deezer/{artist}/{album}",
      *     operationId="searchAlbumOnDeezer",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -373,9 +367,8 @@ class LibraryMusicController
      *         description="Info from Deezer retrieved",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Info from Deezer retrieved."),
      *             @OA\Property(property="data", type="object")
      *         )
      *     ),
@@ -392,8 +385,8 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/search/{service}/{query}",
-     *     operationId="search",
+     *     path="/libraries/music/search/{service}/{query}",
+     *     operationId="searchLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
      *
@@ -420,9 +413,8 @@ class LibraryMusicController
      *         description="Search results retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Search results retrieved successfully."),
      *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
      *         )
      *     ),
@@ -442,8 +434,8 @@ class LibraryMusicController
 
     /**
      * @OA\Post(
-     *     path="/api/libraries/music/import/{service}",
-     *     operationId="import",
+     *     path="/libraries/music/import/{service}",
+     *     operationId="importLibraryMusic",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
      *
@@ -471,9 +463,8 @@ class LibraryMusicController
      *         description="Album imported successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Album imported successfully."),
      *             @OA\Property(property="data", ref="#/components/schemas/MusicReleaseImport")
      *         )
      *     ),
@@ -498,7 +489,7 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/api/libraries/music/integrations",
+     *     path="/libraries/music/integrations",
      *     operationId="musicIntegrations",
      *     tags={"Libraries - Music"},
      *     security={{"sanctum": {}}},
@@ -508,9 +499,8 @@ class LibraryMusicController
      *         description="Available music integrations retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Available music integrations retrieved successfully."),
      *             @OA\Property(property="data", type="object", @OA\Property(property="integrations", type="array", @OA\Items(type="string", enum={"deezer", "discogs", "spotify"})))
      *         )
      *     ),

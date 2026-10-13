@@ -9,10 +9,7 @@ use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Tags\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-
-uses(RefreshDatabase::class);
 
 describe('Library book CRUD', function () {
     it('lists, stores, shows, updates and deletes books', function () {

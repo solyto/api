@@ -99,7 +99,8 @@ class ImportFeeds extends Command
         }
     }
 
-    private function parseOpml(string $content): array {
+    private function parseOpml(string $content): array
+    {
         $content = preg_replace('/&(?!(?:[a-zA-Z]+|#[0-9]+|#x[0-9a-fA-F]+);)/', '&amp;', $content);
 
         libxml_use_internal_errors(true);

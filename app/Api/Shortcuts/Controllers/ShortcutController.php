@@ -20,7 +20,7 @@ class ShortcutController
 
     /**
      * @OA\Get(
-     *     path="/api/shortcuts",
+     *     path="/shortcuts",
      *     operationId="shortcutIndex",
      *     tags={"Shortcuts"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class ShortcutController
 
     /**
      * @OA\Get(
-     *     path="/api/shortcuts/{shortcut}",
+     *     path="/shortcuts/{shortcut}",
      *     operationId="shortcutShow",
      *     tags={"Shortcuts"},
      *     security={{"sanctum":{}}},
@@ -86,7 +86,7 @@ class ShortcutController
 
     /**
      * @OA\Post(
-     *     path="/api/shortcuts",
+     *     path="/shortcuts",
      *     operationId="shortcutStore",
      *     tags={"Shortcuts"},
      *     security={{"sanctum":{}}},
@@ -129,7 +129,7 @@ class ShortcutController
 
     /**
      * @OA\Put(
-     *     path="/api/shortcuts/{shortcut}",
+     *     path="/shortcuts/{shortcut}",
      *     operationId="shortcutUpdate",
      *     tags={"Shortcuts"},
      *     security={{"sanctum":{}}},
@@ -185,7 +185,7 @@ class ShortcutController
 
     /**
      * @OA\Delete(
-     *     path="/api/shortcuts/{shortcut}",
+     *     path="/shortcuts/{shortcut}",
      *     operationId="shortcutDestroy",
      *     tags={"Shortcuts"},
      *     security={{"sanctum":{}}},

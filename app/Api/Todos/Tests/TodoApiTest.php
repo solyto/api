@@ -6,9 +6,6 @@ use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Models\TodoSubtask;
 use App\Api\Todos\Models\TodoWorkspace;
 use App\Api\Todos\Services\TodoService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('Todo categories CRUD', function () {
     it('lists, stores, shows, updates and deletes categories', function () {

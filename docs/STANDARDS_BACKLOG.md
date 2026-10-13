@@ -44,9 +44,9 @@ go-ahead first (package rule in `docs/AGENTS.md`).
       Check: `grep -rc 'path="/api/' app/Api/*/Controllers` or `/v1/` → all 0.
 - [ ] Inline envelope → `allOf SuccessResponse`: 137 blocks in 20 controller
       files (rule 2.3). Check: `grep -rn '@OA\\Property(property="success"' app/Api/*/Controllers` → 0.
-- [ ] 422 schema: 54 `ValidationErrorResponse` refs in 21 files →
-      `ErrorResponse`; delete the schema from `app/OpenApi/OpenApiSpec.php:54-61`
-      (rule 2.4, after OQ-2). Check: `grep -rn ValidationErrorResponse app` → 0.
+- [ ] 422 schema: the 21 validation 422s that reference `ErrorResponse`
+      (Todos, Notes, Calendars, CheckIn, Users) → `ValidationErrorResponse`
+      (rule 2.4, OQ-2 decided: keep the schema).
 - [ ] Duplicate `operationId`s `search` ×4 and `import` ×5 in
       `Libraries/Controllers/Library{Book,Movie,Game,Music,Recipe}Controller.php`
       → `searchLibraryBooks`, `importLibraryBook`, … (rule 2.5).

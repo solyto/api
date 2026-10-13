@@ -18,7 +18,7 @@ class NotesImportExportController
 
     /**
      * @OA\Post(
-     *     path="/v1/notes/import",
+     *     path="/notes/import",
      *     operationId="noteImport",
      *     summary="Import notes from a file",
      *     tags={"Notes"},
@@ -83,7 +83,7 @@ class NotesImportExportController
 
     /**
      * @OA\Get(
-     *     path="/v1/notes/export",
+     *     path="/notes/export",
      *     operationId="noteExport",
      *     summary="Export notes to a file",
      *     tags={"Notes"},

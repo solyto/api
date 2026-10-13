@@ -20,7 +20,7 @@ class TagController
 
     /**
      * @OA\Get(
-     *     path="/api/tags",
+     *     path="/tags",
      *     operationId="tagIndex",
      *     tags={"Tags"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class TagController
 
     /**
      * @OA\Get(
-     *     path="/api/tags/{tag}",
+     *     path="/tags/{tag}",
      *     operationId="tagShow",
      *     tags={"Tags"},
      *     security={{"sanctum":{}}},
@@ -86,7 +86,7 @@ class TagController
 
     /**
      * @OA\Post(
-     *     path="/api/tags",
+     *     path="/tags",
      *     operationId="tagStore",
      *     tags={"Tags"},
      *     security={{"sanctum":{}}},
@@ -128,7 +128,7 @@ class TagController
 
     /**
      * @OA\Put(
-     *     path="/api/tags/{tag}",
+     *     path="/tags/{tag}",
      *     operationId="tagUpdate",
      *     tags={"Tags"},
      *     security={{"sanctum":{}}},
@@ -183,7 +183,7 @@ class TagController
 
     /**
      * @OA\Delete(
-     *     path="/api/tags/{tag}",
+     *     path="/tags/{tag}",
      *     operationId="tagDestroy",
      *     tags={"Tags"},
      *     security={{"sanctum":{}}},

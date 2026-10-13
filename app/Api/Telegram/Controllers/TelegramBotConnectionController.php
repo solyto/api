@@ -17,7 +17,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Get(
-     *     path="/api/telegram/token",
+     *     path="/telegram/token",
      *     operationId="telegramBotConnectionGetToken",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},
@@ -54,7 +54,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Get(
-     *     path="/api/telegram/connection",
+     *     path="/telegram/connection",
      *     operationId="telegramBotConnectionGetRequest",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},
@@ -83,7 +83,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Put(
-     *     path="/api/telegram/your-day-alert",
+     *     path="/telegram/your-day-alert",
      *     operationId="telegramBotConnectionUpdateYourDayAlert",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},
@@ -129,7 +129,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Put(
-     *     path="/api/telegram/check-in-alert",
+     *     path="/telegram/check-in-alert",
      *     operationId="telegramBotConnectionUpdateCheckInAlert",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},
@@ -175,7 +175,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Post(
-     *     path="/api/telegram/confirm-token",
+     *     path="/telegram/confirm-token",
      *     operationId="telegramBotConnectionConfirmToken",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},

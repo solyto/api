@@ -4,9 +4,6 @@ use App\Api\TimeTracking\Models\TimeTrackingCategory;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Users\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 describe('TimeTrackingEntry Factory', function () {
     it('creates a valid time tracking entry', function () {
