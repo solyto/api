@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Books;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLibraryBookRequest extends FormRequest
 {
@@ -26,9 +27,9 @@ class StoreLibraryBookRequest extends FormRequest
             'wishlist' => 'nullable|boolean',
             'summary' => 'nullable|string',
             'genres' => 'nullable|array',
-            'genres.*' => 'exists:library_books_genres,id',
+            'genres.*' => [Rule::exists('library_books_genres', 'id')->where('user_id', $this->user()->id)],
             'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

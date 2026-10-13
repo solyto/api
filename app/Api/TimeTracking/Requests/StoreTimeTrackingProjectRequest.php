@@ -3,6 +3,7 @@
 namespace App\Api\TimeTracking\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTimeTrackingProjectRequest extends FormRequest
 {
@@ -13,7 +14,7 @@ class StoreTimeTrackingProjectRequest extends FormRequest
             'description' => 'nullable|string|max:1000',
             'color' => 'nullable|string|max:7',
             'category_ids' => 'nullable|array',
-            'category_ids.*' => 'exists:time_tracking_categories,id'
+            'category_ids.*' => [Rule::exists('time_tracking_categories', 'id')->where('user_id', $this->user()->id)]
         ];
     }
 }

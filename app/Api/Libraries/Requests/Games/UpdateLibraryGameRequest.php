@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Games;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLibraryGameRequest extends FormRequest
 {
@@ -23,9 +24,9 @@ class UpdateLibraryGameRequest extends FormRequest
             'completed' => 'sometimes|nullable|boolean',
             'wishlist' => 'sometimes|nullable|boolean',
             'genres' => 'sometimes|nullable|array',
-            'genres.*' => 'exists:library_games_genres,id',
+            'genres.*' => [Rule::exists('library_games_genres', 'id')->where('user_id', $this->user()->id)],
             'tags' => 'sometimes|nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

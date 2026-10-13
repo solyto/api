@@ -3,6 +3,7 @@
 namespace App\Api\Todos\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTodoWorkspaceRequest extends FormRequest
 {
@@ -11,7 +12,7 @@ class StoreTodoWorkspaceRequest extends FormRequest
         return [
             'title' => 'required|string|max:50',
             'categories' => 'sometimes|array',
-            'categories.*' => 'exists:todo_categories,id'
+            'categories.*' => [Rule::exists('todo_categories', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

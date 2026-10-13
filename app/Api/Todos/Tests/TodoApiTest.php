@@ -107,6 +107,28 @@ describe('Todo workspaces CRUD', function () {
 
         expect($workspace->fresh()->categories)->toHaveCount(0);
     });
+
+    it('rejects another user\'s category on workspace store, attach and detach', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $workspace = TodoWorkspace::factory()->forUser($user)->create();
+        $foreignCategory = TodoCategory::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos/workspaces', ['title' => 'Projects', 'categories' => [$foreignCategory->id]])
+            ->assertStatus(422);
+
+        foreach (['attach', 'detach'] as $action) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/todos/workspaces/'.$workspace->id.'/categories/'.$action, [
+                    'categories' => [$foreignCategory->id],
+                ])
+                ->assertStatus(422);
+        }
+
+        expect(TodoWorkspace::count())->toBe(1);
+        expect($workspace->fresh()->categories)->toHaveCount(0);
+    });
 });
 
 describe('Todo CRUD', function () {
@@ -163,6 +185,38 @@ describe('Todo CRUD', function () {
             ->getJson('/api/v1/todos')
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
+    });
+
+    it('rejects another user\'s category and tags on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $todo = Todo::factory()->forUser($user)->create();
+        $foreignCategory = TodoCategory::factory()->forUser($other)->create();
+        $foreignTag = Tag::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/todos/'.$todo->id, ['category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/todos/'.$todo->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        expect(Todo::count())->toBe(1);
+        expect($todo->fresh()->category_id)->toBeNull();
+        expect($todo->fresh()->tags)->toHaveCount(0);
     });
 
     it('lists due-date todos', function () {

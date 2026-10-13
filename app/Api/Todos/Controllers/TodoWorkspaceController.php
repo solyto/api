@@ -11,6 +11,7 @@ use App\Api\Todos\Resources\TodoWorkspaceResource;
 use App\Api\Todos\Services\TodoWorkspaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class TodoWorkspaceController
 {
@@ -270,7 +271,7 @@ class TodoWorkspaceController
 
         $validatedData = $request->validate([
             'categories' => 'required|array',
-            'categories.*' => 'exists:todo_categories,id',
+            'categories.*' => [Rule::exists('todo_categories', 'id')->where('user_id', $request->user()->id)],
         ]);
 
         $workspace = $this->todoWorkspaceService->attachCategories($workspace, $validatedData['categories']);
@@ -332,7 +333,7 @@ class TodoWorkspaceController
 
         $validatedData = $request->validate([
             'categories' => 'required|array',
-            'categories.*' => 'exists:todo_categories,id',
+            'categories.*' => [Rule::exists('todo_categories', 'id')->where('user_id', $request->user()->id)],
         ]);
 
         $workspace = $this->todoWorkspaceService->detachCategories($workspace, $validatedData['categories']);

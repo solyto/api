@@ -73,6 +73,26 @@ describe('Time tracking categories and projects', function () {
             ->assertStatus(200)
             ->assertJsonPath('data.color', '#445566');
     });
+
+    it('rejects another user\'s categories on project store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($user)->create();
+        $foreignCategory = TimeTrackingCategory::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/projects', ['title' => 'Solyto', 'category_ids' => [$foreignCategory->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_ids.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/projects/'.$project->id, ['category_ids' => [$foreignCategory->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_ids.0');
+
+        expect(TimeTrackingProject::count())->toBe(1);
+        expect($project->fresh()->categories)->toHaveCount(0);
+    });
 });
 
 describe('Time tracking entries', function () {

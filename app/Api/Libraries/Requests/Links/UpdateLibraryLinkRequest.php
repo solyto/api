@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Requests\Links;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLibraryLinkRequest extends FormRequest
 {
@@ -14,8 +15,8 @@ class UpdateLibraryLinkRequest extends FormRequest
             'is_favorite' => 'sometimes|boolean',
             'cover_path' => 'nullable|string',
             'tags' => 'sometimes|nullable|array',
-            'tags.*' => 'exists:tags,id',
-            'category_id' => 'sometimes|nullable|exists:library_links_categories,id',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
+            'category_id' => ['sometimes', 'nullable', Rule::exists('library_links_categories', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

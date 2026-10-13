@@ -66,6 +66,38 @@ describe('Note CRUD', function () {
             ->getJson('/api/v1/notes/'.$note->id)
             ->assertStatus(403);
     });
+
+    it('rejects another user\'s category and tags on store and update', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $note = Note::factory()->forUser($user)->create();
+        $foreignCategory = NoteCategory::factory()->forUser($other)->create();
+        $foreignTag = Tag::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/'.$note->id, ['category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/'.$note->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        expect(Note::count())->toBe(1);
+        expect($note->fresh()->category_id)->toBeNull();
+        expect($note->fresh()->tags)->toHaveCount(0);
+    });
 });
 
 describe('Note categories CRUD', function () {
@@ -95,6 +127,19 @@ describe('Note categories CRUD', function () {
 
         // Only the provisioned journal folder remains.
         expect(NoteCategory::count())->toBe(1);
+    });
+
+    it('rejects another user\'s category as parent', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $foreignParent = NoteCategory::factory()->forUser($other)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes/categories', ['title' => 'Child', 'parent_id' => $foreignParent->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('parent_id');
+
+        expect(NoteCategory::where('title', 'Child')->exists())->toBeFalse();
     });
 });
 
