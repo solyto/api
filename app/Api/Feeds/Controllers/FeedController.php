@@ -101,7 +101,7 @@ class FeedController
      *         required=true,
      *         description="Feed Subscription ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -366,7 +366,7 @@ class FeedController
      *         required=true,
      *         description="Feed Subscription ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -420,7 +420,7 @@ class FeedController
      *         required=true,
      *         description="Feed Subscription ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

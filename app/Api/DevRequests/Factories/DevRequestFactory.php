@@ -6,6 +6,7 @@ use App\Api\DevRequests\Models\DevRequest;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<DevRequest> */
 class DevRequestFactory extends Factory
 {
     protected $model = DevRequest::class;

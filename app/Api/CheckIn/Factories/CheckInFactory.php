@@ -6,6 +6,7 @@ use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<CheckIn> */
 class CheckInFactory extends Factory
 {
     protected $model = CheckIn::class;

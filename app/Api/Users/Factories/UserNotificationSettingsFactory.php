@@ -6,6 +6,7 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserNotificationSettings;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<UserNotificationSettings> */
 class UserNotificationSettingsFactory extends Factory
 {
     protected $model = UserNotificationSettings::class;

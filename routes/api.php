@@ -139,7 +139,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     Route::prefix('notes')->name('notes.')->group(function () {
         Route::post('import', [NotesImportExportController::class, 'import']);
-        Route::get('export', [NotesImportExportController::class, 'export']);
         Route::patch('categories/{category}/hidden', [NoteCategoryController::class, 'updateHidden']);
         Route::apiResource('categories', NoteCategoryController::class);
         Route::get('newest', [NoteController::class, 'newest']);
@@ -296,7 +295,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
         Route::prefix('plants')->name('plants.')->group(function () {
             Route::apiResource('/', LibraryPlantController::class)->parameters(['' => 'plant']);
-            Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover'])->name('uploadCover');
+            Route::post('/{plant}/cover', [LibraryPlantController::class, 'uploadCover']);
         });
     });
 

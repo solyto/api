@@ -6,10 +6,12 @@ parameters:
     level: 5
     paths:
         - app
+    # Every PHPStan process boots Laravel; one worker per CPU gets the 2 GiB
+    # dev container OOM-killed. `composer analyse` runs one process (--debug)
+    # capped at 500M; this only limits a bare `phpstan analyse`.
+    parallel:
+        maximumNumberOfProcesses: 1
     excludePaths:
         - app/Dav
-        # Empty stub methods (`export()` / `confirmToken()` have no body), which
-        # PHPStan reports as non-ignorable `return.missing` errors that cannot
-        # be baselined. Remove these once the stubs are fixed.
-        - app/Api/Notes/Controllers/NotesImportExportController.php
-        - app/Api/Telegram/Controllers/TelegramBotConnectionController.php
+        - app/*/Tests/*
+        - app/Api/*/Tests/*

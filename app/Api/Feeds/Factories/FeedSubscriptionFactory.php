@@ -7,6 +7,7 @@ use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<FeedSubscription> */
 class FeedSubscriptionFactory extends Factory
 {
     protected $model = FeedSubscription::class;

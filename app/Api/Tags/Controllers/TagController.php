@@ -30,9 +30,9 @@ class TagController
      *         description="Tags retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Tag")),
-     *             @OA\Property(property="message", type="string", example="Tags retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Tag"))
      *         )
      *     )
      * )
@@ -65,9 +65,9 @@ class TagController
      *         description="Tag retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Tag"),
-     *             @OA\Property(property="message", type="string", example="Tag retrieved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Tag")
      *         )
      *     ),
      *
@@ -107,9 +107,9 @@ class TagController
      *         description="Tag created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Tag"),
-     *             @OA\Property(property="message", type="string", example="Tag created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Tag")
      *         )
      *     ),
      *
@@ -156,9 +156,9 @@ class TagController
      *         description="Tag updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Tag"),
-     *             @OA\Property(property="message", type="string", example="Tag updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Tag")
      *         )
      *     ),
      *
@@ -201,9 +201,9 @@ class TagController
      *         description="Tag deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Tag deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

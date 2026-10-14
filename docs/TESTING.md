@@ -9,7 +9,7 @@ Run with `composer test` (clears the config cache, then `php artisan test`)
 or `php artisan test` / `./vendor/bin/pest` directly. Filter with
 `php artisan test --filter=Todo` or `php artisan test app/Api/Todos/Tests`.
 Coverage needs a driver (`pcov` or Xdebug) that is not installed by
-default; see `docs/STANDARDS_BACKLOG.md` → Tooling.
+default; a coverage driver was not approved (`docs/STANDARDS.md` → Decisions).
 
 Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
 `tests/Pest.php` and `pest.php` on 2026-10-13.
@@ -62,7 +62,7 @@ tests have no database refresh unless they ask for it.
 | `makeUser(array $attributes = [])` | a verified user; 305 calls, the standard fixture |
 | `$this->actingAs($user, 'sanctum')` | the standard way to authenticate a request (314 calls) |
 | `authHeaders($user)` / `sanctumToken($user)` | only when the test is about tokens themselves (`AuthTest`) |
-| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; defined, currently unused — use them |
+| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; `expectApiError` is the standard for error cases, `expectApiSuccess` has no callers yet — use both |
 | `Model::factory()->forUser($user)` | every user-owned factory has this state |
 
 Custom expectations `greaterThan`, `lessThan`, `toBeBoolean` alias Pest
@@ -78,7 +78,7 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
   403 on `show/update/destroy` and is absent from `index`
   (`TodoApiTest.php:46-59`); and, once `STANDARDS.md` 3.2 is implemented,
   posting another user's `category_id`/`tags`/`genres`/`parent_id`
-  returns 422. Eleven API test files have no isolation case yet (backlog).
+  returns 422.
 - **Validation** — a non-conforming payload returns 422 with the field in
   `errors`.
 - **Service logic** that is not CRUD: parsing (`TodoService::parse`,
@@ -91,6 +91,14 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
 - **Shared contracts** in `tests/Unit` with `covers()`: `ApiResponse`,
   `OpenApiSpecTest` (fails on any drift beyond the two kept entries in
   `OPENAPI_KNOWN_DRIFT`, and on a listed entry that no longer drifts).
+- **`ResourceSchemaDriftTest`** (rule 2.6) reads source statically and
+  compares only top-level keys. It does not see nested keys, keys inside
+  `merge()`/`mergeWhen()` or a nested array, non-literal keys
+  (`self::KEY =>`), or keys added outside the `return [` literal
+  (`+ $extra`); a resource built that way passes unchecked, so cover its
+  keys in the module's API test (`assertJsonStructure`). A `toArray()`
+  without a `return [` literal fails as "no toArray() array literal" —
+  restructure it rather than allow-listing it.
 
 Not tested, on purpose: that a factory produces what its state says, that
 `$fillable` equals `$fillable`, that casts cast, that a `belongsTo` returns

@@ -88,7 +88,7 @@ class DiscogsService
         ), $items);
     }
 
-    private function getRelease(int $releaseId): mixed
+    private function getRelease(int $releaseId): array
     {
         return $this->client->releaseGet(['id' => $releaseId]);
     }

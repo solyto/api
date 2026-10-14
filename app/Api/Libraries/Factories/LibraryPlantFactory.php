@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryPlant;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryPlant> */
 class LibraryPlantFactory extends Factory
 {
     protected $model = LibraryPlant::class;

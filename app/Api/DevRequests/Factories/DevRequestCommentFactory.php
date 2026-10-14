@@ -7,6 +7,7 @@ use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<DevRequestComment> */
 class DevRequestCommentFactory extends Factory
 {
     protected $model = DevRequestComment::class;

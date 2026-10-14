@@ -7,6 +7,7 @@ use App\Api\Libraries\Models\LibraryLinkCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryLink> */
 class LibraryLinkFactory extends Factory
 {
     protected $model = LibraryLink::class;

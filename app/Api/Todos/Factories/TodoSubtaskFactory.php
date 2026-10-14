@@ -6,6 +6,7 @@ use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Models\TodoSubtask;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<TodoSubtask> */
 class TodoSubtaskFactory extends Factory
 {
     protected $model = TodoSubtask::class;

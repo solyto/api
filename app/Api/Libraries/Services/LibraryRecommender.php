@@ -42,11 +42,15 @@ class LibraryRecommender
         private readonly AiService $aiService
     ) {}
 
-    public function favorite(LibraryTypeEnum $type, User $user): array
+    public function favorite(LibraryTypeEnum $type, User $user): ?array
     {
         $this->assertType($type);
 
         $item = $type->getModel()::forUser($user->id)->where('rating', '>=', 4)->inRandomOrder()->first();
+
+        if (!$item) {
+            return null;
+        }
 
         return [
             'id' => $item->id,
@@ -57,11 +61,15 @@ class LibraryRecommender
         ];
     }
 
-    public function unrated(LibraryTypeEnum $type, User $user): array
+    public function unrated(LibraryTypeEnum $type, User $user): ?array
     {
         $this->assertType($type);
 
         $item = $type->getModel()::forUser($user->id)->where('rating', null)->inRandomOrder()->first();
+
+        if (!$item) {
+            return null;
+        }
 
         return [
             'id' => $item->id,

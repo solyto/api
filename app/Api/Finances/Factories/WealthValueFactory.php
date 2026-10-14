@@ -6,6 +6,7 @@ use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<WealthValue> */
 class WealthValueFactory extends Factory
 {
     protected $model = WealthValue::class;

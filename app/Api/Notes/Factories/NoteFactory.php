@@ -7,6 +7,7 @@ use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Note> */
 class NoteFactory extends Factory
 {
     protected $model = Note::class;

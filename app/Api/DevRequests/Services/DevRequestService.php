@@ -18,13 +18,13 @@ class DevRequestService
         return DevRequest::with('votes')->withCount('comments')->get();
     }
 
-    public function create(array $data): DevRequest
+    public function create(User $user, array $data): DevRequest
     {
         $screenshot = $data['screenshot'] ?? null;
         $screenshotName = $data['screenshot_name'] ?? null;
         unset($data['screenshot'], $data['screenshot_name']);
 
-        $devRequest = DevRequest::create($data);
+        $devRequest = DevRequest::create([...$data, 'created_by_user_id' => $user->id]);
 
         if (!empty($screenshot)) {
             $this->screenshotService->save($devRequest->id, $screenshotName, $screenshot);

@@ -6,6 +6,7 @@ use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Clipboard> */
 class ClipboardFactory extends Factory
 {
     protected $model = Clipboard::class;

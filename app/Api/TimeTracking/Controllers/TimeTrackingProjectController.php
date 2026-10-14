@@ -30,9 +30,9 @@ class TimeTrackingProjectController
      *         description="Time tracking projects retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingProject")),
-     *             @OA\Property(property="message", type="string", example="Time tracking projects retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingProject"))
      *         )
      *     )
      * )
@@ -65,9 +65,9 @@ class TimeTrackingProjectController
      *         description="Time tracking project retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject"),
-     *             @OA\Property(property="message", type="string", example="Time tracking project retrieved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject")
      *         )
      *     ),
      *
@@ -114,9 +114,9 @@ class TimeTrackingProjectController
      *         description="Time tracking project created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject"),
-     *             @OA\Property(property="message", type="string", example="Time tracking project created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject")
      *         )
      *     ),
      *
@@ -169,9 +169,9 @@ class TimeTrackingProjectController
      *         description="Time tracking project updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject"),
-     *             @OA\Property(property="message", type="string", example="Time tracking project updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingProject")
      *         )
      *     ),
      *
@@ -217,9 +217,9 @@ class TimeTrackingProjectController
      *         description="Time tracking project deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Time tracking project deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
