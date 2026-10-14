@@ -24,7 +24,7 @@ return [
         '/^https:\/\/.*\.solyto\.de$/',
         '/^https:\/\/.*\.solyto\.app$/',
     ],
-    'allowed_headers' => ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    'allowed_headers' => ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Client-Version'],
     'exposed_headers' => [],
     'max_age' => 86400,
     'supports_credentials' => true,
