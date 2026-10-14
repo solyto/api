@@ -59,11 +59,17 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('v1')->group(function () {
     Route::get('health', function () {
-        return ApiResponse::success([
+        $app = 'solyto';
+        $version = config('app.version');
+
+        $response = ApiResponse::success([
             'status' => 'OK',
-            'app' => 'solyto',
-            'version' => config('app.version'),
+            'app' => $app,
+            'version' => $version,
         ]);
+
+        // Pinned legacy contract (STANDARDS 1.5, 13.5): solyto/app <= 1.0.15 reads `app` and `version` from the top level during self-hosted setup.
+        return $response->setData([...$response->getData(true), 'app' => $app, 'version' => $version]);
     });
 
     Route::prefix('auth')->group(function () {
