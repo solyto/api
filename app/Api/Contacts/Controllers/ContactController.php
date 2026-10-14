@@ -24,7 +24,7 @@ class ContactController
 
     /**
      * @OA\Get(
-     *     path="/contacts/address-books",
+     *     path="/address-books",
      *     operationId="listAddressBooks",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -53,7 +53,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/contacts/address-books",
+     *     path="/address-books",
      *     operationId="storeAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -95,7 +95,7 @@ class ContactController
 
     /**
      * @OA\Put(
-     *     path="/contacts/address-books/{addressBookId}",
+     *     path="/address-books/{addressBookId}",
      *     operationId="updateAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -150,7 +150,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/contacts/address-books/{addressBookId}",
+     *     path="/address-books/{addressBookId}",
      *     operationId="destroyAddressBook",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -194,7 +194,7 @@ class ContactController
 
     /**
      * @OA\Get(
-     *     path="/contacts",
+     *     path="/address-books/contacts",
      *     operationId="listContacts",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -223,7 +223,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/contacts/photos",
+     *     path="/address-books/contacts/photos",
      *     operationId="getContactPhotos",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -272,7 +272,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/contacts/address-books/{addressBookId}",
+     *     path="/address-books/{addressBookId}/contacts",
      *     operationId="storeContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -345,7 +345,7 @@ class ContactController
 
     /**
      * @OA\Put(
-     *     path="/contacts/address-books/{addressBookId}/{contactUri}",
+     *     path="/address-books/{addressBookId}/contacts/{contactUri}",
      *     operationId="updateContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -437,7 +437,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/contacts/address-books/{addressBookId}/{contactUri}",
+     *     path="/address-books/{addressBookId}/contacts/{contactUri}",
      *     operationId="destroyContact",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -498,7 +498,7 @@ class ContactController
 
     /**
      * @OA\Post(
-     *     path="/contacts/address-books/{addressBookId}/{contactUri}/photo",
+     *     path="/address-books/{addressBookId}/contacts/{contactUri}/photo",
      *     operationId="updateContactPhoto",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -580,7 +580,7 @@ class ContactController
 
     /**
      * @OA\Delete(
-     *     path="/contacts/address-books/{addressBookId}/{contactUri}/photo",
+     *     path="/address-books/{addressBookId}/contacts/{contactUri}/photo",
      *     operationId="removeContactPhoto",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},

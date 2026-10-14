@@ -146,7 +146,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/auth/logoutAll",
+     *     path="/auth/logout-all",
      *     operationId="authLogoutAll",
      *     summary="Logout from all devices",
      *     tags={"Auth"},
@@ -289,7 +289,7 @@ class AuthController
 
     /**
      * @OA\Post(
-     *     path="/auth/revokeToken",
+     *     path="/auth/revoke-token",
      *     operationId="authRevokeToken",
      *     summary="Revoke a token",
      *     tags={"Auth"},

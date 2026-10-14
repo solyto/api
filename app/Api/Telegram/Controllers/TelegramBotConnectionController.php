@@ -17,7 +17,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Get(
-     *     path="/telegram/token",
+     *     path="/telegram/token-request",
      *     operationId="telegramBotConnectionGetToken",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},
@@ -54,7 +54,7 @@ class TelegramBotConnectionController
 
     /**
      * @OA\Get(
-     *     path="/telegram/connection",
+     *     path="/telegram/request",
      *     operationId="telegramBotConnectionGetRequest",
      *     tags={"Telegram"},
      *     security={{"sanctum":{}}},

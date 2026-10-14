@@ -36,8 +36,9 @@ not the AI's:
 
 1. **Two generations of OpenAPI annotations.** `/api/…` + inline envelope
    (186 operations, June 2026) next to `/v1/…` + `allOf SuccessResponse`
-   (82, later). Neither matches `@OA\Server(url="/api/v1")`; 80 of 268
-   operations point at paths that do not exist (section 2).
+   (82, later). Neither matched `@OA\Server(url="/api/v1")`; 80 of 268
+   operations pointed at paths that did not exist. Prefixes and paths are
+   fixed; 2 operations remain, on purpose (section 2).
 2. **`exists:table,id` taken as an ownership check.** 40 rules; a user can
    link another user's category, tag, genre or folder to their own record
    and read its name back (section 3, backlog item 1).
@@ -180,7 +181,8 @@ config exists).
 The spec is generated from `@OA` docblocks on every action (268 operations)
 and `@OA\Schema` on 64 of 68 resources. `tests/Unit/OpenApiSpecTest.php`
 checks every documented path (server URL + operation path) against the
-route table and pins 80 stale paths as `OPENAPI_KNOWN_DRIFT`.
+route table and pins the 2 operations that are kept on purpose as
+`OPENAPI_KNOWN_DRIFT` (rule 2.2).
 
 ### 2.1 Operation paths are relative to `@OA\Server`
 
@@ -196,14 +198,21 @@ Check: `grep -rcE 'path="/(api|v1)/' app/Api/*/Controllers` → all 0.
 
 ### 2.2 The path in the annotation is the path in `routes/api.php`
 
-80 of 268 operations document a path that does not resolve
-(`tests/Unit/OpenApiSpecTest.php:16-97`): `/api/check-ins` for prefix
-`check-in` (`routes/api.php:151`), `/api/clipboards` for `clipboard` (`:380`),
-`/api/time-tracking-entries` for `time-tracking/entries` (`:388`),
-`/api/contacts/address-books` for `address-books` (`:207`). The test exists
-so that this list shrinks to zero, then the constant is deleted.
+The route table is the source of truth; when they disagree, the annotation
+is fixed, not the route. The 80 drifting operations of 2026-10-13
+(`/check-ins` for prefix `check-in`, `/time-tracking-entries` for
+`time-tracking/entries`, `/user-settings/*` for `users/me/settings/*`, …)
+were fixed module by module (job `fix`, 2026-10-13).
 
-Check: `OPENAPI_KNOWN_DRIFT` length (80 → 0).
+Two operations still document a route that does not exist, and stay on
+purpose (owner decision, 2026-10-13): `TelegramBotConnectionController::confirmToken()`
+(`POST /telegram/confirm-token`) and `LibraryMusicController::searchAlbumOnDeezer()`
+(`GET /libraries/music/search/deezer/{artist}/{album}`). Neither method has a
+route; both are left untouched until the owner decides what to do with them.
+So the constant is not empty and is not deleted. `OpenApiSpecTest` compares
+the drift exactly, so a new drift and a silently fixed one both fail.
+
+Check: `OPENAPI_KNOWN_DRIFT` length = 2 (the two methods above).
 
 ### 2.3 Responses reference the envelope, never redefine it
 
@@ -441,10 +450,10 @@ Check: `grep -rn '): mixed' app/Api/*/Services` → the two wrapper cases only.
 and `TodoWorkspaceService` are separate aggregates. The four
 `Library{Book,Movie,Game,Music}Service` each carry a genre sub-CRUD that is
 byte-identical after renaming (`diff` of the genre blocks: 2 lines) plus
-four `Library*GenreController` files of 220 lines each. Whether that
-becomes one `LibraryGenreService` (parameterised by model class) is the one
-place the "no new abstractions" rule and this rule disagree — OQ-4; no new
-copy is added either way.
+four `Library*GenreController` files of 220 lines each. They stay as four
+copies (OQ-4, decided 2026-10-13: leave as is): no `LibraryGenreService`
+parameterised by model class, because "no new abstractions" wins here. A
+genre change is made in all four; no fifth copy is added.
 
 ### 4.8 Catch what you can handle, by type
 
@@ -871,6 +880,9 @@ translated (Decisions).
   validation 422; `ErrorResponse` is for other errors (rule 2.4).
 - **Rule 4.4 applies to the reference module** (OQ-3, 2026-10-13):
   `TodoService` has `forgetUser()` like every other service.
+- **The four Libraries genre CRUDs stay as they are** (OQ-4, 2026-10-13):
+  no parameterised `LibraryGenreService`; the duplication is accepted over a
+  new abstraction (rule 4.7).
 - **Dependabot stays composer-only until the owner adds npm**. Tooling
   (2026-10-13): Larastan is adopted (level 5, `phpstan.neon`, `app/Dav`
   excluded, existing errors in `phpstan-baseline.neon`; run
@@ -916,10 +928,6 @@ translated (Decisions).
 
 ## Open questions
 
-- **OQ-4 — the four Libraries genre CRUDs.** Four services + four
-  controllers + eight requests + four resources, identical after renaming.
-  One parameterised `LibraryGenreService` is a new abstraction (hard rule
-  says ask); leaving it means every genre change is made four times.
 - **OQ-6 — Pint.** Commit `pint.json` (preset `laravel`) and run it once
   over the tree (large diff, ends the `!$`/`fn()`/alignment mix), or remove
   `laravel/pint` from `require-dev`? The frontend removed its formatter

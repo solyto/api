@@ -14,7 +14,7 @@ class PushNotificationController
 
     /**
      * @OA\Get(
-     *     path="/notifications/push/public-key",
+     *     path="/notifications/push/vapid-key",
      *     operationId="pushNotificationGetPublicKey",
      *     summary="Get VAPID public key",
      *     tags={"Notifications"},

@@ -20,7 +20,7 @@ class TimeTrackingCategoryController
 
     /**
      * @OA\Get(
-     *     path="/time-tracking-categories",
+     *     path="/time-tracking/categories",
      *     operationId="timeTrackingCategoryIndex",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class TimeTrackingCategoryController
 
     /**
      * @OA\Post(
-     *     path="/time-tracking-categories",
+     *     path="/time-tracking/categories",
      *     operationId="timeTrackingCategoryStore",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -93,7 +93,7 @@ class TimeTrackingCategoryController
 
     /**
      * @OA\Put(
-     *     path="/time-tracking-categories/{category}",
+     *     path="/time-tracking/categories/{category}",
      *     operationId="timeTrackingCategoryUpdate",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -151,7 +151,7 @@ class TimeTrackingCategoryController
 
     /**
      * @OA\Delete(
-     *     path="/time-tracking-categories/{category}",
+     *     path="/time-tracking/categories/{category}",
      *     operationId="timeTrackingCategoryDestroy",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},

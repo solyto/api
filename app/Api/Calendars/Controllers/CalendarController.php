@@ -217,7 +217,7 @@ class CalendarController
 
     /**
      * @OA\Get(
-     *     path="/calendars/widget/events",
+     *     path="/calendars/events/widget",
      *     operationId="listWidgetEvents",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -481,7 +481,7 @@ class CalendarController
 
     /**
      * @OA\Delete(
-     *     path="/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
+     *     path="/calendars/{instanceId}/events/{eventUri}/occurrence/{occurrenceDate}",
      *     operationId="destroyEventOccurrence",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -558,7 +558,7 @@ class CalendarController
 
     /**
      * @OA\Put(
-     *     path="/calendars/{instanceId}/events/{eventUri}/occurrences/{occurrenceDate}",
+     *     path="/calendars/{instanceId}/events/{eventUri}/occurrence/{occurrenceDate}",
      *     operationId="updateEventOccurrence",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},
@@ -846,7 +846,7 @@ class CalendarController
     }
 
     /**
-     * @OA\Post(
+     * @OA\Delete(
      *     path="/calendars/{instanceId}/unsubscribe",
      *     operationId="unsubscribeFromCalendar",
      *     tags={"Calendars"},
@@ -924,7 +924,7 @@ class CalendarController
     }
 
     /**
-     * @OA\Post(
+     * @OA\Put(
      *     path="/calendars/invites/{token}/accept",
      *     operationId="acceptInvite",
      *     tags={"Calendars"},
@@ -962,7 +962,7 @@ class CalendarController
     }
 
     /**
-     * @OA\Post(
+     * @OA\Put(
      *     path="/calendars/invites/{token}/decline",
      *     operationId="declineInvite",
      *     tags={"Calendars"},

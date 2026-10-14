@@ -107,3 +107,83 @@ describe('WeatherService', function () {
         Http::assertSentCount(2);
     });
 });
+
+describe('Weather tenant isolation', function () {
+    it('uses the authenticated user\'s location and unit, not another user\'s', function () {
+        Http::fake([
+            'https://api.open-meteo.com/v1/forecast*' => Http::response([
+                'daily' => [
+                    'time' => [now()->toDateString()],
+                    'weather_code' => [1],
+                    'sunrise' => ['05:00'],
+                    'sunset' => ['21:00'],
+                    'uv_index_max' => [5.0],
+                    'temperature_2m_max' => [24.0],
+                    'temperature_2m_min' => [15.0],
+                    'rain_sum' => [0.0],
+                    'snowfall_sum' => [0.0],
+                    'cloud_cover_mean' => [20.0],
+                    'wind_speed_10m_max' => [12.0],
+                    'relative_humidity_2m_mean' => [60.0],
+                ],
+                'current' => [
+                    'temperature_2m' => 21.3,
+                    'relative_humidity_2m' => 55.0,
+                    'rain' => 0.0,
+                    'cloud_cover' => 10.0,
+                    'wind_speed_10m' => 8.0,
+                    'wind_direction_10m' => 180,
+                    'weather_code' => 1,
+                    'snowfall' => 0.0,
+                    'is_day' => 1,
+                ],
+            ]),
+        ]);
+
+        $other = makeUser();
+        $other->settings()->update([
+            'weather_city' => 'Berlin',
+            'weather_latitude' => 52.52,
+            'weather_longitude' => 13.41,
+            'temperature_unit' => 'f',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $user = makeUser();
+        $user->settings()->update([
+            'weather_city' => 'Paris',
+            'weather_latitude' => 48.85,
+            'weather_longitude' => 2.35,
+            'temperature_unit' => 'c',
+            'timezone' => 'Europe/Paris',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/weather/today')
+            ->assertStatus(200)
+            ->assertJsonPath('data.city', 'Paris')
+            ->assertJsonPath('data.temperature_unit', 'c');
+
+        Http::assertSent(fn ($request) => $request['latitude'] == 48.85 && $request['longitude'] == 2.35);
+        Http::assertNotSent(fn ($request) => $request['latitude'] == 52.52);
+    });
+
+    it('does not fall back to another user\'s location when the user has none', function () {
+        Http::fake();
+
+        $other = makeUser();
+        $other->settings()->update([
+            'weather_city' => 'Berlin',
+            'weather_latitude' => 52.52,
+            'weather_longitude' => 13.41,
+        ]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/weather/today')
+            ->assertStatus(200)
+            ->assertJsonPath('data.configured', false)
+            ->assertJsonPath('data.city', null);
+
+        Http::assertNothingSent();
+    });
+});

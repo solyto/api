@@ -485,3 +485,71 @@ describe('Library recommend endpoints', function () {
             ->assertJsonPath('data.title', 'Kind of Blue');
     });
 });
+
+describe('Library books and music tenant isolation', function () {
+    it('forbids access to another user\'s book', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $book = LibraryBook::factory()->forUser($other)->create(['rating' => 2]);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/books/'.$book->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/books/'.$book->id, ['rating' => 5]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/books/'.$book->id), 403);
+
+        expect($book->fresh()?->rating)->toBe(2);
+    });
+
+    it('hides another user\'s music and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $music = LibraryMusic::factory()->forUser($other)->create(['rating' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/'.$music->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/music/'.$music->id, ['rating' => 5]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/music/'.$music->id), 403);
+
+        expect($music->fresh()?->rating)->toBe(2);
+    });
+
+    it('hides another user\'s book and music genres and forbids access to them', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $genres = [
+            'books' => LibraryBookGenre::factory()->forUser($other)->create(['title' => 'Theirs']),
+            'music' => LibraryMusicGenre::factory()->forUser($other)->create(['title' => 'Theirs']),
+        ];
+
+        foreach ($genres as $type => $genre) {
+            $this->actingAs($user, 'sanctum')
+                ->getJson('/api/v1/libraries/'.$type.'/genres')
+                ->assertStatus(200)
+                ->assertJsonCount(0, 'data');
+
+            expectApiError($this->actingAs($user, 'sanctum')
+                ->getJson('/api/v1/libraries/'.$type.'/genres/'.$genre->id), 403);
+
+            expectApiError($this->actingAs($user, 'sanctum')
+                ->putJson('/api/v1/libraries/'.$type.'/genres/'.$genre->id, ['title' => 'Hijacked']), 403);
+
+            expectApiError($this->actingAs($user, 'sanctum')
+                ->deleteJson('/api/v1/libraries/'.$type.'/genres/'.$genre->id), 403);
+
+            expect($genre->fresh()?->title)->toBe('Theirs');
+        }
+    });
+});

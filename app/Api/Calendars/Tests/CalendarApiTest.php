@@ -5,6 +5,7 @@ use App\Api\Calendars\Models\CalendarEntry;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
+use App\Api\Users\Models\Friend;
 
 describe('Calendar CRUD', function () {
     it('lists calendars including the default one', function () {
@@ -351,5 +352,96 @@ describe('Event attachments', function () {
             ->getJson('/api/v1/calendars/events/'.$entry->id.'/attachments/notes')
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
+    });
+});
+
+describe('Calendar tenant isolation', function () {
+    it('hides another user\'s calendar and denies writes to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $friend = makeUser();
+        Friend::factory()->forUsers($user, $friend)->create();
+
+        $otherInstanceId = $this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $ownIds = collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->assertStatus(200)
+            ->json('data'))->pluck('id');
+        expect($ownIds)->not->toContain($otherInstanceId);
+
+        // The module answers a calendar the user cannot see with 404.
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$otherInstanceId, ['color' => '#000000']), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/'.$otherInstanceId.'/share'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/share', ['friend_id' => $friend->id]), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/events', [
+                'title' => 'Intruder',
+                'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $otherInstanceId,
+            ]), 404);
+
+        $otherIds = collect($this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data'))->pluck('id');
+        expect($otherIds)->toContain($otherInstanceId);
+    });
+
+    it('denies updating and deleting events in another user\'s calendar', function () {
+        $user = makeUser();
+        $other = makeUser();
+
+        $otherInstanceId = $this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $store = $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/events', [
+                'title' => 'Private Meeting',
+                'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $otherInstanceId,
+            ])
+            ->assertStatus(201);
+        $eventUri = $store->json('data.uri') ?? $store->json('data.event.uri');
+        $etag = $store->json('data.etag') ?? $store->json('data.event.etag') ?? 'unknown';
+
+        $titles = collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
+            ->assertStatus(200)
+            ->json('data'))->pluck('title');
+        expect($titles)->not->toContain('Private Meeting');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri, [
+                'title' => 'Hijacked',
+                'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $otherInstanceId,
+                'etag' => $etag,
+            ]), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri), 404);
+
+        $otherTitles = collect($this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
+            ->json('data'))->pluck('title');
+        expect($otherTitles)->toContain('Private Meeting');
     });
 });

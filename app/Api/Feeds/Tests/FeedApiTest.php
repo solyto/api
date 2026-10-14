@@ -138,3 +138,43 @@ describe('Feed items and discovery', function () {
             ->assertJsonPath('data.0.title', 'Latest Article');
     });
 });
+
+// `feeds/friends` is shared by design and not asserted here.
+describe('Feed tenant isolation', function () {
+    it('hides another user\'s subscription and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $feed = Feed::factory()->create();
+        $subscription = FeedSubscription::factory()->forUser($other)->forFeed($feed)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/subscriptions')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/subscriptions/'.$subscription->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/feeds/subscriptions/'.$subscription->id, ['title' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/feeds/subscriptions/'.$subscription->id), 403);
+
+        expect(FeedSubscription::find($subscription->id))->not->toBeNull()
+            ->and(FeedSubscription::find($subscription->id)->title)->toBe($subscription->title);
+    });
+
+    it('does not list items of feeds only another user subscribes to', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($other)->forFeed($feed)->create();
+        FeedItem::factory()->forFeed($feed)->count(2)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    });
+});

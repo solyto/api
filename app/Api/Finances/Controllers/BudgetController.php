@@ -20,7 +20,7 @@ class BudgetController
 
     /**
      * @OA\Get(
-     *     path="/finances/budgets",
+     *     path="/finances/budget",
      *     operationId="listBudgets",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -49,7 +49,7 @@ class BudgetController
 
     /**
      * @OA\Get(
-     *     path="/finances/budgets/{budget}",
+     *     path="/finances/budget/{budget}",
      *     operationId="showBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -91,7 +91,7 @@ class BudgetController
 
     /**
      * @OA\Post(
-     *     path="/finances/budgets",
+     *     path="/finances/budget",
      *     operationId="storeBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -136,7 +136,7 @@ class BudgetController
 
     /**
      * @OA\Put(
-     *     path="/finances/budgets/{budget}",
+     *     path="/finances/budget/{budget}",
      *     operationId="updateBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},
@@ -190,7 +190,7 @@ class BudgetController
 
     /**
      * @OA\Delete(
-     *     path="/finances/budgets/{budget}",
+     *     path="/finances/budget/{budget}",
      *     operationId="destroyBudget",
      *     tags={"Finances"},
      *     security={{"sanctum": {}}},

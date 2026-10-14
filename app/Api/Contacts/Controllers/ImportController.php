@@ -26,7 +26,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/contacts/import/start",
+     *     path="/address-books/import",
      *     operationId="startContactsImport",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -74,7 +74,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/contacts/import/select",
+     *     path="/address-books/import/select",
      *     operationId="selectAddressBooksForImport",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},
@@ -122,7 +122,7 @@ class ImportController
 
     /**
      * @OA\Get(
-     *     path="/contacts/import/state",
+     *     path="/address-books/import/state",
      *     operationId="getContactsImportState",
      *     tags={"Contacts"},
      *     security={{"sanctum": {}}},

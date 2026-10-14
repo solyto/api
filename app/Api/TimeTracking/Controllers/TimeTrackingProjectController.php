@@ -20,7 +20,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Get(
-     *     path="/time-tracking-projects",
+     *     path="/time-tracking/projects",
      *     operationId="timeTrackingProjectIndex",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -47,7 +47,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Get(
-     *     path="/time-tracking-projects/{project}",
+     *     path="/time-tracking/projects/{project}",
      *     operationId="timeTrackingProjectShow",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -91,7 +91,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Post(
-     *     path="/time-tracking-projects",
+     *     path="/time-tracking/projects",
      *     operationId="timeTrackingProjectStore",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -139,7 +139,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Put(
-     *     path="/time-tracking-projects/{project}",
+     *     path="/time-tracking/projects/{project}",
      *     operationId="timeTrackingProjectUpdate",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -199,7 +199,7 @@ class TimeTrackingProjectController
 
     /**
      * @OA\Delete(
-     *     path="/time-tracking-projects/{project}",
+     *     path="/time-tracking/projects/{project}",
      *     operationId="timeTrackingProjectDestroy",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},

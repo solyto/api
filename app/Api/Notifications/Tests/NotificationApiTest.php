@@ -133,3 +133,27 @@ describe('Telegram bot connection endpoints', function () {
         expect($connection->fresh()->check_in_alert)->toBeFalse();
     });
 });
+
+describe('Notification tenant isolation', function () {
+    it('hides another user\'s notification and does not mark it read', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $other->notify(new TestNotification);
+        $notification = DatabaseNotification::where('notifiable_id', $other->id)->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notifications')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        // markRead resolves through the user's own notifications (findOrFail).
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notifications/'.$notification->id.'/read'), 404);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notifications/read-all')
+            ->assertStatus(200);
+
+        expect($notification->fresh()->read_at)->toBeNull();
+    });
+});

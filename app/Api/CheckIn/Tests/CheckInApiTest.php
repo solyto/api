@@ -13,6 +13,17 @@ describe('GET /api/v1/check-in', function () {
             ->assertStatus(200)
             ->assertJsonCount(3, 'data');
     });
+
+    it('does not list another user\'s check-ins', function () {
+        $user = makeUser();
+        $other = makeUser();
+        CheckIn::factory()->forUser($other)->count(2)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    });
 });
 
 describe('POST /api/v1/check-in', function () {
@@ -47,6 +58,25 @@ describe('POST /api/v1/check-in', function () {
             ->assertStatus(201)
             ->assertJsonPath('data.mood', 5);
 
+        expect(CheckIn::where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('does not touch another user\'s check-in for the same date', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $otherCheckIn = CheckIn::factory()->forUser($other)->create([
+            'date' => now()->toDateString(),
+            'mood' => 2,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/check-in', [
+                'date' => now()->toDateString(),
+                'mood' => 5,
+            ])
+            ->assertStatus(201);
+
+        expect($otherCheckIn->fresh()->mood)->toBe(2);
         expect(CheckIn::where('user_id', $user->id)->count())->toBe(1);
     });
 

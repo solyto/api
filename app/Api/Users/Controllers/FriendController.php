@@ -114,15 +114,15 @@ class FriendController
     }
 
     /**
-     * @OA\Post(
-     *     path="/friends/requests/{id}/accept",
+     * @OA\Put(
+     *     path="/friends/requests/{friendRequest}/accept",
      *     operationId="friendAcceptFriendRequest",
      *     summary="Accept friend request",
      *     tags={"Friends"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="id",
+     *         name="friendRequest",
      *         in="path",
      *         description="Friend request ID",
      *         required=true,
@@ -155,15 +155,15 @@ class FriendController
     }
 
     /**
-     * @OA\Delete(
-     *     path="/friends/requests/{id}",
+     * @OA\Put(
+     *     path="/friends/requests/{friendRequest}/reject",
      *     operationId="friendRejectFriendRequest",
      *     summary="Reject friend request",
      *     tags={"Friends"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="id",
+     *         name="friendRequest",
      *         in="path",
      *         description="Friend request ID",
      *         required=true,

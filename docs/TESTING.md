@@ -89,7 +89,8 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
 - **Jobs and commands** — assert the effect (rows written, notification
   sent), not that the job was dispatched.
 - **Shared contracts** in `tests/Unit` with `covers()`: `ApiResponse`,
-  `OpenApiSpecTest` (keeps `OPENAPI_KNOWN_DRIFT` from growing).
+  `OpenApiSpecTest` (fails on any drift beyond the two kept entries in
+  `OPENAPI_KNOWN_DRIFT`, and on a listed entry that no longer drifts).
 
 Not tested, on purpose: that a factory produces what its state says, that
 `$fillable` equals `$fillable`, that casts cast, that a `belongsTo` returns

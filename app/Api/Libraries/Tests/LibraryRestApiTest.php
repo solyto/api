@@ -439,3 +439,138 @@ describe('External services', function () {
         expect($results[0]['title'])->toBe('Soup');
     });
 });
+
+describe('Library tenant isolation', function () {
+    it('hides another user\'s game and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $game = LibraryGame::factory()->forUser($other)->create(['rating' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/games')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/games/'.$game->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/games/'.$game->id, ['rating' => 5]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/games/'.$game->id), 403);
+
+        expect($game->fresh()?->rating)->toBe(2);
+    });
+
+    it('hides another user\'s movie and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $movie = LibraryMovie::factory()->forUser($other)->create(['rating' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/movies')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/movies/'.$movie->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/movies/'.$movie->id, ['rating' => 5]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/movies/'.$movie->id), 403);
+
+        expect($movie->fresh()?->rating)->toBe(2);
+    });
+
+    it('hides another user\'s link and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $link = LibraryLink::factory()->forUser($other)->create(['is_favorite' => false]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links/'.$link->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/links/'.$link->id, ['is_favorite' => true]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/links/'.$link->id), 403);
+
+        expect($link->fresh())->not->toBeNull();
+        expect($link->fresh()->is_favorite)->toBeFalsy();
+    });
+
+    it('hides another user\'s quote and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $quote = LibraryQuote::factory()->forUser($other)->create(['quote' => 'Theirs']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/quotes')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/quotes/'.$quote->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/quotes/'.$quote->id, ['quote' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/quotes/'.$quote->id), 403);
+
+        expect($quote->fresh()?->quote)->toBe('Theirs');
+    });
+
+    it('hides another user\'s recipe and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $recipe = LibraryRecipe::factory()->forUser($other)->create(['rating' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/recipes')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/recipes/'.$recipe->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/recipes/'.$recipe->id, ['rating' => 5]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/recipes/'.$recipe->id), 403);
+
+        expect($recipe->fresh()?->rating)->toBe(2);
+    });
+
+    it('hides another user\'s plant and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $plant = LibraryPlant::factory()->forUser($other)->create(['name' => 'Theirs']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/plants')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/plants/'.$plant->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/plants/'.$plant->id, ['name' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/plants/'.$plant->id), 403);
+
+        expect($plant->fresh()?->name)->toBe('Theirs');
+    });
+});
