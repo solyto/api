@@ -7,6 +7,7 @@ use App\Api\DevRequests\Models\DevRequestVote;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<DevRequestVote> */
 class DevRequestVoteFactory extends Factory
 {
     protected $model = DevRequestVote::class;

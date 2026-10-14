@@ -6,6 +6,7 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Feed> */
 class FeedFactory extends Factory
 {
     protected $model = Feed::class;

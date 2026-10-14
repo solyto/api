@@ -6,6 +6,7 @@ use App\Api\Calendars\Models\Calendar;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Calendar> */
 class CalendarFactory extends Factory
 {
     protected $model = Calendar::class;

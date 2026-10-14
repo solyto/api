@@ -6,6 +6,7 @@ use App\Api\Contacts\Models\AddressBook;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<AddressBook> */
 class AddressBookFactory extends Factory
 {
     protected $model = AddressBook::class;

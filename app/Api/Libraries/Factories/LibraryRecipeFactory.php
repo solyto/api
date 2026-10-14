@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryRecipe;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryRecipe> */
 class LibraryRecipeFactory extends Factory
 {
     protected $model = LibraryRecipe::class;

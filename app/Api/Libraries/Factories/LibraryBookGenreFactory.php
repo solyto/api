@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryBookGenre> */
 class LibraryBookGenreFactory extends Factory
 {
     protected $model = LibraryBookGenre::class;

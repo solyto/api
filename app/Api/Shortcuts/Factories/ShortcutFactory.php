@@ -6,6 +6,7 @@ use App\Api\Shortcuts\Models\Shortcut;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Shortcut> */
 class ShortcutFactory extends Factory
 {
     protected $model = Shortcut::class;

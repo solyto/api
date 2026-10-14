@@ -6,6 +6,7 @@ use App\Api\Todos\Models\TodoWorkspace;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<TodoWorkspace> */
 class TodoWorkspaceFactory extends Factory
 {
     protected $model = TodoWorkspace::class;

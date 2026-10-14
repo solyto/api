@@ -7,6 +7,7 @@ use App\Api\Todos\Models\TodoCategory;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Todo> */
 class TodoFactory extends Factory
 {
     /**

@@ -885,8 +885,9 @@ translated (Decisions).
   new abstraction (rule 4.7).
 - **Dependabot stays composer-only until the owner adds npm**. Tooling
   (2026-10-13): Larastan is adopted (level 5, `phpstan.neon`, `app/Dav`
-  excluded, existing errors in `phpstan-baseline.neon`; run
-  `./vendor/bin/phpstan analyse`). A Pint config, CI, npm in Dependabot and
+  and test directories excluded (2026-10-14), existing errors in
+  `phpstan-baseline.neon`; run `composer analyse`, one process capped at
+  500M). A Pint config, CI, npm in Dependabot and
   a coverage driver were not approved.
 - **The old policy set** (`docs/API-CONVENTIONS.md` + eight
   `docs/CONVENTIONS-*.md`, AI-written 2026-10-10) is folded into section 12

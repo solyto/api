@@ -6,6 +6,7 @@ use App\Api\Users\Models\FriendRequest;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<FriendRequest> */
 class FriendRequestFactory extends Factory
 {
     protected $model = FriendRequest::class;
