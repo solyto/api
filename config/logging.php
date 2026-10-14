@@ -72,6 +72,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'traffic' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/traffic.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
         'queue' => [
             'driver' => 'single',
             'path' => storage_path('logs/queue.log'),

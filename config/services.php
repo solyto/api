@@ -88,4 +88,9 @@ return [
         'topic' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC'),
         'token' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOKEN'),
     ],
+
+    'traffic' => [
+        'alert_threshold' => (int) env('API_TRAFFIC_ALERT_THRESHOLD', 300),
+        'alert_cooldown'  => (int) env('API_TRAFFIC_ALERT_COOLDOWN', 3600),
+    ],
 ];
