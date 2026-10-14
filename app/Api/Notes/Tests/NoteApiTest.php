@@ -108,10 +108,11 @@ describe('Note categories CRUD', function () {
 
         $categoryId = $store->json('data.id');
 
+        // The provisioned journal folder is hidden, so only Work is listed.
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/notes/categories')
             ->assertStatus(200)
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(1, 'data');
 
         $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/notes/categories/'.$categoryId, ['title' => 'Private'])
@@ -262,6 +263,105 @@ describe('Note category visibility', function () {
             ->getJson('/api/v1/notes/newest')
             ->assertStatus(200)
             ->assertJsonCount(2, 'data');
+    });
+});
+
+describe('Hidden notes and categories', function () {
+    it('returns hidden and system folders with their descendants as a tree', function () {
+        $user = makeUser();
+        $hidden = NoteCategory::factory()->forUser($user)->hidden()->withTitle('Hidden')->create();
+        $hiddenChild = NoteCategory::factory()->forUser($user)->withParent($hidden)->withTitle('Hidden child')->create();
+        NoteCategory::factory()->forUser($user)->withParent($hiddenChild)->withTitle('Hidden grandchild')->create();
+        $visible = NoteCategory::factory()->forUser($user)->withTitle('Visible')->create();
+        NoteCategory::factory()->forUser($user)->withParent($visible)->hidden()->withTitle('Nested hidden')->create();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/categories/hidden')
+            ->assertStatus(200)
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.title', NoteCategory::JOURNAL_TITLE)
+            ->assertJsonPath('data.1.title', 'Hidden')
+            ->assertJsonPath('data.1.children.0.title', 'Hidden child')
+            ->assertJsonPath('data.1.children.0.children.0.title', 'Hidden grandchild')
+            ->assertJsonPath('data.2.title', 'Nested hidden');
+
+        expect($response->getContent())->not->toContain('"title":"Visible"');
+    });
+
+    it('returns exactly the notes in hidden folders and their descendants', function () {
+        $user = makeUser();
+        $journal = NoteCategory::forUser($user->id)->where('title', NoteCategory::JOURNAL_TITLE)->firstOrFail();
+        $hidden = NoteCategory::factory()->forUser($user)->hidden()->create();
+        $hiddenChild = NoteCategory::factory()->forUser($user)->withParent($hidden)->create();
+        $visible = NoteCategory::factory()->forUser($user)->create();
+
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-14')->create();
+        Note::factory()->forUser($user)->forCategory($hiddenChild)->withTitle('In hidden child')->create();
+        Note::factory()->forUser($user)->forCategory($visible)->withTitle('In visible')->create();
+        Note::factory()->forUser($user)->withTitle('Uncategorized')->create(['category_id' => null]);
+
+        $titles = collect(
+            $this->actingAs($user, 'sanctum')
+                ->getJson('/api/v1/notes/hidden')
+                ->assertStatus(200)
+                ->json('data')
+        )->pluck('title')->all();
+
+        expect($titles)->toEqualCanonicalizing(['2026-10-14', 'In hidden child']);
+    });
+
+    it('excludes notes in a visible child of a hidden folder from newest', function () {
+        $user = makeUser();
+        $hidden = NoteCategory::factory()->forUser($user)->hidden()->create();
+        $child = NoteCategory::factory()->forUser($user)->withParent($hidden)->create();
+
+        Note::factory()->forUser($user)->forCategory($child)->create();
+        Note::factory()->forUser($user)->create(['category_id' => null]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/newest')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+    });
+
+    it('never returns another user\'s hidden folders or notes', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $foreign = NoteCategory::factory()->forUser($other)->hidden()->withTitle('Foreign')->create();
+        Note::factory()->forUser($other)->forCategory($foreign)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/categories/hidden')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', NoteCategory::JOURNAL_TITLE);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/hidden')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    });
+
+    it('forgets the plain and hidden lists when a folder is hidden', function () {
+        $user = makeUser();
+        $category = NoteCategory::factory()->forUser($user)->create();
+        Note::factory()->forUser($user)->forCategory($category)->create();
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/categories')->assertJsonCount(1, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/categories/hidden')->assertJsonCount(1, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertJsonCount(1, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/hidden')->assertJsonCount(0, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/newest')->assertJsonCount(1, 'data');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true])
+            ->assertStatus(200);
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/categories')->assertJsonCount(0, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/categories/hidden')->assertJsonCount(2, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertJsonCount(0, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/hidden')->assertJsonCount(1, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/newest')->assertJsonCount(0, 'data');
     });
 });
 

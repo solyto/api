@@ -49,6 +49,35 @@ class NoteCategoryController
 
     /**
      * @OA\Get(
+     *     path="/notes/categories/hidden",
+     *     operationId="noteCategoryHidden",
+     *     summary="List hidden and system note categories",
+     *     description="The categories GET /notes/categories leaves out (is_hidden or is_system, and their descendants), as a tree.",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Hidden categories retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/NoteCategory"))
+     *         )
+     *     )
+     * )
+     */
+    public function hidden(Request $request): JsonResponse
+    {
+        return ApiResponse::success(
+            NoteCategoryResource::collection($this->noteCategoryService->listHidden($request->user())),
+            'Hidden categories retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
      *     path="/notes/categories/{category}",
      *     operationId="noteCategoryShow",
      *     summary="Get note category by ID",
