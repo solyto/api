@@ -53,8 +53,11 @@ frontend repository. AGPL-3.0.
 ## Conventions
 New or AI-generated code follows [docs/STANDARDS.md](./STANDARDS.md) instead of generic Laravel patterns: numbered, checkable rules (controllers and routing, OpenAPI annotations, requests and validation, services, models, resources, errors, caching, jobs, comments, formatting, architecture conventions), plus `## Decisions` and `## Open questions`. Tests follow [docs/TESTING.md](./TESTING.md). Known cleanups live in [docs/backlog/](./backlog/) (manigot backlog entries); how the standards are maintained is in [docs/STANDARDS_WORKFLOW.md](./STANDARDS_WORKFLOW.md). Where anything older disagrees with `STANDARDS.md`, `STANDARDS.md` wins.
 
+A job is not done until `composer test` and `composer analyse` both exit 0 in the worktree. Reviewers run the full suite, not only the files the job touched; a verdict that says "tests not run" is NEEDS WORK, not APPROVED.
+
 ## Commands
 - `composer test` (or `php artisan test`) — run the Pest suite (Unit, Feature, Api)
+- `composer analyse` — PHPStan/Larastan (single process, 500M memory cap); never run a bare `phpstan analyse`, it can OOM-kill the container. Needs `vendor/` in sync with the lock file (`composer install`)
 - `composer audit` — check dependencies for vulnerabilities
 - `composer run dev` — run all dev processes (artisan serve, queue:listen, pail, Vite)
 - `npm run dev` / `npm run build` — Vite dev server / asset build
