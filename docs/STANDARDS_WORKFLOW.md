@@ -13,9 +13,9 @@ how code in this repository is written. Every rule in it comes from a
 concrete piece of code — either something the owner is unhappy with, or the
 owner's own reference module (`app/Api/Todos/`) showing the intended shape.
 No rule is imported from a generic Laravel or PSR guide; where a rule rests
-on framework behaviour (`env()` under `config:cache`, Pint's `laravel`
-preset, `Rule::exists()->where()`, `SerializesModels`) the official Laravel
-12 / Pint source was read and the rule says so in one line.
+on framework behaviour (`env()` under `config:cache`,
+`Rule::exists()->where()`, `SerializesModels`) the official Laravel 12
+source was read and the rule says so in one line.
 
 The older policy set (`docs/API-CONVENTIONS.md` and eight
 `docs/CONVENTIONS-*.md`, written by an AI job on 2026-10-10) was verified
@@ -42,7 +42,7 @@ the answer may be "no, this one is fine".
 2. Measures instead of asserting: greps the pattern across `app/`, counts
    occurrences and files, checks `git log`/`git show --stat` against
    `docs/jobs/archive/*/brief.md` to see whether a job wrote it, runs
-   `composer test` (and `./vendor/bin/pint --test`, dry run) when a claim
+   `composer test` (and `composer analyse`) when a claim
    depends on it. Numbers go in the answer when they change what the reader
    does.
 3. Names the pattern, separates the symptom from the design behind it, and

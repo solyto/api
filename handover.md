@@ -44,6 +44,10 @@ analyse` no errors.
 
 ## Dropped on purpose (owner decision, no backlog entry)
 
+- §3.4 / §5.2 / OQ-6: Pint is rejected (it was already rejected in job
+  `love_standards-tooling-approval-needed`). OQ-6 is closed in
+  `STANDARDS.md` Decisions, rule 11.1 is now "match the file you are in",
+  and `laravel/pint` is removed from `require-dev`.
 - §3.2 leftovers: `toRecommendation()` helper and the typed exception in
   `LibraryRecommender::assertType()`.
 - §3.7 and anything in `app/Bots/`: "the bot works", too risky for quick
@@ -53,12 +57,11 @@ analyse` no errors.
   dies silently on `exit(1)` in `SolytoBot::auth()`, and one test fails on
   `chat_id` string vs `'integer'` cast). Do not "fix" this without the owner.
 - §3.6 (`instanceof` chain: the report itself says two is fine), §3.11
-  (`elseif`: Pint will do it once OQ-6 is decided), §3.15 (optional, already
+  (two `else if`, not worth a commit), §3.15 (optional, already
   safe), §3.16's "longterm" comment and Spotify/Deezer loop.
 
 ## Still open: owner decisions
 
-- **§3.4 / §5.2:** decide OQ-6 (Pint). Would also allow `composer lint`.
 - **§5.1 CI:** `.github/workflows/tests.yml` needs the owner's go-ahead.
 - **§5.3:** make `STANDARDS.md` "timeless" (drop counts from rule bodies;
   `TESTING.md`'s helper table counts too).
@@ -69,5 +72,4 @@ analyse` no errors.
 ## Suggested next step
 
 Nothing in the audit is left to do here without an owner decision. Next is
-one of the decisions above (OQ-6 is the one that grows while it waits), or
-a job from `docs/backlog/`.
+one of the decisions above, or a job from `docs/backlog/`.

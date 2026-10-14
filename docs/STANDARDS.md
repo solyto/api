@@ -51,7 +51,7 @@ not the AI's:
 5. **Dispatch by string and service-locator calls**: `call_user_func([$x,
    $enum->value])`, `app()->makeWith(…, ['user' => $user])`, `$this->{$route}()`
    where a `match` or a method argument would do (section 4).
-6. **Formatting by habit, not by tool.** Pint is installed and never run;
+6. **Formatting by habit, not by tool.** There is no formatter (rule 11.1);
    `!$x`/`! $x`, `fn()`/`fn ()`, aligned `=>` all coexist (section 11).
 
 ---
@@ -715,25 +715,15 @@ Check: `grep -rn '@param\|@return' app/Api app/Shared | grep -v 'array<'` → 0 
 
 ## 11. Formatting
 
-### 11.1 Pint, `laravel` preset, run on every change — once the owner says so
+### 11.1 Hand formatting: match the file you are in
 
-`laravel/pint` is installed and has never been run on the tree
-(`docs/jobs/dawn_standards/tooling-report.md` lists the evidence). Until
-the owner decides (OQ-6), the shapes below are the hand-written target and
-match the preset's defaults (preset read from `laravel/pint`
-`resources/presets/laravel.php`, 2026-10-13):
+There is no formatter: Pint was rejected and removed from `require-dev`
+(OQ-6, Decisions). The tree mixes `!$x`/`! $x`, `fn()`/`fn ()`,
+column-aligned `=>` and both brace positions, and that mix stays. New and
+changed lines follow the style of the file they are in; do not reformat
+lines you did not change, and do not normalise a file's style in passing.
 
-| Shape | Preset rule | Today |
-| --- | --- | --- |
-| `! $x` | `not_operator_with_successor_space` | 54 `! $` vs 137 `!$` |
-| `fn () =>` | `function_declaration` (default closure spacing) | 313 vs 48 `fn(` |
-| `'key' => value` single space, no column alignment | `binary_operator_spaces: single_space` | 152 aligned lines in 30 files (`LibraryBookService.php:20-23`, `TodoService.php:236-248`, `SolytoMessage.php`) |
-| `{` on the next line for functions | `braces_position` | `ApiResponse.php:69`, `ImportFeeds.php:102` |
-| imports alphabetical | `ordered_imports` | `bootstrap/app.php:3-15` |
-| one blank line max | `no_extra_blank_lines` | `ApiResponse.php:104-105` |
-
-Until then: match the file you are in, and do not reformat lines you did
-not change.
+Check: `git diff` has no formatting-only hunks.
 
 ### 11.2 Typed constants, promoted constructors, `readonly`
 
@@ -745,8 +735,8 @@ files); do not start adding it file by file (Decisions).
 ### 11.3 Annotation blocks keep the blank `*` line before nested `@OA\JsonContent`/`@OA\Property`
 
 The owner's shape (`TodoController.php:31-40`): blank ` *` after
-`@OA\Response(` arguments and after the `allOf` line. Pint's phpdoc rules
-do not touch `@OA` blocks; consistency is by hand.
+`@OA\Response(` arguments and after the `allOf` line. Consistency is by
+hand.
 
 ## 12. Architecture conventions
 
@@ -893,6 +883,9 @@ translated (Decisions).
   `phpstan-baseline.neon`; run `composer analyse`, one process capped at
   500M). A Pint config, CI, npm in Dependabot and
   a coverage driver were not approved.
+- **No Pint** (OQ-6, 2026-10-14): no `pint.json`, no repo-wide run, and
+  `laravel/pint` is removed from `require-dev`. Formatting is by hand,
+  matching the file you are in (rule 11.1).
 - **The old policy set** (`docs/API-CONVENTIONS.md` + eight
   `docs/CONVENTIONS-*.md`, AI-written 2026-10-10) is folded into section 12
   and deleted; where it and this document disagree, this document wins.
@@ -912,7 +905,7 @@ translated (Decisions).
   - "`@OA` `path` is `/v1/<route>`" — stated as if settled; 186 of 268
     operations use `/api/`, and neither matches `@OA\Server`. Was OQ-1; decided: relative to `/api/v1` (rule 2.1).
   - "Pint is the style enforcer; run `./vendor/bin/pint --dirty`" — Pint has
-    never been run on this tree (`tooling-report.md`); now OQ-6 and 11.1.
+    never been run on this tree (`tooling-report.md`); Pint is rejected (OQ-6), see 11.1.
   - "Repo-wide suites live in `tests/Unit` and `tests/Feature`" and
     "`tests/Feature` tests declare `RefreshDatabase` per file" —
     `tests/Feature/` contains only `Pest.php`; corrected in `TESTING.md`.
@@ -933,10 +926,5 @@ translated (Decisions).
 
 ## Open questions
 
-- **OQ-6 — Pint.** Commit `pint.json` (preset `laravel`) and run it once
-  over the tree (large diff, ends the `!$`/`fn()`/alignment mix), or remove
-  `laravel/pint` from `require-dev`? The frontend removed its formatter
-  because it fought hand formatting; here the hand formatting mostly already
-  matches the preset.
 - **OQ-8 — `StoreDevRequestRequest` `created_by_user_id`** is client-chosen;
   intended (admins filing on behalf of users) or an oversight?

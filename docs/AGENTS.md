@@ -39,7 +39,7 @@ frontend repository. AGPL-3.0.
 - Frontend: minimal — Vite + Tailwind CSS 4 asset build (`resources/`) only; the actual UI is a separate solyto repository
 - Database: MariaDB (default app connection), PostgreSQL (dedicated `pgsql` connection used by SabreDAV + contact photos), SQLite in-memory for tests
 - Cache/Queue: Redis
-- Key packages: `sabre/dav` (CalDAV/CardDAV server), `laravel/sanctum` (token auth + passkeys), `laravel-notification-channels/webpush`, `openai-php/client` (AI), `simplepie/simplepie` (RSS feeds), `calliostro/php-discogs-api` (music metadata), `intervention/image` (image processing), `johngrogg/ics-parser` (calendar import), `darkaonline/l5-swagger` (OpenAPI docs), `laravel/pulse` + `laravel/telescope` (observability), Pest + `laravel/pint` (tests / style)
+- Key packages: `sabre/dav` (CalDAV/CardDAV server), `laravel/sanctum` (token auth + passkeys), `laravel-notification-channels/webpush`, `openai-php/client` (AI), `simplepie/simplepie` (RSS feeds), `calliostro/php-discogs-api` (music metadata), `intervention/image` (image processing), `johngrogg/ics-parser` (calendar import), `darkaonline/l5-swagger` (OpenAPI docs), `laravel/pulse` + `laravel/telescope` (observability), Pest (tests)
 
 ## Architecture
 - Feature domains are self-contained modules under `app/Api/<Module>/` (Todos, Calendars, Contacts, Libraries, Feeds, Finances, Notes, Telegram, ...), each with its own Controllers, Models, Requests, Resources, Services, Factories, Jobs, Notifications, and Tests. Cross-module code lives in `app/Shared/` (Models, Services like `IntegrationGateway` and `QuickAddService`, Helpers like `DockerSecretHelper`, Providers).
