@@ -1,0 +1,1043 @@
+{
+    "source": "solyto/app 1.0.15 (22c5a68): src/lib/config/apiRoutes.ts call sites in src/lib/state and src/lib/components, plus direct fetch calls",
+    "routes": [
+        {
+            "method": "GET",
+            "uri": "api/v1/address-books"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/address-books/contacts"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books/contacts/photos"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books/import"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books/import/select"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/address-books/import/state"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/address-books/{addressBookId}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/address-books/{addressBookId}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books/{addressBookId}/contacts"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/address-books/{addressBookId}/contacts/{contactUri}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/address-books/{addressBookId}/contacts/{contactUri}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/address-books/{addressBookId}/contacts/{contactUri}/photo"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/address-books/{addressBookId}/contacts/{contactUri}/photo"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/forgot-password"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/login"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/passkey/authenticate"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/passkey/authenticate-options"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/auth/passkeys"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/passkeys/register"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/passkeys/register-options"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/auth/passkeys/{passkey}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/auth/passkeys/{passkey}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/refresh"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/register"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/reset-password"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/auth/verify"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/events/widget"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/notes"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/notes"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/notes/{noteId}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/todos"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/todos"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/events/{eventId}/attachments/todos/{todoId}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/events/{yearMonth}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/import"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/import/select"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/import/state"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/invites/{token}/accept"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/invites/{token}/decline"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/order"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/{instanceId}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/{instanceId}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/{instanceId}/events"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/{instanceId}/events/{eventUri}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/{instanceId}/events/{eventUri}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/{instanceId}/events/{eventUri}/occurrence/{occurrenceDate}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/calendars/{instanceId}/events/{eventUri}/occurrence/{occurrenceDate}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/calendars/{instanceId}/share"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/calendars/{instanceId}/share"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/{instanceId}/share/{userId}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/calendars/{instanceId}/unsubscribe"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/check-in"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/check-in"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/clipboard"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/clipboard"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/clipboard/image"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/clipboard/{clipboard}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/clipboard/{clipboard}/image"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/dashboard/quick-add/commit"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/dashboard/quick-add/detect"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/dev-requests"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/dev-requests"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/dev-requests/{devRequest}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/dev-requests/{devRequest}/comments"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/dev-requests/{devRequest}/comments"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/dev-requests/{devRequest}/vote"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/export"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/export/status"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/export/{id}/download"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/feeds/available"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/feeds/friends"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/feeds/items"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/feeds/search"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/feeds/subscriptions"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/feeds/subscriptions"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/feeds/subscriptions/{feedSubscription}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/feeds/subscriptions/{feedSubscription}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/feeds/test"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/finances/budget"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/finances/budget"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/finances/budget/{budget}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/finances/budget/{budget}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/finances/wealth/fields"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/finances/wealth/fields"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/finances/wealth/fields/{field}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/finances/wealth/fields/{field}/value"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/friends"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/friends/requests"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/friends/requests"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/friends/requests/{friendRequest}/accept"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/friends/requests/{friendRequest}/reject"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/health"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/books"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/books"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/books/genres"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/books/genres"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/books/genres/{genre}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/books/import/{service}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/books/recommend/{type}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/books/releases"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/books/search/{service}/{query}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/books/{book}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/books/{book}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/games"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/games"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/games/genres"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/games/genres"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/games/genres/{genre}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/games/import/{service}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/games/search/{service}/{query}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/games/{game}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/games/{game}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/links"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/links"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/links/categories"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/links/categories"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/links/categories/{category}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/links/newest"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/links/{link}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/links/{link}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/movies"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/movies"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/movies/genres"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/movies/genres"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/movies/genres/{genre}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/movies/import/{service}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/movies/releases"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/movies/search/{service}/{title}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/movies/{movie}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/movies/{movie}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/movies/{movie}/trailers"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/music"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music/genres"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/music/genres"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/music/genres/{genre}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/music/import/{service}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music/integrations"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music/recommend/{type}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music/releases"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/music/search/{service}/{query}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/music/{music}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/music/{music}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/plants"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/plants"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/plants/{plant}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/plants/{plant}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/plants/{plant}/cover"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/quotes"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/quotes"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/quotes/random"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/quotes/{quote}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/quotes/{quote}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/libraries/recipes"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/recipes"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/libraries/recipes/import/{service}"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/libraries/recipes/{recipe}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/libraries/recipes/{recipe}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/notes"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notes"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/notes/categories"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notes/categories"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/notes/categories/{category}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/notes/categories/{category}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notes/import"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/notes/{note}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/notes/{note}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/notifications"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notifications/push/subscribe"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notifications/push/unsubscribe"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/notifications/push/vapid-key"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/notifications/read-all"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/notifications/settings"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/notifications/settings"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/notifications/{notification}/read"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/shortcuts"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/shortcuts"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/shortcuts/reorder"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/shortcuts/{shortcut}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/shortcuts/{shortcut}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/statistics/overview"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/tags"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/tags"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/tags/{tag}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/tags/{tag}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/telegram/check-in-alert"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/telegram/request"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/telegram/token-request"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/telegram/your-day-alert"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/time-tracking/categories"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/time-tracking/categories"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/time-tracking/categories/{category}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/time-tracking/categories/{category}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/time-tracking/entries"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/time-tracking/entries"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/time-tracking/entries/start"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/time-tracking/entries/statistics"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/time-tracking/entries/{entry}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/time-tracking/entries/{entry}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/time-tracking/entries/{entry}/stop"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/time-tracking/projects"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/time-tracking/projects"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/time-tracking/projects/{project}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/time-tracking/projects/{project}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/todos"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/todos/categories"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos/categories"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/todos/categories/{category}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/todos/categories/{category}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/todos/workspaces"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos/workspaces"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/todos/workspaces/{workspace}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/todos/workspaces/{workspace}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos/workspaces/{workspace}/categories/attach"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos/workspaces/{workspace}/categories/detach"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/todos/{todo}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/todos/{todo}"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/todos/{todo}/subtasks"
+        },
+        {
+            "method": "DELETE",
+            "uri": "api/v1/todos/{todo}/subtasks/{subtask}"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/todos/{todo}/subtasks/{subtask}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/users"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/users/me"
+        },
+        {
+            "method": "POST",
+            "uri": "api/v1/users/me/profile-image"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/users/me/settings/check-in"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/check-in"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/complete-onboarding"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/date-format"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/language"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/navigation"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/openai-api-key"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/time-format"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/timezone"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/weather-city"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/weather-temperature-unit"
+        },
+        {
+            "method": "PUT",
+            "uri": "api/v1/users/{user}"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/users/{user}/public-profile"
+        },
+        {
+            "method": "GET",
+            "uri": "api/v1/weather/today"
+        }
+    ],
+    "unused": [
+        {
+            "key": "calendars.listInvites",
+            "path": "/calendars/invites"
+        },
+        {
+            "key": "checkIn.update",
+            "path": "/check-in/%s"
+        },
+        {
+            "key": "dev.requests.delete",
+            "path": "/dev-requests/%d"
+        },
+        {
+            "key": "finances.wealth.updateField",
+            "path": "/finances/wealth/fields/%d"
+        },
+        {
+            "key": "libraries.books.get",
+            "path": "/libraries/books/%s"
+        },
+        {
+            "key": "libraries.games.get",
+            "path": "/libraries/games/%s"
+        },
+        {
+            "key": "libraries.getCover",
+            "path": "/libraries/covers/"
+        },
+        {
+            "key": "libraries.links.updateCategory",
+            "path": "/libraries/links/categories/%d"
+        },
+        {
+            "key": "libraries.movies.get",
+            "path": "/libraries/movies/%s"
+        },
+        {
+            "key": "libraries.music.get",
+            "path": "/libraries/music/%s"
+        },
+        {
+            "key": "libraries.plants.get",
+            "path": "/libraries/plants/%s"
+        },
+        {
+            "key": "notes.export",
+            "path": "/notes/export"
+        },
+        {
+            "key": "notes.get",
+            "path": "/notes/%s"
+        },
+        {
+            "key": "notes.newest",
+            "path": "/notes/newest"
+        },
+        {
+            "key": "timeTracking.projects.get",
+            "path": "/time-tracking/projects/%s"
+        },
+        {
+            "key": "todos.changeWorkspaceDefaultStatus",
+            "path": "/todos/workspaces/%d/default"
+        },
+        {
+            "key": "todos.get",
+            "path": "/todos/%s"
+        },
+        {
+            "key": "todos.listDueDate",
+            "path": "/todos/due-date"
+        }
+    ]
+}
