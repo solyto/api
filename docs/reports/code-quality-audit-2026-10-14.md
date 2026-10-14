@@ -1,7 +1,7 @@
 # Report: Code quality audit after the standards refactors
 
 date: 2026-10-14
-read: false
+read: true
 branch: `main` at `059bbea`
 scope: the eight commits from `0ba7665 STANDARDS` (2026-10-13) to `059bbea`
 (2026-10-14), judged as a whole: has code quality improved, what is the

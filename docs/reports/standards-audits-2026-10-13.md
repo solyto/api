@@ -1,6 +1,7 @@
 # Report: Standards audits (backlog "Audits" section)
 
 date: 2026-10-13
+read: true
 branch: `feature/force_standards-audits` (job `force`), tree at `19f0849`
 scope: The five items under "Audits (read, then decide per hit)" in `docs/STANDARDS_BACKLOG.md`, judged against `docs/STANDARDS.md`. Written for the owner, who makes the decisions. No application code, routes, config, tests, `STANDARDS.md` or `STANDARDS_BACKLOG.md` were changed. Fixes go to a follow-up job.
 
