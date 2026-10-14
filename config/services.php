@@ -31,10 +31,6 @@ return [
         ]
     ],
 
-    'bremerstadtreinigung' => [
-        'trash_calendar_url' => 'https://www.die-bremer-stadtreinigung.de/api/c-trace/app/garbage-file-ics?street=%s&houseNo=%s',
-    ],
-
     'hardcover' => [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('HARDCOVER_API_KEY'),
     ],
@@ -47,10 +43,6 @@ return [
         'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('AI_API_KEY'),
         'base_url' => env('AI_BASE_URL'),
         'model' => env('AI_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
-    ],
-
-    'radicale' => [
-        'url' => env('RADICALE_URL'),
     ],
 
     'mailgun' => [
