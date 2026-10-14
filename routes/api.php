@@ -14,6 +14,7 @@ use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
+use App\Api\Integrations\Controllers\IntegrationController;
 use App\Api\Libraries\Controllers\LibraryBookController;
 use App\Api\Libraries\Controllers\LibraryBookGenreController;
 use App\Api\Libraries\Controllers\LibraryCoverController;
@@ -355,6 +356,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
     Route::apiResource('shortcuts', ShortcutController::class);
 
     Route::get('statistics/overview', [StatisticsController::class, 'overview']);
+
+    Route::get('integrations', [IntegrationController::class, 'index']);
 
     Route::prefix('friends')->group(function () {
         Route::get('', [FriendController::class, 'listFriends']);
