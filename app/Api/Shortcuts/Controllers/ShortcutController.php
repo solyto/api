@@ -30,9 +30,9 @@ class ShortcutController
      *         description="Shortcuts retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Shortcut")),
-     *             @OA\Property(property="message", type="string", example="Shortcuts retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Shortcut"))
      *         )
      *     )
      * )
@@ -65,9 +65,9 @@ class ShortcutController
      *         description="Shortcut retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut"),
-     *             @OA\Property(property="message", type="string", example="Shortcut retrieved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut")
      *         )
      *     ),
      *
@@ -108,9 +108,9 @@ class ShortcutController
      *         description="Shortcut created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut"),
-     *             @OA\Property(property="message", type="string", example="Shortcut created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut")
      *         )
      *     ),
      *
@@ -158,9 +158,9 @@ class ShortcutController
      *         description="Shortcut updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut"),
-     *             @OA\Property(property="message", type="string", example="Shortcut updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Shortcut")
      *         )
      *     ),
      *
@@ -203,9 +203,9 @@ class ShortcutController
      *         description="Shortcut deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Shortcut deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

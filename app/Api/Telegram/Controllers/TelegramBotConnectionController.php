@@ -27,9 +27,9 @@ class TelegramBotConnectionController
      *         description="Token retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="string"),
-     *             @OA\Property(property="message", type="string", example="Token retrieved successfully.")
+     *             @OA\Property(property="data", type="string")
      *         )
      *     )
      * )
@@ -64,9 +64,9 @@ class TelegramBotConnectionController
      *         description="Token retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection"),
-     *             @OA\Property(property="message", type="string", example="Token retrieved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection")
      *         )
      *     )
      * )
@@ -103,9 +103,9 @@ class TelegramBotConnectionController
      *         description="Your day alert updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection"),
-     *             @OA\Property(property="message", type="string", example="Your day alert updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection")
      *         )
      *     ),
      *
@@ -149,9 +149,9 @@ class TelegramBotConnectionController
      *         description="Check-in alert updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection"),
-     *             @OA\Property(property="message", type="string", example="Check-in alert updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TelegramBotConnection")
      *         )
      *     ),
      *
