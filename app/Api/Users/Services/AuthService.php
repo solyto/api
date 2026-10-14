@@ -5,9 +5,12 @@ namespace App\Api\Users\Services;
 use App\Api\Users\Mails\UserVerification;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
+use App\Api\Users\Notifications\UserRegisteredNotification;
 use App\Shared\Enums\AuthPlatformEnum;
+use App\Shared\Notifications\Channels\NtfyChannel;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class AuthService
@@ -41,6 +44,8 @@ class AuthService
         }
 
         Mail::to($user->email)->send(new UserVerification($user, $verificationToken, $data['platform'] ?? 'web', $data['language'] ?? 'en'));
+
+        Notification::route(NtfyChannel::class, config('services.ntfy.topic'))->notify(new UserRegisteredNotification());
 
         return $user;
     }

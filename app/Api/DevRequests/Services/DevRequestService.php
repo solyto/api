@@ -6,8 +6,11 @@ use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\DevRequests\Models\DevRequestVote;
 use App\Api\DevRequests\Notifications\DevRequestCommentNotification;
+use App\Api\DevRequests\Notifications\DevRequestCreatedNotification;
 use App\Api\Users\Models\User;
+use App\Shared\Notifications\Channels\NtfyChannel;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Notification;
 
 class DevRequestService
 {
@@ -30,6 +33,8 @@ class DevRequestService
             $this->screenshotService->save($devRequest->id, $screenshotName, $screenshot);
             $devRequest->update(['screenshot' => $this->screenshotService->getFileName($screenshotName)]);
         }
+
+        Notification::route(NtfyChannel::class, config('services.ntfy.topic'))->notify(new DevRequestCreatedNotification($devRequest->title));
 
         $devRequest->load('votes')->loadCount('comments');
 
