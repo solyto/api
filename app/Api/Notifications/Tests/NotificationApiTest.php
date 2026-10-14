@@ -53,6 +53,13 @@ describe('Notification endpoints', function () {
         expect($user->fresh()->notificationSettings->music_release_ui)->toBeFalse();
     });
 
+    it('rejects a non-boolean notification setting', function () {
+        $user = makeUser();
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notifications/settings', ['music_release_ui' => 'yes please']), 422);
+    });
+
     it('returns the vapid public key', function () {
         $user = makeUser();
 
