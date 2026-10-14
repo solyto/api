@@ -24,7 +24,6 @@ use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Models\TodoWorkspace;
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
-use App\Shared\Models\AiUsage;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -67,7 +66,6 @@ class StatisticsService
             'wealth_entries' => WealthValue::count(),
             'check_in_entries' => CheckIn::count(),
             'ui_notifications' => DB::table('notifications')->count(),
-            'ai_tokens' => AiUsage::sum('total_tokens'),
         ];
     }
 }

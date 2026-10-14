@@ -38,6 +38,7 @@
  */
 const MIGRATION_COMPATIBILITY_ALLOWLIST = [
     '2026_10_10_000001_backfill_journal_categories.php' => 'hidden from old clients by `hidden-note-categories-opt-in`',
+    '2026_10_14_000002_drop_ai_usage_table.php' => '`remove-ai-usage`: no supported client reads `ai_usage`',
     '2026_10_14_000002_drop_openai_api_key_and_ai_enabled_from_user_settings.php' => '`remove-user-openai-key`: 1.0.15 doesn\'t read either column (owner, 2026-10-14)',
 ];
 

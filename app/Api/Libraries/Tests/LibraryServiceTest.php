@@ -6,8 +6,6 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Services\AiService;
 use App\Api\Libraries\Services\LibraryRecommender;
 use App\Api\Libraries\Services\LibraryReleases;
-use App\Shared\Enums\AiUsageFeatureEnum;
-use App\Shared\Models\AiUsage;
 
 /**
  * Build a fake chat completion response.
@@ -68,22 +66,6 @@ describe('AiService', function () {
         $result = $service->respondStructured('Prompt', 'input', ['type' => 'json_schema']);
 
         expect($result)->toBe(['recommendations' => []]);
-    });
-
-    it('saveUsageForUser persists the tracked usage', function () {
-        $user = makeUser();
-        $service = new AiService(mockedOpenAiClient(fakeChatResponse('x')));
-
-        $service->respond('Prompt', 'Input');
-        $service->saveUsageForUser($user, AiUsageFeatureEnum::ASSISTANT_CHAT);
-
-        $usage = AiUsage::where('user_id', $user->id)->first();
-        expect($usage)->not->toBeNull();
-        expect($usage->model)->toBe('gpt-4o-mini');
-        expect($usage->input_tokens)->toBe(10);
-        expect($usage->output_tokens)->toBe(5);
-        expect($usage->total_tokens)->toBe(15);
-        expect($usage->feature)->toBe(AiUsageFeatureEnum::ASSISTANT_CHAT->value);
     });
 });
 
@@ -150,7 +132,6 @@ describe('LibraryRecommender', function () {
         $ai->shouldReceive('respondStructured')->once()->andReturn([
             'recommendations' => [['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi']],
         ]);
-        $ai->shouldReceive('saveUsageForUser')->once()->with($user, AiUsageFeatureEnum::LIBRARY_RECOMMENDER);
 
         $result = app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user);
 

@@ -2,10 +2,9 @@
 
 use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Bots\Messages\SolytoMessage;
-use App\Shared\Enums\AiUsageFeatureEnum;
 use App\Shared\Enums\AuthPlatformEnum;
 
-covers(AuthPlatformEnum::class, AiUsageFeatureEnum::class, QuickAddContentType::class, SolytoMessage::class);
+covers(AuthPlatformEnum::class, QuickAddContentType::class, SolytoMessage::class);
 
 describe('AuthPlatformEnum', function () {
     it('has the expected cases', function () {
@@ -25,13 +24,6 @@ describe('AuthPlatformEnum', function () {
 
     it('can be instantiated from a value', function () {
         expect(AuthPlatformEnum::from('mobile'))->toBe(AuthPlatformEnum::MOBILE);
-    });
-});
-
-describe('AiUsageFeatureEnum', function () {
-    it('has the expected cases', function () {
-        expect(AiUsageFeatureEnum::ASSISTANT_CHAT->value)->toBe('assistant_chat');
-        expect(AiUsageFeatureEnum::LIBRARY_RECOMMENDER->value)->toBe('library_recommender');
     });
 });
 
