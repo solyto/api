@@ -1,0 +1,24 @@
+{
+    "mistral": [
+        {
+            "id": "mistral-small",
+            "name": "Mistral Small"
+        }
+    ],
+    "openai": [
+        {
+            "id": "gpt-a",
+            "name": "GPT A"
+        },
+        {
+            "id": "gpt-b",
+            "name": "GPT B"
+        }
+    ],
+    "openrouter": [
+        {
+            "id": "anthropic/claude-sonnet",
+            "name": "Claude Sonnet"
+        }
+    ]
+}

@@ -5,4 +5,5 @@ pest()
     ->in('tests/Unit')
     ->in('app/Api/*/Tests')
     ->in('app/Bots/Tests')
-    ->in('app/Dav/Tests');
+    ->in('app/Dav/Tests')
+    ->in('app/Plugins/*/Tests');

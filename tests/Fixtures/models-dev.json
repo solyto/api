@@ -1,0 +1,32 @@
+{
+    "openrouter": {
+        "id": "openrouter",
+        "models": {
+            "z-vendor/zeta": { "id": "z-vendor/zeta", "name": "Zeta", "structured_output": true, "tool_call": true },
+            "a-vendor/alpha": { "id": "a-vendor/alpha", "name": "Alpha", "structured_output": true, "status": "beta" },
+            "a-vendor/old": { "id": "a-vendor/old", "name": "Old", "structured_output": true, "status": "deprecated" },
+            "a-vendor/plain": { "id": "a-vendor/plain", "name": "Plain", "structured_output": false }
+        }
+    },
+    "anthropic": {
+        "id": "anthropic",
+        "models": {
+            "claude-sonnet": { "id": "claude-sonnet", "name": "Claude Sonnet", "structured_output": true }
+        }
+    },
+    "openai": {
+        "id": "openai",
+        "models": {
+            "gpt-b": { "id": "gpt-b", "name": "GPT B", "structured_output": true },
+            "gpt-a": { "id": "gpt-a", "name": "GPT A", "structured_output": true, "status": "alpha" },
+            "gpt-no-flag": { "id": "gpt-no-flag", "name": "GPT No Flag" }
+        }
+    },
+    "mistral": {
+        "id": "mistral",
+        "models": {
+            "mistral-small": { "id": "mistral-small", "name": "Mistral Small", "structured_output": true },
+            "mistral-legacy": { "id": "mistral-legacy", "name": "Mistral Legacy", "structured_output": true, "status": "deprecated" }
+        }
+    }
+}

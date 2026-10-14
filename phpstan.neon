@@ -15,3 +15,4 @@ parameters:
         - app/Dav
         - app/*/Tests/*
         - app/Api/*/Tests/*
+        - app/Plugins/*/Tests/*
