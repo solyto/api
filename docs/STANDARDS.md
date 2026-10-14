@@ -204,15 +204,17 @@ is fixed, not the route. The 80 drifting operations of 2026-10-13
 `time-tracking/entries`, `/user-settings/*` for `users/me/settings/*`, …)
 were fixed module by module (job `fix`, 2026-10-13).
 
-Two operations still document a route that does not exist, and stay on
-purpose (owner decision, 2026-10-13): `TelegramBotConnectionController::confirmToken()`
-(`POST /telegram/confirm-token`) and `LibraryMusicController::searchAlbumOnDeezer()`
-(`GET /libraries/music/search/deezer/{artist}/{album}`). Neither method has a
-route; both are left untouched until the owner decides what to do with them.
-So the constant is not empty and is not deleted. `OpenApiSpecTest` compares
+One operation still documents a route that does not exist, and stays on
+purpose (owner decision, 2026-10-13): `LibraryMusicController::searchAlbumOnDeezer()`
+(`GET /libraries/music/search/deezer/{artist}/{album}`). The method has no
+route and is left untouched until the owner decides what to do with it.
+So the constant is not empty and is not deleted. (The empty
+`TelegramBotConnectionController::confirmToken()` stub and the empty
+`GET notes/export` stub were deleted with their annotations and route,
+owner decision, 2026-10-14.) `OpenApiSpecTest` compares
 the drift exactly, so a new drift and a silently fixed one both fail.
 
-Check: `OPENAPI_KNOWN_DRIFT` length = 2 (the two methods above).
+Check: `OPENAPI_KNOWN_DRIFT` length = 1 (the method above).
 
 ### 2.3 Responses reference the envelope, never redefine it
 

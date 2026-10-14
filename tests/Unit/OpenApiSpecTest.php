@@ -12,13 +12,11 @@ use OpenApi\Generator as OpenApiGenerator;
  * mismatch between the OpenAPI spec and the route table fails this test,
  * and so does fixing one of the listed entries without removing it.
  */
-// Kept by owner decision: both document controller methods that have no
-// route (TelegramBotConnectionController::confirmToken() and
-// LibraryMusicController::searchAlbumOnDeezer()). The methods and their
-// annotations are left as they are for now.
+// Kept by owner decision: documents a controller method that has no route
+// (LibraryMusicController::searchAlbumOnDeezer()). The method and its
+// annotation are left as they are for now.
 const OPENAPI_KNOWN_DRIFT = [
     'GET api/v1/libraries/music/search/deezer/{artist}/{album}',
-    'POST api/v1/telegram/confirm-token',
 ];
 
 it('documents a route for every OpenAPI path operation', function () {
