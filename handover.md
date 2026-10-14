@@ -70,7 +70,9 @@ analyse` no errors.
 ## Still open: owner decisions
 
 - **§4:** behaviour changes to check against the frontend. Add: recommend
-  `favorite`/`unrated` now answer 404 instead of 500 when nothing matches.
+  `favorite`/`unrated` now answer 404 instead of 500 when nothing matches;
+  `POST /dev-requests` ignores `created_by_user_id` and always files as the
+  logged-in user (before, omitting it stored `null`).
 
 ## Suggested next step
 

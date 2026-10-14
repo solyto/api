@@ -16,7 +16,6 @@ class StoreDevRequestRequest extends FormRequest
             'screenshot_name' => 'nullable|string|max:255',
             'priority' => 'nullable|integer|min:1|max:5',
             'url' => 'nullable|string|max:255|url',
-            'created_by_user_id' => 'nullable|uuid|exists:users,id',
         ];
     }
 }
