@@ -3,71 +3,9 @@
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMusic;
-use App\Api\Libraries\Services\AiService;
 use App\Api\Libraries\Services\LibraryRecommender;
 use App\Api\Libraries\Services\LibraryReleases;
-
-/**
- * Build a fake chat completion response.
- */
-function fakeChatResponse(string $content, array $usage = ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15]): \OpenAI\Responses\Chat\CreateResponse
-{
-    return \OpenAI\Responses\Chat\CreateResponse::from([
-        'id' => 'chatcmpl-test',
-        'object' => 'chat.completion',
-        'created' => time(),
-        'model' => 'gpt-4o-mini',
-        'choices' => [[
-            'index' => 0,
-            'message' => ['role' => 'assistant', 'content' => $content],
-            'finish_reason' => 'stop',
-        ]],
-        'usage' => $usage,
-    ], \OpenAI\Responses\Meta\MetaInformation::from([]));
-}
-
-/**
- * Build a mocked OpenAI client that returns the given responses for chat()->create().
- */
-function mockedOpenAiClient($response): \OpenAI\Contracts\ClientContract
-{
-    $chat = Mockery::mock(\OpenAI\Contracts\Resources\ChatContract::class);
-    $chat->shouldReceive('create')->andReturn($response);
-
-    $client = Mockery::mock(\OpenAI\Contracts\ClientContract::class);
-    $client->shouldReceive('chat')->andReturn($chat);
-
-    return $client;
-}
-
-describe('AiService', function () {
-    it('respond returns the chat message content and tracks usage', function () {
-        $service = new AiService(mockedOpenAiClient(fakeChatResponse('Hello there!')));
-
-        $result = $service->respond('You are helpful', 'Hi');
-
-        expect($result)->toBe('Hello there!');
-    });
-
-    it('respond handles an array of messages', function () {
-        $service = new AiService(mockedOpenAiClient(fakeChatResponse('ok')));
-
-        $result = $service->respond('System', [
-            ['role' => 'user', 'content' => 'one'],
-            ['role' => 'assistant', 'content' => 'two'],
-        ]);
-
-        expect($result)->toBe('ok');
-    });
-
-    it('respondStructured decodes the json response', function () {
-        $service = new AiService(mockedOpenAiClient(fakeChatResponse(json_encode(['recommendations' => []]))));
-
-        $result = $service->respondStructured('Prompt', 'input', ['type' => 'json_schema']);
-
-        expect($result)->toBe(['recommendations' => []]);
-    });
-});
+use App\Plugins\Ai\Services\AiService;
 
 describe('LibraryRecommender', function () {
     it('throws for types without a recommender', function () {
@@ -124,18 +62,30 @@ describe('LibraryRecommender', function () {
         expect(app(LibraryRecommender::class)->random(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 
-    it('new() calls the AI service with favorites and saves usage', function () {
+    it('new() calls the AI service with the user and their favorites', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert', 'title' => 'Dune']);
 
         $ai = $this->mock(AiService::class);
-        $ai->shouldReceive('respondStructured')->once()->andReturn([
+        $ai->shouldReceive('respondStructured')
+            ->once()
+            ->withArgs(fn ($passedUser, $prompt, $input) => $passedUser->is($user) && str_contains($input, 'Dune by Frank Herbert'))
+            ->andReturn([
             'recommendations' => [['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi']],
         ]);
 
         $result = app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user);
 
         expect($result['recommendations'][0]['title'])->toBe('Children of Dune');
+    });
+
+    it('new() returns null when the AI service is unavailable for the user', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
+
+        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn(null);
+
+        expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 
     it('new() returns null without favorites', function () {

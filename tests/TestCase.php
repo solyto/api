@@ -69,13 +69,10 @@ abstract class TestCase extends BaseTestCase
             'serialize' => true,
         ]);
 
-        // The app key and the AI service key are read from Docker secrets at
-        // runtime (DockerSecretHelper), which do not exist in tests. Use a
-        // fixed test key so encryption and the password reset broker work;
-        // the AI client is always replaced by a mock in the tests that
-        // exercise AiService.
+        // The app key is read from a Docker secret at runtime
+        // (DockerSecretHelper), which does not exist in tests. Use a fixed
+        // test key so encryption and the password reset broker work.
         $app['config']->set('app.key', 'base64:AoYoKps+wlm4si7c1Q8IijIzpTPDxuZds9MS6/cHPlE=');
-        $app['config']->set('services.ai.api_key', 'test-key');
 
         // The image transformation service relies on Imagick/imgproxy which
         // are not available in the test environment; use a no-op double that

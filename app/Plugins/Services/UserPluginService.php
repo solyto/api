@@ -7,11 +7,19 @@ use App\Plugins\Ai\Enums\AiProviderEnum;
 use App\Plugins\Ai\Services\AiModelSnapshot;
 use App\Plugins\Enums\PluginEnum;
 use App\Plugins\Models\UserPlugin;
+use App\Shared\Services\UserCacheService;
 use Illuminate\Contracts\Encryption\DecryptException;
 
 class UserPluginService
 {
-    public function __construct(private readonly AiModelSnapshot $snapshot) {}
+    // Owned by LibraryBookService / LibraryMusicService; their AI recommendations depend on this plugin.
+    private const string CACHE_KEY_BOOK_RECOMMENDATIONS = 'book_recommendations';
+    private const string CACHE_KEY_MUSIC_RECOMMENDATIONS = 'music_recommendations';
+
+    public function __construct(
+        private readonly AiModelSnapshot $snapshot,
+        private readonly UserCacheService $cache,
+    ) {}
 
     /**
      * @return array<int, array{plugin: PluginEnum, enabled: bool, has_api_key: bool, settings: ?array, model_available: bool}>
@@ -55,6 +63,10 @@ class UserPluginService
         };
         $row->save();
 
+        match ($plugin) {
+            PluginEnum::AI => $this->forgetAiRecommendations($user),
+        };
+
         return $this->state($plugin, $row);
     }
 
@@ -69,9 +81,36 @@ class UserPluginService
         );
     }
 
+    /**
+     * The user's usable AI configuration, or null when the plugin is missing, disabled,
+     * has no readable key, or points at a model that is not in the snapshot.
+     *
+     * @return array{provider: AiProviderEnum, api_key: string, model: string}|null
+     */
+    public function aiConfig(User $user): ?array
+    {
+        $row = $this->row($user, PluginEnum::AI);
+
+        if ($row === null || ! $row->enabled || ! $this->apiKeyStored($row) || ! $this->aiModelAvailable($row->settings ?? [])) {
+            return null;
+        }
+
+        return [
+            'provider' => AiProviderEnum::from($row->settings['provider']),
+            'api_key' => (string) $row->credentials['api_key'],
+            'model' => (string) $row->settings['model'],
+        ];
+    }
+
     public function hasApiKey(User $user, PluginEnum $plugin): bool
     {
         return $this->apiKeyStored($this->row($user, $plugin));
+    }
+
+    private function forgetAiRecommendations(User $user): void
+    {
+        $this->cache->forget([self::CACHE_KEY_BOOK_RECOMMENDATIONS, $user->id]);
+        $this->cache->forget([self::CACHE_KEY_MUSIC_RECOMMENDATIONS, $user->id]);
     }
 
     private function row(User $user, PluginEnum $plugin): ?UserPlugin
