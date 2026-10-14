@@ -1,70 +1,73 @@
 # Handover: code-quality audit 2026-10-14
 
-Status of `docs/reports/code-quality-audit-2026-10-14.md` as of 2026-10-14.
+Status of `docs/reports/code-quality-audit-2026-10-14.md` as of 2026-10-14
+(second session).
 
 ## State of the tree
 
-Committed on `main` (not pushed):
+Everything is committed on `main` (not pushed). Only `.env.testing` shows as
+modified: it is a device mount, not ours, leave it alone. A bare `git diff`
+fails on it (`unsupported file type`); pass paths (`git diff -- app docs`).
 
-- `58cc6b3` PHPStan: exclude Pest tests, cap memory, type factories (§2.2)
-- `29f09af` Remove empty notes export and Telegram confirm-token stubs (§2.3)
+Commits from the first session: `58cc6b3` (§2.2), `29f09af` (§2.3),
+`68ded42` (job timeouts, route name, STANDARDS fixes, backlog move).
 
-Uncommitted (planned as two commits: code + rules, then backlog move):
+Commits from this session:
 
-- `app/Api/Libraries/Jobs/Grab{Music,Book,Movie}Releases.php`: `$tries = 1`, `$timeout = 300`
-- `routes/api.php`: `->name('uploadCover')` removed (rule 1.4)
-- `docs/STANDARDS.md`: stale facts fixed, the 14 corrections from
-  `standards-audits-2026-10-13.md` applied, rules 1.4 / 3.1 / 9.2 updated,
-  OQ-7 closed
-- `docs/STANDARDS_BACKLOG.md` deleted; open items moved to 10 entries in
-  `docs/backlog/`; references updated in `docs/AGENTS.md`,
-  `docs/STANDARDS_WORKFLOW.md`, `docs/TESTING.md`, `docs/STANDARDS.md`
-
-Not ours, leave alone: `.env.testing` (device mount),
-`app/Api/Libraries/Tests/GrabReleasesTest.php`, `app/Api/Users/Tests/JobTest.php`.
-
-PHPStan: run only via `composer analyse` (single process, 500M cap). A bare
-`phpstan analyse` can OOM-kill the container.
-
-## Done
-
-Blockers are closed (§2.1 earlier, §2.2 and §2.3 on 2026-10-14).
-
-- §3.1: stale facts fixed, backlog moved. The "timeless" rewrite (§5.3) is not done.
-- §3.9: owner decision, cache behaviour stays as is.
-- In `docs/backlog/`: §3.7 (bot dispatch only), §3.8, §3.11, §3.13 (via
-  the inline-validation entry), §3.15 (the OQ-8 part).
-- §5.1.1–2: `composer analyse` exists.
-
-## Still open, not tracked anywhere yet
-
-| § | What | Kind |
+| Commit | § | What |
 |---|---|---|
-| 3.2 | `LibraryRecommender::favorite()`/`unrated()` crash with a 500 on an empty library | **real bug** |
-| 3.7 | `SolytoBot::auth()` calls `exit(1)` mid-request; the trait catches `\Exception` instead of `\Throwable`; dead `commitWithType()` | bug-ish |
-| 3.10 | `ScaleCovers` repeats the daily Deezer sweep | waste |
-| 3.3 | four jobs use `app()` in `handle()` instead of parameters; unused imports | cleanup |
-| 3.5 + 3.6 | the not-found preamble repeated ×11 in `CalendarController` and ×9 in `ContactController`; the `instanceof` chain in `bootstrap/app.php` | refactor (DAV-adjacent) |
-| 3.12 | 46 inline-envelope annotations that rule 2.3's check misses | mechanical |
-| 3.11 | `else if` → `elseif` in both import loops | tiny |
-| 3.14 | document the blind spots of `ResourceSchemaDriftTest` in `TESTING.md` | docs |
-| 3.15 | time-tracking `project_id`/`category_id` → scoped `Rule::exists` (optional; already safe) | cleanup |
-| 3.16 | unused `expectApiSuccess`/`expectApiError`; the repeated "longterm store" comment; Deezer/Spotify duplicate loop (only once Spotify is switched on) | small |
+| `674e46f` | 5.1 | `docs/AGENTS.md`: `composer test` + `composer analyse` are the done gate; `composer analyse` listed under Commands |
+| `e51fd79` | 3.2 | `LibraryRecommender::favorite()`/`unrated()` return null → documented 404 instead of 500; two regression tests |
+| `b528513` | 3.10 | `ScaleCovers` no longer sweeps music releases (`GrabMusicReleases` does it at 05:00) |
+| `ae861e6` | 3.3 | the four calendar/contact jobs take their service as a `handle()` parameter; unused imports gone |
+| `1e737cb` | 3.14 | `TESTING.md`: `ResourceSchemaDriftTest` blind spots |
+| `a45d8cd` | 3.16 | `TESTING.md`: `expectApiError` is used, only `expectApiSuccess` has no callers |
+| `d970fed` | 3.5, 3.12 | backlog entries (see below) |
 
-## Process and decisions
+Gate at the end of this session: `composer test` 755 passed, `composer
+analyse` no errors.
 
-- **§3.4 / §5.2:** decide OQ-6 (Pint). That would also allow a `composer lint` script.
-- **§5.1:** write in `docs/AGENTS.md` that a job isn't done until
-  `composer test` and `composer analyse` pass, and that reviewers run the
-  full suite. CI needs the owner's approval.
-- **§5.3:** make `STANDARDS.md` "timeless" by removing the counts from rule bodies.
-- **§5.5:** commit hygiene (`chore: commit all`). Partly how manigot merges, so the owner's call.
-- **§4:** a list of behaviour changes to check against the frontend.
-  Informational, not a task for this repo.
+## Environment
+
+- `vendor/` was stale (2026-08-22, before Larastan): `phpstan` was missing.
+  Fixed with `composer install` from the lock (owner approved; no
+  `composer.json`/`composer.lock` change). Agent sessions do not get a full
+  `vendor/` sync (it is gitignored); the owner is looking at that on the
+  manigot side.
+- PHPStan only via `composer analyse` (single process, 500M cap). A bare
+  `phpstan analyse` can OOM-kill the container.
+
+## Backlog (new this session)
+
+- `docs/backlog/calendar-and-contact-controller-not-found-preamble.md` (§3.5)
+- `docs/backlog/inline-envelope-annotations-message-variant.md` (§3.12)
+
+## Dropped on purpose (owner decision, no backlog entry)
+
+- §3.2 leftovers: `toRecommendation()` helper and the typed exception in
+  `LibraryRecommender::assertType()`.
+- §3.7 and anything in `app/Bots/`: "the bot works", too risky for quick
+  changes. Known and deliberately left: `phpunit.xml` does not include
+  `app/Bots/Tests` or `app/Dav/Tests`, so `composer test` does not run them
+  (DAV's 13 pass when run directly; running `SolytoBotTest.php` directly
+  dies silently on `exit(1)` in `SolytoBot::auth()`, and one test fails on
+  `chat_id` string vs `'integer'` cast). Do not "fix" this without the owner.
+- §3.6 (`instanceof` chain: the report itself says two is fine), §3.11
+  (`elseif`: Pint will do it once OQ-6 is decided), §3.15 (optional, already
+  safe), §3.16's "longterm" comment and Spotify/Deezer loop.
+
+## Still open: owner decisions
+
+- **§3.4 / §5.2:** decide OQ-6 (Pint). Would also allow `composer lint`.
+- **§5.1 CI:** `.github/workflows/tests.yml` needs the owner's go-ahead.
+- **§5.3:** make `STANDARDS.md` "timeless" (drop counts from rule bodies;
+  `TESTING.md`'s helper table counts too).
+- **§5.5:** commit hygiene (`chore: commit all`).
+- **§4:** behaviour changes to check against the frontend. Add: recommend
+  `favorite`/`unrated` now answer 404 instead of 500 when nothing matches.
 
 ## Suggested next step
 
-The §5.1 gate note in `docs/AGENTS.md` first. It's a few lines, and it's
-the report's main process finding, the reason the blockers went unnoticed.
-Then put the untracked code items into `docs/backlog/` (or fix §3.2 right
-away, since it's a live 500).
+Nothing in the audit is left to do here without an owner decision. Next is
+one of the decisions above (OQ-6 is the one that grows while it waits), or
+a job from `docs/backlog/`.
