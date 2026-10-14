@@ -6,12 +6,10 @@ use App\Api\DevRequests\Jobs\DeleteOldDevRequests;
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\Libraries\Jobs\GenerateCoverPreview;
 use App\Api\Libraries\Jobs\ScaleCovers;
-use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Users\Jobs\DeleteOldFriendRequests;
 use App\Api\Users\Jobs\ScaleProfileImage;
 use App\Api\Users\Models\FriendRequest;
 use App\Shared\Services\Images\ImageTransformationService;
-use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -108,11 +106,7 @@ describe('ScaleCovers', function () {
             ->with($dir.'/cover.jpg', 400, 85)
             ->andReturn(true);
 
-        app(ScaleCovers::class)->handle(
-            app(UserCacheService::class),
-            $imageTransformation,
-            app(LibraryReleases::class)
-        );
+        app(ScaleCovers::class)->handle($imageTransformation);
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
     });
@@ -126,11 +120,7 @@ describe('ScaleCovers', function () {
         $imageTransformation = Mockery::mock(ImageTransformationService::class);
         $imageTransformation->shouldReceive('scaleToWidth')->never();
 
-        app(ScaleCovers::class)->handle(
-            app(UserCacheService::class),
-            $imageTransformation,
-            app(LibraryReleases::class)
-        );
+        app(ScaleCovers::class)->handle($imageTransformation);
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
     });
@@ -143,11 +133,7 @@ describe('ScaleCovers', function () {
         $imageTransformation = Mockery::mock(ImageTransformationService::class);
         $imageTransformation->shouldReceive('scaleToWidth')->never();
 
-        app(ScaleCovers::class)->handle(
-            app(UserCacheService::class),
-            $imageTransformation,
-            app(LibraryReleases::class)
-        );
+        app(ScaleCovers::class)->handle($imageTransformation);
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeFalse();
     });
