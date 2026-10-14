@@ -66,8 +66,7 @@ class DevRequestController
      *             @OA\Property(property="screenshot", type="string", nullable=true),
      *             @OA\Property(property="screenshot_name", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="priority", type="integer", minimum=1, maximum=5, nullable=true),
-     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="created_by_user_id", type="string", format="uuid", nullable=true)
+     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true)
      *         )
      *     ),
      *
@@ -90,7 +89,7 @@ class DevRequestController
      */
     public function store(StoreDevRequestRequest $request): JsonResponse
     {
-        $devRequest = $this->devRequestService->create($request->validated());
+        $devRequest = $this->devRequestService->create($request->user(), $request->validated());
 
         return ApiResponse::success(
             new DevRequestResource($devRequest),

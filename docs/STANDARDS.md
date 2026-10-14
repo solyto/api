@@ -333,14 +333,13 @@ or scoped lookup in the service, as `EventAttachmentController.php:138` and
 Still bare: `ShareCalendarRequest.php:14` (`friend_id`),
 `StoreFriendRequestRequest.php:12` (`receiver_id`), the time-tracking
 `project_id` / `category_id` rules (`StoreTimeTrackingEntryRequest.php:17`,
-`UpdateTimeTrackingEntryRequest.php:17`, `TimeTrackingEntryController.php:261,387`),
-and `StoreDevRequestRequest.php:19` `created_by_user_id`, which the caller
-picks and `DevRequestService::create:27` stores — attribution must come from
-`$request->user()`.
+`UpdateTimeTrackingEntryRequest.php:17`, `TimeTrackingEntryController.php:261,387`).
+Attribution never comes from the payload: `DevRequestService::create(User $user, …)`
+sets `created_by_user_id` from `$request->user()` (OQ-8).
 
 Check: `grep -rn "exists:" app/Api --include=*.php | grep -v Tests` — every
 hit either uses `Rule::exists(...)->where('user_id', …)` or names a service
-line that re-scopes it. Currently 7 bare hits (above); 33 rules use `Rule::exists`.
+line that re-scopes it. Currently 6 bare hits (above); 33 rules use `Rule::exists`.
 
 ### 3.3 `authorize()` stays empty; ownership is a controller line
 
@@ -853,6 +852,9 @@ translated (Decisions).
 - **Calendar sharing is restricted to friends** (OQ-7, 2026-10-14):
   `ShareCalendarRequest::after()` rejects non-friends and self with a 422 on
   `friend_id`. Where that check lives is left as is for now.
+- **Nobody files a dev request in someone else's name** (OQ-8,
+  2026-10-14): `created_by_user_id` is not accepted from the request; the
+  service sets it from the authenticated user (rule 3.2).
 - **No `authorize()` in FormRequests.** Ownership is `HandlesApiAuth` in the
   controller.
 - **`LoginRequest::authenticate()` stays** (Breeze pattern); no other request
@@ -926,5 +928,4 @@ translated (Decisions).
 
 ## Open questions
 
-- **OQ-8 — `StoreDevRequestRequest` `created_by_user_id`** is client-chosen;
-  intended (admins filing on behalf of users) or an oversight?
+None at the moment.
