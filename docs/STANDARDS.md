@@ -969,6 +969,10 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   minimum with a 426. A request without the header is always accepted,
   because builds up to 1.0.15 send none (backlog: `client-version-header`,
   `client-minimum-version`).
+- **Plugins live in `app/Plugins/`, not in `app/Api/`** (2026-10-14): a
+  plugin is something a user turns on, with their own credentials if
+  needed (AI first). Modules may call plugin services; rule 12.8 only
+  covers module-to-module calls (backlog: `user-plugins-storage`).
 - **Reference module is `app/Api/Todos/`.** Owner's statement (job
   `online`, 2026-10-10); when a rule and the Todos code disagree it is listed
   under Open questions, not silently resolved either way.
