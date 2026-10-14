@@ -7,6 +7,7 @@ use App\Api\Contacts\Models\Contact;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Contact> */
 class ContactFactory extends Factory
 {
     protected $model = Contact::class;

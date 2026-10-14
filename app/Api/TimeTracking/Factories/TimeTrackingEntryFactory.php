@@ -7,6 +7,7 @@ use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<TimeTrackingEntry> */
 class TimeTrackingEntryFactory extends Factory
 {
     protected $model = TimeTrackingEntry::class;

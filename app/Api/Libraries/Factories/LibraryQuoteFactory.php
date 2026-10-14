@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryQuote;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryQuote> */
 class LibraryQuoteFactory extends Factory
 {
     protected $model = LibraryQuote::class;

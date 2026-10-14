@@ -6,6 +6,7 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<VerificationToken> */
 class VerificationTokenFactory extends Factory
 {
     protected $model = VerificationToken::class;

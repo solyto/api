@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryGame> */
 class LibraryGameFactory extends Factory
 {
     protected $model = LibraryGame::class;
