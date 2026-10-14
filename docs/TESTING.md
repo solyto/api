@@ -47,9 +47,9 @@ tests have no database refresh unless they ask for it.
   (Redis in production). `phpunit.xml` sets `CACHE_STORE=array`,
   `QUEUE_CONNECTION=sync`, `MAIL_MAILER=array`, `SESSION_DRIVER=array`,
   Pulse/Telescope off, `PASSWORD_UNCOMPROMISED=false`, `EMAIL_CONFIRMATION=true`.
-- `app.key` is a fixed test key and `services.ai.api_key` a stub (both are
-  Docker secrets in production); `AiService` is always mocked where it is
-  exercised.
+- `app.key` is a fixed test key (a Docker secret in production). `AiService`
+  is either mocked or given an injected OpenAI client (or PSR-18 HTTP client),
+  so no test reaches a real AI provider.
 - `ImageTransformationService` is bound to a no-op double (no Imagick/imgproxy).
 - Consequence: do not write a test that needs MariaDB, PostgreSQL or Redis
   features; SQLite is what runs. (`whereRaw('LOWER(...)')` in `TodoService`

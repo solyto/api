@@ -3,6 +3,7 @@
 use App\Plugins\Ai\Services\AiModelSnapshot;
 use App\Plugins\Enums\PluginEnum;
 use App\Plugins\Models\UserPlugin;
+use App\Shared\Services\UserCacheService;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 
@@ -261,4 +262,27 @@ describe('User plugin secrecy and isolation', function () {
 
         expect(DB::table('user_plugins')->where('user_id', $user->id)->count())->toBe(0);
     });
+});
+
+describe('AI plugin changes and recommendation caches', function () {
+    it('forgets the cached book and music recommendations when the AI plugin is saved', function (array $payload) {
+        $user = makeUser();
+        $other = makeUser();
+        UserPlugin::factory()->forUser($user)->create();
+        $cache = app(UserCacheService::class);
+        foreach ([$user, $other] as $owner) {
+            $cache->store(['book_recommendations', $owner->id], 3600, [['title' => 'Old book']]);
+            $cache->store(['music_recommendations', $owner->id], 3600, [['title' => 'Old album']]);
+        }
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload($payload)));
+
+        expect($cache->get(['book_recommendations', $user->id]))->toBeNull()
+            ->and($cache->get(['music_recommendations', $user->id]))->toBeNull()
+            ->and($cache->get(['book_recommendations', $other->id]))->toBe([['title' => 'Old book']])
+            ->and($cache->get(['music_recommendations', $other->id]))->toBe([['title' => 'Old album']]);
+    })->with([
+        'disabled' => [['enabled' => false]],
+        'model changed' => [['model' => 'gpt-b']],
+    ]);
 });

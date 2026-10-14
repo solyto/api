@@ -39,12 +39,6 @@ return [
         'access_token' => \App\Shared\Helpers\DockerSecretHelper::get('TMDB_ACCESS_TOKEN'),
     ],
 
-    'ai' => [
-        'api_key' => \App\Shared\Helpers\DockerSecretHelper::get('AI_API_KEY'),
-        'base_url' => env('AI_BASE_URL'),
-        'model' => env('AI_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
-    ],
-
     'mailgun' => [
         'domain' => env('MAILGUN_DOMAIN'),
         'secret' => \App\Shared\Helpers\DockerSecretHelper::get('MAILGUN_SECRET'),

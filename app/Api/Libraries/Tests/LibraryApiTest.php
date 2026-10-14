@@ -9,6 +9,8 @@ use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Tags\Models\Tag;
+use App\Plugins\Models\UserPlugin;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 
 describe('Library book CRUD', function () {
@@ -484,6 +486,31 @@ describe('Library recommend endpoints', function () {
             ->assertJsonPath('data.id', $music->id)
             ->assertJsonPath('data.title', 'Kind of Blue');
     });
+});
+
+describe('Library NEW recommendations without a usable AI plugin', function () {
+    it('returns the same 404 as without favorites', function (string $type, Closure $favorite, Closure $setup) {
+        $user = makeUser();
+
+        $withoutFavorites = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/libraries/{$type}/recommend/new");
+        expectApiError($withoutFavorites, 404);
+
+        $favorite($user);
+        $setup($user);
+
+        $withoutAi = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/libraries/{$type}/recommend/new");
+        expectApiError($withoutAi, 404);
+
+        expect(Arr::except($withoutAi->json(), 'timestamp'))->toBe(Arr::except($withoutFavorites->json(), 'timestamp'));
+    })->with([
+        'books' => ['books', fn () => fn ($user) => LibraryBook::factory()->forUser($user)->create(['rating' => 5])],
+        'music' => ['music', fn () => fn ($user) => LibraryMusic::factory()->forUser($user)->create(['rating' => 5])],
+    ])->with([
+        'no plugin' => [fn () => fn ($user) => null],
+        'plugin disabled' => [fn () => fn ($user) => UserPlugin::factory()->forUser($user)->create(['enabled' => false])],
+    ]);
 });
 
 describe('Library books and music tenant isolation', function () {
