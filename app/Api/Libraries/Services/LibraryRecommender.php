@@ -4,7 +4,6 @@ namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Users\Models\User;
-use App\Shared\Enums\AiUsageFeatureEnum;
 
 class LibraryRecommender
 {
@@ -123,10 +122,7 @@ class LibraryRecommender
             ? $this->getBooksMessage($favorites)
             : $this->getMusicMessage($favorites);
 
-        $response = $this->aiService->respondStructured($prompt, $message, self::RESPONSE_SCHEMA);
-        $this->aiService->saveUsageForUser($user, AiUsageFeatureEnum::LIBRARY_RECOMMENDER);
-
-        return $response;
+        return $this->aiService->respondStructured($prompt, $message, self::RESPONSE_SCHEMA);
     }
 
     private function assertType(LibraryTypeEnum $type): void
