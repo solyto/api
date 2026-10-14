@@ -51,6 +51,10 @@ analyse` no errors.
 - §5.1 CI: rejected in the same job (`.github/workflows/tests.yml`);
   already recorded in `STANDARDS.md` Decisions ("CI … not approved").
 - §5.5 commit hygiene (`chore: commit all`): ignored by owner decision.
+- §5.3 "timeless" `STANDARDS.md`: left as is by owner decision. Known: many
+  rules still describe already-fixed problems as current (e.g. 1.3, 1.5,
+  2.3, 2.5, 4.5, 5.1, 6.1) and carry stale counts; trust the `Check:` greps
+  over the numbers in the text.
 - §3.2 leftovers: `toRecommendation()` helper and the typed exception in
   `LibraryRecommender::assertType()`.
 - §3.7 and anything in `app/Bots/`: "the bot works", too risky for quick
@@ -65,8 +69,6 @@ analyse` no errors.
 
 ## Still open: owner decisions
 
-- **§5.3:** make `STANDARDS.md` "timeless" (drop counts from rule bodies;
-  `TESTING.md`'s helper table counts too).
 - **§4:** behaviour changes to check against the frontend. Add: recommend
   `favorite`/`unrated` now answer 404 instead of 500 when nothing matches.
 
