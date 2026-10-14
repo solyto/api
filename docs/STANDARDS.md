@@ -291,14 +291,14 @@ no check; the reviewer diffs them for the touched endpoint.
 `app/Api/<Module>/Requests/<Verb><Resource>Request.php`, pipe-string rules,
 `sometimes` on update rules, `attributes()` where a field name would read
 badly (`StoreTodoRequest.php:29-34`). No inline `$request->validate([...])`,
-whatever the size of the shape (owner decision, 2026-10-14). 21 inline sites
-remain and are to be converted, e.g. `TodoController.php:320` (one field) and
-`NotificationSettingsController.php:107-144` (36 fields in `update`).
+whatever the size of the shape (owner decision, 2026-10-14). 20 inline sites
+remain and are to be converted, e.g. `TodoController.php:320` (one field).
+Good: `UpdateNotificationSettingsRequest` (36 fields, moved out of the controller).
 
 Arrays instead of pipe strings only when a rule object is in the list
 (`RegisterRequest.php:15` `['required', 'confirmed', Password::defaults()]`).
 
-Check: `grep -rn '\$request->validate(' app/Api/*/Controllers` → 0 (21 today).
+Check: `grep -rn '\$request->validate(' app/Api/*/Controllers` → 0 (20 today).
 
 ### 3.2 `exists:` proves existence, not ownership
 
