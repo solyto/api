@@ -51,6 +51,7 @@ use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
+use App\Plugins\Controllers\UserPluginController;
 use App\Shared\Middleware\TrackApiTraffic;
 use Illuminate\Support\Facades\Route;
 
@@ -122,8 +123,18 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::put('check-in', [UserSettingsController::class, 'updateCheckIn']);
             Route::put('check-in-calendar-mark', [UserSettingsController::class, 'updateCheckInCalendarMark']);
         });
+
+        Route::prefix('me/plugins')->group(function () {
+            Route::get('', [UserPluginController::class, 'index']);
+            Route::get('{plugin}', [UserPluginController::class, 'show']);
+            Route::put('{plugin}', [UserPluginController::class, 'update']);
+        });
     });
     Route::apiResource('users', UserController::class)->only(['index', 'update']);
+
+    Route::prefix('plugins')->group(function () {
+        Route::get('ai/providers', [UserPluginController::class, 'providers']);
+    });
 
     Route::prefix('todos')->name('todos.')->group(function () {
         Route::apiResource('categories', TodoCategoryController::class);

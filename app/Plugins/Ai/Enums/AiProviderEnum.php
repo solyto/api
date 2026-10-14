@@ -16,4 +16,13 @@ enum AiProviderEnum: string
             self::MISTRAL => 'https://api.mistral.ai/v1',
         };
     }
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::OPENAI => 'OpenAI',
+            self::OPENROUTER => 'OpenRouter',
+            self::MISTRAL => 'Mistral',
+        };
+    }
 }

@@ -46,6 +46,7 @@ return [
                 'annotations' => [
                     base_path('app/OpenApi'),
                     base_path('app/Api'),
+                    base_path('app/Plugins'),
                 ],
             ],
         ],

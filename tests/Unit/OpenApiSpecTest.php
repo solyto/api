@@ -44,6 +44,7 @@ it('documents a route for every OpenAPI path operation', function () {
     $openApi = (new OpenApiGenerator($silentLogger))->generate([
         base_path('app/OpenApi'),
         base_path('app/Api'),
+        base_path('app/Plugins'),
     ]);
 
     $routes = Route::getRoutes();
