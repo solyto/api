@@ -41,6 +41,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Minimum Client Version
+    |--------------------------------------------------------------------------
+    |
+    | Requests to authenticated routes whose X-Client-Version header is below
+    | this version get a 426. Requests without the header are always allowed.
+    | null turns the check off.
+    |
+    */
+
+    'min_client_version' => env('MIN_CLIENT_VERSION'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------
     |
