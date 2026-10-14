@@ -2,9 +2,6 @@
 
 namespace App\Api\Libraries\Jobs;
 
-use App\Api\Libraries\Services\LibraryReleases;
-use App\Api\Users\Models\User;
-use App\Shared\Services\UserCacheService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,10 +15,7 @@ class ScaleCovers implements ShouldQueue
 {
     use Queueable, Dispatchable, InteractsWithQueue;
 
-    private const string CACHE_KEY_RELEASES = 'music_releases';
-    private const int CACHE_TTL_RELEASES = 86400;
-
-    public function handle(UserCacheService $cache, ImageTransformationService $imageTransformation, LibraryReleases $libraryReleases): void
+    public function handle(ImageTransformationService $imageTransformation): void
     {
         Log::channel('queue')->info('Looking for covers that are too big..');
 
@@ -63,16 +57,5 @@ class ScaleCovers implements ShouldQueue
         }
 
         Log::channel('queue')->info('Done processing album covers.');
-
-        $users = User::all();
-
-        foreach ($users as $user) {
-            $releases = $libraryReleases->getMusicReleases($user);
-            $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
-
-            Log::channel('queue')->info('Cached ' . count($releases) . ' releases for user ' . $user->id);
-        }
-
-        Log::channel('queue')->info('Done.');
     }
 }
