@@ -85,7 +85,7 @@ From the two briefs (`docs/jobs/archive/online_php-laravel-api-best-pratices/bri
   item marked "(approval)", never an action.
 - Sessions are isolated; the agent's memory does not survive. Everything
   that matters for the next session lives in this file, in
-  `docs/STANDARDS.md`, and in `docs/STANDARDS_BACKLOG.md`.
+  `docs/STANDARDS.md`, and in `docs/backlog/`.
 
 ## Shape of `docs/STANDARDS.md`
 
@@ -98,17 +98,17 @@ From the two briefs (`docs/jobs/archive/online_php-laravel-api-best-pratices/bri
   rule, why it matters, a bad/good example from this repo with file and
   line, and a check where one exists.
 - **Decisions**: choices the owner made that are not derivable from the
-  code (inline `validate()` allowed, no `strict_types`, `$casts` property,
+  code (no inline `validate()`, no `strict_types`, `$casts` property,
   deletes return 200, what was dropped from the old docs).
 - **Open questions** (OQ-n): things waiting for the owner's answer, each
   with the data point that raised it. The owner's own inconsistencies with
   a rule are recorded here, not silently dropped and not silently turned
   into exceptions.
 
-Concrete cleanups go to `docs/STANDARDS_BACKLOG.md` (a checkbox list grouped
-by size — First / Mechanical / Extract to helpers / Rewrites / Larger /
-Audits / Tooling — each item naming its rule and a check line), never into
-`STANDARDS.md`. The working notes with full counts from the first session
+Concrete cleanups go to `docs/backlog/` as manigot backlog entries (one
+idea per file, written with the `backlog-entry` skill, naming its rule and
+a check line), never into `STANDARDS.md`. `docs/STANDARDS_BACKLOG.md` was
+retired on 2026-10-14; its open items moved there. The working notes with full counts from the first session
 are in `docs/jobs/dawn_standards/findings-*.md`, `provenance.md` and
 `tooling-report.md`; they are job artefacts and may go stale.
 
