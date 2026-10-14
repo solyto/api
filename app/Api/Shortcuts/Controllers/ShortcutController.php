@@ -57,7 +57,7 @@ class ShortcutController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -139,7 +139,7 @@ class ShortcutController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -195,7 +195,7 @@ class ShortcutController
      *         in="path",
      *         required=true,
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

@@ -66,7 +66,7 @@ class LibraryMusicController
      *         required=true,
      *         description="Music ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -234,7 +234,7 @@ class LibraryMusicController
      *         required=true,
      *         description="Music ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -297,7 +297,7 @@ class LibraryMusicController
      *         required=true,
      *         description="Music ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

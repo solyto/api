@@ -60,7 +60,7 @@ class LibraryLinkController
      *         required=true,
      *         description="Link ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -173,7 +173,7 @@ class LibraryLinkController
      *         required=true,
      *         description="Link ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -228,7 +228,7 @@ class LibraryLinkController
      *         required=true,
      *         description="Link ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

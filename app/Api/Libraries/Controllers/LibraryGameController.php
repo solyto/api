@@ -63,7 +63,7 @@ class LibraryGameController
      *         required=true,
      *         description="Game ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -157,7 +157,7 @@ class LibraryGameController
      *         required=true,
      *         description="Game ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -220,7 +220,7 @@ class LibraryGameController
      *         required=true,
      *         description="Game ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
