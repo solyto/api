@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
               __DIR__.'/../app/Api/Notifications/Commands',
               __DIR__.'/../app/Api/Users/Commands',
               __DIR__.'/../app/Bots/Commands',
+              __DIR__.'/../app/Plugins/Ai/Commands',
           ])
           ->withExceptions(function ($exceptions) {
               $exceptions->render(function (Throwable $e, Request $request) {

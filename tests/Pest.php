@@ -4,8 +4,8 @@ use App\Api\Users\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests');
-uses(RefreshDatabase::class)->in('../app/Api');
+uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests', '../app/Plugins');
+uses(RefreshDatabase::class)->in('../app/Api', '../app/Plugins');
 
 /*
 |--------------------------------------------------------------------------
