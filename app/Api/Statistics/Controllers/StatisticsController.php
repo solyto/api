@@ -26,9 +26,9 @@ class StatisticsController
      *         description="Statistics retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Statistics retrieved successfully.")
+     *             @OA\Property(property="data", type="object")
      *         )
      *     ),
      *

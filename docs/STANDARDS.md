@@ -247,7 +247,7 @@ Bad (`LibraryBookController.php:37-42`, 137 times in 20 files):
  *         )
 ```
 
-Check: `grep -rn '@OA\\Property(property="success"' app/Api/*/Controllers` → 0.
+Check: `grep -rnE '@OA\\Property\(property="(success|message)"' app/Api/*/Controllers` → 0.
 
 ### 2.4 422 validation errors use `ValidationErrorResponse`
 

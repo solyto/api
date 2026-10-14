@@ -30,9 +30,9 @@ class TimeTrackingCategoryController
      *         description="Time tracking categories retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingCategory")),
-     *             @OA\Property(property="message", type="string", example="Time tracking categories retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingCategory"))
      *         )
      *     )
      * )
@@ -68,9 +68,9 @@ class TimeTrackingCategoryController
      *         description="Time tracking category created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingCategory"),
-     *             @OA\Property(property="message", type="string", example="Time tracking category created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingCategory")
      *         )
      *     ),
      *
@@ -121,9 +121,9 @@ class TimeTrackingCategoryController
      *         description="Time tracking category updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingCategory"),
-     *             @OA\Property(property="message", type="string", example="Time tracking category updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingCategory")
      *         )
      *     ),
      *
@@ -169,9 +169,9 @@ class TimeTrackingCategoryController
      *         description="Time tracking category deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Time tracking category deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
