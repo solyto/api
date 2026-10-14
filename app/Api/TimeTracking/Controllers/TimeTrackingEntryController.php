@@ -22,7 +22,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Get(
-     *     path="/time-tracking-entries",
+     *     path="/time-tracking/entries",
      *     operationId="timeTrackingEntryIndex",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -49,7 +49,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/time-tracking-entries",
+     *     path="/time-tracking/entries",
      *     operationId="timeTrackingEntryStore",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -104,7 +104,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Put(
-     *     path="/time-tracking-entries/{entry}",
+     *     path="/time-tracking/entries/{entry}",
      *     operationId="timeTrackingEntryUpdate",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -173,7 +173,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Delete(
-     *     path="/time-tracking-entries/{entry}",
+     *     path="/time-tracking/entries/{entry}",
      *     operationId="timeTrackingEntryDestroy",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -214,7 +214,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/time-tracking-entries/start",
+     *     path="/time-tracking/entries/start",
      *     operationId="timeTrackingEntryStart",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -281,7 +281,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Post(
-     *     path="/time-tracking-entries/{entry}/stop",
+     *     path="/time-tracking/entries/{entry}/stop",
      *     operationId="timeTrackingEntryStop",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},
@@ -330,7 +330,7 @@ class TimeTrackingEntryController
 
     /**
      * @OA\Get(
-     *     path="/time-tracking-entries/statistics",
+     *     path="/time-tracking/entries/statistics",
      *     operationId="timeTrackingEntryStatistics",
      *     tags={"Time Tracking"},
      *     security={{"sanctum":{}}},

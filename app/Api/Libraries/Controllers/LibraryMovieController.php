@@ -376,7 +376,7 @@ class LibraryMovieController
 
     /**
      * @OA\Get(
-     *     path="/libraries/movies/search/{service}/{query}",
+     *     path="/libraries/movies/search/{service}/{title}",
      *     operationId="searchLibraryMovies",
      *     tags={"Libraries - Movies"},
      *     security={{"sanctum": {}}},
@@ -391,7 +391,7 @@ class LibraryMovieController
      *      ),
      *
      *     @OA\Parameter(
-     *         name="query",
+     *         name="title",
      *         in="path",
      *         required=true,
      *         description="Query to search for",

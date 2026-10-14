@@ -158,3 +158,42 @@ describe('DeleteExpiredExports job', function () {
         Storage::disk('user_data')->assertMissing($job->file_path);
     });
 });
+
+describe('Export tenant isolation', function () {
+    it('does not let a user download another user\'s export', function () {
+        Storage::fake('user_data');
+        $user = makeUser();
+        $other = makeUser();
+
+        $job = ExportJob::create([
+            'user_id' => $other->id,
+            'status' => 'completed',
+            'features' => ['todos'],
+        ]);
+        Storage::disk('user_data')->put($job->file_path, 'zip-bytes');
+
+        // The download is scoped via `forUser`, so a foreign id is unknown.
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/export/'.$job->id.'/download'), 404);
+
+        $this->actingAs($other, 'sanctum')
+            ->get('/api/v1/export/'.$job->id.'/download')
+            ->assertStatus(200);
+    });
+
+    it('does not report another user\'s export in the status', function () {
+        $user = makeUser();
+        $other = makeUser();
+
+        ExportJob::create([
+            'user_id' => $other->id,
+            'status' => 'pending',
+            'features' => ['todos'],
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/export/status')
+            ->assertStatus(200)
+            ->assertJsonPath('data', null);
+    });
+});

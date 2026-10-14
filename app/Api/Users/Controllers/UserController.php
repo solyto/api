@@ -62,20 +62,11 @@ class UserController
 
     /**
      * @OA\Get(
-     *     path="/users/{id}",
+     *     path="/users/me",
      *     operationId="userShow",
      *     summary="Get user details",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="User ID",
-     *         required=true,
-     *
-     *         @OA\Schema(type="integer")
-     *     ),
      *
      *     @OA\Response(
      *         response=200,
@@ -117,7 +108,7 @@ class UserController
 
     /**
      * @OA\Post(
-     *     path="/users/update-profile-image",
+     *     path="/users/me/profile-image",
      *     operationId="userUpdateProfileImage",
      *     summary="Update user profile image",
      *     tags={"Users"},
@@ -173,13 +164,13 @@ class UserController
 
     /**
      * @OA\Get(
-     *     path="/users/{id}/public-profile",
+     *     path="/users/{user}/public-profile",
      *     operationId="userPublicProfile",
      *     summary="Get user public profile",
      *     tags={"Users"},
      *
      *     @OA\Parameter(
-     *         name="id",
+     *         name="user",
      *         in="path",
      *         description="User ID",
      *         required=true,

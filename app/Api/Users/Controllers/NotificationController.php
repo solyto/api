@@ -42,14 +42,14 @@ class NotificationController
 
     /**
      * @OA\Put(
-     *     path="/notifications/{id}/mark-read",
+     *     path="/notifications/{notification}/read",
      *     operationId="notificationMarkRead",
      *     summary="Mark notification as read",
      *     tags={"Notifications"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="id",
+     *         name="notification",
      *         in="path",
      *         description="Notification ID",
      *         required=true,

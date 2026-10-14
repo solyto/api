@@ -26,7 +26,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/navigation",
+     *     path="/users/me/settings/navigation",
      *     operationId="userSettingsUpdateNavigation",
      *     summary="Update navigation settings",
      *     tags={"User Settings"},
@@ -66,7 +66,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/language",
+     *     path="/users/me/settings/language",
      *     operationId="userSettingsUpdateLanguage",
      *     summary="Update language setting",
      *     tags={"User Settings"},
@@ -103,7 +103,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/timezone",
+     *     path="/users/me/settings/timezone",
      *     operationId="userSettingsUpdateTimezone",
      *     summary="Update timezone setting",
      *     tags={"User Settings"},
@@ -140,7 +140,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/date-format",
+     *     path="/users/me/settings/date-format",
      *     operationId="userSettingsUpdateDateFormat",
      *     summary="Update date format setting",
      *     tags={"User Settings"},
@@ -177,7 +177,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/time-format",
+     *     path="/users/me/settings/time-format",
      *     operationId="userSettingsUpdateTimeFormat",
      *     summary="Update time format setting",
      *     tags={"User Settings"},
@@ -214,7 +214,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/weather-city",
+     *     path="/users/me/settings/weather-city",
      *     operationId="userSettingsUpdateWeatherCity",
      *     summary="Update weather city setting",
      *     tags={"User Settings"},
@@ -253,7 +253,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/weather-temperature-unit",
+     *     path="/users/me/settings/weather-temperature-unit",
      *     operationId="userSettingsUpdateTemperatureUnit",
      *     summary="Update temperature unit setting",
      *     tags={"User Settings"},
@@ -290,7 +290,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/openai-api-key",
+     *     path="/users/me/settings/openai-api-key",
      *     operationId="userSettingsUpdateOpenaiApiKey",
      *     summary="Update OpenAI API key",
      *     tags={"User Settings"},
@@ -325,8 +325,8 @@ class UserSettingsController
     }
 
     /**
-     * @OA\Post(
-     *     path="/user-settings/complete-onboarding",
+     * @OA\Put(
+     *     path="/users/me/settings/complete-onboarding",
      *     operationId="userSettingsCompleteOnboarding",
      *     summary="Complete onboarding",
      *     tags={"User Settings"},
@@ -464,7 +464,7 @@ class UserSettingsController
 
     /**
      * @OA\Get(
-     *     path="/user-settings/check-in",
+     *     path="/users/me/settings/check-in",
      *     operationId="userSettingsShowCheckIn",
      *     summary="Get check-in settings",
      *     tags={"User Settings"},
@@ -494,7 +494,7 @@ class UserSettingsController
 
     /**
      * @OA\Put(
-     *     path="/user-settings/check-in",
+     *     path="/users/me/settings/check-in",
      *     operationId="userSettingsUpdateCheckIn",
      *     summary="Update check-in settings",
      *     tags={"User Settings"},

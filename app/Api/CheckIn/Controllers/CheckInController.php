@@ -20,7 +20,7 @@ class CheckInController
 
     /**
      * @OA\Get(
-     *     path="/check-ins",
+     *     path="/check-in",
      *     operationId="checkInIndex",
      *     tags={"Check-In"},
      *     security={{"sanctum":{}}},
@@ -91,7 +91,7 @@ class CheckInController
 
     /**
      * @OA\Post(
-     *     path="/check-ins",
+     *     path="/check-in",
      *     operationId="checkInStore",
      *     tags={"Check-In"},
      *     security={{"sanctum":{}}},

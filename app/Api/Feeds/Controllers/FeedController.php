@@ -23,7 +23,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/feeds",
+     *     path="/feeds/subscriptions",
      *     operationId="listFeedSubscriptions",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -90,7 +90,7 @@ class FeedController
 
     /**
      * @OA\Get(
-     *     path="/feeds/{feedSubscription}",
+     *     path="/feeds/subscriptions/{feedSubscription}",
      *     operationId="showFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -171,20 +171,19 @@ class FeedController
     }
 
     /**
-     * @OA\Post(
+     * @OA\Get(
      *     path="/feeds/search",
      *     operationId="searchFeeds",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
      *
-     *     @OA\RequestBody(
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
      *         required=true,
+     *         description="Search term",
      *
-     *         @OA\JsonContent(
-     *             required={"search"},
-     *
-     *             @OA\Property(property="search", type="string", minLength=2, maxLength=100, example="tech")
-     *         )
+     *         @OA\Schema(type="string", minLength=2, maxLength=100, example="tech")
      *     ),
      *
      *     @OA\Response(
@@ -294,7 +293,7 @@ class FeedController
 
     /**
      * @OA\Post(
-     *     path="/feeds",
+     *     path="/feeds/subscriptions",
      *     operationId="storeFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -356,7 +355,7 @@ class FeedController
 
     /**
      * @OA\Put(
-     *     path="/feeds/{feedSubscription}",
+     *     path="/feeds/subscriptions/{feedSubscription}",
      *     operationId="updateFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
@@ -410,7 +409,7 @@ class FeedController
 
     /**
      * @OA\Delete(
-     *     path="/feeds/{feedSubscription}",
+     *     path="/feeds/subscriptions/{feedSubscription}",
      *     operationId="destroyFeedSubscription",
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},

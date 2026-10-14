@@ -328,3 +328,108 @@ describe('TimeTrackingService statistics', function () {
         expect($stats['by_project'])->toBe([]);
     });
 });
+
+describe('Time tracking tenant isolation', function () {
+    it('hides another user\'s category and forbids writes to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $category = TimeTrackingCategory::factory()->forUser($other)->create(['title' => 'Theirs']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/categories')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/categories/'.$category->id, ['title' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/time-tracking/categories/'.$category->id), 403);
+
+        expect($category->fresh()?->title)->toBe('Theirs');
+    });
+
+    it('hides another user\'s project and forbids access to it', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($other)->create(['title' => 'Theirs']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/projects')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/projects/'.$project->id), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/projects/'.$project->id, ['title' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/time-tracking/projects/'.$project->id), 403);
+
+        expect($project->fresh()?->title)->toBe('Theirs');
+    });
+
+    it('forbids tracking time on another user\'s project', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($other)->create();
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/entries', [
+                'started_at' => now()->subHour()->toIso8601String(),
+                'stopped_at' => now()->toIso8601String(),
+                'duration_minutes' => 60,
+                'project_id' => $project->id,
+            ]), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 403);
+
+        expect(TimeTrackingEntry::count())->toBe(0);
+    });
+
+    it('hides another user\'s entries and forbids writes to them', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($other)->create();
+        $entry = TimeTrackingEntry::factory()->forUser($other)->forProject($project)->running()->create(['description' => 'Theirs']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/entries/'.$entry->id, ['description' => 'Hijacked']), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/entries/'.$entry->id.'/stop'), 403);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/time-tracking/entries/'.$entry->id), 403);
+
+        $entry = $entry->fresh();
+        expect($entry)->not->toBeNull();
+        expect($entry->description)->toBe('Theirs');
+        expect($entry->stopped_at)->toBeNull();
+    });
+
+    it('leaves another user\'s entries out of the statistics', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($other)->create();
+        TimeTrackingEntry::factory()->forUser($other)->forProject($project)->create([
+            'started_at' => now()->subDay(),
+            'stopped_at' => now(),
+            'duration_minutes' => 30,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString())
+            ->assertStatus(200)
+            ->assertJsonPath('data.total_minutes', 0)
+            ->assertJsonCount(0, 'data.by_project');
+    });
+});

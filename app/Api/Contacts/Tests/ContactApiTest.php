@@ -113,3 +113,85 @@ describe('Contact photos', function () {
             ->assertStatus(200);
     });
 });
+
+describe('Contact tenant isolation', function () {
+    it('hides another user\'s address book and contacts and denies writes to them', function () {
+        $user = makeUser();
+        $other = makeUser();
+
+        $addressBookId = $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Private'])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        $contactUri = $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
+                'address_book_id' => $addressBookId,
+                'first_name' => 'Secret',
+                'last_name' => 'Person',
+            ])
+            ->assertStatus(201)
+            ->json('data.uri');
+
+        $this->actingAs($other, 'sanctum')
+            ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo', [
+                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+            ])
+            ->assertStatus(200);
+
+        $addressBookIds = collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/address-books')
+            ->assertStatus(200)
+            ->json('data'))->pluck('id');
+        expect($addressBookIds)->not->toContain($addressBookId);
+
+        $contactUris = collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/address-books/contacts')
+            ->assertStatus(200)
+            ->json('data'))->pluck('uri');
+        expect($contactUris)->not->toContain($contactUri);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books/contacts/photos', [
+                'contacts' => [['address_book_id' => $addressBookId, 'uri' => $contactUri]],
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data', []);
+
+        // The module answers an address book the user cannot see with 404.
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#000000']), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
+                'address_book_id' => $addressBookId,
+                'first_name' => 'Intruder',
+            ]), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri, [
+                'address_book_id' => $addressBookId,
+                'first_name' => 'Hijacked',
+            ]), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo', [
+                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+            ]), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo'), 404);
+
+        $otherContacts = collect($this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/address-books/contacts')
+            ->json('data'));
+        expect($otherContacts->pluck('uri'))->toContain($contactUri);
+        expect($otherContacts->firstWhere('uri', $contactUri)['first_name'])->toBe('Secret');
+    });
+});

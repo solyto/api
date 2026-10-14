@@ -26,7 +26,7 @@ class ImportController
 
     /**
      * @OA\Post(
-     *     path="/calendars/import/start",
+     *     path="/calendars/import",
      *     operationId="startCalendarsImport",
      *     tags={"Calendars"},
      *     security={{"sanctum": {}}},

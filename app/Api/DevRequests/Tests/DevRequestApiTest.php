@@ -92,3 +92,40 @@ describe('DevRequest comments', function () {
             ->assertJsonPath('data.comment_count', 2);
     });
 });
+
+// Listing, voting and comments are shared by design (STANDARDS 12.3); only
+// the update (admin-only) and each user's own vote are private.
+describe('DevRequest tenant isolation', function () {
+    it('forbids a non-admin from updating another user\'s dev request', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $devRequest = DevRequest::factory()->create([
+            'created_by_user_id' => $other->id,
+            'status' => 'open',
+        ]);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['status' => 'in-progress']), 403);
+
+        expect($devRequest->fresh()->status)->toBe('open');
+    });
+
+    it('does not change another user\'s vote when voting', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $devRequest = DevRequest::factory()->create();
+        DevRequestVote::factory()->forDevRequestAndUser($devRequest, $other)->upvote()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests/'.$devRequest->id.'/vote', ['vote' => 'down'])
+            ->assertStatus(200);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests/'.$devRequest->id.'/vote', ['vote' => null])
+            ->assertStatus(200);
+
+        $otherVote = DevRequestVote::where('dev_request_id', $devRequest->id)->where('user_id', $other->id)->first();
+        expect($otherVote?->vote_type)->toBe('up');
+        expect(DevRequestVote::where('dev_request_id', $devRequest->id)->where('user_id', $user->id)->count())->toBe(0);
+    });
+});
