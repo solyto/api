@@ -62,7 +62,7 @@ tests have no database refresh unless they ask for it.
 | `makeUser(array $attributes = [])` | a verified user; 305 calls, the standard fixture |
 | `$this->actingAs($user, 'sanctum')` | the standard way to authenticate a request (314 calls) |
 | `authHeaders($user)` / `sanctumToken($user)` | only when the test is about tokens themselves (`AuthTest`) |
-| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; defined, currently unused — use them |
+| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; `expectApiError` is the standard for error cases, `expectApiSuccess` has no callers yet — use both |
 | `Model::factory()->forUser($user)` | every user-owned factory has this state |
 
 Custom expectations `greaterThan`, `lessThan`, `toBeBoolean` alias Pest
