@@ -161,13 +161,6 @@ describe('UserSettings Factory', function () {
         expect($settings->user_id)->toBe($user->id);
     });
 
-    it('creates settings with AI enabled', function () {
-        $settings = UserSettings::factory()->withAiEnabled()->create();
-
-        expect($settings->ai_enabled)->toBeTrue();
-        expect($settings->openai_api_key)->not()->toBeNull();
-    });
-
     it('creates settings with weather location', function () {
         $settings = UserSettings::factory()->withWeatherLocation()->create();
 

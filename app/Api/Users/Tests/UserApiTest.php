@@ -243,31 +243,6 @@ describe('User settings endpoints', function () {
         expect($user->fresh()->settings->temperature_unit)->toBe('f');
     });
 
-    it('enables AI when an API key is provided', function () {
-        $user = makeUser();
-
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/settings/openai-api-key', ['key' => 'sk-test'])
-            ->assertStatus(200);
-
-        $settings = $user->fresh()->settings;
-        expect($settings->openai_api_key)->toBe('sk-test');
-        expect($settings->ai_enabled)->toBeTrue();
-    });
-
-    it('disables AI when the API key is cleared', function () {
-        $user = makeUser();
-        $user->settings()->update(['openai_api_key' => 'sk-old', 'ai_enabled' => true]);
-
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/settings/openai-api-key', ['key' => ''])
-            ->assertStatus(200);
-
-        $settings = $user->fresh()->settings;
-        expect($settings->openai_api_key)->toBeNull();
-        expect($settings->ai_enabled)->toBeFalse();
-    });
-
     it('completes onboarding', function () {
         $user = makeUser();
         $user->settings()->update(['first_visit' => true]);

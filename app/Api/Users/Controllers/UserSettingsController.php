@@ -11,7 +11,6 @@ use App\Api\Users\Requests\UpdateJournalCalendarMarkRequest;
 use App\Api\Users\Requests\UpdateJournalRequest;
 use App\Api\Users\Requests\UpdateLanguageRequest;
 use App\Api\Users\Requests\UpdateNavigationSettingsRequest;
-use App\Api\Users\Requests\UpdateOpenaiApiKey;
 use App\Api\Users\Requests\UpdateTimeFormatRequest;
 use App\Api\Users\Requests\UpdateTimezoneRequest;
 use App\Api\Users\Requests\UpdateWeatherCityRequest;
@@ -286,42 +285,6 @@ class UserSettingsController
         $this->userSettingsService->updateWeatherTemperatureUnit($request->user(), $request->validated());
 
         return ApiResponse::success(null, 'Weather city updated successfully.');
-    }
-
-    /**
-     * @OA\Put(
-     *     path="/users/me/settings/openai-api-key",
-     *     operationId="userSettingsUpdateOpenaiApiKey",
-     *     summary="Update OpenAI API key",
-     *     tags={"User Settings"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="key", type="string", maxLength=255, nullable=true)
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Key updated successfully",
-     *
-     *         @OA\JsonContent(
-     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
-     *
-     *             @OA\Property(property="data", nullable=true)
-     *         )
-     *     )
-     * )
-     */
-    public function updateOpenaiApiKey(UpdateOpenaiApiKey $request): JsonResponse
-    {
-        $this->userSettingsService->updateOpenaiApiKey($request->user(), $request->validated('key'));
-
-        return ApiResponse::success(null, 'Key updated successfully.');
     }
 
     /**
