@@ -3,6 +3,7 @@
 use App\Api\ApiResponse;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
+use App\Shared\Middleware\RecordClientVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
               $middleware->validateCsrfTokens(except: [
                   'webhooks/*',
               ]);
+              $middleware->appendToGroup('api', RecordClientVersion::class);
           })
           ->withCommands([
               __DIR__.'/../app/Api/Contacts/Commands',
