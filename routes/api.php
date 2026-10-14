@@ -50,6 +50,7 @@ use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
+use App\Shared\Middleware\TrackApiTraffic;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -83,7 +84,7 @@ Route::prefix('v1')->group(function () {
     });
 });
 
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
