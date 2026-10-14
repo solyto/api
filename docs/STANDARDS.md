@@ -181,6 +181,10 @@ Check: `grep -rn "env(" routes app` → 0 (`bootstrap/app.php:25`
 `env('TRUSTED_PROXIES')` is the one legitimate call: bootstrap runs before
 config exists).
 
+Exception (rule 13.5): every frontend's self-hosted setup reads `app` and
+`version` at the top level of the health body, so health keeps them there
+in addition to the envelope (backlog: `health-response-backwards-compatibility`).
+
 ## 2. OpenAPI annotations
 
 The spec is generated from `@OA` docblocks on every action (268 operations)
@@ -840,10 +844,129 @@ User-facing copy (notifications, mails, bot replies) comes from
 (rule 9.4). API `message` strings in the envelope are English and are not
 translated (Decisions).
 
+## 13. API compatibility with older frontends
+
+The web frontend is deployed in lock-step with the API. The F-Droid and
+desktop builds are not: an installed app keeps calling the newest API with
+the frontend code it shipped with. The oldest supported build is **1.0.15**,
+the first F-Droid release (Decisions). The 1.0.15 → `main` check on
+2026-10-14 found that the problems came from cleanups and a data backfill,
+not from features: the health shape (`f3545db`) and the `.journal` folder
+(`4648dd9`). Background: `docs/reports/frontend-backwards-compatibility-2026-10-14.md`.
+
+### 13.1 An old frontend never breaks and never looks weird
+
+Every change is checked against the oldest supported frontend. That build
+must keep working, and it must not show anything the user can't make
+sense of. "Doesn't return an error" is not enough: the `.journal` backfill
+broke no request, but every 1.0.15 user would see an unknown folder they
+can't rename or delete.
+
+Check: the client contract tests are green (rule 13.6). Before a deploy,
+also compare against the last release tag; for changes that tests can't
+see (backfills, changed meaning), search the frontend's last released tag.
+
+### 13.2 Additive changes are free; status codes are contract, messages are not
+
+Always allowed: new endpoints, new response fields, new optional request
+fields, looser validation. The 1.0.15 `ApiService`
+(`solyto/app` `src/lib/services/ApiService.ts`) ignores unknown fields and
+never reads an error body: any non-OK response becomes `null`/`false`. So
+envelope `message` text can change freely. Status codes, the envelope keys,
+and the type and nullability of an existing field cannot.
+
+### 13.3 New kinds of data are opt-in
+
+Data that an old frontend would show in a confusing way stays out of
+existing endpoints. This covers system or hidden records, backfilled rows,
+and new enum values in lists. It is delivered only when the client asks
+for it, through a separate endpoint or an explicit parameter. Old builds
+never ask, so they never see it. Filter every endpoint that exposes the
+data, not only the obvious one. For example, hidden note categories must
+be left out of `GET notes/categories`, and the notes inside them out of
+`GET notes`.
+
+Bad: `2026_10_10_000001_backfill_journal_categories.php` creates
+`.journal` for every user, and `NoteCategoryService` lists it to every
+client. Good: the plain list returns only visible categories, and the new
+frontend asks for hidden ones separately (backlog).
+
+### 13.4 Removing, renaming or re-typing happens in steps
+
+1. Add the new field or endpoint next to the old one, and serve both.
+2. The frontend switches to the new one.
+3. Remove the old one in a later release, once no supported build reads it
+   (rule 13.6 shows which builds do).
+
+A destructive migration (drop, rename or convert a column) never ships
+while a supported build still reads that column through the API.
+
+Bad: recipe `ingredients` went from string to array, and the string
+column was dropped in the same release
+(`2026_07_24_120000_restructure_library_recipes`, 1.0.13 → 1.0.15). Good:
+add an `ingredients_list` array next to `ingredients`, fill both, and drop
+the string later.
+
+### 13.5 A standards cleanup never changes the contract
+
+Applying a rule from sections 1–12 to existing code keeps the response
+shape that clients see. Where a rule and a supported client disagree, this
+section wins and the rule gets an exception note.
+
+Bad: `f3545db` moved the health body into `ApiResponse::success`
+(rule 1.5), so `app` and `version` moved under `data`. The setup page of
+every frontend (`solyto/app` `src/routes/setup/+page.svelte:37`) reads
+them at the top level and can no longer add a self-hosted server.
+
+### 13.6 Every field an old frontend reads has a client contract test
+
+`tests/Unit/ClientContractTest.php` pins the fields that supported
+frontend builds read. Each test names the oldest build that needs it. A
+red contract test means the API change is wrong, not the test. How to
+write these tests: `docs/TESTING.md` → Client contract tests.
+
+Check: `php artisan test tests/Unit/ClientContractTest.php`.
+
+### 13.7 Release and deploy
+
+- **Supported builds** are released frontend tags from the oldest supported
+  one (Decisions) onwards. An unreleased frontend `main` is not a
+  supported build: it can change freely, as long as it matches the API by
+  its own release.
+- **Tags are linear.** Tags are cut only from `main`, or from a release
+  branch that is merged back, so every tag is an ancestor of the next. Tag
+  `1.0.14` sits on the unmerged `authors` branch, so "older than" between
+  versions is meaningless for it.
+- **Order:** API first, then the web frontend, which deploys in
+  lock-step. Anything a new frontend needs from the API (an endpoint, a
+  CORS header) is deployed before that frontend is released or sent to
+  F-Droid.
+- **Gate:** `make deploy` runs `composer test` and `composer analyse`
+  first. If it is red, don't bypass it. Make the change additive
+  (13.2–13.4), or have the owner decide to drop the build that the failing
+  test protects.
+- **Dropping a build** is the owner's decision, based on the active
+  installs per `client_version` once those are recorded. Then:
+  1. Update the oldest supported build in Decisions.
+  2. Delete the contract tests that only the dropped build needed (13.6).
+  3. Regenerate the migration baseline at the new oldest tag.
+  4. Remove what 13.4 kept for the dropped build, in a normal release.
+
 ---
 
 ## Decisions
 
+- **Older frontends stay supported, starting at 1.0.15** (2026-10-14):
+  1.0.15 is the first F-Droid release and the oldest build the API must
+  serve (section 13). Dropping support for a build is the owner's
+  decision. Compatibility comes from additive changes inside `v1`; there
+  is no `v2` and no second API deployment.
+- **The frontend sends its version** (2026-10-14): from the next frontend
+  release on, every request carries `X-Client-Version: <major.minor.patch>`.
+  The API records it per token, and it may later reject builds below a
+  minimum with a 426. A request without the header is always accepted,
+  because builds up to 1.0.15 send none (backlog: `client-version-header`,
+  `client-minimum-version`).
 - **Reference module is `app/Api/Todos/`.** Owner's statement (job
   `online`, 2026-10-10); when a rule and the Todos code disagree it is listed
   under Open questions, not silently resolved either way.
