@@ -94,7 +94,8 @@ From the two briefs (`docs/jobs/archive/online_php-laravel-api-best-pratices/bri
 - **Rules**, numbered by section (1 Controllers and routing, 2 OpenAPI,
   3 Requests and validation, 4 Services, 5 Models and queries, 6 Resources,
   7 Errors and responses, 8 Caching, 9 Jobs/commands/schedule, 10 Comments,
-  11 Formatting, 12 Architecture conventions). Each rule has: a one-line
+  11 Formatting, 12 Architecture conventions, 13 API compatibility with
+  older frontends). Each rule has: a one-line
   rule, why it matters, a bad/good example from this repo with file and
   line, and a check where one exists.
 - **Decisions**: choices the owner made that are not derivable from the
