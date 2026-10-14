@@ -172,19 +172,4 @@ class TelegramBotConnectionController
             'Check-in alert updated successfully.'
         );
     }
-
-    /**
-     * @OA\Post(
-     *     path="/telegram/confirm-token",
-     *     operationId="telegramBotConnectionConfirmToken",
-     *     tags={"Telegram"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Token confirmed successfully"
-     *     )
-     * )
-     */
-    public function confirmToken(Request $request): JsonResponse {}
 }

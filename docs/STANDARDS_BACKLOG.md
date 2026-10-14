@@ -171,13 +171,13 @@ go-ahead first (package rule in `docs/AGENTS.md`).
 
 ## Larger (a feature's worth)
 
-- [ ] `OPENAPI_KNOWN_DRIFT`: 78 of 80 entries fixed (job `fix`,
-      2026-10-13). Two remain by owner decision and the constant stays:
-      `POST telegram/confirm-token` (`TelegramBotConnectionController::confirmToken()`)
-      and `GET libraries/music/search/deezer/{artist}/{album}`
-      (`LibraryMusicController::searchAlbumOnDeezer()`). Neither has a
-      route; decide whether to route or delete each method, then remove its
-      entry, and delete the constant once it is empty (rule 2.2).
+- [ ] `OPENAPI_KNOWN_DRIFT`: 79 of 80 entries fixed (job `fix`,
+      2026-10-13; `confirmToken()` deleted 2026-10-14). One remains by
+      owner decision and the constant stays:
+      `GET libraries/music/search/deezer/{artist}/{album}`
+      (`LibraryMusicController::searchAlbumOnDeezer()`). It has no route;
+      decide whether to route or delete the method, then remove its entry,
+      and delete the constant once it is empty (rule 2.2).
 - [x] Libraries genre CRUD ×4 (services, controllers, requests, resources):
       closed, leave as is (OQ-4 decided 2026-10-13, rule 4.7).
 - [ ] Tenant-isolation tests for the 11 API test files that have none

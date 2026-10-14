@@ -15,8 +15,3 @@ parameters:
         - app/Dav
         - app/*/Tests/*
         - app/Api/*/Tests/*
-        # Empty stub methods (`export()` / `confirmToken()` have no body), which
-        # PHPStan reports as non-ignorable `return.missing` errors that cannot
-        # be baselined. Remove these once the stubs are fixed.
-        - app/Api/Notes/Controllers/NotesImportExportController.php
-        - app/Api/Telegram/Controllers/TelegramBotConnectionController.php
