@@ -48,14 +48,6 @@ class UserSettingsService
         ]);
     }
 
-    public function updateOpenaiApiKey(User $user, ?string $key): void
-    {
-        $user->settings()->update([
-            'openai_api_key' => $key,
-            'ai_enabled' => ! empty($key),
-        ]);
-    }
-
     public function completeOnboarding(User $user): void
     {
         $user->settings()->update(['first_visit' => false]);

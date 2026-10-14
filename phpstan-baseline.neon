@@ -3403,12 +3403,6 @@ parameters:
 			path: app/Api/Users/Resources/UserResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Api\\Users\\Resources\\UserSettingsResource\:\:\$ai_enabled\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/UserSettingsResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\Users\\Resources\\UserSettingsResource\:\:\$check_in_calendar_mark\.$#'
 			identifier: property.notFound
 			count: 1
@@ -3446,12 +3440,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property App\\Api\\Users\\Resources\\UserSettingsResource\:\:\$navigation\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/UserSettingsResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Users\\Resources\\UserSettingsResource\:\:\$openai_api_key\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Api/Users/Resources/UserSettingsResource.php

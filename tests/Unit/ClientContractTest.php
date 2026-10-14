@@ -174,7 +174,7 @@ describe('Client contract', function () {
                 'profile' => ['profile_image_path'],
                 'settings' => [
                     'language', 'timezone', 'date_format', 'time_format', 'navigation',
-                    'openai_api_key', 'first_visit', 'temperature_unit',
+                    'first_visit', 'temperature_unit',
                 ],
             ]]);
     });

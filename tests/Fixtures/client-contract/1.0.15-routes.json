@@ -935,10 +935,6 @@
         },
         {
             "method": "PUT",
-            "uri": "api/v1/users/me/settings/openai-api-key"
-        },
-        {
-            "method": "PUT",
             "uri": "api/v1/users/me/settings/time-format"
         },
         {

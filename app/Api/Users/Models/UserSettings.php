@@ -25,8 +25,6 @@ class UserSettings extends Model
         'date_format',
         'time_format',
         'language',
-        'ai_enabled',
-        'openai_api_key',
         'first_visit',
         'check_in_settings',
         'journal_enabled',
@@ -40,7 +38,6 @@ class UserSettings extends Model
 
     protected $casts = [
         'check_in_settings' => 'array',
-        'ai_enabled' => 'boolean',
         'first_visit' => 'boolean',
         'journal_enabled' => 'boolean',
         'journal_calendar_mark' => 'boolean',
