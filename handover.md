@@ -48,6 +48,9 @@ analyse` no errors.
   `love_standards-tooling-approval-needed`). OQ-6 is closed in
   `STANDARDS.md` Decisions, rule 11.1 is now "match the file you are in",
   and `laravel/pint` is removed from `require-dev`.
+- §5.1 CI: rejected in the same job (`.github/workflows/tests.yml`);
+  already recorded in `STANDARDS.md` Decisions ("CI … not approved").
+- §5.5 commit hygiene (`chore: commit all`): ignored by owner decision.
 - §3.2 leftovers: `toRecommendation()` helper and the typed exception in
   `LibraryRecommender::assertType()`.
 - §3.7 and anything in `app/Bots/`: "the bot works", too risky for quick
@@ -62,10 +65,8 @@ analyse` no errors.
 
 ## Still open: owner decisions
 
-- **§5.1 CI:** `.github/workflows/tests.yml` needs the owner's go-ahead.
 - **§5.3:** make `STANDARDS.md` "timeless" (drop counts from rule bodies;
   `TESTING.md`'s helper table counts too).
-- **§5.5:** commit hygiene (`chore: commit all`).
 - **§4:** behaviour changes to check against the frontend. Add: recommend
   `favorite`/`unrated` now answer 404 instead of 500 when nothing matches.
 
