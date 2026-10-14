@@ -144,7 +144,11 @@ it('keeps resource @OA\Schema properties in sync with toArray() keys', function 
         return $found ? array_values(array_unique($keys)) : null;
     };
 
-    $files = glob(base_path('app/Api/*/Resources/*Resource.php'));
+    $files = array_merge(
+        glob(base_path('app/Api/*/Resources/*Resource.php')),
+        glob(base_path('app/Plugins/Resources/*Resource.php')),
+        glob(base_path('app/Plugins/*/Resources/*Resource.php')),
+    );
     expect($files)->not->toBeEmpty();
 
     $drift = [];
