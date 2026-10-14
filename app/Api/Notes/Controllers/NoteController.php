@@ -50,6 +50,35 @@ class NoteController
 
     /**
      * @OA\Get(
+     *     path="/notes/hidden",
+     *     operationId="noteHidden",
+     *     summary="List notes in hidden and system categories",
+     *     description="The notes GET /notes leaves out: those in a category returned by GET /notes/categories/hidden.",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Hidden notes retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Note"))
+     *         )
+     *     )
+     * )
+     */
+    public function hidden(Request $request): JsonResponse
+    {
+        return ApiResponse::success(
+            NoteResource::collection($this->noteService->listHidden($request->user())),
+            'Hidden notes retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
      *     path="/notes/newest",
      *     operationId="noteNewest",
      *     summary="List newest notes",

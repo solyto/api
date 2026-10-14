@@ -5,11 +5,13 @@ namespace App\Api\Notes\Services;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 class NoteCategoryService
 {
     private const string CACHE_KEY = 'note_categories';
+    private const string CACHE_KEY_HIDDEN = 'note_categories_hidden';
     private const int CACHE_TTL = 86400;
 
     public function __construct(
@@ -22,11 +24,20 @@ class NoteCategoryService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => NoteCategory::forUser($user->id)
-                ->roots()
-                ->with('descendants')
-                ->orderBy('title', 'asc')
-                ->get()
+            fn() => $this->tree($user->id, false)
+        );
+    }
+
+    /**
+     * The categories listRoots leaves out (hidden or system, and their
+     * descendants), as a tree rooted at the topmost hidden ones.
+     */
+    public function listHidden(User $user): Collection
+    {
+        return $this->cache->remember(
+            [self::CACHE_KEY_HIDDEN, $user->id],
+            self::CACHE_TTL,
+            fn() => $this->tree($user->id, true)
         );
     }
 
@@ -41,7 +52,7 @@ class NoteCategoryService
         $category = NoteCategory::create($data);
         $category->load(['user']);
 
-        $this->cache->forget([self::CACHE_KEY, $user->id]);
+        $this->forgetUser($user->id);
 
         return $category;
     }
@@ -51,7 +62,7 @@ class NoteCategoryService
         $userId = $category->user_id;
         $category->update($data);
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->forgetUser($userId);
 
         return $category->fresh(['user']);
     }
@@ -61,7 +72,7 @@ class NoteCategoryService
         $userId = $category->user_id;
         $category->delete();
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->forgetUser($userId);
     }
 
     public function updateHidden(NoteCategory $category, bool $hidden): NoteCategory
@@ -69,10 +80,47 @@ class NoteCategoryService
         $userId = $category->user_id;
         $category->update(['is_hidden' => $hidden]);
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->noteService->forgetNewest($userId);
+        $this->forgetUser($userId);
 
         return $category->fresh(['user']);
+    }
+
+    /**
+     * Builds the visible or the hidden tree from one flat load. Roots are
+     * ordered by title, children by sort_order, as the descendants relation
+     * does; a with('descendants') constraint would only filter the first level.
+     */
+    private function tree(string $userId, bool $hidden): Collection
+    {
+        $hiddenIds = array_flip($this->noteService->hiddenCategoryIds($userId));
+
+        $nodes = NoteCategory::forUser($userId)
+            ->orderBy('title', 'asc')
+            ->get()
+            ->filter(fn(NoteCategory $category) => isset($hiddenIds[$category->id]) === $hidden)
+            ->keyBy('id');
+
+        $children = $nodes->groupBy('parent_id');
+
+        foreach ($nodes as $node) {
+            $node->setRelation('descendants', new EloquentCollection(
+                $children->get($node->id, collect())->sortBy('sort_order')->values()->all()
+            ));
+        }
+
+        return $nodes
+            ->filter(fn(NoteCategory $category) => $category->parent_id === null || !$nodes->has($category->parent_id))
+            ->values();
+    }
+
+    /**
+     * Category writes change which notes are hidden, so the note lists go too.
+     */
+    private function forgetUser(string $userId): void
+    {
+        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->cache->forget([self::CACHE_KEY_HIDDEN, $userId]);
+        $this->noteService->forgetLists($userId);
     }
 
     public function getAncestors(NoteCategory $category): Collection
