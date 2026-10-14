@@ -100,6 +100,9 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
   without a `return [` literal fails as "no toArray() array literal" —
   restructure it rather than allow-listing it.
 
+- **Client contract tests** — what older frontend builds read
+  (`docs/STANDARDS.md` section 13); see below.
+
 Not tested, on purpose: that a factory produces what its state says, that
 `$fillable` equals `$fillable`, that casts cast, that a `belongsTo` returns
 the parent. 278 of 720 tests today are of that kind (`<Module>Test.php`
@@ -128,6 +131,56 @@ describe('Todo CRUD', function () {
 - No narration comments; a comment explains a fixture's boundary when the
   value is not self-evident (`CalendarApiTest.php:141-151`).
 - Requests go to `/api/v1/...`; assertions go through the envelope.
+
+## Client contract tests
+
+Installed apps (F-Droid, desktop) run older frontend code against the
+newest API. These tests pin what those builds read, so a change that would
+break them fails `composer test` (`docs/STANDARDS.md` 13.6).
+
+- **One file:** `tests/Unit/ClientContractTest.php`, next to the other
+  shared contracts. It declares `uses(RefreshDatabase::class)` itself,
+  because `tests/Unit` gets no refresh by default.
+- **What goes in:** only the fields that a supported frontend build
+  actually reads, found by searching the frontend at that build's tag
+  (`solyto/app`). Do not snapshot whole responses: extra fields are always
+  allowed (13.2), so a full snapshot would fail on harmless changes.
+- **Absence counts too:** for opt-in data (13.3), test that the plain
+  endpoint does **not** return it.
+- **Header comment per test:** the oldest build that needs it and the
+  frontend line that reads it. That tells you when the test may go.
+- **One test per thing read, not per version.** When a new build starts
+  reading a field, add one test. When support for a build ends, delete the
+  tests whose oldest build is the dropped one and that no newer build
+  needs.
+- **Red means the API is wrong.** Do not edit a contract test to make it
+  pass. Make the API change additive (13.2–13.4), or ask the owner whether
+  the build can be dropped.
+
+```php
+uses(RefreshDatabase::class);
+
+describe('Client contract', function () {
+    // Since 1.0.15. solyto/app src/routes/setup/+page.svelte:37
+    it('keeps app and version at the top level of health', function () {
+        $this->getJson('/api/v1/health')
+            ->assertStatus(200)
+            ->assertJsonPath('app', 'solyto')
+            ->assertJsonStructure(['version']);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/types/note.ts:28-36
+    it('keeps the note category fields', function () {
+        $user = makeUser();
+        NoteCategory::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/categories')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['id', 'title', 'parent_id', 'sort_order', 'created_at', 'updated_at', 'children']]]);
+    });
+});
+```
 
 ## Caveats
 
