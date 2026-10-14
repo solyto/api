@@ -116,6 +116,24 @@ describe('LibraryRecommender', function () {
         expect(app(LibraryRecommender::class)->unrated(LibraryTypeEnum::BOOK, $user)['title'])->toBe('Unrated');
     });
 
+    it('returns null for favorite when nothing is rated 4 or higher', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 3]);
+
+        $this->mock(AiService::class);
+
+        expect(app(LibraryRecommender::class)->favorite(LibraryTypeEnum::BOOK, $user))->toBeNull();
+    });
+
+    it('returns null for unrated when everything is rated', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 3]);
+
+        $this->mock(AiService::class);
+
+        expect(app(LibraryRecommender::class)->unrated(LibraryTypeEnum::BOOK, $user))->toBeNull();
+    });
+
     it('returns null for random when the library is empty', function () {
         $user = makeUser();
 
