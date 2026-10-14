@@ -91,6 +91,14 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
 - **Shared contracts** in `tests/Unit` with `covers()`: `ApiResponse`,
   `OpenApiSpecTest` (fails on any drift beyond the two kept entries in
   `OPENAPI_KNOWN_DRIFT`, and on a listed entry that no longer drifts).
+- **`ResourceSchemaDriftTest`** (rule 2.6) reads source statically and
+  compares only top-level keys. It does not see nested keys, keys inside
+  `merge()`/`mergeWhen()` or a nested array, non-literal keys
+  (`self::KEY =>`), or keys added outside the `return [` literal
+  (`+ $extra`); a resource built that way passes unchecked, so cover its
+  keys in the module's API test (`assertJsonStructure`). A `toArray()`
+  without a `return [` literal fails as "no toArray() array literal" —
+  restructure it rather than allow-listing it.
 
 Not tested, on purpose: that a factory produces what its state says, that
 `$fillable` equals `$fillable`, that casts cast, that a `belongsTo` returns
