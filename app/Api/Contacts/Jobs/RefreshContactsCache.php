@@ -2,10 +2,8 @@
 
 namespace App\Api\Contacts\Jobs;
 
-use App\Api\Calendars\Services\CalendarService;
 use App\Api\Contacts\Services\ContactService;
 use App\Api\Users\Models\User;
-use App\Dav\Services\DavService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -20,10 +18,9 @@ class RefreshContactsCache implements ShouldQueue
         public string $userId,
     ) {}
 
-    public function handle(): void
+    public function handle(ContactService $service): void
     {
         $user = User::findOrFail($this->userId);
-        $service = app(ContactService::class);
 
         Log::info('Refreshing contacts cache for user ' . $user->id . ' after invalidation');
 

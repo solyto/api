@@ -18,10 +18,9 @@ class ImportCalendars implements ShouldQueue
         public string $userId,
     ) {}
 
-    public function handle(): void
+    public function handle(DavService $dav): void
     {
         $user = User::findOrFail($this->userId);
-        $dav = app(DavService::class);
         $state = $dav->import()->calendars()->getState($user->id);
         $start = time();
 
