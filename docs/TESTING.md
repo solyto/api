@@ -9,7 +9,7 @@ Run with `composer test` (clears the config cache, then `php artisan test`)
 or `php artisan test` / `./vendor/bin/pest` directly. Filter with
 `php artisan test --filter=Todo` or `php artisan test app/Api/Todos/Tests`.
 Coverage needs a driver (`pcov` or Xdebug) that is not installed by
-default; see `docs/STANDARDS_BACKLOG.md` → Tooling.
+default; a coverage driver was not approved (`docs/STANDARDS.md` → Decisions).
 
 Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
 `tests/Pest.php` and `pest.php` on 2026-10-13.
@@ -78,7 +78,7 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
   403 on `show/update/destroy` and is absent from `index`
   (`TodoApiTest.php:46-59`); and, once `STANDARDS.md` 3.2 is implemented,
   posting another user's `category_id`/`tags`/`genres`/`parent_id`
-  returns 422. Eleven API test files have no isolation case yet (backlog).
+  returns 422.
 - **Validation** — a non-conforming payload returns 422 with the field in
   `errors`.
 - **Service logic** that is not CRUD: parsing (`TodoService::parse`,

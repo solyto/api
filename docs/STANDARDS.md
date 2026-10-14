@@ -17,9 +17,8 @@ Structure:
   data point that raised it, including places where the owner's own code
   breaks a proposed rule.
 
-Concrete cleanups found while writing the rules live in
-`docs/STANDARDS_BACKLOG.md`; this file describes the target and is never a
-todo list. How tests are written: `docs/TESTING.md`. Working notes with the
+Concrete cleanups live in `docs/backlog/` (one entry per idea, the manigot
+backlog); this file describes the target and is never a todo list. How tests are written: `docs/TESTING.md`. Working notes with the
 full counts: `docs/jobs/dawn_standards/findings-*.md`.
 
 Counts are from 2026-10-13 on `app/` and are reproducible with the greps in
@@ -39,9 +38,10 @@ not the AI's:
    (82, later). Neither matched `@OA\Server(url="/api/v1")`; 80 of 268
    operations pointed at paths that did not exist. Prefixes and paths are
    fixed; 2 operations remain, on purpose (section 2).
-2. **`exists:table,id` taken as an ownership check.** 40 rules; a user can
-   link another user's category, tag, genre or folder to their own record
-   and read its name back (section 3, backlog item 1).
+2. **`exists:table,id` taken as an ownership check.** 40 rules on
+   2026-10-13 (scoped in `d48f7b9`); a user could link another user's
+   category, tag, genre or folder to their own record and read its name
+   back (rule 3.2).
 3. **`try { … } catch (\Exception $e) { report($e); return 500 }` around a
    service call** — 16 sites — when `bootstrap/app.php` already does exactly
    that for every uncaught exception (section 7).
@@ -106,7 +106,7 @@ if (!$todo) {
 }
 ```
 
-Also good (`app/Api/TimeTracking/Controllers/TimeTrackingEntryController.php:167-170`).
+Also good (`app/Api/TimeTracking/Controllers/TimeTrackingEntryController.php:161-164`).
 
 Bad: every `category_id`, `tags.*`, `genres.*`, `parent_id`,
 `categories.*`, `category_ids.*` rule listed under rule 3.2 — the id goes
@@ -151,13 +151,18 @@ limiters) and the `auth:sanctum` group. Inside: `Route::prefix('<domain>')->grou
 custom actions first, `Route::apiResource('/', XController::class)->parameters(['' => 'x'])`
 last so `due-date` is not swallowed by `{todo}` (`routes/api.php:121-136`).
 Sub-resources are explicit lines next to the resource (`:132-134`). Flat
-lines inside a domain block (`:276-277` `recipes/import/{service}` then
+lines inside a domain block (`:275-276` `recipes/import/{service}` then
 `apiResource('recipes')`) are the exception; they should be a `recipes`
 sub-block like the siblings.
 
-`->name('x.')` is set on seven groups and used by nothing (`grep -rn "route('" app`
-finds only the Telegram webhook name from `routes/web.php`); keep it or
-drop it, but do not add names to new groups without a caller.
+A group that contains `apiResource('/', …)` needs `->name('x.')`: it is
+what keeps the generated names unique (`todos.index`, `notes.index`, …;
+without it all eleven would be `index`, `store`, …). No other route or group
+gets a name without a caller (`grep -rn "route('" app` finds only the
+Telegram webhook name from `routes/web.php`). Today: eleven named groups,
+each with one `apiResource('/', …)`; no other names (owner decision,
+2026-10-14). Route caching is not used, so duplicate names are harmless at
+runtime.
 
 Check: `grep -c 'Route::' routes/*.php` — only `api.php` and `web.php`
 exist; a new route file is a violation.
@@ -269,11 +274,10 @@ Check: `grep -rhoE 'operationId="[^"]+"' app/Api | sort | uniq -d` → empty.
 
 The FormRequest is the contract; the `@OA\RequestBody` and the resource's
 `@OA\Schema` are its documentation. Drift today, all in the owner's
-reference module: `StoreTodoRequest` has 14 rules, `TodoController.php:131-143`
-documents 9 (`link`, `recurrence_*` missing); `TodoResource::toArray` emits
-20 keys, its schema lists 14; `{todo}` is documented `type="integer"`
-(`:93,181,240`) while `todos.id` is a UUID. Nine other resources drift
-(`docs/jobs/dawn_standards/findings-data.md` §3).
+reference module, was fixed in `ca1627b` (`{todo}` is documented as a UUID,
+`TodoResource` and its schema agree). Resource schemas no longer drift: the
+only allow-listed entry in `ResourceSchemaDriftTest` is `StatisticsResource`
+(a schema-only class).
 
 Check: `php artisan test tests/Unit/ResourceSchemaDriftTest.php` compares
 each resource's top-level `@OA\Schema` properties with its `toArray()` keys
@@ -282,22 +286,19 @@ no check; the reviewer diffs them for the touched endpoint.
 
 ## 3. Requests and validation
 
-### 3.1 A write endpoint has a FormRequest; a one-to-three-field action may validate inline
+### 3.1 Every endpoint that validates input has a FormRequest; no inline validation
 
 `app/Api/<Module>/Requests/<Verb><Resource>Request.php`, pipe-string rules,
 `sometimes` on update rules, `attributes()` where a field name would read
-badly (`StoreTodoRequest.php:29-34`). Inline `$request->validate([...])`
-is allowed when the shape is tiny and exists nowhere else — the owner's own
-`TodoController.php:312` (`['title' => 'required|string']`) is the model;
-19 of the 22 inline sites are of that kind. `update` actions always get a
-FormRequest: `TimeTrackingEntryController.php:158-165` validates six
-fields inline while its sibling `store` has `StoreTimeTrackingEntryRequest`.
+badly (`StoreTodoRequest.php:29-34`). No inline `$request->validate([...])`,
+whatever the size of the shape (owner decision, 2026-10-14). 21 inline sites
+remain and are to be converted, e.g. `TodoController.php:320` (one field) and
+`NotificationSettingsController.php:107-144` (36 fields in `update`).
 
 Arrays instead of pipe strings only when a rule object is in the list
 (`RegisterRequest.php:15` `['required', 'confirmed', Password::defaults()]`).
 
-Check: `grep -rn '\$request->validate(' app/Api/*/Controllers` — each hit
-≤ 3 fields and not an `update`.
+Check: `grep -rn '\$request->validate(' app/Api/*/Controllers` → 0 (21 today).
 
 ### 3.2 `exists:` proves existence, not ownership
 
@@ -327,19 +328,19 @@ confirmed 2026-10-13):
 ```
 
 or scoped lookup in the service, as `EventAttachmentController.php:138` and
-`TimeTrackingEntryController.php:167-170` already do.
+`TimeTrackingEntryController.php:161-164` already do.
 
-Affected today (all unchecked): Todos (`category_id`, `tags.*`), Todo
-workspaces (`categories.*` ×3), Notes (`category_id`, `tags.*`), Note
-categories (`parent_id`), Libraries books/movies/games/music (`genres.*`,
-`tags.*`), links (`category_id`, `tags.*`), quotes (`tags.*`), time-tracking
-projects (`category_ids.*`); plus `StoreDevRequestRequest.php:19`
-`created_by_user_id`, which the caller picks and `DevRequestService::create:27`
-stores — attribution must come from `$request->user()`.
+Still bare: `ShareCalendarRequest.php:14` (`friend_id`),
+`StoreFriendRequestRequest.php:12` (`receiver_id`), the time-tracking
+`project_id` / `category_id` rules (`StoreTimeTrackingEntryRequest.php:17`,
+`UpdateTimeTrackingEntryRequest.php:17`, `TimeTrackingEntryController.php:261,387`),
+and `StoreDevRequestRequest.php:19` `created_by_user_id`, which the caller
+picks and `DevRequestService::create:27` stores — attribution must come from
+`$request->user()`.
 
 Check: `grep -rn "exists:" app/Api --include=*.php | grep -v Tests` — every
 hit either uses `Rule::exists(...)->where('user_id', …)` or names a service
-line that re-scopes it. Currently 40 hits, 0 scoped.
+line that re-scopes it. Currently 7 bare hits (above); 33 rules use `Rule::exists`.
 
 ### 3.3 `authorize()` stays empty; ownership is a controller line
 
@@ -367,11 +368,10 @@ are about the places that drift from it.
 Services are container singletons; a `User` in the constructor makes the
 class un-injectable and forces every caller through `app()->makeWith`.
 
-Bad (`app/Api/Libraries/Services/LibraryReleases.php:22-28` → 7 call sites
-`app()->makeWith(LibraryReleases::class, ['user' => $user])` in
-`LibraryBookService.php:143`, `LibraryMusicService.php:145`,
-`LibraryMovieService.php:116`, `Jobs/Grab{Book,Movie,Music}Releases.php:36`,
-`Jobs/ScaleCovers.php:70`).
+Bad (fixed in `ca1627b`): `LibraryReleases` took the user in its
+constructor, so its 7 call sites built it with
+`app()->makeWith(LibraryReleases::class, ['user' => $user])`. It now takes
+`User $user` per method (`LibraryReleases::getMusicReleases(User $user)`).
 
 Good: every other service — `TodoService::list(User $user)`,
 `CalendarService::listEvents(User $user, string $yearMonth)`.
@@ -386,10 +386,7 @@ resolves module services late (`app/Shared/Services/IntegrationGateway.php:26,36
 and in `ExportService::export:45-61` (15 feature services behind a `match`;
 injecting all 15 would be worse). Inside a module service, inject.
 
-Check: `grep -rn 'app(' app/Api/*/Services` → target is `ExportService.php:46-60`
-only. Today it also hits the three `Library*Service.php` `makeWith` sites (rule
-4.1) and `LibraryRecommender.php:116` `app(AiService::class)` — the latter is a
-violation of this rule (backlog, Rewrites).
+Check: `grep -rn 'app(' app/Api/*/Services` → `ExportService.php:46-60` only.
 
 ### 4.3 Dispatch on an enum is a `match`, not a string call
 
@@ -531,7 +528,7 @@ collation and SQLite (tests) does not. `DB::connection('pgsql')` outside
 commands (write). Nothing new touches `pgsql` from `app/Api` without being
 flagged first (project hard rule).
 
-Check: `grep -rn "connection('pgsql')" app/Api app/Shared` → the three existing files.
+Check: `grep -rn "connection('pgsql')" app/Api app/Shared | grep -v Tests` → the three existing files.
 
 ## 6. Resources
 
@@ -548,9 +545,8 @@ Check: `grep -rnE '\$this->(user|feed|comments)->' app/Api/*/Resources` → 0.
 
 ### 6.2 Every resource has a schema, and the schema lists what `toArray` returns
 
-64 of 68 resources carry `@OA\Schema`; the four `*SearchResultResource`
-files do not. Ten schemas drift from their `toArray()` (rule 2.6 and
-`findings-data.md` §3). Field names are the column names, snake_case.
+All 68 resources carry `@OA\Schema`, and none drifts from its `toArray()`
+(rule 2.6). Field names are the column names, snake_case.
 
 Check: `grep -rL '@OA\\Schema' app/Api/*/Resources` → 0.
 
@@ -574,11 +570,11 @@ map. The health route (rule 1.5) is the one exception to fix.
 `AuthenticationException`, `ModelNotFoundException`, `NotFoundHttpException`,
 `MethodNotAllowedHttpException`, `QueryException`, `ThrottleRequestsException`,
 `HttpException` and finally any `Throwable` → `ApiResponse::serverError`.
-Laravel reports the exception before rendering it. So this, 16 times in
-`CalendarController` (10) and `ContactController` (6), adds nothing but a
-different sentence:
+Laravel reports the exception before rendering it. So this adds nothing but
+a different sentence (it was in `CalendarController` 10 times and
+`ContactController` 6 times; all removed in `ca1627b`):
 
-Bad (`app/Api/Calendars/Controllers/CalendarController.php:103-108`):
+Bad (former `app/Api/Calendars/Controllers/CalendarController.php:103-108`):
 
 ```php
 try {
@@ -597,10 +593,9 @@ fine where it happens (`FeedController.php:350-355` `FeedAlreadySubscribedExcept
 exception is caught in a second controller, it moves into the central map
 instead. `AuthController.php:111,246,331,358` and `PasskeyController.php:34,59`
 (`\RuntimeException`/`ValidationException` → 401, 400 or 422) are this kind
-and stay. The one odd member is `AuthController.php:63-66`: `\RuntimeException`
-→ `serverError($e->getMessage())` is still a 500, only with the service's
-message in the body — a custom-message catch like the Bad example, not a
-status mapping (backlog, Rewrites).
+and stay. The register endpoint's `\RuntimeException` →
+`serverError($e->getMessage())` catch (a 500 with the service's message, not
+a status mapping) was removed in `ca1627b`.
 
 Check: `grep -rn -A2 'catch (\\Exception' app/Api/*/Controllers | grep -c 'report('` → 0.
 
@@ -642,22 +637,22 @@ shape of the forget block.
 
 ### 8.3 `remember` reads once
 
-`UserCacheService::remember:56-71` does `has()` → `get()` → `get()` again
-on hit (three round trips). Keep the method; the body should be one
-`get()` with a null check. Owner's code; backlog.
+`UserCacheService::remember:56-69` does one `get()` with a null check
+(was `has()` → `get()` → `get()`, fixed in `ca1627b`). `get()` treats any
+falsy cached value as a miss; that stays (owner decision, 2026-10-14:
+e.g. `WeatherService` returns `[]` on an API failure, which must not be
+cached).
 
 ## 9. Jobs, commands, schedule
 
 ### 9.1 A job carries ids, not models
 
 `SyncFeed(string $feedId)`, `ProcessExport(string $userId, int $jobId)`,
-`ScaleProfileImage(string $path)` re-read state in `handle()`. Four jobs
-take `public User $user` (`Calendars/Jobs/RefreshCalendarCache.php:18-20`,
-`ImportCalendars.php:17-19`, `Contacts/Jobs/RefreshContactsCache.php:20`,
-`ImportContacts.php:18`) and **no job uses `SerializesModels`**, so the whole
-user row is serialised into Redis and used stale. Pass `$userId` (or add
-the trait — Laravel 12 queues.md documents it as the default for model
-payloads; decision in Decisions).
+`ScaleProfileImage(string $path)` re-read state in `handle()`. The four
+jobs that took `public User $user` (`RefreshCalendarCache`,
+`ImportCalendars`, `RefreshContactsCache`, `ImportContacts`) take
+`string $userId` since `ca1627b`. No job uses `SerializesModels`, so a
+model in a job payload would be serialised whole and used stale.
 
 Check: `grep -rln 'User \$user' app/Api/*/Jobs` → 0, or every such file has `SerializesModels`.
 
@@ -665,8 +660,12 @@ Check: `grep -rln 'User \$user' app/Api/*/Jobs` → 0, or every such file has `S
 
 `SyncFeeds` (`tries = 1`, `timeout = 60`) and `SyncFeed` (`tries = 2`,
 `timeout = 240`) say why in the owner's commit (one poisoned feed must not
-retry forever). The `Grab*Releases` jobs call three external APIs per user
-and run on defaults; decide per job, write the number, not a comment.
+retry forever). The `Grab*Releases` jobs each call one external API
+(Deezer, Hardcover, TMDB) per user and set `tries = 1`, `timeout = 300`
+(2026-10-14): a retry would re-send release notifications. Any `$timeout`
+must stay below the queue's `retry_after` of 360 s
+(`config/queue.php:44,54`). `ImportCalendars` / `ImportContacts` stay on
+defaults for now (owner decision, 2026-10-14).
 
 ### 9.3 Schedule in `routes/console.php`, grouped by module; commands in the module, registered in `bootstrap/app.php`
 
@@ -858,9 +857,12 @@ translated (Decisions).
 - **Reference module is `app/Api/Todos/`.** Owner's statement (job
   `online`, 2026-10-10); when a rule and the Todos code disagree it is listed
   under Open questions, not silently resolved either way.
-- **Inline `$request->validate()` is allowed** for ≤ 3 fields on a child or
-  action endpoint whose shape exists nowhere else (`TodoController.php:312`);
-  never on `update`.
+- **No inline `$request->validate()`** (2026-10-14, replaces "allowed for
+  ≤ 3 fields"): every endpoint that validates input has a FormRequest
+  (rule 3.1).
+- **Calendar sharing is restricted to friends** (OQ-7, 2026-10-14):
+  `ShareCalendarRequest::after()` rejects non-friends and self with a 422 on
+  `friend_id`. Where that check lives is left as is for now.
 - **No `authorize()` in FormRequests.** Ownership is `HandlesApiAuth` in the
   controller.
 - **`LoginRequest::authenticate()` stays** (Breeze pattern); no other request
@@ -906,7 +908,7 @@ translated (Decisions).
     are shared by design (12.3).
   - "Jobs: constructor only carries identifiers … `RefreshCalendarCache`
     takes the `User`" — the example contradicted the rule; 9.1 is the rule
-    and the four `User`-carrying jobs are backlog.
+    (the four `User`-carrying jobs were fixed in `ca1627b`).
   - "`@OA` `path` is `/v1/<route>`" — stated as if settled; 186 of 268
     operations use `/api/`, and neither matches `@OA\Server`. Was OQ-1; decided: relative to `/api/v1` (rule 2.1).
   - "Pint is the style enforcer; run `./vendor/bin/pint --dirty`" — Pint has
@@ -923,8 +925,8 @@ translated (Decisions).
   - "`whenLoaded` … never `$this->category` without it" — kept as 6.1, with
     the three violations named instead of asserted away.
   - "Validation is the first line of defense … existence via `exists:`" —
-    `exists:` is not an ownership check; replaced by 3.2 and the backlog's
-    first item.
+    `exists:` is not an ownership check; replaced by 3.2 (scoped in
+    `d48f7b9`).
   - The ten-rule "golden rules" list, the checklists at the end of each old
     doc and the module anatomy tree are not carried over; sections 1–12
     cover them with file references.
@@ -936,8 +938,5 @@ translated (Decisions).
   `laravel/pint` from `require-dev`? The frontend removed its formatter
   because it fought hand formatting; here the hand formatting mostly already
   matches the preset.
-- **OQ-7 — `ShareCalendarRequest` `friend_id`** accepts any user id; is
-  sharing meant to be restricted to friends (`Friend` model exists) or is the
-  name just historical?
 - **OQ-8 — `StoreDevRequestRequest` `created_by_user_id`** is client-chosen;
   intended (admins filing on behalf of users) or an oversight?

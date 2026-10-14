@@ -6,6 +6,7 @@ use App\Api\DevRequests\Jobs\DeleteOldDevRequests;
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\Libraries\Jobs\GenerateCoverPreview;
 use App\Api\Libraries\Jobs\ScaleCovers;
+use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Users\Jobs\DeleteOldFriendRequests;
 use App\Api\Users\Jobs\ScaleProfileImage;
 use App\Api\Users\Models\FriendRequest;
@@ -109,7 +110,8 @@ describe('ScaleCovers', function () {
 
         app(ScaleCovers::class)->handle(
             app(UserCacheService::class),
-            $imageTransformation
+            $imageTransformation,
+            app(LibraryReleases::class)
         );
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
@@ -126,7 +128,8 @@ describe('ScaleCovers', function () {
 
         app(ScaleCovers::class)->handle(
             app(UserCacheService::class),
-            $imageTransformation
+            $imageTransformation,
+            app(LibraryReleases::class)
         );
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeTrue();
@@ -142,7 +145,8 @@ describe('ScaleCovers', function () {
 
         app(ScaleCovers::class)->handle(
             app(UserCacheService::class),
-            $imageTransformation
+            $imageTransformation,
+            app(LibraryReleases::class)
         );
 
         expect(File::exists($dir.'/cover_original.jpg'))->toBeFalse();
