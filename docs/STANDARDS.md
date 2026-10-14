@@ -169,21 +169,22 @@ exist; a new route file is a violation.
 
 ### 1.5 The health route follows the same rules as everything else
 
-`routes/api.php:60-67` is a closure returning `response()->json([...])` with
-`env('API_VERSION', '1.0.7')`. Laravel 12 (configuration.md, "Configuration
-Caching", confirmed 2026-10-13): after `config:cache` the `.env` file is not
-loaded and `env()` returns only real OS environment variables, so the
-version silently falls back to `'1.0.7'` in production. `env()` belongs in
-`config/*.php`; the route reads `config('app.version')` and returns through
-`ApiResponse::success`.
+`routes/api.php` health is a closure that reads `config('app.version')` and
+returns through `ApiResponse::success` (since `f3545db`; before that it was
+`response()->json([...])` with `env('API_VERSION', '1.0.7')`). Laravel 12
+(configuration.md, "Configuration Caching", confirmed 2026-10-13): after
+`config:cache` the `.env` file is not loaded and `env()` returns only real OS
+environment variables, so the version silently falls back to `'1.0.7'` in
+production. `env()` belongs in `config/*.php`.
 
 Check: `grep -rn "env(" routes app` → 0 (`bootstrap/app.php:25`
 `env('TRUSTED_PROXIES')` is the one legitimate call: bootstrap runs before
 config exists).
 
-Exception (rule 13.5): every frontend's self-hosted setup reads `app` and
-`version` at the top level of the health body, so health keeps them there
-in addition to the envelope (backlog: `health-response-backwards-compatibility`).
+Exception (rule 13.5): the health body is a pinned legacy contract. Every
+frontend's self-hosted setup reads `app` and `version` at the top level, so
+health merges them into the top level of the `ApiResponse::success` envelope
+in addition to `data` (pinned by `tests/Unit/ClientContractTest.php`).
 
 ## 2. OpenAPI annotations
 
@@ -565,7 +566,8 @@ its own line; nothing else in the repo does. One line per field.
 `app/Api/ApiResponse.php` is the only `response()->json` in `app/`
 (verified: 0 other hits). Status codes: 201 create, 200 everything else
 including deletes (`data: null`), 422/401/403/404/405/429 from the central
-map. The health route (rule 1.5) is the one exception to fix.
+map. The health route (rule 1.5) builds its body with `ApiResponse::success`
+and only adds the legacy top-level `app` and `version` keys.
 
 ### 7.2 Throw; do not catch what `bootstrap/app.php` already renders
 
