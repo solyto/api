@@ -60,7 +60,7 @@ class LibraryQuoteController
      *         required=true,
      *         description="Quote ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -177,7 +177,7 @@ class LibraryQuoteController
      *         required=true,
      *         description="Quote ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -230,7 +230,7 @@ class LibraryQuoteController
      *         required=true,
      *         description="Quote ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

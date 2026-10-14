@@ -96,6 +96,38 @@ describe('DevRequest comments', function () {
 // Listing, voting and comments are shared by design (STANDARDS 12.3); only
 // the update (admin-only) and each user's own vote are private.
 describe('DevRequest tenant isolation', function () {
+    it('files a dev request as the authenticated user, ignoring created_by_user_id', function () {
+        $user = makeUser();
+        $other = makeUser();
+
+        $id = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests', [
+                'title' => 'Dark mode',
+                'description' => 'Add a dark theme',
+                'type' => 'feature',
+                'created_by_user_id' => $other->id,
+            ])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(DevRequest::find($id)->created_by_user_id)->toBe($user->id);
+    });
+
+    it('files a dev request without created_by_user_id as the authenticated user', function () {
+        $user = makeUser();
+
+        $id = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests', [
+                'title' => 'Dark mode',
+                'description' => 'Add a dark theme',
+                'type' => 'feature',
+            ])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(DevRequest::find($id)->created_by_user_id)->toBe($user->id);
+    });
+
     it('forbids a non-admin from updating another user\'s dev request', function () {
         $user = makeUser();
         $other = makeUser();

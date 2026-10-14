@@ -31,9 +31,9 @@ class ClipboardController
      *         description="Clipboards retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Clipboard")),
-     *             @OA\Property(property="message", type="string", example="Clipboards retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Clipboard"))
      *         )
      *     )
      * )
@@ -67,9 +67,9 @@ class ClipboardController
      *         description="Clipboard created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Clipboard"),
-     *             @OA\Property(property="message", type="string", example="Clipboard created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Clipboard")
      *         )
      *     ),
      *
@@ -115,9 +115,9 @@ class ClipboardController
      *         description="Clipboard image saved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/Clipboard"),
-     *             @OA\Property(property="message", type="string", example="Clipboard image saved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/Clipboard")
      *         )
      *     ),
      *
@@ -203,9 +203,9 @@ class ClipboardController
      *         description="Clipboard entry deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Clipboard entry deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *

@@ -64,7 +64,7 @@ class LibraryMovieController
      *         required=true,
      *         description="Movie ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -154,7 +154,7 @@ class LibraryMovieController
      *         required=true,
      *         description="Movie ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -215,7 +215,7 @@ class LibraryMovieController
      *         required=true,
      *         description="Movie ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

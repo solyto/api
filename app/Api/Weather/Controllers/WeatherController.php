@@ -27,9 +27,9 @@ class WeatherController
      *         description="Weather forecast retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/DailyWeatherForecast"),
-     *             @OA\Property(property="message", type="string", example="Weather forecast retrieved successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/DailyWeatherForecast")
      *         )
      *     ),
      *

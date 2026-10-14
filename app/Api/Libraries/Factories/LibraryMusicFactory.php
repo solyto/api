@@ -6,6 +6,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<LibraryMusic> */
 class LibraryMusicFactory extends Factory
 {
     protected $model = LibraryMusic::class;

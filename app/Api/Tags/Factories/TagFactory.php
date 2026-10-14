@@ -6,6 +6,7 @@ use App\Api\Tags\Models\Tag;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Tag> */
 class TagFactory extends Factory
 {
     protected $model = Tag::class;

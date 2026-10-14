@@ -66,7 +66,7 @@ class LibraryBookController
      *         required=true,
      *         description="Book ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -239,7 +239,7 @@ class LibraryBookController
      *         required=true,
      *         description="Book ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -305,7 +305,7 @@ class LibraryBookController
      *         required=true,
      *         description="Book ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

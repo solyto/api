@@ -6,6 +6,7 @@ use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<TelegramBotConnection> */
 class TelegramBotConnectionFactory extends Factory
 {
     protected $model = TelegramBotConnection::class;

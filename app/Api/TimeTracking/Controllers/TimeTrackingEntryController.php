@@ -32,9 +32,9 @@ class TimeTrackingEntryController
      *         description="Time tracking entries retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingEntry")),
-     *             @OA\Property(property="message", type="string", example="Time tracking entries retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/TimeTrackingEntry"))
      *         )
      *     )
      * )
@@ -74,9 +74,9 @@ class TimeTrackingEntryController
      *         description="Time tracking entry created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry"),
-     *             @OA\Property(property="message", type="string", example="Time tracking entry created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry")
      *         )
      *     ),
      *
@@ -136,9 +136,9 @@ class TimeTrackingEntryController
      *         description="Time tracking entry updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry"),
-     *             @OA\Property(property="message", type="string", example="Time tracking entry updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry")
      *         )
      *     ),
      *
@@ -191,9 +191,9 @@ class TimeTrackingEntryController
      *         description="Time tracking entry deleted successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", nullable=true),
-     *             @OA\Property(property="message", type="string", example="Time tracking entry deleted successfully.")
+     *             @OA\Property(property="data", nullable=true)
      *         )
      *     ),
      *
@@ -235,9 +235,9 @@ class TimeTrackingEntryController
      *         description="Timer started successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry"),
-     *             @OA\Property(property="message", type="string", example="Timer started successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry")
      *         )
      *     ),
      *
@@ -299,9 +299,9 @@ class TimeTrackingEntryController
      *         description="Timer stopped successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry"),
-     *             @OA\Property(property="message", type="string", example="Timer stopped successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/TimeTrackingEntry")
      *         )
      *     ),
      *
@@ -367,9 +367,9 @@ class TimeTrackingEntryController
      *         description="Statistics retrieved successfully. total_minutes is scoped to the requested range, while a project's total_duration is all-time.",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Statistics retrieved successfully.")
+     *             @OA\Property(property="data", type="object")
      *         )
      *     ),
      *

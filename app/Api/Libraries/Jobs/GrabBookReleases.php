@@ -22,6 +22,10 @@ class GrabBookReleases implements ShouldQueue
 
     private const int CACHE_TTL_RELEASES = 604800;
 
+    public int $tries = 1;
+
+    public int $timeout = 300;
+
     public function handle(UserCacheService $cache, LibraryReleases $libraryReleases): void
     {
         Log::channel('queue')->info('Grabbing new book releases for all users..');

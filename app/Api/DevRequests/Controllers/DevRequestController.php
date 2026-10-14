@@ -32,9 +32,9 @@ class DevRequestController
      *         description="Dev Requests retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/DevRequest")),
-     *             @OA\Property(property="message", type="string", example="Dev Requests retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/DevRequest"))
      *         )
      *     )
      * )
@@ -66,8 +66,7 @@ class DevRequestController
      *             @OA\Property(property="screenshot", type="string", nullable=true),
      *             @OA\Property(property="screenshot_name", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="priority", type="integer", minimum=1, maximum=5, nullable=true),
-     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="created_by_user_id", type="string", format="uuid", nullable=true)
+     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true)
      *         )
      *     ),
      *
@@ -76,9 +75,9 @@ class DevRequestController
      *         description="Dev Request created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest"),
-     *             @OA\Property(property="message", type="string", example="Dev Request created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest")
      *         )
      *     ),
      *
@@ -90,7 +89,7 @@ class DevRequestController
      */
     public function store(StoreDevRequestRequest $request): JsonResponse
     {
-        $devRequest = $this->devRequestService->create($request->validated());
+        $devRequest = $this->devRequestService->create($request->user(), $request->validated());
 
         return ApiResponse::success(
             new DevRequestResource($devRequest),
@@ -134,9 +133,9 @@ class DevRequestController
      *         description="Dev Request updated successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest"),
-     *             @OA\Property(property="message", type="string", example="Dev Request updated successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest")
      *         )
      *     ),
      *
@@ -189,9 +188,9 @@ class DevRequestController
      *         description="Vote recorded successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest"),
-     *             @OA\Property(property="message", type="string", example="Vote recorded successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/DevRequest")
      *         )
      *     ),
      *
@@ -230,9 +229,9 @@ class DevRequestController
      *         description="Comments retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/DevRequestComment")),
-     *             @OA\Property(property="message", type="string", example="Comments retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/DevRequestComment"))
      *         )
      *     )
      * )
@@ -277,9 +276,9 @@ class DevRequestController
      *         description="Comment created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/DevRequestComment"),
-     *             @OA\Property(property="message", type="string", example="Comment created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/DevRequestComment")
      *         )
      *     ),
      *

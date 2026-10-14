@@ -11,6 +11,7 @@ use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Libraries\Services\External\TmdbService;
+use App\Api\Libraries\Services\LibraryReleases;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
@@ -34,7 +35,7 @@ describe('GrabMusicReleases', function () {
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
 
@@ -46,7 +47,7 @@ describe('GrabMusicReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('music_release_notified_'.$this->user->id, [10]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
 
@@ -58,7 +59,7 @@ describe('GrabMusicReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('music_release_notified_'.$this->user->id, [10]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
     });
@@ -80,7 +81,7 @@ describe('GrabMusicReleases', function () {
             'release_date' => now()->toDateString(),
         ]]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
 
@@ -91,7 +92,7 @@ describe('GrabMusicReleases', function () {
         // second run (the dedup must suppress the already-notified string id).
         Notification::fake();
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
     });
@@ -118,7 +119,7 @@ describe('GrabBookReleases', function () {
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabBookReleases::class)->handle(app(UserCacheService::class));
+        app(GrabBookReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\BookReleaseNotification::class);
 
@@ -130,7 +131,7 @@ describe('GrabBookReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('book_release_notified_'.$this->user->id, [20]);
 
-        app(GrabBookReleases::class)->handle(app(UserCacheService::class));
+        app(GrabBookReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\BookReleaseNotification::class);
 
@@ -161,7 +162,7 @@ describe('GrabMovieReleases', function () {
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabMovieReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMovieReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MovieReleaseNotification::class);
 
@@ -173,7 +174,7 @@ describe('GrabMovieReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('movie_release_notified_'.$this->user->id, ['tt123']);
 
-        app(GrabMovieReleases::class)->handle(app(UserCacheService::class));
+        app(GrabMovieReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
         Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MovieReleaseNotification::class);
 

@@ -39,9 +39,9 @@ class QuickAddController
      *         description="Content detected successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/QuickAddDetection"),
-     *             @OA\Property(property="message", type="string", example="Content detected successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/QuickAddDetection")
      *         )
      *     ),
      *
@@ -84,10 +84,7 @@ class QuickAddController
      *         response=200,
      *         description="Content added successfully",
      *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="message", type="string", example="Content added successfully.")
-     *         )
+     *         @OA\JsonContent(ref="#/components/schemas/SuccessResponse")
      *     ),
      *
      *     @OA\Response(

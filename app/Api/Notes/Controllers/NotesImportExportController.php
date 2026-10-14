@@ -80,26 +80,4 @@ class NotesImportExportController
             'Notes imported successfully.'
         );
     }
-
-    /**
-     * @OA\Get(
-     *     path="/notes/export",
-     *     operationId="noteExport",
-     *     summary="Export notes to a file",
-     *     tags={"Notes"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="File exported successfully",
-     *
-     *         @OA\MediaType(
-     *             mediaType="application/octet-stream",
-     *
-     *             @OA\Schema(type="string", format="binary")
-     *         )
-     *     )
-     * )
-     */
-    public function export(): JsonResponse {}
 }

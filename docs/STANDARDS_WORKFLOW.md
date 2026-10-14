@@ -13,9 +13,9 @@ how code in this repository is written. Every rule in it comes from a
 concrete piece of code — either something the owner is unhappy with, or the
 owner's own reference module (`app/Api/Todos/`) showing the intended shape.
 No rule is imported from a generic Laravel or PSR guide; where a rule rests
-on framework behaviour (`env()` under `config:cache`, Pint's `laravel`
-preset, `Rule::exists()->where()`, `SerializesModels`) the official Laravel
-12 / Pint source was read and the rule says so in one line.
+on framework behaviour (`env()` under `config:cache`,
+`Rule::exists()->where()`, `SerializesModels`) the official Laravel 12
+source was read and the rule says so in one line.
 
 The older policy set (`docs/API-CONVENTIONS.md` and eight
 `docs/CONVENTIONS-*.md`, written by an AI job on 2026-10-10) was verified
@@ -42,7 +42,7 @@ the answer may be "no, this one is fine".
 2. Measures instead of asserting: greps the pattern across `app/`, counts
    occurrences and files, checks `git log`/`git show --stat` against
    `docs/jobs/archive/*/brief.md` to see whether a job wrote it, runs
-   `composer test` (and `./vendor/bin/pint --test`, dry run) when a claim
+   `composer test` (and `composer analyse`) when a claim
    depends on it. Numbers go in the answer when they change what the reader
    does.
 3. Names the pattern, separates the symptom from the design behind it, and
@@ -85,7 +85,7 @@ From the two briefs (`docs/jobs/archive/online_php-laravel-api-best-pratices/bri
   item marked "(approval)", never an action.
 - Sessions are isolated; the agent's memory does not survive. Everything
   that matters for the next session lives in this file, in
-  `docs/STANDARDS.md`, and in `docs/STANDARDS_BACKLOG.md`.
+  `docs/STANDARDS.md`, and in `docs/backlog/`.
 
 ## Shape of `docs/STANDARDS.md`
 
@@ -98,17 +98,17 @@ From the two briefs (`docs/jobs/archive/online_php-laravel-api-best-pratices/bri
   rule, why it matters, a bad/good example from this repo with file and
   line, and a check where one exists.
 - **Decisions**: choices the owner made that are not derivable from the
-  code (inline `validate()` allowed, no `strict_types`, `$casts` property,
+  code (no inline `validate()`, no `strict_types`, `$casts` property,
   deletes return 200, what was dropped from the old docs).
 - **Open questions** (OQ-n): things waiting for the owner's answer, each
   with the data point that raised it. The owner's own inconsistencies with
   a rule are recorded here, not silently dropped and not silently turned
   into exceptions.
 
-Concrete cleanups go to `docs/STANDARDS_BACKLOG.md` (a checkbox list grouped
-by size — First / Mechanical / Extract to helpers / Rewrites / Larger /
-Audits / Tooling — each item naming its rule and a check line), never into
-`STANDARDS.md`. The working notes with full counts from the first session
+Concrete cleanups go to `docs/backlog/` as manigot backlog entries (one
+idea per file, written with the `backlog-entry` skill, naming its rule and
+a check line), never into `STANDARDS.md`. `docs/STANDARDS_BACKLOG.md` was
+retired on 2026-10-14; its open items moved there. The working notes with full counts from the first session
 are in `docs/jobs/dawn_standards/findings-*.md`, `provenance.md` and
 `tooling-report.md`; they are job artefacts and may go stale.
 

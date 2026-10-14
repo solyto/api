@@ -4,7 +4,6 @@ namespace App\Api\Calendars\Jobs;
 
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\Users\Models\User;
-use App\Dav\Services\DavService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,10 +17,9 @@ class RefreshCalendarCache implements ShouldQueue
         public string $userId,
     ) {}
 
-    public function handle(): void
+    public function handle(CalendarService $service): void
     {
         $user = User::findOrFail($this->userId);
-        $service = app(CalendarService::class);
 
         $service->list($user);
         $service->listEvents($user, date('Y-m'));

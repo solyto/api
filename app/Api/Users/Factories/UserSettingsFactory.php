@@ -6,6 +6,7 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<UserSettings> */
 class UserSettingsFactory extends Factory
 {
     protected $model = UserSettings::class;

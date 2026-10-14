@@ -62,7 +62,7 @@ class LibraryRecipeController
      *         required=true,
      *         description="Recipe ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(
@@ -150,7 +150,7 @@ class LibraryRecipeController
      *         required=true,
      *         description="Recipe ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\RequestBody(
@@ -210,7 +210,7 @@ class LibraryRecipeController
      *         required=true,
      *         description="Recipe ID",
      *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="string", format="uuid")
      *     ),
      *
      *     @OA\Response(

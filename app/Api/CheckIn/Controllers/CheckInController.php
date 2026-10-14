@@ -30,9 +30,9 @@ class CheckInController
      *         description="Check-in data retrieved successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/CheckIn")),
-     *             @OA\Property(property="message", type="string", example="Check-in data retrieved successfully.")
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/CheckIn"))
      *         )
      *     )
      * )
@@ -122,9 +122,9 @@ class CheckInController
      *         description="Check-in data created successfully",
      *
      *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/CheckIn"),
-     *             @OA\Property(property="message", type="string", example="Check-in data created successfully.")
+     *             @OA\Property(property="data", ref="#/components/schemas/CheckIn")
      *         )
      *     ),
      *

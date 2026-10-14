@@ -6,6 +6,7 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Friend> */
 class FriendFactory extends Factory
 {
     protected $model = Friend::class;
