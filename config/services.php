@@ -82,4 +82,10 @@ return [
     'image' => [
         'driver' => env('IMAGE_DRIVER', 'intervention'),
     ],
+
+    'ntfy' => [
+        'url'   => env('NTFY_URL'),
+        'topic' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC'),
+        'token' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOKEN'),
+    ],
 ];

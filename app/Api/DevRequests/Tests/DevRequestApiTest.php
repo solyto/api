@@ -3,6 +3,9 @@
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\DevRequests\Models\DevRequestVote;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 
 describe('DevRequest CRUD', function () {
     it('lists, stores, updates and deletes dev requests', function () {
@@ -160,4 +163,48 @@ describe('DevRequest tenant isolation', function () {
         expect($otherVote?->vote_type)->toBe('up');
         expect(DevRequestVote::where('dev_request_id', $devRequest->id)->where('user_id', $user->id)->count())->toBe(0);
     });
+});
+
+describe('DevRequest ntfy announcement', function () {
+    $store = fn ($test) => $test->actingAs(makeUser(), 'sanctum')
+        ->postJson('/api/v1/dev-requests', [
+            'title' => 'Dark mode',
+            'description' => 'Add a dark theme',
+            'type' => 'feature',
+        ]);
+
+    it('sends nothing when ntfy is not configured', function () use ($store) {
+        config(['services.ntfy.url' => null, 'services.ntfy.topic' => null]);
+        Http::fake();
+
+        $store($this)->assertStatus(201);
+
+        Http::assertNothingSent();
+    });
+
+    it('sends the title but not the description when ntfy is configured', function () use ($store) {
+        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
+        Http::fake();
+
+        $store($this)->assertStatus(201);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) =>
+            $request->url() === 'https://ntfy.example.test'
+            && $request['message'] === 'New dev request: Dark mode'
+            && !str_contains($request->body(), 'Add a dark theme')
+        );
+    });
+
+    it('still creates the dev request when ntfy fails', function (Closure $fake) use ($store) {
+        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
+        $fake();
+
+        $store($this)->assertStatus(201)->assertJsonPath('data.title', 'Dark mode');
+
+        expect(DevRequest::where('title', 'Dark mode')->exists())->toBeTrue();
+    })->with([
+        'error response' => fn () => fn () => Http::fake(['*' => Http::response('boom', 500)]),
+        'connection error' => fn () => fn () => Http::fake(fn () => throw new ConnectionException('Connection refused')),
+    ]);
 });

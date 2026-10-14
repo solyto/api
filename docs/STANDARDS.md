@@ -681,6 +681,7 @@ user's per-type settings and wraps copy in `withLocale`. Copy comes from
 `resources/lang/*` (`__('notifications.…')`); the bot uses the
 `SolytoMessage` enum of translation keys (`app/Bots/Messages/SolytoMessage.php`).
 No literal user-facing string in a notification or bot reply.
+Operator alerts (`AdminNotification`, ntfy) are not user-facing (Decisions).
 
 Check: `grep -rn "sendMessage(\|replyWithText('" app/Bots | grep -v trans` → 0.
 
@@ -896,6 +897,13 @@ translated (Decisions).
   long as they will not go stale within weeks; no per-class inventories.
 - **Envelope `message` strings stay English** and untranslated; they are
   for developers and logs, the frontend renders its own copy.
+- **Operator alerts are not user-facing messages under rule 9.4**
+  (2026-10-14): notifications sent to the instance operator's ntfy topic
+  extend `App\Shared\Notifications\AdminNotification`, not
+  `BaseNotification`, and use English literals instead of lang keys, like
+  the envelope messages (12.10). The reader is the operator, not a user.
+  This covers only `AdminNotification` subclasses; every notification a
+  user receives still follows 9.4.
 - **From the old policy set, dropped or corrected on 2026-10-13:**
   - "`HasUuids` + `HasFactory` are the two traits on app models" — wrong
     for 30 of 52 models; UUID vs auto-increment follows the migration (5.4).
