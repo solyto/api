@@ -37,7 +37,12 @@ class UserSettingsController
      *         @OA\JsonContent(
      *             required={"navigation"},
      *
-     *             @OA\Property(property="navigation", type="string", description="JSON string of navigation settings")
+     *             @OA\Property(
+     *                 property="navigation",
+     *                 type="string",
+     *                 description="Client-owned JSON string, stored as sent. Current format: {""visible"": {<featureKey>: bool}, ""desktop"": [<slug>] | null, ""mobile"": [<slug>] | null}; a null order means not customised, the client uses its default. Legacy rows use the flat format {<featureKey>: bool}.",
+     *                 example="{""visible"":{""calendar"":true,""checkIn"":false},""desktop"":[""home"",""calendar"",""check-in""],""mobile"":null}"
+     *             )
      *         )
      *     ),
      *
