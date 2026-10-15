@@ -23,7 +23,7 @@ class BudgetService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => Budget::forUser($user->id)->get()
+            fn() => Budget::forUser($user->id)->orderByDesc('value')->get()
         );
     }
 
