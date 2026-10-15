@@ -18,7 +18,20 @@ class DevRequestService
 
     public function list(): Collection
     {
-        return DevRequest::with('votes')->withCount('comments')->get();
+        // Newest first from the query; the stable score sort keeps that order among ties.
+        return DevRequest::with('votes')
+            ->withCount('comments')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->sortByDesc(fn (DevRequest $devRequest) => $this->score($devRequest))
+            ->values();
+    }
+
+    private function score(DevRequest $devRequest): int
+    {
+        return $devRequest->votes->where('vote_type', 'up')->count()
+            - $devRequest->votes->where('vote_type', 'down')->count();
     }
 
     public function create(User $user, array $data): DevRequest

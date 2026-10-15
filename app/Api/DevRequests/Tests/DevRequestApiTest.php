@@ -62,6 +62,24 @@ describe('DevRequest voting', function () {
         expect(DevRequestVote::where('dev_request_id', $request->id)->where('user_id', $user->id)->count())->toBe(1);
         expect(DevRequestVote::where('dev_request_id', $request->id)->where('user_id', $user->id)->first()->vote_type)->toBe('down');
     });
+
+    it('lists dev requests by score, newest first among ties', function () {
+        $user = makeUser();
+        $older = DevRequest::factory()->create(['created_at' => now()->subDays(2)]);
+        $newer = DevRequest::factory()->create(['created_at' => now()->subDay()]);
+        $top = DevRequest::factory()->create(['created_at' => now()->subDays(3)]);
+        $bottom = DevRequest::factory()->create();
+
+        DevRequestVote::factory()->count(2)->upvote()->create(['dev_request_id' => $top->id]);
+        DevRequestVote::factory()->downvote()->create(['dev_request_id' => $bottom->id]);
+
+        $ids = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->json('data.*.id');
+
+        expect($ids)->toBe([$top->id, $newer->id, $older->id, $bottom->id]);
+    });
 });
 
 describe('DevRequest comments', function () {
