@@ -136,11 +136,7 @@ class ContactController
      */
     public function updateAddressBook(UpdateAddressBookRequest $request, int $addressBookId): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
-
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
         $addressBook->color = $request->validated('color');
         $this->contactService->updateAddressBook($request->user(), $addressBook);
@@ -181,11 +177,7 @@ class ContactController
      */
     public function destroyAddressBook(Request $request, int $addressBookId): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
-
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
         $this->contactService->destroyAddressBook($request->user(), $addressBook);
 
@@ -332,11 +324,7 @@ class ContactController
      */
     public function storeContact(StoreContactRequest $request, int $addressBookId): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
-
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
         $contact = $this->contactService->createContact($request->user(), $addressBook, $request->validated());
 
@@ -414,17 +402,9 @@ class ContactController
      */
     public function updateContact(UpdateContactRequest $request, int $addressBookId, string $contactUri): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
-
-        $contact = $this->contactService->getContact($addressBook, $contactUri);
-
-        if ($contact === null) {
-            return ApiResponse::error('Contact does not exist', 404);
-        }
+        $contact = $this->contactService->getContactOrFail($addressBook, $contactUri);
 
         $contact = $this->contactService->updateContact($request->user(), $addressBook, $contact, $request->validated());
 
@@ -477,17 +457,9 @@ class ContactController
      */
     public function destroyContact(Request $request, int $addressBookId, string $contactUri): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
-
-        $contact = $this->contactService->getContact($addressBook, $contactUri);
-
-        if ($contact === null) {
-            return ApiResponse::error('Contact does not exist', 404);
-        }
+        $contact = $this->contactService->getContactOrFail($addressBook, $contactUri);
 
         if (! $this->contactService->destroyContact($request->user(), $addressBook, $contact)) {
             return ApiResponse::error('Error deleting contact', 500);
@@ -553,17 +525,9 @@ class ContactController
      */
     public function updateContactPhoto(AddContactPhotoRequest $request, int $addressBookId, string $contactUri): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
-
-        $contact = $this->contactService->getContact($addressBook, $contactUri);
-
-        if ($contact === null) {
-            return ApiResponse::error('Contact does not exist', 404);
-        }
+        $contact = $this->contactService->getContactOrFail($addressBook, $contactUri);
 
         if (! $request->hasFile('photo')) {
             return ApiResponse::error('No photo uploaded', 400);
@@ -620,17 +584,9 @@ class ContactController
      */
     public function removeContactPhoto(Request $request, int $addressBookId, string $contactUri): JsonResponse
     {
-        $addressBook = $this->contactService->getAddressBook($request->user(), $addressBookId);
+        $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
-        if ($addressBook === null) {
-            return ApiResponse::error('Address Book does not exist', 404);
-        }
-
-        $contact = $this->contactService->getContact($addressBook, $contactUri);
-
-        if ($contact === null) {
-            return ApiResponse::error('Contact does not exist', 404);
-        }
+        $contact = $this->contactService->getContactOrFail($addressBook, $contactUri);
 
         $contact = $this->contactService->removeContactPhoto($request->user(), $addressBook, $contact);
 

@@ -3,6 +3,7 @@
 namespace App\Api\Calendars\Services;
 
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
+use App\Api\Calendars\Exceptions\CalendarNotFoundException;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
@@ -33,6 +34,14 @@ class CalendarService
     public function get(User $user, int $instanceId): ?CalendarDTO
     {
         return $this->dav->calendars()->get($user, $instanceId);
+    }
+
+    /**
+     * @throws CalendarNotFoundException
+     */
+    public function getOrFail(User $user, int $instanceId): CalendarDTO
+    {
+        return $this->get($user, $instanceId) ?? throw new CalendarNotFoundException();
     }
 
     public function getByName(User $user, string $name): ?CalendarDTO

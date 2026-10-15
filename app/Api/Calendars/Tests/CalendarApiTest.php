@@ -374,16 +374,16 @@ describe('Calendar tenant isolation', function () {
 
         // The module answers a calendar the user cannot see with 404.
         expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/calendars/'.$otherInstanceId, ['color' => '#000000']), 404);
+            ->putJson('/api/v1/calendars/'.$otherInstanceId, ['color' => '#000000'])->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId), 404);
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId)->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/calendars/'.$otherInstanceId.'/share'), 404);
+            ->getJson('/api/v1/calendars/'.$otherInstanceId.'/share')->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/share', ['friend_id' => $friend->id]), 404);
+            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/share', ['friend_id' => $friend->id])->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/calendars/'.$otherInstanceId.'/events', [
@@ -392,7 +392,15 @@ describe('Calendar tenant isolation', function () {
                 'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
                 'is_all_day' => false,
                 'calendar_id' => $otherInstanceId,
-            ]), 404);
+            ])->assertJsonPath('message', 'Calendar does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/share/'.$friend->id)
+            ->assertJsonPath('message', 'Calendar does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/unsubscribe')
+            ->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         $otherIds = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/calendars')
@@ -434,10 +442,27 @@ describe('Calendar tenant isolation', function () {
                 'is_all_day' => false,
                 'calendar_id' => $otherInstanceId,
                 'etag' => $etag,
-            ]), 404);
+            ])->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri), 404);
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri)->assertJsonPath('message', 'Calendar does not exist'), 404);
+
+        $occurrenceDate = now()->addDay()->format('Y-m-d');
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri.'/occurrence/'.$occurrenceDate, [
+                'title' => 'Hijacked',
+                'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $otherInstanceId,
+                'etag' => $etag,
+            ])
+            ->assertJsonPath('message', 'Calendar does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri.'/occurrence/'.$occurrenceDate)
+            ->assertJsonPath('message', 'Calendar does not exist'), 404);
 
         $otherTitles = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
