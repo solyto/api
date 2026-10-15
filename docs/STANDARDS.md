@@ -846,6 +846,54 @@ User-facing copy (notifications, mails, bot replies) comes from
 (rule 9.4). API `message` strings in the envelope are English and are not
 translated (Decisions).
 
+### 12.11 Renaming a feature updates the stored navigation settings in PHP
+
+`user_settings.navigation` is client-owned JSON, stored as a string, in two
+formats that coexist (rows convert when the user next saves): legacy flat
+`{"<featureKey>": bool}` and current
+`{"visible": {"<featureKey>": bool}, "desktop": ["<slug>"]|null, "mobile": ["<slug>"]|null}`.
+Feature keys (`checkIn`) and navigation slugs (`check-in`) are different
+strings. A migration that renames a feature decodes each row, renames the
+key in `visible` (top level for legacy rows) and the slug in `desktop` and
+`mobile` (skipping `null`), and re-encodes it; `down()` does the reverse. No
+string `REPLACE` on this column. A missed slug does not break the
+navigation, but the user's custom position for that feature is lost.
+
+Bad: `2026_01_31_220757_rename_tracker_to_check_in.php:32` matches only
+`"tracker":`, so in the current format the order arrays keep `tracker`.
+
+Good:
+
+```php
+$renameKey = fn (array $a) => array_combine(
+    array_map(fn ($k) => $k === 'tracker' ? 'checkIn' : $k, array_keys($a)),
+    $a,
+);
+
+DB::table('user_settings')->whereNotNull('navigation')->eachById(function ($row) use ($renameKey) {
+    $nav = json_decode($row->navigation, true);
+    if (! is_array($nav)) {
+        return;
+    }
+
+    if (isset($nav['visible'])) {
+        $nav['visible'] = $renameKey($nav['visible']);
+        foreach (['desktop', 'mobile'] as $list) {
+            if (is_array($nav[$list] ?? null)) {
+                $nav[$list] = array_map(fn ($s) => $s === 'tracker' ? 'check-in' : $s, $nav[$list]);
+            }
+        }
+    } else {
+        $nav = $renameKey($nav);
+    }
+
+    DB::table('user_settings')->where('id', $row->id)->update(['navigation' => json_encode($nav)]);
+});
+```
+
+Check: `grep -rln "REPLACE(navigation" database/migrations` lists only
+`2026_01_31_220757_rename_tracker_to_check_in.php`.
+
 ## 13. API compatibility with older frontends
 
 The web frontend is deployed in lock-step with the API. The F-Droid and

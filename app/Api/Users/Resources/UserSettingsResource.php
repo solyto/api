@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="timezone", type="string"),
  *     @OA\Property(property="date_format", type="string"),
  *     @OA\Property(property="time_format", type="string"),
- *     @OA\Property(property="navigation", type="object", nullable=true),
+ *     @OA\Property(property="navigation", type="string", nullable=true, description="Client-owned JSON string as sent to PUT /users/me/settings/navigation (current {visible, desktop, mobile} or legacy flat format); null orders mean the client default"),
  *     @OA\Property(property="first_visit", type="boolean"),
  *     @OA\Property(property="journal_enabled", type="boolean"),
  *     @OA\Property(property="journal_calendar_mark", type="boolean"),
