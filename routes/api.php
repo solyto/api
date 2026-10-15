@@ -341,9 +341,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::post('', [WealthController::class, 'storeField']);
             Route::put('{field}', [WealthController::class, 'updateField']);
             Route::delete('{field}', [WealthController::class, 'destroyField']);
-            Route::put('{field}/value', [WealthController::class, 'updateValue']);
+            Route::put('{field}/value', [WealthController::class, 'storeValue']);
+            Route::put('{field}/values/{value}', [WealthController::class, 'updateValue']);
+            Route::delete('{field}/values/{value}', [WealthController::class, 'destroyValue']);
         });
 
+        Route::get('budget/{budget}/values', [BudgetController::class, 'listValues']);
+        Route::post('budget/{budget}/values', [BudgetController::class, 'storeValue']);
+        Route::put('budget/{budget}/values/{value}', [BudgetController::class, 'updateValue']);
+        Route::delete('budget/{budget}/values/{value}', [BudgetController::class, 'destroyValue']);
         Route::apiResource('budget', BudgetController::class);
     });
 

@@ -919,42 +919,6 @@ parameters:
 			path: app/Api/Feeds/Services/FeedService.php
 
 		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$updated_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\BudgetResource\:\:\$value\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Finances/Resources/BudgetResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\Finances\\Resources\\WealthFieldResource\:\:\$created_at\.$#'
 			identifier: property.notFound
 			count: 1
