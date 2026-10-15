@@ -51,6 +51,18 @@ describe('Budget CRUD', function () {
             ->deleteJson('/api/v1/finances/budget/'.$budget->id)
             ->assertStatus(403);
     });
+
+    it('lists budgets from highest to lowest value', function () {
+        $user = makeUser();
+        Budget::factory()->forUser($user)->create(['title' => 'Side job', 'value' => 400]);
+        Budget::factory()->forUser($user)->create(['title' => 'Salary', 'value' => 2500]);
+        Budget::factory()->forUser($user)->create(['title' => 'Interest', 'value' => 15]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget')
+            ->assertStatus(200)
+            ->assertJsonPath('data.*.title', ['Salary', 'Side job', 'Interest']);
+    });
 });
 
 describe('Wealth fields', function () {
@@ -93,6 +105,25 @@ describe('Wealth fields', function () {
             ->assertJsonPath('data.value', 1234.56);
 
         expect(WealthValue::where('field_id', $field->id)->count())->toBe(1);
+    });
+
+    it('lists fields from highest to lowest current value, empty fields last', function () {
+        $user = makeUser();
+        WealthField::factory()->forUser($user)->create(['title' => 'Empty']);
+        $debt = WealthField::factory()->forUser($user)->create(['title' => 'Debt']);
+        $savings = WealthField::factory()->forUser($user)->create(['title' => 'Savings']);
+        $stocks = WealthField::factory()->forUser($user)->create(['title' => 'Stocks']);
+
+        WealthValue::factory()->forField($debt)->today()->withValue(-500)->create();
+        WealthValue::factory()->forField($savings)->today()->withValue(1000)->create();
+        // An older, higher value must not count: only the latest-dated value decides.
+        WealthValue::factory()->forField($stocks)->historical(30)->withValue(9000)->create();
+        WealthValue::factory()->forField($stocks)->today()->withValue(200)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/wealth/fields')
+            ->assertStatus(200)
+            ->assertJsonPath('data.*.title', ['Savings', 'Stocks', 'Debt', 'Empty']);
     });
 });
 

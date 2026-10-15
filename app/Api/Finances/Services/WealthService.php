@@ -25,6 +25,8 @@ class WealthService
             fn() => WealthField::forUser($user->id)
                 ->with(['values' => fn ($query) => $query->orderBy('date')])
                 ->get()
+                ->sortByDesc(fn (WealthField $field) => $field->values->last()->value ?? -INF)
+                ->values()
         );
     }
 
