@@ -3,6 +3,8 @@
 namespace App\Api\Contacts\Services;
 
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
+use App\Api\Contacts\Exceptions\AddressBookNotFoundException;
+use App\Api\Contacts\Exceptions\ContactNotFoundException;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\AddressBookDTO;
 use App\Dav\DTOs\ContactDTO;
@@ -33,6 +35,14 @@ class ContactService
     public function getAddressBook(User $user, int $id): ?AddressBookDTO
     {
         return $this->dav->addressBooks()->get($user, (string) $id);
+    }
+
+    /**
+     * @throws AddressBookNotFoundException
+     */
+    public function getAddressBookOrFail(User $user, int $id): AddressBookDTO
+    {
+        return $this->getAddressBook($user, $id) ?? throw new AddressBookNotFoundException();
     }
 
     public function getAddressBookByName(User $user, string $name): ?AddressBookDTO
@@ -87,6 +97,14 @@ class ContactService
     public function getContact(AddressBookDTO $addressBook, string $uri): ?ContactDTO
     {
         return $this->dav->addressBooks()->contacts()->get($addressBook, $uri);
+    }
+
+    /**
+     * @throws ContactNotFoundException
+     */
+    public function getContactOrFail(AddressBookDTO $addressBook, string $uri): ContactDTO
+    {
+        return $this->getContact($addressBook, $uri) ?? throw new ContactNotFoundException();
     }
 
     public function getContactPhotos(User $user, array $contacts): array

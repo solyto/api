@@ -160,38 +160,70 @@ describe('Contact tenant isolation', function () {
 
         // The module answers an address book the user cannot see with 404.
         expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#000000']), 404);
+            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#000000'])->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId), 404);
+            ->deleteJson('/api/v1/address-books/'.$addressBookId)->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
                 'address_book_id' => $addressBookId,
                 'first_name' => 'Intruder',
-            ]), 404);
+            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri, [
                 'address_book_id' => $addressBookId,
                 'first_name' => 'Hijacked',
-            ]), 404);
+            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri), 404);
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri)->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo', [
                 'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
-            ]), 404);
+            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo'), 404);
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo')->assertJsonPath('message', 'Address Book does not exist'), 404);
 
         $otherContacts = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/address-books/contacts')
             ->json('data'));
         expect($otherContacts->pluck('uri'))->toContain($contactUri);
         expect($otherContacts->firstWhere('uri', $contactUri)['first_name'])->toBe('Secret');
+    });
+
+    it('answers a contact that does not exist in an own address book with 404', function () {
+        $user = makeUser();
+
+        $addressBookId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        $missingUri = 'missing-contact.vcf';
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri, [
+                'address_book_id' => $addressBookId,
+                'first_name' => 'Nobody',
+            ])
+            ->assertJsonPath('message', 'Contact does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri)
+            ->assertJsonPath('message', 'Contact does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri.'/photo', [
+                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+            ])
+            ->assertJsonPath('message', 'Contact does not exist'), 404);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri.'/photo')
+            ->assertJsonPath('message', 'Contact does not exist'), 404);
     });
 });

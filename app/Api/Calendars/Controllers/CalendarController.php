@@ -142,11 +142,7 @@ class CalendarController
      */
     public function updateCalendarColor(UpdateCalendarRequest $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $calendar->color = $request->validated('color');
 
@@ -166,11 +162,7 @@ class CalendarController
 
     public function destroyCalendar(Request $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $this->calendarService->destroy($request->user(), $calendar);
 
@@ -297,11 +289,7 @@ class CalendarController
      */
     public function storeEvent(StoreEventRequest $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
         $event = $this->calendarService->createEvent($request->user(), $calendar, $dto);
@@ -373,11 +361,7 @@ class CalendarController
      */
     public function updateEvent(UpdateEventRequest $request, int $instanceId, string $eventUri): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $event = $this->calendarService->getEvent($calendar, $eventUri);
 
@@ -458,11 +442,7 @@ class CalendarController
      */
     public function destroyEvent(Request $request, int $instanceId, string $eventUri): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $event = $this->calendarService->getEvent($calendar, $eventUri);
 
@@ -531,11 +511,7 @@ class CalendarController
      */
     public function destroyEventOccurrence(Request $request, int $instanceId, string $eventUri, string $occurrenceDate): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $event = $this->calendarService->getEvent($calendar, $eventUri);
 
@@ -629,11 +605,7 @@ class CalendarController
      */
     public function updateEventOccurrence(UpdateEventRequest $request, int $instanceId, string $eventUri, string $occurrenceDate): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         $event = $this->calendarService->getEvent($calendar, $eventUri);
 
@@ -701,11 +673,7 @@ class CalendarController
      */
     public function listSharees(Request $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         if ($calendar->isShared) {
             return ApiResponse::error('You can only list sharees for calendars you own', 403);
@@ -759,11 +727,7 @@ class CalendarController
      */
     public function shareCalendar(ShareCalendarRequest $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         if ($calendar->isShared) {
             return ApiResponse::error('You can only share calendars you own', 403);
@@ -824,11 +788,7 @@ class CalendarController
      */
     public function revokeShare(Request $request, int $instanceId, string $userId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         if ($calendar->isShared) {
             return ApiResponse::error('You can only manage shares for calendars you own', 403);
@@ -879,11 +839,7 @@ class CalendarController
      */
     public function unsubscribeFromCalendar(Request $request, int $instanceId): JsonResponse
     {
-        $calendar = $this->calendarService->get($request->user(), $instanceId);
-
-        if ($calendar === null) {
-            return ApiResponse::error('Calendar does not exist', 404);
-        }
+        $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
         if (! $calendar->isShared) {
             return ApiResponse::error('You can only unsubscribe from shared calendars', 403);
