@@ -25,10 +25,10 @@ class WealthFieldResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'values' => $this->whenLoaded('values', fn () => WealthValueResource::collection($this->values)
+            'values' => $this->whenLoaded('values', fn () => WealthValueResource::collection($this->values->sortBy('date')->values())
             ),
-            'currentValue' => $this->whenLoaded('values', fn () => $this->values->last()
-                ? new WealthValueResource($this->values->last())
+            'currentValue' => $this->whenLoaded('values', fn () => $this->values->sortBy('date')->last()
+                ? new WealthValueResource($this->values->sortBy('date')->last())
                 : null
             ),
             'user_id' => $this->user_id,

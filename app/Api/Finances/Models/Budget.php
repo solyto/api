@@ -7,6 +7,7 @@ use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 
 use App\Api\Finances\Factories\BudgetFactory;
@@ -41,5 +42,10 @@ class Budget extends Model
     public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    public function values(): HasMany
+    {
+        return $this->hasMany(BudgetValue::class);
     }
 }

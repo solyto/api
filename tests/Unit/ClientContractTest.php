@@ -1,5 +1,9 @@
 <?php
 
+use App\Api\Finances\Models\Budget;
+use App\Api\Finances\Models\BudgetValue;
+use App\Api\Finances\Models\WealthField;
+use App\Api\Finances\Models\WealthValue;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Models\LibraryGame;
@@ -536,5 +540,58 @@ describe('Client contract', function () {
             ->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonStructure(['data' => ['enabled_trackers', 'selected_sports']]);
+    });
+
+    // Since 1.0.15 (job river). The frontend line was not verified: solyto/app was not
+    // available to the job. `value` has been in BudgetResource since the initial commit.
+    it('keeps the budget value as a number on list and show', function () {
+        $user = makeUser();
+        $budget = Budget::factory()->forUser($user)->withValue(1250.5)->create();
+        BudgetValue::factory()->forBudget($budget)->withValue(1250.5)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['id', 'title', 'type', 'value']]])
+            ->assertJsonPath('data.0.value', 1250.5);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget/'.$budget->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.value', 1250.5);
+    });
+
+    // Since 1.0.15 (job river). The frontend line was not verified: solyto/app was not
+    // available to the job. `values` and `currentValue` have been in WealthFieldResource
+    // since the initial commit.
+    it('keeps currentValue and values on the wealth fields', function () {
+        $user = makeUser();
+        $field = WealthField::factory()->forUser($user)->create();
+        WealthValue::factory()->forField($field)->historical(10)->withValue(100)->create();
+        WealthValue::factory()->forField($field)->today()->withValue(200)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/wealth/fields')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [[
+                'id',
+                'title',
+                'values' => [['id', 'date', 'value']],
+                'currentValue' => ['id', 'date', 'value'],
+            ]]])
+            ->assertJsonPath('data.0.currentValue.value', 200);
+    });
+
+    // Since 1.0.15 (job river). `PUT finances/wealth/fields/{field}/value` is in
+    // 1.0.15-routes.json; the request body 1.0.15 sends was not verified.
+    it('accepts a wealth value without a date', function () {
+        $user = makeUser();
+        $field = WealthField::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/value', ['value' => 321])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.value', 321);
     });
 });

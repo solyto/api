@@ -6,7 +6,9 @@ use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class WealthService
 {
@@ -20,7 +22,9 @@ class WealthService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => WealthField::forUser($user->id)->with(['values'])->get()
+            fn() => WealthField::forUser($user->id)
+                ->with(['values' => fn ($query) => $query->orderBy('date')])
+                ->get()
         );
     }
 
@@ -53,16 +57,53 @@ class WealthService
         $this->cache->forget([self::CACHE_KEY, $userId]);
     }
 
-    public function updateValue(WealthField $field, array $data): WealthValue
+    public function storeValue(WealthField $field, array $data): WealthValue
     {
-        $value = WealthValue::create([
-            'date' => date('Y-m-d'),
-            'value' => $data['value'],
-            'field_id' => $field->id,
-        ]);
+        $date = $data['date'] ?? Carbon::today()->toDateString();
+
+        $value = WealthValue::where('field_id', $field->id)->whereDate('date', $date)->first();
+
+        if ($value) {
+            $value->update(['value' => $data['value']]);
+        } else {
+            $value = WealthValue::create([
+                'date' => $date,
+                'value' => $data['value'],
+                'field_id' => $field->id,
+            ]);
+        }
 
         $this->cache->forget([self::CACHE_KEY, $field->user_id]);
 
         return $value;
+    }
+
+    public function updateValue(WealthField $field, WealthValue $value, array $data): WealthValue
+    {
+        if (isset($data['date'])) {
+            $taken = $field->values()
+                ->whereDate('date', $data['date'])
+                ->whereKeyNot($value->id)
+                ->exists();
+
+            if ($taken) {
+                throw ValidationException::withMessages([
+                    'date' => 'The field already has a value on this date.',
+                ]);
+            }
+        }
+
+        $value->update($data);
+
+        $this->cache->forget([self::CACHE_KEY, $field->user_id]);
+
+        return $value;
+    }
+
+    public function destroyValue(WealthField $field, WealthValue $value): void
+    {
+        $value->delete();
+
+        $this->cache->forget([self::CACHE_KEY, $field->user_id]);
     }
 }
