@@ -62,7 +62,8 @@ A job is not done until `composer test` and `composer analyse` both exit 0 in th
 - `composer run dev` — run all dev processes (artisan serve, queue:listen, pail, Vite)
 - `npm run dev` / `npm run build` — Vite dev server / asset build
 - `php artisan migrate` — run database migrations
-- `make deploy` — Ansible deploy (requires the separate solyto/deployment repo)
+- `make check` — `composer test` + `composer analyse`; run it before deploying
+- Deploys run from the separate solyto/deployment repo (`make deploy-api` there)
 
 ## Hard rules
 - NEVER modify files outside /workspace

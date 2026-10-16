@@ -991,8 +991,8 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   lock-step. Anything a new frontend needs from the API (an endpoint, a
   CORS header) is deployed before that frontend is released or sent to
   F-Droid.
-- **Gate:** `make deploy` runs `composer test` and `composer analyse`
-  first. If it is red, don't bypass it. Make the change additive
+- **Gate:** run `make check` (`composer test` and `composer analyse`)
+  before deploying from the deployment repo. If it is red, don't deploy. Make the change additive
   (13.2–13.4), or have the owner decide to drop the build that the failing
   test protects.
 - **Dropping a build** is the owner's decision, based on the active
