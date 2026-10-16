@@ -12,8 +12,12 @@ class DockerSecretHelper
 
         $filePath = getenv($identifier . '_FILE');
 
+        // Without a secret file the plain env var is used, so optional secrets
+        // like ntfy can be set in .env without creating files.
         if (!$filePath) {
-            return null;
+            $value = getenv($identifier);
+
+            return $value === false ? null : $value;
         }
 
         return trim(file_get_contents($filePath));
