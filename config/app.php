@@ -33,11 +33,12 @@ return [
     | API Version
     |--------------------------------------------------------------------------
     |
-    | The version reported by the public health endpoint.
+    | The version reported by the public health endpoint. It is read from the
+    | VERSION file in the project root, which releases/release.sh writes.
     |
     */
 
-    'version' => env('API_VERSION', '1.0.7'),
+    'version' => trim((string) file_get_contents(base_path('VERSION'))),
 
     /*
     |--------------------------------------------------------------------------
