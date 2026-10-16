@@ -7,9 +7,32 @@ use App\Api\Users\Models\UserSettings;
 
 class UserSettingsService
 {
+    // Clients from this version on store navigation as {visible, desktop, mobile};
+    // older ones read and write only a flat map of feature flags.
+    public const string NESTED_NAVIGATION_SINCE = '1.1.0';
+
     public function updateNavigation(User $user, array $navigation): void
     {
+        // A flat write from an older client replaces the visibility but keeps the stored orders.
+        if (!array_key_exists('visible', $navigation)) {
+            $stored = json_decode($user->settings->navigation ?? 'null', true);
+            if (is_array($stored) && is_array($stored['visible'] ?? null)) {
+                $navigation = [...$stored, 'visible' => $navigation];
+            }
+        }
+
         $user->settings()->update(['navigation' => $navigation]);
+    }
+
+    // What clients older than NESTED_NAVIGATION_SINCE understand: only the flat visibility.
+    public static function legacyNavigation(?string $navigation): ?string
+    {
+        $decoded = json_decode($navigation ?? 'null', true);
+        if (!is_array($decoded) || !is_array($decoded['visible'] ?? null)) {
+            return $navigation;
+        }
+
+        return json_encode((object) $decoded['visible']);
     }
 
     public function updateLanguage(User $user, string $language): void

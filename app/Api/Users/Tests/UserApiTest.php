@@ -176,6 +176,70 @@ describe('User settings endpoints', function () {
         expect($user->fresh()->settings->navigation)->toBe(json_encode(['dashboard' => true]));
     });
 
+    it('returns stored nested navigation unchanged to clients from 1.1.0', function () {
+        $nested = ['visible' => ['calendar' => false], 'desktop' => ['home', 'notes'], 'mobile' => null];
+        $user = makeUser();
+        $user->settings()->update(['navigation' => $nested]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-Client-Version', '1.1.0')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200);
+
+        expect(json_decode($response->json('data.settings.navigation'), true))->toBe($nested);
+    });
+
+    it('returns only the flat visibility to clients below 1.1.0 or without a version', function (?string $version) {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => false, 'notes' => true], 'desktop' => ['home'], 'mobile' => null]]);
+
+        $request = $this->actingAs($user, 'sanctum');
+        if ($version !== null) {
+            $request = $request->withHeader('X-Client-Version', $version);
+        }
+
+        $response = $request->getJson('/api/v1/users/me')->assertStatus(200);
+
+        expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => false, 'notes' => true]);
+    })->with([null, '1.0.15']);
+
+    it('returns flat navigation unchanged to older clients', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['calendar' => false]]);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/users/me')->assertStatus(200);
+
+        expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => false]);
+    });
+
+    it('keeps the stored orders when an older client saves flat navigation', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true], 'desktop' => ['home', 'notes'], 'mobile' => ['home']]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/navigation', ['navigation' => json_encode(['calendar' => false, 'todos' => true])])
+            ->assertStatus(200);
+
+        expect(json_decode($user->fresh()->settings->navigation, true))->toBe([
+            'visible' => ['calendar' => false, 'todos' => true],
+            'desktop' => ['home', 'notes'],
+            'mobile' => ['home'],
+        ]);
+    });
+
+    it('stores nested navigation as sent', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true], 'desktop' => ['home', 'notes'], 'mobile' => null]]);
+        $nested = ['visible' => ['calendar' => false], 'desktop' => null, 'mobile' => ['home', 'todos']];
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeader('X-Client-Version', '1.1.0')
+            ->putJson('/api/v1/users/me/settings/navigation', ['navigation' => json_encode($nested)])
+            ->assertStatus(200);
+
+        expect(json_decode($user->fresh()->settings->navigation, true))->toBe($nested);
+    });
+
     it('updates language', function () {
         $user = makeUser();
 
