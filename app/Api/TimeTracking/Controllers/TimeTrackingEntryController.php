@@ -362,6 +362,15 @@ class TimeTrackingEntryController
      *         @OA\Schema(type="integer")
      *     ),
      *
+     *     @OA\Parameter(
+     *         name="category_ids",
+     *         in="query",
+     *         required=false,
+     *         description="Comma-separated category ids, e.g. 3,7. Restricts statistics to projects tagged with any of them (optional, combines with category_id).",
+     *
+     *         @OA\Schema(type="string", example="3,7")
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Statistics retrieved successfully. total_minutes is scoped to the requested range, while a project's total_duration is all-time.",
@@ -385,12 +394,18 @@ class TimeTrackingEntryController
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
             'category_id' => 'nullable|exists:time_tracking_categories,id',
+            'category_ids' => ['nullable', 'string', 'regex:/^\d+(,\d+)*$/'],
         ]);
+
+        $categoryIds = array_map('intval', array_filter(explode(',', $validated['category_ids'] ?? '')));
+        if (isset($validated['category_id'])) {
+            $categoryIds[] = (int) $validated['category_id'];
+        }
 
         $from = Carbon::parse($validated['from'])->startOfDay();
         $to = Carbon::parse($validated['to'])->endOfDay();
 
-        $stats = $this->timeTrackingService->getStatistics($request->user(), $from, $to, $validated['category_id'] ?? null);
+        $stats = $this->timeTrackingService->getStatistics($request->user(), $from, $to, $categoryIds);
 
         return ApiResponse::success(array_merge($stats, [
             'from' => $validated['from'],

@@ -328,6 +328,37 @@ describe('TimeTrackingService statistics', function () {
             ->assertJsonCount(1, 'data.by_project');
     });
 
+    it('filters statistics by several comma-separated categories', function () {
+        $user = makeUser();
+        $categories = [];
+
+        foreach ([30, 45, 60] as $minutes) {
+            $category = TimeTrackingCategory::factory()->forUser($user)->create();
+            $project = TimeTrackingProject::factory()->forUser($user)->create();
+            $project->categories()->attach($category);
+            TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
+                'started_at' => now()->subDay(),
+                'stopped_at' => now(),
+                'duration_minutes' => $minutes,
+            ]);
+            $categories[] = $category;
+        }
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_ids='.$categories[0]->id.','.$categories[1]->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.total_minutes', 75)
+            ->assertJsonCount(2, 'data.by_project');
+    });
+
+    it('rejects malformed category_ids', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_ids=3,abc')
+            ->assertStatus(422);
+    });
+
     it('rejects an unknown category filter', function () {
         $user = makeUser();
 

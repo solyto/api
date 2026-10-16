@@ -102,13 +102,16 @@ class TimeTrackingService
         return $entry;
     }
 
-    public function getStatistics(User $user, Carbon $from, Carbon $to, ?int $categoryId = null): array
+    /**
+     * @param  int[]  $categoryIds  Keeps projects tagged with any of these categories; empty means all.
+     */
+    public function getStatistics(User $user, Carbon $from, Carbon $to, array $categoryIds = []): array
     {
         $entries = TimeTrackingEntry::forUser($user->id)
             ->whereNotNull('stopped_at')
             ->where('started_at', '>=', $from)
             ->where('started_at', '<=', $to)
-            ->when($categoryId, fn ($query) => $query->whereHas('project.categories', fn ($q) => $q->where('time_tracking_categories.id', $categoryId)))
+            ->when($categoryIds, fn ($query) => $query->whereHas('project.categories', fn ($q) => $q->whereIn('time_tracking_categories.id', $categoryIds)))
             ->with(['project.categories'])
             ->get();
 
