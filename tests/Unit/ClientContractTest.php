@@ -52,6 +52,13 @@ describe('Client contract', function () {
             ->and($response->json('data.version'))->toBe($response->json('version'));
     });
 
+    // solyto/app compares this against its own version to warn about an outdated server.
+    it('reports the version from the VERSION file on health', function () {
+        $this->getJson('/api/v1/health')
+            ->assertStatus(200)
+            ->assertJsonPath('version', trim(file_get_contents(base_path('VERSION'))));
+    });
+
     // Since 1.0.15. solyto/app src/lib/state/Notes.svelte.ts:83-84
     it('leaves hidden and system note categories and their descendants out of the plain list', function () {
         $user = makeUser();
