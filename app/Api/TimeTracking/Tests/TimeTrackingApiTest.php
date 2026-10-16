@@ -284,6 +284,23 @@ describe('TimeTrackingService statistics', function () {
         expect($stats['by_project'][0]['color'])->toBe('#AABBCC');
     });
 
+    it('falls back to the first category color in statistics when the project has none', function () {
+        $user = makeUser();
+        $category = TimeTrackingCategory::factory()->forUser($user)->withColor('#DDEEFF')->create();
+        $project = TimeTrackingProject::factory()->forUser($user)->create(['color' => null]);
+        $project->categories()->attach($category);
+
+        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
+            'started_at' => now()->subDay(),
+            'stopped_at' => now(),
+            'duration_minutes' => 30,
+        ]);
+
+        $stats = app(TimeTrackingService::class)->getStatistics($user, now()->subWeek(), now());
+
+        expect($stats['by_project'][0]['color'])->toBe('#DDEEFF');
+    });
+
     it('filters statistics by category', function () {
         $user = makeUser();
         $category = TimeTrackingCategory::factory()->forUser($user)->create();
