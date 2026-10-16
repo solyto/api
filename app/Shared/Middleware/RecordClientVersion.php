@@ -3,6 +3,7 @@
 namespace App\Shared\Middleware;
 
 use App\Api\ApiResponse;
+use App\Shared\Helpers\ClientVersionHelper;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -10,10 +11,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RecordClientVersion
 {
-    private const string HEADER = 'X-Client-Version';
-
-    private const string PATTERN = '/^\d{1,5}\.\d{1,5}\.\d{1,5}$/';
-
     public function handle(Request $request, Closure $next): Response
     {
         if ($this->isBelowMinimum($request)) {
@@ -24,8 +21,8 @@ class RecordClientVersion
 
         // Runs after $next: the api group runs before the route's auth:sanctum,
         // so the user and token are only resolved once the route has handled it.
-        $version = $request->header(self::HEADER);
-        if (!is_string($version) || preg_match(self::PATTERN, $version) !== 1) {
+        $version = ClientVersionHelper::fromRequest($request);
+        if ($version === null) {
             return $response;
         }
 
@@ -49,8 +46,8 @@ class RecordClientVersion
         }
 
         // A missing or invalid header is allowed: builds up to 1.0.15 send none.
-        $version = $request->header(self::HEADER);
-        if (!is_string($version) || preg_match(self::PATTERN, $version) !== 1) {
+        $version = ClientVersionHelper::fromRequest($request);
+        if ($version === null) {
             return false;
         }
 
