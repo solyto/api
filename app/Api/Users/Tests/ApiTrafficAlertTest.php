@@ -63,6 +63,15 @@ describe('API traffic alert', function () {
             ->and($records[0]->context['route'])->toBe('api/v1/users/me');
     });
 
+    it('sends to the traffic topic when one is set', function () {
+        config(['services.ntfy.topics.traffic' => 'solyto-traffic']);
+
+        hitApi($this, User::factory()->create(), 4);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-traffic');
+    });
+
     it('sends no second alert while above the threshold within the cooldown', function () {
         hitApi($this, User::factory()->create(), 10);
 

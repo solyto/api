@@ -38,7 +38,7 @@ class TrackApiTraffic
                 'route'   => $route?->getName() ?? $route?->uri(),
             ]);
 
-            Notification::route(NtfyChannel::class, config('services.ntfy.topic'))
+            Notification::route(NtfyChannel::class, config('services.ntfy.topics.traffic') ?: config('services.ntfy.topic'))
                 ->notify(new ApiTrafficAlertNotification((string) $userId, $count));
         }
 

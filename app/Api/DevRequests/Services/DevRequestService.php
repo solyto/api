@@ -47,7 +47,7 @@ class DevRequestService
             $devRequest->update(['screenshot' => $this->screenshotService->getFileName($screenshotName)]);
         }
 
-        Notification::route(NtfyChannel::class, config('services.ntfy.topic'))->notify(new DevRequestCreatedNotification($devRequest->title));
+        Notification::route(NtfyChannel::class, config('services.ntfy.topics.dev_requests') ?: config('services.ntfy.topic'))->notify(new DevRequestCreatedNotification($devRequest->title));
 
         $devRequest->load('votes')->loadCount('comments');
 
