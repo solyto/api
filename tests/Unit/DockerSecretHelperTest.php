@@ -43,9 +43,32 @@ describe('DockerSecretHelper::get', function () {
         }
     });
 
-    it('returns null when not in debug mode and no _FILE env is set', function () {
+    it('falls back to the plain env value when not in debug mode and no _FILE env is set', function () {
         putenv('APP_DEBUG=false');
         putenv('SECRET_FILE');
+        putenv('SECRET=plain-value');
+
+        expect(DockerSecretHelper::get('SECRET'))->toBe('plain-value');
+    });
+
+    it('prefers the _FILE value over the plain env value', function () {
+        putenv('APP_DEBUG=false');
+        putenv('SECRET=plain-value');
+        $file = tempnam(sys_get_temp_dir(), 'secret');
+        file_put_contents($file, 'file-secret-value');
+        putenv('SECRET_FILE='.$file);
+
+        try {
+            expect(DockerSecretHelper::get('SECRET'))->toBe('file-secret-value');
+        } finally {
+            unlink($file);
+        }
+    });
+
+    it('returns null when not in debug mode and neither _FILE nor the plain env is set', function () {
+        putenv('APP_DEBUG=false');
+        putenv('SECRET_FILE');
+        putenv('SECRET');
 
         expect(DockerSecretHelper::get('SECRET'))->toBeNull();
     });
@@ -53,6 +76,7 @@ describe('DockerSecretHelper::get', function () {
     it('returns null when the file path env is empty', function () {
         putenv('APP_DEBUG=false');
         putenv('SECRET_FILE=');
+        putenv('SECRET');
 
         expect(DockerSecretHelper::get('SECRET'))->toBeNull();
     });
