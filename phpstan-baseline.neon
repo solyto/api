@@ -2929,7 +2929,7 @@ parameters:
 			path: app/Api/TimeTracking/Resources/TimeTrackingProjectResource.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$color\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categories\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Api/TimeTracking/Services/TimeTrackingService.php
