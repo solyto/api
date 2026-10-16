@@ -115,6 +115,20 @@ describe('POST /v1/auth/register ntfy announcement', function () {
         );
     });
 
+    it('sends to the registrations topic when one is set', function () use ($register) {
+        config([
+            'services.ntfy.url' => 'https://ntfy.example.test',
+            'services.ntfy.topic' => 'solyto-admin',
+            'services.ntfy.topics.registrations' => 'solyto-registrations',
+        ]);
+        Http::fake();
+
+        $register($this)->assertStatus(201);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-registrations');
+    });
+
     it('still registers the user when ntfy fails', function (Closure $fake) use ($register) {
         config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
         $fake();

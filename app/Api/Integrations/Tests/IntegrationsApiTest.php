@@ -16,6 +16,7 @@ describe('GET /api/v1/integrations', function () {
         'spotify' => ['spotify', ['services.spotify.client_id' => 'fake-spotify-id', 'services.spotify.client_secret' => 'fake-spotify-secret']],
         'telegram' => ['telegram', ['telegram.bots.solyto.telegram_token' => 'fake-telegram-token', 'telegram.bots.solyto.webhook_token' => 'fake-webhook-token']],
         'ntfy' => ['ntfy', ['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'fake-topic']],
+        'ntfy with only a per-type topic' => ['ntfy', ['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => null, 'services.ntfy.topics.traffic' => 'fake-topic']],
     ]);
 
     it('reports an integration as not configured when its config is missing', function (string $integration, array $config) {
@@ -34,7 +35,7 @@ describe('GET /api/v1/integrations', function () {
         'spotify without client id' => ['spotify', ['services.spotify.client_id' => '', 'services.spotify.client_secret' => 'fake-spotify-secret']],
         'telegram without webhook token' => ['telegram', ['telegram.bots.solyto.telegram_token' => 'fake-telegram-token', 'telegram.bots.solyto.webhook_token' => null]],
         'telegram without bot token' => ['telegram', ['telegram.bots.solyto.telegram_token' => '', 'telegram.bots.solyto.webhook_token' => 'fake-webhook-token']],
-        'ntfy without topic' => ['ntfy', ['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => null]],
+        'ntfy without topic' => ['ntfy', ['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => null, 'services.ntfy.topics' => ['registrations' => null, 'dev_requests' => '', 'traffic' => null]]],
         'ntfy without url' => ['ntfy', ['services.ntfy.url' => '', 'services.ntfy.topic' => 'fake-topic']],
     ]);
 

@@ -214,6 +214,20 @@ describe('DevRequest ntfy announcement', function () {
         );
     });
 
+    it('sends to the dev requests topic when one is set', function () use ($store) {
+        config([
+            'services.ntfy.url' => 'https://ntfy.example.test',
+            'services.ntfy.topic' => 'solyto-admin',
+            'services.ntfy.topics.dev_requests' => 'solyto-dev-requests',
+        ]);
+        Http::fake();
+
+        $store($this)->assertStatus(201);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-dev-requests');
+    });
+
     it('still creates the dev request when ntfy fails', function (Closure $fake) use ($store) {
         config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
         $fake();

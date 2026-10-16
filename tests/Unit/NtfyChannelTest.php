@@ -23,6 +23,11 @@ function enableNtfy(?string $token = null): void
     ]);
 }
 
+function ntfyRoute(): AnonymousNotifiable
+{
+    return (new AnonymousNotifiable())->route(NtfyChannel::class, config('services.ntfy.topic'));
+}
+
 function sendNtfy(string $title = 'Dark mode'): void
 {
     Notification::route(NtfyChannel::class, config('services.ntfy.topic'))
@@ -34,7 +39,7 @@ describe('AdminNotification::via', function () {
         config(['services.ntfy.url' => null, 'services.ntfy.topic' => null]);
         Http::fake();
 
-        expect((new DevRequestCreatedNotification('x'))->via(new AnonymousNotifiable()))->toBe([]);
+        expect((new DevRequestCreatedNotification('x'))->via(ntfyRoute()))->toBe([]);
 
         sendNtfy();
 
@@ -46,7 +51,7 @@ describe('AdminNotification::via', function () {
         config(["services.ntfy.$key" => '']);
         Http::fake();
 
-        expect((new DevRequestCreatedNotification('x'))->via(new AnonymousNotifiable()))->toBe([]);
+        expect((new DevRequestCreatedNotification('x'))->via(ntfyRoute()))->toBe([]);
 
         sendNtfy();
 
@@ -80,7 +85,7 @@ describe('AdminNotification::via', function () {
     it('returns the ntfy channel when url and topic are set', function () {
         enableNtfy();
 
-        expect((new DevRequestCreatedNotification('x'))->via(new AnonymousNotifiable()))->toBe([NtfyChannel::class]);
+        expect((new DevRequestCreatedNotification('x'))->via(ntfyRoute()))->toBe([NtfyChannel::class]);
     });
 });
 

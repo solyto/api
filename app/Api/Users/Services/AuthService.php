@@ -45,7 +45,7 @@ class AuthService
 
         Mail::to($user->email)->send(new UserVerification($user, $verificationToken, $data['platform'] ?? 'web', $data['language'] ?? 'en'));
 
-        Notification::route(NtfyChannel::class, config('services.ntfy.topic'))->notify(new UserRegisteredNotification());
+        Notification::route(NtfyChannel::class, config('services.ntfy.topics.registrations') ?: config('services.ntfy.topic'))->notify(new UserRegisteredNotification());
 
         return $user;
     }

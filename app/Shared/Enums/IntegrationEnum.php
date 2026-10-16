@@ -21,7 +21,7 @@ enum IntegrationEnum: string
             self::BGG => filled(config('services.bgg.api_key')),
             self::SPOTIFY => filled(config('services.spotify.client_id')) && filled(config('services.spotify.client_secret')),
             self::TELEGRAM => filled(config('telegram.bots.solyto.telegram_token')) && filled(config('telegram.bots.solyto.webhook_token')),
-            self::NTFY => filled(config('services.ntfy.url')) && filled(config('services.ntfy.topic')),
+            self::NTFY => filled(config('services.ntfy.url')) && collect([config('services.ntfy.topic'), ...config('services.ntfy.topics')])->contains(fn ($topic) => filled($topic)),
         };
     }
 }

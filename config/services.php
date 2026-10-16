@@ -73,6 +73,12 @@ return [
         'url'   => env('NTFY_URL'),
         'topic' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC'),
         'token' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOKEN'),
+        // Optional per-type topics; an empty one falls back to `topic`
+        'topics' => [
+            'registrations' => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC_REGISTRATIONS'),
+            'dev_requests'  => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC_DEV_REQUESTS'),
+            'traffic'       => \App\Shared\Helpers\DockerSecretHelper::get('NTFY_TOPIC_TRAFFIC'),
+        ],
     ],
 
     'traffic' => [
