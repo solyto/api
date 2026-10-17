@@ -198,6 +198,35 @@ describe('DAV calendar sharing', function () {
         expect(davRequest($this->other, 'GET', $this->calendar.'secret.ics')->getStatus())->toBe(403);
     });
 
+    it('keeps an accepted share accepted when the calendar is shared again', function () {
+        $shared = shareCalendar($this->owner, $this->other, true);
+        $calendar = app(DavService::class)->calendars()->list($this->owner)[0];
+
+        app(DavService::class)->calendars()->sharing()->inviteUser($calendar, $this->owner, $this->other);
+
+        expect(app(DavService::class)->calendars()->sharing()->listAcceptedShares($this->other))->toHaveCount(1)
+            ->and(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(200);
+    });
+
+    it('keeps a pending share pending when the calendar is shared again', function () {
+        shareCalendar($this->owner, $this->other, true, accept: false);
+        $calendar = app(DavService::class)->calendars()->list($this->owner)[0];
+
+        app(DavService::class)->calendars()->sharing()->inviteUser($calendar, $this->owner, $this->other);
+
+        expect(app(DavService::class)->calendars()->sharing()->listInvites($this->other))->toHaveCount(1);
+    });
+
+    it('changes the access of an existing share without resetting it', function () {
+        $shared = shareCalendar($this->owner, $this->other, true);
+        $calendar = app(DavService::class)->calendars()->list($this->owner)[0];
+
+        (new AppCalendarsPDO(DB::connection('pgsql')->getPdo()))->shareCalendarWithUserCustom($this->owner, $this->other, $calendar, false);
+
+        expect(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(200)
+            ->and(davRequest($this->other, 'PUT', $shared.'added.ics', davIcs('added'), ['Content-Type' => 'text/calendar'])->getStatus())->toBe(403);
+    });
+
     it('removes access when the share is revoked', function () {
         $shared = shareCalendar($this->owner, $this->other, true);
         $calendar = app(DavService::class)->calendars()->list($this->owner)[0];
