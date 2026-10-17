@@ -191,3 +191,56 @@ function davVcard(string $uid, string $fullName = 'Jane Doe', array $extra = [])
 
     return implode("\r\n", $lines)."\r\n";
 }
+
+/*
+|--------------------------------------------------------------------------
+| MCP helpers
+|--------------------------------------------------------------------------
+|
+| routes/ai.php registers /mcp at boot only when services.mcp.enabled is
+| true; mcpEnable() flips the flag and loads the file again for the current
+| (per-test) application. mcpPost() sends one JSON-RPC message over HTTP
+| with a real bearer token, so call_api forwards it like a real client.
+|
+*/
+
+function mcpEnable(): void
+{
+    config(['services.mcp.enabled' => true]);
+    \Illuminate\Support\Facades\Route::group([], base_path('routes/ai.php'));
+}
+
+function mcpPost(?string $token, string $method, array $params = []): \Illuminate\Testing\TestResponse
+{
+    // Sanctum caches the resolved user per guard; each request authenticates on its own
+    app('auth')->forgetGuards();
+
+    $headers = ['Accept' => 'application/json, text/event-stream'];
+    if ($token !== null) {
+        $headers['Authorization'] = 'Bearer '.$token;
+    }
+
+    return test()->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => $method,
+        'params' => (object) $params,
+    ], $headers);
+}
+
+/**
+ * Call an MCP tool and return ['isError' => bool, 'text' => string, 'json' => decoded text or null].
+ */
+function mcpTool(string $token, string $tool, array $arguments = []): array
+{
+    $response = mcpPost($token, 'tools/call', ['name' => $tool, 'arguments' => (object) $arguments]);
+    $response->assertStatus(200);
+
+    $text = (string) $response->json('result.content.0.text');
+
+    return [
+        'isError' => (bool) $response->json('result.isError'),
+        'text' => $text,
+        'json' => json_decode($text, true),
+    ];
+}
