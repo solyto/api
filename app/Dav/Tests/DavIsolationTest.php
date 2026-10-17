@@ -83,7 +83,7 @@ describe('DAV isolation: reading another user\'s data', function () {
 
         expect($response->getStatus())->toBe(403)
             ->and($response->getBodyAsString())->not->toContain('FREEBUSY');
-    })->skip('Known gap: sabre grants read-free-busy to every authenticated user, so anyone can read another user\'s busy times.');
+    });
 
     it('hides other users from the principal and collection listings', function () {
         $principals = davRequest($this->other, 'PROPFIND', 'principals/', null, ['Depth' => '1'])->getBodyAsString();
@@ -91,7 +91,23 @@ describe('DAV isolation: reading another user\'s data', function () {
 
         expect($principals)->not->toContain($this->owner->email)
             ->and($calendar)->not->toContain('secret.ics');
-    })->skip('Known gap: principal URIs carry the email, and listings show the href of every principal and object the requester cannot read (ACL plugin hideNodesFromListings is off).');
+    });
+
+    it('finds nobody with a principal search by email', function () {
+        $response = davRequest($this->other, 'REPORT', 'principals/', '<?xml version="1.0"?>'
+            .'<d:principal-property-search xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"><d:property-search><d:prop><s:email-address/></d:prop>'
+            .'<d:match>'.$this->owner->email.'</d:match></d:property-search><d:prop><d:displayname/></d:prop></d:principal-property-search>', ['Depth' => '0']);
+
+        expect($response->getStatus())->toBe(207)
+            ->and(davXpath($response)->evaluate('count(//d:response)'))->toBe(0.0);
+    });
+
+    // Accepted (owner decision, 2026-10-17): fixing this needs principal URIs
+    // without the email, which means migrating the DAV data and every client.
+    it('still tells an existing principal from a missing one', function () {
+        expect(davRequest($this->other, 'PROPFIND', 'principals/'.$this->owner->email.'/', null, ['Depth' => '0'])->getStatus())->toBe(207)
+            ->and(davRequest($this->other, 'PROPFIND', 'principals/nobody@example.org/', null, ['Depth' => '0'])->getStatus())->toBe(404);
+    });
 });
 
 describe('DAV isolation: writing another user\'s data', function () {
@@ -158,6 +174,16 @@ describe('DAV calendar sharing', function () {
             ->and(davRequest($this->other, 'DELETE', $shared.'secret.ics')->getStatus())->toBe(403);
     });
 
+    it('lets an accepted sharee query free/busy on the shared calendar', function () {
+        $shared = shareCalendar($this->owner, $this->other, false);
+
+        $response = davRequest($this->other, 'REPORT', $shared, '<?xml version="1.0"?>'
+            .'<cal:free-busy-query xmlns:cal="urn:ietf:params:xml:ns:caldav"><cal:time-range start="20301015T000000Z" end="20301016T000000Z"/></cal:free-busy-query>', ['Depth' => '1']);
+
+        expect($response->getStatus())->toBe(200)
+            ->and($response->getBodyAsString())->toContain('FREEBUSY:20301015T100000Z/20301015T110000Z');
+    });
+
     it('marks a read-only share as read-only in PROPFIND', function () {
         $shared = shareCalendar($this->owner, $this->other, false);
 
@@ -189,10 +215,47 @@ describe('DAV calendar sharing', function () {
         expect(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(404);
     });
 
+    it('lists an accepted share in the sharee\'s calendar home', function () {
+        shareCalendar($this->owner, $this->other, false);
+
+        $home = davRequest($this->other, 'PROPFIND', 'calendars/'.$this->other->email.'/', davPropfindBody(['d:displayname']), ['Depth' => '1']);
+
+        expect($home->getBodyAsString())->toContain(sharedInstanceUri($this->other));
+    });
+
+    it('keeps a pending share out of the sharee\'s calendar home', function () {
+        shareCalendar($this->owner, $this->other, true, accept: false);
+
+        $home = davRequest($this->other, 'PROPFIND', 'calendars/'.$this->other->email.'/', davPropfindBody(['d:displayname']), ['Depth' => '1']);
+
+        expect($home->getBodyAsString())->not->toContain(sharedInstanceUri($this->other));
+    });
+
+    it('still shows a pending share as an invite in the app', function () {
+        shareCalendar($this->owner, $this->other, true, accept: false);
+
+        expect(app(DavService::class)->calendars()->sharing()->listInvites($this->other))->toHaveCount(1);
+    });
+
+    it('turns a share made over DAV into an invite the sharee accepts in the app', function () {
+        $response = davRequest($this->owner, 'POST', $this->calendar, '<?xml version="1.0" encoding="utf-8"?>'
+            .'<d:share-resource xmlns:d="DAV:"><d:sharee><d:href>mailto:'.$this->other->email.'</d:href>'
+            .'<d:share-access><d:read-write/></d:share-access></d:sharee></d:share-resource>', ['Content-Type' => 'application/davsharing+xml; charset=utf-8']);
+        $shared = 'calendars/'.$this->other->email.'/'.sharedInstanceUri($this->other).'/';
+        $sharing = app(DavService::class)->calendars()->sharing();
+
+        $beforeAccept = davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus();
+        $sharing->acceptInvite('mailto:'.$this->other->email);
+
+        expect($response->getStatus())->toBeLessThan(300)
+            ->and($beforeAccept)->toBe(404)
+            ->and(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(200);
+    });
+
     it('grants no access before the invite is accepted', function () {
         $shared = shareCalendar($this->owner, $this->other, true, accept: false);
 
         expect(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(404)
             ->and(davRequest($this->other, 'PUT', $shared.'early.ics', davIcs('early'), ['Content-Type' => 'text/calendar'])->getStatus())->toBe(404);
-    })->skip('Known gap: sabre lists and serves a share instance regardless of share_invitestatus, so a pending invite already grants full read/write access over DAV.');
+    });
 });

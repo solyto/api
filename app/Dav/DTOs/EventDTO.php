@@ -5,10 +5,20 @@ namespace App\Dav\DTOs;
 use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Str;
+use Sabre\VObject\Component\VCalendar;
+use Sabre\VObject\Component\VEvent;
+use Sabre\VObject\Reader;
 use Sabre\VObject\TimeZoneUtil;
 
 class EventDTO
 {
+    /**
+     * The stored iCalendar object, set only when a single event is read for
+     * an edit (AppCalendarsPDO::getEventByUriCustom()); listings and caches
+     * never carry it.
+     */
+    public ?string $storedData = null;
+
     public function __construct(
         public ?int $id,
         public string $title,
@@ -161,7 +171,7 @@ class EventDTO
 
         $currentTz = null;
 
-        foreach ($lines as $line) {
+        foreach (self::selectEventLines($lines) as $line) {
             [$name, $params, $value] = self::splitContentLine(trim($line));
 
             // TZID from VTIMEZONE block or DTSTART/DTEND
@@ -247,6 +257,59 @@ class EventDTO
         }
 
         return $data;
+    }
+
+    /**
+     * Pick the lines to read: the TZID lines of the VTIMEZONE blocks and the
+     * properties of the master VEVENT (the one without RECURRENCE-ID), leaving
+     * out nested components such as VALARM. Data without a VEVENT is read as is.
+     *
+     * @param  string[]  $lines
+     * @return string[]
+     */
+    private static function selectEventLines(array $lines): array
+    {
+        $tzidLines = [];
+        $events = [];
+        $current = null;
+        $components = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if (stripos($line, 'BEGIN:') === 0) {
+                $components[] = strtoupper(substr($line, 6));
+                if (end($components) === 'VEVENT') {
+                    $current = [];
+                }
+                continue;
+            }
+
+            if (stripos($line, 'END:') === 0) {
+                if (array_pop($components) === 'VEVENT' && $current !== null) {
+                    $events[] = $current;
+                    $current = null;
+                }
+                continue;
+            }
+
+            $component = end($components);
+            if ($component === 'VEVENT' && $current !== null) {
+                $current[] = $line;
+            } elseif ($component === 'VTIMEZONE' && stripos($line, 'TZID:') === 0) {
+                $tzidLines[] = $line;
+            }
+        }
+
+        if ($events === []) {
+            return $lines;
+        }
+
+        $isException = static fn (array $event): bool => collect($event)
+            ->contains(fn (string $line) => stripos($line, 'RECURRENCE-ID') === 0);
+        $master = collect($events)->first(fn (array $event) => !$isException($event)) ?? $events[0];
+
+        return [...$tzidLines, ...$master];
     }
 
     /**
@@ -359,6 +422,122 @@ class EventDTO
         $lines[] = 'END:VCALENDAR';
 
         return implode("\r\n", $lines) . "\r\n";
+    }
+
+    /**
+     * The iCalendar to store for an edit: the stored object with this event's
+     * fields applied to its master VEVENT, so the UID, VALARMs, attendees and
+     * other client data survive. EXDATE, RDATE and RECURRENCE-ID exceptions
+     * survive too, unless the series stops recurring or its start moves (they
+     * would no longer match). Without usable stored data this is toVCal().
+     */
+    public function toVCalForUpdate(): string
+    {
+        if (!$this->storedData || !$this->startDate) {
+            return $this->toVCal();
+        }
+
+        try {
+            $vcalendar = Reader::read($this->storedData);
+        } catch (\Throwable) {
+            return $this->toVCal();
+        }
+
+        $master = null;
+        foreach ($vcalendar->VEVENT ?? [] as $vevent) {
+            if (!isset($vevent->{'RECURRENCE-ID'})) {
+                $master = $vevent;
+                break;
+            }
+        }
+
+        if (!$vcalendar instanceof VCalendar || !$master instanceof VEvent) {
+            return $this->toVCal();
+        }
+
+        $dropExceptions = !$this->recurrenceRule || $this->startMovedFrom($master);
+
+        $master->SUMMARY = $this->title;
+        foreach (['DESCRIPTION' => $this->description, 'LOCATION' => $this->location] as $name => $value) {
+            if ($value) {
+                $master->{$name} = $value;
+            } else {
+                $master->remove($name);
+            }
+        }
+
+        $master->remove('DTSTART');
+        $master->remove('DTEND');
+        $master->remove('DURATION');
+        if ($this->isAllDay) {
+            $master->add('DTSTART', $this->startDate->format('Ymd'), ['VALUE' => 'DATE']);
+            if ($this->endDate) {
+                $end = \DateTime::createFromInterface($this->endDate)->modify('+1 day'); // exclusive
+                $master->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
+            }
+        } else {
+            $master->add('DTSTART', $this->startDate->format('Ymd\THis'), ['TZID' => $this->startDate->getTimezone()->getName()]);
+            $this->addMissingTimeZone($vcalendar, $this->startDate);
+            if ($this->endDate) {
+                $master->add('DTEND', $this->endDate->format('Ymd\THis'), ['TZID' => $this->endDate->getTimezone()->getName()]);
+                $this->addMissingTimeZone($vcalendar, $this->endDate);
+            }
+        }
+
+        if ($this->recurrenceRule) {
+            $master->RRULE = $this->recurrenceRule;
+        } else {
+            $master->remove('RRULE');
+        }
+
+        if ($dropExceptions) {
+            $master->remove('EXDATE');
+            $master->remove('RDATE');
+            foreach ($vcalendar->select('VEVENT') as $vevent) {
+                if ($vevent !== $master) {
+                    $vcalendar->remove($vevent);
+                }
+            }
+        }
+
+        $now = gmdate('Ymd\THis\Z');
+        $master->DTSTAMP = $now;
+        $master->{'LAST-MODIFIED'} = $now;
+        $master->SEQUENCE = isset($master->SEQUENCE) ? (int) (string) $master->SEQUENCE + 1 : 1;
+
+        return $vcalendar->serialize();
+    }
+
+    private function startMovedFrom(VEvent $master): bool
+    {
+        if (!isset($master->DTSTART)) {
+            return true;
+        }
+
+        $wasAllDay = $master->DTSTART->getValueType() === 'DATE';
+        if ($wasAllDay !== $this->isAllDay) {
+            return true;
+        }
+
+        $storedStart = $master->DTSTART->getDateTime();
+
+        return $this->isAllDay
+            ? $storedStart->format('Ymd') !== $this->startDate->format('Ymd')
+            : $storedStart->getTimestamp() !== $this->startDate->getTimestamp();
+    }
+
+    private function addMissingTimeZone(VCalendar $vcalendar, \DateTimeInterface $date): void
+    {
+        $tzName = $date->getTimezone()->getName();
+
+        foreach ($vcalendar->select('VTIMEZONE') as $vtimezone) {
+            if ((string) $vtimezone->TZID === $tzName) {
+                return;
+            }
+        }
+
+        $generated = Reader::read("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n".$this->generateVTimeZone($date->getTimezone(), $date)."\r\nEND:VCALENDAR\r\n");
+        $vcalendar->add(clone $generated->VTIMEZONE);
     }
 
     /**

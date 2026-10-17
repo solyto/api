@@ -30,6 +30,30 @@ function apiContacts(\Tests\TestCase $test, \App\Api\Users\Models\User $user): \
     return collect($test->actingAs($user, 'sanctum')->getJson('/api/v1/address-books/contacts')->assertStatus(200)->json('data'));
 }
 
+function apiEdit(\Tests\TestCase $test, string $uri, array $fields): \Sabre\VObject\Component\VCalendar
+{
+    $path = 'calendars/'.$test->user->email.'/my-calendar/'.$uri;
+    $test->actingAs($test->user, 'sanctum')->putJson('/api/v1/calendars/'.$test->instanceId.'/events/'.$uri, array_merge([
+        'is_all_day' => false,
+        'calendar_id' => $test->instanceId,
+        'etag' => davRequest($test->user, 'GET', $path)->getHeader('ETag'),
+    ], $fields))->assertStatus(200);
+
+    return \Sabre\VObject\Reader::read(davRequest($test->user, 'GET', $path)->getBodyAsString());
+}
+
+function seriesWithMovedDate(): string
+{
+    return implode("\r\n", [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN',
+        'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'DTSTART:20301014T090000Z', 'DTEND:20301014T091500Z',
+        'RRULE:FREQ=DAILY;COUNT=4', 'EXDATE:20301015T090000Z', 'SUMMARY:Standup', 'END:VEVENT',
+        'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'RECURRENCE-ID:20301016T090000Z',
+        'DTSTART:20301016T110000Z', 'DTEND:20301016T111500Z', 'SUMMARY:Standup (moved)', 'END:VEVENT',
+        'END:VCALENDAR',
+    ])."\r\n";
+}
+
 describe('Events: DAV and API agree', function () {
     it('shows an event written over DAV in the API, unescaped', function () {
         davRequest($this->user, 'PUT', $this->calendar.'dav.ics', davIcs('dav', 'Lunch\, then walk', '20301015T120000Z', '20301015T130000Z', [
@@ -99,11 +123,123 @@ describe('Events: DAV and API agree', function () {
             ->and(davRequest($this->user, 'GET', $this->calendar.'dav.ics')->getStatus())->toBe(404);
     });
 
+    it('keeps the UID, deleted occurrences and reminders when an event is edited in the app', function () {
+        $path = $this->calendar.'series.ics';
+        $etag = davRequest($this->user, 'PUT', $path, davIcs('original-uid', 'Standup', '20301014T090000Z', '20301014T091500Z', [
+            'RRULE:FREQ=DAILY;COUNT=4', 'EXDATE:20301015T090000Z',
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'TRIGGER:-PT10M', 'END:VALARM',
+        ]), ['Content-Type' => 'text/calendar'])->getHeader('ETag');
+        $instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+
+        $this->actingAs($this->user, 'sanctum')->putJson('/api/v1/calendars/'.$instanceId.'/events/series.ics', [
+            'title' => 'Standup (renamed)',
+            'start_date' => '2030-10-14 09:00:00',
+            'end_date' => '2030-10-14 09:15:00',
+            'is_all_day' => false,
+            'is_recurring' => true,
+            'recurrence_rule' => 'FREQ=DAILY;COUNT=4',
+            'calendar_id' => $instanceId,
+            'etag' => $etag,
+        ])->assertStatus(200);
+        $vevent = \Sabre\VObject\Reader::read(davRequest($this->user, 'GET', $path)->getBodyAsString())->VEVENT;
+
+        expect((string) $vevent->SUMMARY)->toBe('Standup (renamed)')
+            ->and((string) $vevent->UID)->toBe('original-uid')
+            ->and(isset($vevent->EXDATE))->toBeTrue()
+            ->and(isset($vevent->VALARM))->toBeTrue();
+    });
+
     it('keeps the API event listing working when a client stores a VTODO', function () {
         davRequest($this->user, 'PUT', $this->calendar.'event.ics', davIcs('event', 'Event', '20301015T120000Z', '20301015T130000Z'), ['Content-Type' => 'text/calendar']);
         davRequest($this->user, 'PUT', $this->calendar.'todo.ics', "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Solyto//Tests//EN\r\nBEGIN:VTODO\r\nUID:todo\r\nDTSTAMP:20300101T000000Z\r\nDUE:20301015T120000Z\r\nSUMMARY:Task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n", ['Content-Type' => 'text/calendar']);
 
         expect(apiEvents($this, $this->user)->pluck('uri')->all())->toBe(['event.ics']);
+    });
+});
+
+describe('Events: editing through the API keeps client data', function () {
+    beforeEach(function () {
+        $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+    });
+
+    it('keeps a moved occurrence and a deleted date when the series is renamed', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        apiEdit($this, 'series.ics', ['title' => 'Daily sync', 'start_date' => '2030-10-14 09:00:00', 'end_date' => '2030-10-14 09:15:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4']);
+
+        expect(apiEvents($this, $this->user)->map(fn (array $e) => $e['title'].' '.$e['start_date'])->all())->toBe([
+            'Daily sync 2030-10-14T09:00:00',
+            'Standup (moved) 2030-10-16T11:00:00',
+            'Daily sync 2030-10-17T09:00:00',
+        ]);
+    });
+
+    it('drops deleted and moved dates when the series start moves', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        $vcalendar = apiEdit($this, 'series.ics', ['title' => 'Standup', 'start_date' => '2030-10-14 10:00:00', 'end_date' => '2030-10-14 10:15:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4']);
+
+        expect(count($vcalendar->VEVENT))->toBe(1)
+            ->and(isset($vcalendar->VEVENT->EXDATE))->toBeFalse()
+            ->and((string) $vcalendar->VEVENT->UID)->toBe('series');
+    });
+
+    it('drops deleted and moved dates when the series turns all-day', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        $vcalendar = apiEdit($this, 'series.ics', ['title' => 'Standup', 'start_date' => '2030-10-14 00:00:00', 'end_date' => '2030-10-14 00:00:00', 'is_all_day' => true, 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4']);
+
+        expect(count($vcalendar->VEVENT))->toBe(1)
+            ->and(isset($vcalendar->VEVENT->EXDATE))->toBeFalse()
+            ->and($vcalendar->VEVENT->DTSTART->getValueType())->toBe('DATE');
+    });
+
+    it('keeps attendees, the organizer and client extras of a single event and counts the change', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'meeting.ics', davIcs('meeting', 'Meeting', '20301015T120000Z', '20301015T130000Z', [
+            'ORGANIZER:mailto:boss@example.org', 'ATTENDEE;CN=Jane:mailto:jane@example.org', 'X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC', 'SEQUENCE:3',
+        ]), ['Content-Type' => 'text/calendar']);
+
+        $vevent = apiEdit($this, 'meeting.ics', ['title' => 'Meeting (room 2)', 'location' => 'Room 2', 'start_date' => '2030-10-15 12:00:00', 'end_date' => '2030-10-15 13:30:00'])->VEVENT;
+
+        expect((string) $vevent->SUMMARY)->toBe('Meeting (room 2)')
+            ->and((string) $vevent->LOCATION)->toBe('Room 2')
+            ->and($vevent->DTEND->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-15 13:30')
+            ->and((string) $vevent->UID)->toBe('meeting')
+            ->and((string) $vevent->ORGANIZER)->toBe('mailto:boss@example.org')
+            ->and((string) $vevent->ATTENDEE)->toBe('mailto:jane@example.org')
+            ->and((string) $vevent->{'X-APPLE-TRAVEL-ADVISORY-BEHAVIOR'})->toBe('AUTOMATIC')
+            ->and((string) $vevent->SEQUENCE)->toBe('4');
+    });
+
+    it('keeps an Outlook event readable after an edit in another time zone', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'outlook.ics', file_get_contents(base_path('tests/Fixtures/dav/outlook-windows-timezone.ics')), ['Content-Type' => 'text/calendar']);
+        $this->user->settings()->update(['timezone' => 'Europe/Berlin']);
+
+        $vcalendar = apiEdit($this, 'outlook.ics', ['title' => 'Quartalsplanung Q4 (verschoben)', 'start_date' => '2030-10-16 15:00:00', 'end_date' => '2030-10-16 16:00:00']);
+        $timezones = collect($vcalendar->select('VTIMEZONE'))->map(fn ($tz) => (string) $tz->TZID)->all();
+
+        expect($timezones)->toBe(['W. Europe Standard Time', 'Europe/Berlin'])
+            ->and($vcalendar->VEVENT->DTSTART->getDateTime()->format('Y-m-d H:i P'))->toBe('2030-10-16 15:00 +02:00')
+            ->and($vcalendar->validate())->toBe([]);
+    });
+
+    it('keeps the UID and the reminder when an event is moved to another calendar', function () {
+        davRequest($this->user, 'MKCALENDAR', 'calendars/'.$this->user->email.'/work/', '<?xml version="1.0"?>'
+            .'<cal:mkcalendar xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav"><d:set><d:prop><d:displayname>Work</d:displayname></d:prop></d:set></cal:mkcalendar>');
+        davRequest($this->user, 'PUT', $this->calendar.'a.ics', davIcs('keep-me', 'Event', '20301015T120000Z', '20301015T130000Z', [
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'TRIGGER:-PT10M', 'END:VALARM',
+        ]), ['Content-Type' => 'text/calendar']);
+        $workId = collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Work')['id'];
+
+        $moved = $this->actingAs($this->user, 'sanctum')->putJson('/api/v1/calendars/'.$this->instanceId.'/events/a.ics', [
+            'title' => 'Event', 'start_date' => '2030-10-15 12:00:00', 'end_date' => '2030-10-15 13:00:00', 'is_all_day' => false,
+            'calendar_id' => $workId, 'etag' => davRequest($this->user, 'GET', $this->calendar.'a.ics')->getHeader('ETag'),
+        ])->assertStatus(200)->json('data.uri');
+        $vevent = \Sabre\VObject\Reader::read(davRequest($this->user, 'GET', 'calendars/'.$this->user->email.'/work/'.$moved)->getBodyAsString())->VEVENT;
+
+        expect((string) $vevent->UID)->toBe('keep-me')
+            ->and(isset($vevent->VALARM))->toBeTrue()
+            ->and(davRequest($this->user, 'GET', $this->calendar.'a.ics')->getStatus())->toBe(404);
     });
 });
 

@@ -16,6 +16,25 @@ use Sabre\VObject\Reader;
 
 class AppCalendarsPDO extends SabreBackend
 {
+    /**
+     * Calendars shared with the principal reach DAV clients only once the
+     * invite is accepted, as in the app. listCalendarsCustom() reads the
+     * parent directly, so the app still sees pending invites.
+     */
+    public function getCalendarsForUser($principalUri)
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1 AND share_invitestatus <> ?'
+        );
+        $stmt->execute([$principalUri, \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED]);
+        $notAccepted = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+        return array_values(array_filter(
+            parent::getCalendarsForUser($principalUri),
+            fn (array $calendar) => !in_array($calendar['id'][1], $notAccepted, true)
+        ));
+    }
+
     public function listCalendarsCustom(string $principalUri): array
     {
         $entries = parent::getCalendarsForUser($principalUri);
@@ -345,20 +364,28 @@ SQL
     {
         $stmt = $this->pdo->prepare('SELECT id, uri, lastmodified, etag, calendarid, size, calendardata, componenttype FROM '.$this->calendarObjectTableName.' WHERE calendarid = ? AND uri = ? LIMIT 1');
         $stmt->execute([$calendar->calendarId, $uri]);
-        $row = $stmt->fetch();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row) {
             return null;
         }
 
-        return EventDTO::fromSabre($row, $calendar);
+        $row['calendardata'] = is_resource($row['calendardata'])
+            ? stream_get_contents($row['calendardata'])
+            : $row['calendardata'];
+
+        $event = EventDTO::fromSabre($row, $calendar);
+        $event->storedData = $row['calendardata'];
+
+        return $event;
     }
 
     public function createEventCustom(CalendarDTO $calendar, EventDTO $dto): ?string
     {
         $uri = bin2hex(Str::random(16)) . '.ics';
 
-        return parent::createCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri, $dto->toVCal()) ? $uri : null;
+        // An event moved here from another calendar keeps its stored data.
+        return parent::createCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri, $dto->toVCalForUpdate()) ? $uri : null;
     }
 
     public function importEventCustom(CalendarDTO $calendar, string $vCal): ?string
@@ -370,7 +397,7 @@ SQL
 
     public function updateEventCustom(CalendarDTO $calendar, EventDTO $dto): bool
     {
-        return parent::updateCalendarObject([$calendar->calendarId, $calendar->instanceId], $dto->uri, $dto->toVCal()) !== null;
+        return parent::updateCalendarObject([$calendar->calendarId, $calendar->instanceId], $dto->uri, $dto->toVCalForUpdate()) !== null;
     }
 
     public function deleteEventCustom(CalendarDTO $calendar, EventDTO $dto): bool

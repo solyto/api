@@ -3,6 +3,7 @@
 namespace App\Dav\Factories;
 
 use App\Dav\Auth\LaravelAuthBackend;
+use App\Dav\Backend\AppCalendarsPDO;
 use Illuminate\Database\DatabaseManager;
 use Sabre\CalDAV\CalendarRoot;
 use Sabre\CardDAV\AddressBookRoot;
@@ -12,6 +13,7 @@ use Sabre\DAVACL\Plugin as AclPlugin;
 use Sabre\DAVACL\PrincipalBackend\PDO as PrincipalBackend;
 use Sabre\DAVACL\PrincipalCollection;
 use App\Dav\Plugins\CacheInvalidationPlugin;
+use App\Dav\Plugins\PrivacyPlugin;
 use Sabre\CalDAV\Backend\PDO as CalDAVBackend;
 use Sabre\CalDAV\Plugin as CalDAVPlugin;
 use Sabre\CardDAV\Backend\PDO as CardDAVBackend;
@@ -31,7 +33,7 @@ class DavServerFactory
         $pdo = $this->db->connection('pgsql')->getPdo();
         $principalBackend = new \Sabre\DAVACL\PrincipalBackend\PDO($pdo);
         $carddavBackend   = new \Sabre\CardDAV\Backend\PDO($pdo);
-        $caldavBackend    = new \Sabre\CalDAV\Backend\PDO($pdo);
+        $caldavBackend    = new AppCalendarsPDO($pdo);
 
         $nodes = [
             new \Sabre\CalDAV\Principal\Collection($principalBackend),
@@ -42,9 +44,13 @@ class DavServerFactory
         $server = new \Sabre\DAV\Server($nodes);
         $server->setBaseUri('/');
         $server->addPlugin(new \Sabre\DAV\Auth\Plugin(new LaravelAuthBackend('DAV')));
-        $server->addPlugin(new \Sabre\DAVACL\Plugin());
+        $aclPlugin = new \Sabre\DAVACL\Plugin();
+        // Principal URIs carry the email: keep nodes a user cannot read out of listings.
+        $aclPlugin->hideNodesFromListings = true;
+        $server->addPlugin($aclPlugin);
         $server->addPlugin(new \Sabre\DAV\Browser\Plugin());
         $server->addPlugin(new \Sabre\CalDAV\Plugin());
+        $server->addPlugin(new PrivacyPlugin());
         $server->addPlugin(new \Sabre\CardDAV\Plugin());
         $server->addPlugin(new \Sabre\DAV\Sync\Plugin());
         $server->addPlugin(new \Sabre\DAV\Sharing\Plugin());

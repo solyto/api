@@ -105,6 +105,20 @@ describe('Reading client events into the app', function () {
         expect($event->location)->toBe('Alexanderplatz 1, 10178 Berlin, Germany');
     });
 
+    it('does not take the text of a reminder as the description', function () {
+        $event = storeEventFixture(davUser(), 'apple-event.ics');
+
+        expect($event->description)->toBeNull();
+    });
+
+    it('reads the series, not a moved occurrence, when reading a recurring event as a whole', function () {
+        $event = storeEventFixture(davUser(), 'google-recurring.ics');
+
+        expect($event->title)->toBe('Weekly standup')
+            ->and($event->startDate->format('Y-m-d H:i'))->toBe('2030-10-07 09:00')
+            ->and($event->recurrenceRule)->toBe('FREQ=WEEKLY;BYDAY=MO;UNTIL=20301111T140000Z');
+    });
+
     it('reads a Thunderbird all-day event with Unicode in the title', function () {
         $event = storeEventFixture(davUser(), 'thunderbird-all-day.ics');
 
@@ -196,7 +210,7 @@ describe('Reading client contacts into the app', function () {
             ->and($contact->city)->toBe('München')
             ->and($contact->postalCode)->toBe('80331')
             ->and($contact->country)->toBe('Deutschland');
-    })->skip('Known bug: ContactDTO::parseVCard() ignores grouped properties (item1.ADR, item2.TEL).');
+    });
 
     it('reads both emails, the address and the groups of a Google contact', function () {
         $contact = storeContactFixture(davUser(), 'google-contact.vcf');
@@ -220,11 +234,11 @@ describe('Reading client contacts into the app', function () {
         $contact = storeContactFixture(davUser(), 'davx5-contact-v4.vcf');
 
         expect(collect(json_decode($contact->phone ?? '[]', true))->pluck('value')->all())->toBe(['tel:+34-600-123-456', '+34 911 234 567']);
-    })->skip('Known bug: ContactDTO::parseVCard() ignores grouped properties (item1.ADR, item2.TEL).');
+    });
 
     it('reads a folded note of a DAVx5 vCard 4.0 in full', function () {
         $contact = storeContactFixture(davUser(), 'davx5-contact-v4.vcf');
 
         expect($contact->note)->toBe('Prefers WhatsApp over phone calls. Speaks Spanish, English and some German. Ask about the marathon in April.');
-    })->skip('Known bug: ContactDTO::parseVCard() does not unfold continuation lines (only PHOTO), so folded values are cut at the fold.');
+    });
 });

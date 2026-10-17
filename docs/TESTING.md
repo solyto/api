@@ -240,6 +240,7 @@ Limits of the setup:
 | Cross-user read / write / move denied | `DavIsolationTest` | `DavIsolationTest` | `DavIsolationTest` |
 | Sharing (read-write, read-only, revoke, decline) | `DavIsolationTest` | — | — |
 | API ↔ DAV round trip, cache invalidation | `DavApiConsistencyTest` | `DavApiConsistencyTest` | — |
+| API edits keep client data (UID, EXDATE, exceptions, VALARM, attendees) | `DavApiConsistencyTest`, `tests/Unit/Dav/EventDTOUpdateTest` | — | — |
 | Real-client data (Apple, Google, Outlook, Thunderbird, DAVx5) | `DavClientFixtureTest` | `DavClientFixtureTest` | — |
 | Occurrence edits, expansion, DST | `EventOccurrenceServiceTest`, `DavClientFixtureTest` | — | — |
 | Import from a remote server | `DavImportTest` | `DavImportTest` | — |
@@ -250,14 +251,13 @@ Limits of the setup:
 Each is a `->skip('Known …')` test that states the wanted behavior; it
 turns green once the gap is fixed (remove the `skip`).
 
-- `ContactDTO::parseVCard()` ignores grouped properties (`item1.ADR`) and
-  does not unfold continuation lines.
 - Calendars accept VEVENT and VTODO: `createCalendarCustom()`'s
   `components` key is not mapped by sabre (pinned in `CalDavProtocolTest`;
-  VTODOs are skipped by the API listing).
-- A pending calendar invite already grants DAV access; any authenticated
-  user can read another user's free/busy and list every principal (emails)
-  and object name.
+  VTODOs are skipped by the API listing). Kept on purpose (owner decision,
+  2026-10-17): real CalDAV todo sync is planned, so no events-only change.
+- Accepted, not skipped: a known email can still be confirmed as a
+  principal (207 vs 404), because principal URIs carry the email
+  (`DavIsolationTest`).
 
 ## Caveats
 
