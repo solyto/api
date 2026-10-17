@@ -243,6 +243,91 @@ describe('Events: editing through the API keeps client data', function () {
     });
 });
 
+describe('Events: editing a series through one of its occurrences', function () {
+    beforeEach(function () {
+        $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+    });
+
+    function seriesEdit(string $start, string $end, string $occurrence, string $title = 'Standup'): array
+    {
+        return ['title' => $title, 'start_date' => $start, 'end_date' => $end, 'occurrence_start_date' => $occurrence, 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4'];
+    }
+
+    it('keeps the series start and its exceptions when renamed through a later occurrence', function () {
+        apiEdit($this, 'series.ics', seriesEdit('2030-10-17 09:00:00', '2030-10-17 09:15:00', '2030-10-17 09:00:00', 'Daily sync'));
+
+        expect(apiEvents($this, $this->user)->map(fn (array $e) => $e['title'].' '.$e['start_date'])->all())->toBe([
+            'Daily sync 2030-10-14T09:00:00',
+            'Standup (moved) 2030-10-16T11:00:00',
+            'Daily sync 2030-10-17T09:00:00',
+        ]);
+    });
+
+    it('keeps the series and the moved occurrence when renamed through the moved occurrence', function () {
+        $vcalendar = apiEdit($this, 'series.ics', seriesEdit('2030-10-16 11:00:00', '2030-10-16 11:15:00', '2030-10-16 11:00:00', 'Daily sync'));
+        $master = collect($vcalendar->VEVENT)->first(fn ($vevent) => ! isset($vevent->{'RECURRENCE-ID'}));
+
+        expect($master->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 09:00')
+            ->and(count($vcalendar->VEVENT))->toBe(2)
+            ->and(isset($master->EXDATE))->toBeTrue();
+    });
+
+    it('moves the whole series by the hour an occurrence was moved', function () {
+        $vevent = apiEdit($this, 'series.ics', seriesEdit('2030-10-17 10:00:00', '2030-10-17 10:15:00', '2030-10-17 09:00:00'))->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 10:00')
+            ->and($vevent->DTEND->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 10:15');
+    });
+
+    it('moves the whole series by the day an occurrence was dragged', function () {
+        $vevent = apiEdit($this, 'series.ics', seriesEdit('2030-10-18 09:00:00', '2030-10-18 09:15:00', '2030-10-17 09:00:00'))->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-15 09:00');
+    });
+
+    it('keeps the local time when a series moves by a day across a daylight saving change', function () {
+        $this->user->settings()->update(['timezone' => 'America/New_York']);
+        davRequest($this->user, 'PUT', $this->calendar.'ny.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:ny', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=America/New_York:20301031T090000', 'DTEND;TZID=America/New_York:20301031T093000',
+            'RRULE:FREQ=DAILY;COUNT=10', 'SUMMARY:Morning', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        $vevent = apiEdit($this, 'ny.ics', [
+            'title' => 'Morning', 'start_date' => '2030-11-03 09:00:00', 'end_date' => '2030-11-03 09:30:00',
+            'occurrence_start_date' => '2030-11-02 09:00:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=10',
+        ])->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->setTimezone(new \DateTimeZone('America/New_York'))->format('Y-m-d H:i'))->toBe('2030-11-01 09:00');
+    });
+
+    it('moves an all-day series by the day an occurrence was dragged', function () {
+        $this->user->settings()->update(['timezone' => 'America/New_York']);
+        davRequest($this->user, 'PUT', $this->calendar.'bins.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:bins', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;VALUE=DATE:20301007', 'DTEND;VALUE=DATE:20301008', 'RRULE:FREQ=WEEKLY;COUNT=3', 'SUMMARY:Bin day', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        $vevent = apiEdit($this, 'bins.ics', [
+            'title' => 'Bin day', 'start_date' => '2030-10-15 00:00:00', 'end_date' => '2030-10-15 00:00:00', 'is_all_day' => true,
+            'occurrence_start_date' => '2030-10-14 00:00:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=WEEKLY;COUNT=3',
+        ])->VEVENT;
+
+        expect((string) $vevent->DTSTART)->toBe('20301008')
+            ->and((string) $vevent->DTEND)->toBe('20301009');
+    });
+
+    // Frontend builds from before occurrence_start_date do not send it.
+    it('starts the series at start_date when occurrence_start_date is missing', function () {
+        $vevent = apiEdit($this, 'series.ics', [
+            'title' => 'Standup', 'start_date' => '2030-10-16 09:00:00', 'end_date' => '2030-10-16 09:15:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4',
+        ])->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-16 09:00');
+    });
+});
+
 describe('Calendars: DAV and API agree', function () {
     it('lists a calendar created over DAV after the API listing was cached', function () {
         $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->assertJsonCount(1, 'data');

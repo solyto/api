@@ -18,6 +18,7 @@ class UpdateEventRequest extends FormRequest
             'is_recurring' => 'boolean',
             'recurrence_rule' => 'nullable|string|required_if:is_recurring,true',
             'recurrence_end' => 'nullable|date',
+            'occurrence_start_date' => 'nullable|date',
             'calendar_id' => 'required|integer',
             'etag' => 'required|string'
         ];

@@ -241,6 +241,7 @@ Limits of the setup:
 | Sharing (read-write, read-only, revoke, decline) | `DavIsolationTest` | — | — |
 | API ↔ DAV round trip, cache invalidation | `DavApiConsistencyTest` | `DavApiConsistencyTest` | — |
 | API edits keep client data (UID, EXDATE, exceptions, VALARM, attendees) | `DavApiConsistencyTest`, `tests/Unit/Dav/EventDTOUpdateTest` | — | — |
+| Series edits through an occurrence (`occurrence_start_date`, wall-clock shift, DST) | `DavApiConsistencyTest` | — | — |
 | Real-client data (Apple, Google, Outlook, Thunderbird, DAVx5) | `DavClientFixtureTest` | `DavClientFixtureTest` | — |
 | Occurrence edits, expansion, DST | `EventOccurrenceServiceTest`, `DavClientFixtureTest` | — | — |
 | Import from a remote server | `DavImportTest` | `DavImportTest` | — |
