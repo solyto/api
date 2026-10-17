@@ -1081,6 +1081,19 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   the envelope messages (12.10). The reader is the operator, not a user.
   This covers only `AdminNotification` subclasses; every notification a
   user receives still follows 9.4.
+- **The experimental MCP server is a proxy, not a module API** (job
+  `brick`, 2026-10-17): `app/Api/Mcp/` exposes `list_endpoints` and
+  `call_api` on `/mcp`, off unless `MCP_ENABLED=true`
+  (`services.mcp.enabled`). Three exceptions follow from that:
+  - MCP responses are JSON-RPC and are not built by `ApiResponse`
+    (rules 7.1, 12.4); the API response relayed inside a `call_api`
+    result still is.
+  - `/mcp` is registered in `routes/ai.php`, the file `laravel/mcp`
+    loads, not in `routes/api.php` (rules 1.4, 12.2).
+  - `call_api` sends a request through the HTTP kernel instead of calling
+    other modules' services through `app/Shared` (rule 12.8), so routing,
+    middleware, FormRequests and `HandlesApiAuth` run as they do for the
+    frontend and no business logic is duplicated.
 - **From the old policy set, dropped or corrected on 2026-10-13:**
   - "`HasUuids` + `HasFactory` are the two traits on app models" — wrong
     for 30 of 52 models; UUID vs auto-increment follows the migration (5.4).

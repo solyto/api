@@ -85,4 +85,9 @@ return [
         'alert_threshold' => (int) env('API_TRAFFIC_ALERT_THRESHOLD', 300),
         'alert_cooldown'  => (int) env('API_TRAFFIC_ALERT_COOLDOWN', 3600),
     ],
+
+    // Experimental MCP server (routes/ai.php); off unless explicitly enabled
+    'mcp' => [
+        'enabled' => (bool) env('MCP_ENABLED', false),
+    ],
 ];

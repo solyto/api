@@ -47,6 +47,23 @@ Contributing code? Read the coding standards first: [docs/STANDARDS.md](docs/STA
 
 ## 
 
+## MCP server (experimental, local only)
+
+An MCP server lets a local AI agent use the API as one user. It has two tools: `list_endpoints` lists the `/api/v1` endpoints and `call_api` calls one with that user's token. It is off by default.
+
+```sh
+# .env
+MCP_ENABLED=true
+
+php artisan app:mcp:token you@example.com   # prints a non-expiring token once
+claude mcp add --transport http solyto http://localhost:8000/mcp --header "Authorization: Bearer <token>"
+php artisan mcp:inspector mcp               # debug the server in the MCP inspector
+```
+
+`call_api` refuses the endpoints that would sign the user out or revoke the token (`auth/*` except listing tokens and managing passkeys, and `users/change-password`). To revoke the MCP token, use `auth/revoke-token` from another session, or delete the `mcp-token` row.
+
+## 
+
 ## Deployment
 
 Handled via Ansible in [solyto/deployment](https://github.com/solyto/deployment).
