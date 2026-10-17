@@ -84,7 +84,6 @@ class ContactImport
 
             try {
                 unset($addressBook['url']);
-                echo 'Importing address book ' . $addressBook['display_name'] . "\n";
                 $this->addressBooks->create($user, AddressBookDTO::fromRequest($addressBook));
             } catch (\Exception $e) {
                 continue;

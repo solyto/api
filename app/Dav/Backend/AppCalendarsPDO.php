@@ -241,7 +241,8 @@ SQL
 
             $vObj = \Sabre\VObject\Reader::read($vCalData);
 
-            foreach ($vObj->VEVENT as $vevent) {
+            // Calendars also accept VTODOs from DAV clients; they have no VEVENT.
+            foreach ($vObj->VEVENT ?? [] as $vevent) {
                 $startOrig = $vevent->DTSTART->getDateTime();
                 $endOrig   = isset($vevent->DTEND) ? $vevent->DTEND->getDateTime() : $startOrig;
                 $isAllDay = $vevent->DTSTART->getValueType() === 'DATE';

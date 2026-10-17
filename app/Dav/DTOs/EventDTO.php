@@ -5,6 +5,7 @@ namespace App\Dav\DTOs;
 use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Str;
+use Sabre\VObject\TimeZoneUtil;
 
 class EventDTO
 {
@@ -143,7 +144,8 @@ class EventDTO
 
     public static function parseVCal(string $vCalData): array
     {
-        $lines = explode("\n", str_replace("\r\n", "\n", $vCalData));
+        // Unfold continuation lines (RFC 5545 3.1) before reading properties.
+        $lines = explode("\n", preg_replace("/\n[ \t]/", '', str_replace("\r\n", "\n", $vCalData)));
         $data = [
             'title' => null,
             'description' => null,
@@ -160,30 +162,30 @@ class EventDTO
         $currentTz = null;
 
         foreach ($lines as $line) {
-            $line = trim($line);
+            [$name, $params, $value] = self::splitContentLine(trim($line));
 
             // TZID from VTIMEZONE block or DTSTART/DTEND
-            if (preg_match('/^TZID:(.+)$/', $line, $matches)) {
-                $currentTz = $matches[1];
+            if ($name === 'TZID') {
+                $currentTz = TimeZoneUtil::getTimeZone($value)->getName();
                 $data['timezone'] = $currentTz;
                 continue;
             }
 
-            if (str_starts_with($line, 'SUMMARY:')) {
-                $data['title'] = substr($line, 8);
-            } elseif (str_starts_with($line, 'DESCRIPTION:')) {
-                $data['description'] = substr($line, 12);
-            } elseif (str_starts_with($line, 'LOCATION:')) {
-                $data['location'] = substr($line, 9);
-            } elseif (str_starts_with($line, 'RRULE:')) {
-                $data['recurrence_rule'] = substr($line, 6);
-            } elseif (str_starts_with($line, 'DTSTART')) {
-                $isAllDay = str_contains($line, 'VALUE=DATE');
-                $dateStr = substr($line, strpos($line, ':') + 1);
+            if ($name === 'SUMMARY') {
+                $data['title'] = self::unescapeText($value);
+            } elseif ($name === 'DESCRIPTION') {
+                $data['description'] = self::unescapeText($value);
+            } elseif ($name === 'LOCATION') {
+                $data['location'] = self::unescapeText($value);
+            } elseif ($name === 'RRULE') {
+                $data['recurrence_rule'] = $value;
+            } elseif ($name === 'DTSTART') {
+                $isAllDay = str_contains($params, 'VALUE=DATE');
+                $dateStr = $value;
 
-                if (preg_match('/TZID=([^:]+):/', $line, $matches)) {
-                    $tz = new \DateTimeZone($matches[1]);
-                    $data['timezone'] = $matches[1];
+                if (preg_match('/TZID="?([^";]+)"?/', $params, $matches)) {
+                    $tz = TimeZoneUtil::getTimeZone($matches[1]);
+                    $data['timezone'] = $tz->getName();
                 } elseif ($currentTz) {
                     $tz = new \DateTimeZone($currentTz);
                 } else {
@@ -208,13 +210,13 @@ class EventDTO
                 }
 
                 $data['is_all_day'] = $isAllDay;
-            } elseif (str_starts_with($line, 'DTEND')) {
-                $isAllDay = str_contains($line, 'VALUE=DATE');
-                $dateStr = substr($line, strpos($line, ':') + 1);
+            } elseif ($name === 'DTEND') {
+                $isAllDay = str_contains($params, 'VALUE=DATE');
+                $dateStr = $value;
 
-                if (preg_match('/TZID=([^:]+):/', $line, $matches)) {
-                    $tz = new \DateTimeZone($matches[1]);
-                    $data['timezone'] = $matches[1];
+                if (preg_match('/TZID="?([^";]+)"?/', $params, $matches)) {
+                    $tz = TimeZoneUtil::getTimeZone($matches[1]);
+                    $data['timezone'] = $tz->getName();
                 } elseif ($currentTz) {
                     $tz = new \DateTimeZone($currentTz);
                 } else {
@@ -247,7 +249,42 @@ class EventDTO
         return $data;
     }
 
+    /**
+     * Split a content line into its upper-cased name, its raw parameters and
+     * its value; the value starts at the first colon outside a quoted
+     * parameter (TZID="W. Europe Standard Time").
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private static function splitContentLine(string $line): array
+    {
+        $inQuotes = false;
 
+        for ($i = 0, $length = strlen($line); $i < $length; $i++) {
+            if ($line[$i] === '"') {
+                $inQuotes = !$inQuotes;
+            } elseif ($line[$i] === ':' && !$inQuotes) {
+                $head = substr($line, 0, $i);
+                $semicolon = strpos($head, ';');
+
+                return [
+                    strtoupper($semicolon === false ? $head : substr($head, 0, $semicolon)),
+                    $semicolon === false ? '' : substr($head, $semicolon + 1),
+                    substr($line, $i + 1),
+                ];
+            }
+        }
+
+        return [strtoupper($line), '', ''];
+    }
+
+    private static function unescapeText(string $value): string
+    {
+        return preg_replace_callback('/\\\\(.)/', static fn(array $m) => match ($m[1]) {
+            'n', 'N' => "\n",
+            default => $m[1],
+        }, $value);
+    }
 
     public function toVCal(): string
     {
