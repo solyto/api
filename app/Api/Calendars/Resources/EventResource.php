@@ -2,6 +2,7 @@
 
 namespace App\Api\Calendars\Resources;
 
+use App\Api\Users\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,19 +32,33 @@ class EventResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Times go out without an offset and clients read them as local time,
+        // so timed events are shown in the user's zone, whatever zone a DAV
+        // client stored them in. All-day dates are floating and stay as they are.
+        $user = $request->user();
+        $timezone = $user instanceof User ? ($user->settings->timezone ?? null) : null;
+        $isAllDay = $this->isAllDay;
+        $local = function (?\DateTimeInterface $date) use ($timezone, $isAllDay): ?string {
+            if ($date && !$isAllDay && $timezone) {
+                $date = \DateTime::createFromInterface($date)->setTimezone(new \DateTimeZone($timezone));
+            }
+
+            return $date?->format('Y-m-d\TH:i:s');
+        };
+
         return [
             'id' => $this->id,
             'uri' => $this->uri,
             'title' => $this->title,
             'description' => $this->description,
             'location' => $this->location,
-            'start_date' => $this->startDate?->format('Y-m-d\TH:i:s'),
-            'end_date' => $this->endDate?->format('Y-m-d\TH:i:s'),
-            'is_all_day' => $this->isAllDay,
+            'start_date' => $local($this->startDate),
+            'end_date' => $local($this->endDate),
+            'is_all_day' => $isAllDay,
             'is_recurring' => $this->recurrenceRule !== null,
             'recurrence_rule' => $this->recurrenceRule,
-            'recurrence_end' => $this->recurrenceEnd?->format('Y-m-d\TH:i:s'),
-            'original_start_date' => $this->originalStartDate?->format('Y-m-d\TH:i:s'),
+            'recurrence_end' => $local($this->recurrenceEnd),
+            'original_start_date' => $local($this->originalStartDate),
             'etag' => $this->etag,
             'calendar_id' => $this->calendarId,
             'calendar_name' => $this->calendarName,

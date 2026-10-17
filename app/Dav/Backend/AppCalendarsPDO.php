@@ -222,7 +222,14 @@ SQL
         $events = [];
 
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-            $events[] = EventDTO::fromSabre($row, $calendar);
+            $row['calendardata'] = is_resource($row['calendardata'])
+                ? stream_get_contents($row['calendardata'])
+                : $row['calendardata'];
+
+            // Used by the calendar export, which writes the stored objects.
+            $event = EventDTO::fromSabre($row, $calendar);
+            $event->storedData = $row['calendardata'];
+            $events[] = $event;
         }
 
         return $events;
@@ -450,7 +457,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
                     $updateStmt->execute([
                         $sharee->access,
                         $sharee->properties['{DAV:}displayname'] ?? null,
-                        $sharee->inviteStatus ?: $oldSharee->inviteStatus,
+                        // Sharing again changes the access, not the sharee's answer.
+                        $oldSharee->inviteStatus ?: $sharee->inviteStatus,
                         $calendarId,
                         $sharee->href,
                     ]);

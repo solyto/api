@@ -162,7 +162,14 @@ class EventDTO
 
         $this->isAllDay = $data['is_all_day'] ?? $this->isAllDay;
         $this->location = $data['location'] ?? $this->location;
-        $this->recurrenceRule = $data['recurrence_rule'] ?? $this->recurrenceRule;
+        // The form switches repetition off with is_recurring: false (and no
+        // rule); without is_recurring the stored rule stays.
+        if (array_key_exists('is_recurring', $data) && !$data['is_recurring']) {
+            $this->recurrenceRule = null;
+            $this->recurrenceEnd = null;
+        } else {
+            $this->recurrenceRule = $data['recurrence_rule'] ?? $this->recurrenceRule;
+        }
 
         $this->timezone = $user->settings->timezone; // always use user’s timezone
         $this->etag = $data['etag'] ?? $this->etag;

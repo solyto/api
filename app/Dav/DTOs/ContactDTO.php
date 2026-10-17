@@ -321,6 +321,15 @@ class ContactDTO
         foreach ($lines as $line) {
             // Grouped properties (item1.ADR, item2.TEL) are read like plain ones.
             $line = preg_replace('/^[A-Za-z0-9-]+\.(?=[A-Za-z])/', '', rtrim($line));
+            // Property names are case-insensitive, and parameters on the plain
+            // text properties (FN;CHARSET=UTF-8:...) do not change their value.
+            $line = preg_replace_callback('/^([A-Za-z][A-Za-z0-9-]*)(;[^:]*)?:/', static function (array $m): string {
+                $name = strtoupper($m[1]);
+
+                return in_array($name, ['FN', 'N', 'ORG', 'NOTE', 'CATEGORIES', 'UID', 'URI'], true)
+                    ? $name.':'
+                    : $name.($m[2] ?? '').':';
+            }, $line);
 
             if (str_starts_with($line, 'PHOTO')) {
                 $isPhoto = true;
@@ -388,7 +397,7 @@ class ContactDTO
                 $result['postal_code'] = $parts[$offset + 3] ?? null;
                 $result['country'] = $parts[$offset + 4] ?? null;
             }
-            elseif (str_starts_with($line, 'uri:')) $result['uri'] = self::unescapeText(substr($line, 4));
+            elseif (str_starts_with($line, 'URI:')) $result['uri'] = self::unescapeText(substr($line, 4));
             elseif (str_starts_with($line, 'UID:')) $result['uid'] = self::unescapeText(substr($line, 4));
         }
 

@@ -334,6 +334,50 @@ describe('Events: editing a series through one of its occurrences', function () 
     });
 });
 
+describe('Events: switching repetition off through the API', function () {
+    beforeEach(function () {
+        $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+    });
+
+    it('turns the series into a single event on its first date when repeat is switched off via an occurrence', function () {
+        $vcalendar = apiEdit($this, 'series.ics', [
+            'title' => 'Standup', 'start_date' => '2030-10-16T11:00:00', 'end_date' => '2030-10-16T11:15:00',
+            'occurrence_start_date' => '2030-10-16T11:00:00', 'is_recurring' => false, 'recurrence_rule' => null, 'recurrence_end' => '2030-10-17T09:00:00',
+        ]);
+
+        expect(count($vcalendar->VEVENT))->toBe(1)
+            ->and(isset($vcalendar->VEVENT->RRULE))->toBeFalse()
+            ->and(isset($vcalendar->VEVENT->EXDATE))->toBeFalse()
+            ->and(apiEvents($this, $this->user)->map(fn (array $e) => $e['start_date'].' '.($e['is_recurring'] ? 'recurring' : 'single').' '.($e['recurrence_end'] ?? '-'))->all())
+            ->toBe(['2030-10-14T09:00:00 single -']);
+    });
+
+    it('stops repeating at start_date when an older frontend sends no occurrence_start_date', function () {
+        $vevent = apiEdit($this, 'series.ics', [
+            'title' => 'Standup', 'start_date' => '2030-10-14T09:00:00', 'end_date' => '2030-10-14T09:15:00', 'is_recurring' => false, 'recurrence_rule' => null,
+        ])->VEVENT;
+
+        expect(isset($vevent->RRULE))->toBeFalse()
+            ->and($vevent->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 09:00');
+    });
+
+    it('keeps the series repeating when a drag sends the stored rule back', function () {
+        $vcalendar = apiEdit($this, 'series.ics', [
+            'title' => 'Standup', 'start_date' => '2030-10-17T10:00:00', 'end_date' => '2030-10-17T10:15:00',
+            'occurrence_start_date' => '2030-10-17T09:00:00', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=4',
+        ]);
+
+        expect((string) $vcalendar->VEVENT->RRULE)->toBe('FREQ=DAILY;COUNT=4');
+    });
+
+    it('keeps the rule when is_recurring is not sent at all', function () {
+        $vcalendar = apiEdit($this, 'series.ics', ['title' => 'Daily sync', 'start_date' => '2030-10-14T09:00:00', 'end_date' => '2030-10-14T09:15:00']);
+
+        expect((string) $vcalendar->VEVENT->RRULE)->toBe('FREQ=DAILY;COUNT=4');
+    });
+});
+
 describe('Events: changing only one occurrence through the API', function () {
     beforeEach(function () {
         $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
@@ -431,6 +475,67 @@ describe('Events: changing only one occurrence through the API', function () {
         'UTC' => ['UTC', '2030-10-14T00:00:00.000Z'],
         'west of UTC' => ['America/New_York', '2030-10-14T04:00:00.000Z'],
     ]);
+});
+
+describe('Events: times in the user\'s time zone', function () {
+    beforeEach(function () {
+        $this->user->settings()->update(['timezone' => 'Europe/Berlin']);
+    });
+
+    it('shows an event a client stored in UTC in the user\'s local time', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'utc.ics', davIcs('utc', 'Standup', '20301015T070000Z', '20301015T071500Z'), ['Content-Type' => 'text/calendar']);
+
+        $event = apiEvents($this, $this->user)->first();
+
+        expect($event['start_date'])->toBe('2030-10-15T09:00:00')
+            ->and($event['end_date'])->toBe('2030-10-15T09:15:00');
+    });
+
+    it('shows a series stored in another zone in the user\'s local time, original slots included', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'ny.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:ny', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=America/New_York:20301014T090000', 'DTEND;TZID=America/New_York:20301014T093000',
+            'RRULE:FREQ=DAILY;COUNT=2', 'SUMMARY:Call New York', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        expect(apiEvents($this, $this->user)->map(fn (array $e) => $e['start_date'].' / '.$e['original_start_date'])->all())->toBe([
+            '2030-10-14T15:00:00 / 2030-10-14T15:00:00',
+            '2030-10-15T15:00:00 / 2030-10-15T15:00:00',
+        ]);
+    });
+
+    it('leaves all-day dates as they are', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'day.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:day', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;VALUE=DATE:20301015', 'DTEND;VALUE=DATE:20301016', 'SUMMARY:Holiday', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        $event = apiEvents($this, $this->user)->first();
+
+        expect($event['start_date'])->toBe('2030-10-15T00:00:00')
+            ->and($event['end_date'])->toBe('2030-10-15T00:00:00');
+    });
+
+    it('keeps the time of a UTC event when it is saved again with the shown local time', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'utc.ics', davIcs('utc', 'Standup', '20301015T070000Z', '20301015T071500Z'), ['Content-Type' => 'text/calendar']);
+        $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $shown = apiEvents($this, $this->user)->first();
+
+        $vevent = apiEdit($this, 'utc.ics', ['title' => 'Standup (renamed)', 'start_date' => $shown['start_date'], 'end_date' => $shown['end_date']])->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->getTimestamp())->toBe((new \DateTime('2030-10-15 07:00:00', new \DateTimeZone('UTC')))->getTimestamp());
+    });
+
+    it('shows the times of a created event in the user\'s local time', function () {
+        $instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+
+        $created = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/calendars/'.$instanceId.'/events', [
+            'title' => 'Dentist', 'start_date' => '2030-10-15 09:00:00', 'end_date' => '2030-10-15 10:00:00', 'is_all_day' => false, 'calendar_id' => $instanceId,
+        ])->assertStatus(201)->json('data');
+
+        expect($created['start_date'])->toBe('2030-10-15T09:00:00')
+            ->and(apiEvents($this, $this->user)->first()['start_date'])->toBe('2030-10-15T09:00:00');
+    });
 });
 
 describe('Calendars: DAV and API agree', function () {
