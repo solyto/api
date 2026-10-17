@@ -1,0 +1,13 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Sam O'Neil
+N:O'Neil;Sam;;;
+EMAIL;TYPE=INTERNET;TYPE=HOME:sam@example.com
+EMAIL;TYPE=INTERNET;TYPE=WORK:sam.oneil@work.example.com
+TEL;TYPE=CELL:+1 555 0100
+ADR;TYPE=HOME:;;1 Main St;Springfield;IL;62701;USA
+ORG:Initech
+CATEGORIES:myContacts,Friends
+BDAY:1985-04-12
+UID:c2a7f0e4-3b1d-4e5f-8a9b-0c1d2e3f4a5b
+END:VCARD

@@ -1,0 +1,16 @@
+BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Apple Inc.//iOS 18.0//EN
+N:Müller;Jürgen;;Dr.;
+FN:Dr. Jürgen Müller
+ORG:Müller & Söhne GmbH;Vertrieb
+TITLE:Sales Lead
+EMAIL;type=INTERNET;type=WORK;type=pref:juergen@example.de
+TEL;type=CELL;type=VOICE;type=pref:+49 170 1234567
+item1.ADR;type=HOME;type=pref:;;Hauptstraße 5;München;;80331;Deutschland
+item1.X-ABADR:de
+NOTE:Met at the trade fair\, booth 12.\nFollow up in November.
+PHOTO;ENCODING=b;TYPE=JPEG:/9j/4CBmYWtlIGpwZWcgYnl0ZXMgZm9yIHRoZSBmaXh0dXJl
+ IP/Z
+UID:3E1D5C2A-9B8F-4A7E-8D6C-5B4A3F2E1D0C
+END:VCARD

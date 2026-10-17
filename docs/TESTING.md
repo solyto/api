@@ -17,17 +17,18 @@ Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
 ## Layout and suites
 
 `phpunit.xml` defines three suites; `pest.php` (root) lists the same
-directories plus two more for Pest's own discovery:
+directories plus `app/Bots/Tests` for Pest's own discovery:
 
 | Suite (`phpunit.xml`) | Path | What lives there |
 | --- | --- | --- |
 | `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, the OpenAPI drift test, the resource-schema drift test (`ResourceSchemaDriftTest`, rule 2.6) |
 | `Feature` | `tests/Feature/` | **empty** (only `.gitkeep`); keep it empty — feature tests are co-located |
+| `Dav` | `app/Dav/Tests/` | DAV service, protocol, isolation, client fixtures (see [DAV tests](#dav-tests)) |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
-| — (Pest only) | `app/Bots/Tests/`, `app/Dav/Tests/` | bot state machine, DAV service |
+| — (Pest only) | `app/Bots/Tests/` | bot state machine; not in `phpunit.xml`, so `composer test` does not run it |
 
 Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
-`goodreads_book.html`).
+`goodreads_book.html`) and `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`).
 
 Binding: `tests/Pest.php` is the only Pest bootstrap file Pest loads
 (nested `Pest.php` files are ignored). It binds `Tests\TestCase` to all five
@@ -64,6 +65,7 @@ tests have no database refresh unless they ask for it.
 | `authHeaders($user)` / `sanctumToken($user)` | only when the test is about tokens themselves (`AuthTest`) |
 | `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; `expectApiError` is the standard for error cases, `expectApiSuccess` has no callers yet — use both |
 | `Model::factory()->forUser($user)` | every user-owned factory has this state |
+| `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()` | DAV protocol tests, see [DAV tests](#dav-tests) |
 
 Custom expectations `greaterThan`, `lessThan`, `toBeBoolean` alias Pest
 built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
@@ -182,6 +184,81 @@ describe('Client contract', function () {
 });
 ```
 
+## DAV tests
+
+`DavController` and `public/dav.php` read the raw PHP request
+(`Sapi::getRequest()`), so Laravel's HTTP helpers cannot reach them.
+`davRequest($user, $method, $path, $body, $headers)` (`tests/Pest.php`)
+builds the server both entry points use (`DavServerFactory`), sends it a
+`Sabre\HTTP\Request` with Basic auth (factory password `password`; `null`
+user = no credentials) and returns the captured `Sabre\HTTP\Response`.
+It runs on the `pgsql` connection's PDO, so the per-test transaction still
+isolates DAV writes.
+
+- `davUser()` = `makeUser()` + a DAV principal (the observer creates the
+  default calendar `my-calendar` and address book `contacts`, not the
+  principal). Paths: `calendars/<email>/<calendar>/<object>`,
+  `addressbooks/<email>/<book>/<object>`, `principals/<email>/`.
+- `davXpath($response)` registers `d`, `cal`, `card`, `cs`, `apple`, `s`;
+  `davPropfindBody(['d:displayname', …])` builds a PROPFIND body;
+  `davIcs()`/`davVcard()` build minimal objects.
+- Files: `DavAuthTest` (auth, discovery), `CalDavProtocolTest`,
+  `CardDavProtocolTest`, `DavIsolationTest` (cross-user access, sharing),
+  `DavApiConsistencyTest` (API ↔ DAV, `CacheInvalidationPlugin`),
+  `DavClientFixtureTest` (`tests/Fixtures/dav/`), `DavImportTest`
+  (`Http::fake()` remote server), `EventOccurrenceServiceTest`,
+  `PrincipalsServiceTest`, `DavServiceTest`.
+- A DAV-level isolation test belongs next to every new DAV-reachable
+  resource or method.
+
+Limits of the setup:
+
+- SQLite, not PostgreSQL: the production `BYTEA` columns are not exercised
+  (sabre/dav 4.7.1's `PARAM_LOB` fix is invisible here). Escaped fixtures
+  still belong in the suite; they pass on SQLite either way.
+- `UserCacheService::forgetByPrefix()` needs Redis and is a silent no-op on
+  the array store, so event-cache invalidation is asserted with a
+  `UserCacheService` spy, not through a cached API listing.
+- XML parsing turns CRLF into LF inside `calendar-data`/`address-data`.
+
+### Coverage map
+
+| Area | Calendar / event | Address book / card | Principal |
+| --- | --- | --- | --- |
+| Auth (none, wrong, unknown, valid) | `DavAuthTest` | `DavAuthTest` | `DavAuthTest` |
+| Discovery (home sets, current principal) | `DavAuthTest` | `DavAuthTest` | `DavAuthTest` |
+| MKCALENDAR / extended MKCOL | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| PROPFIND / PROPPATCH (name, color, transp, description, ctag, sync-token) | `CalDavProtocolTest` | `CardDavProtocolTest` | `DavAuthTest` |
+| PUT / GET / DELETE, ETag, `If-Match`, `If-None-Match: *` | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| Validation (415, unsupported component, repair) | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| `calendar-query` / `addressbook-query` | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| multiget | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| `sync-collection` (initial, delta, deletes, bad token) | `CalDavProtocolTest` | `CardDavProtocolTest` | — |
+| `free-busy-query` | `CalDavProtocolTest` | — | — |
+| MOVE / COPY (`Depth`), `Range` | `CalDavProtocolTest` | — | — |
+| vCard 3.0 ↔ 4.0 negotiation | — | `CardDavProtocolTest`, `DavClientFixtureTest` | — |
+| Cross-user read / write / move denied | `DavIsolationTest` | `DavIsolationTest` | `DavIsolationTest` |
+| Sharing (read-write, read-only, revoke, decline) | `DavIsolationTest` | — | — |
+| API ↔ DAV round trip, cache invalidation | `DavApiConsistencyTest` | `DavApiConsistencyTest` | — |
+| Real-client data (Apple, Google, Outlook, Thunderbird, DAVx5) | `DavClientFixtureTest` | `DavClientFixtureTest` | — |
+| Occurrence edits, expansion, DST | `EventOccurrenceServiceTest`, `DavClientFixtureTest` | — | — |
+| Import from a remote server | `DavImportTest` | `DavImportTest` | — |
+| Service CRUD, sharing, deletion | `DavServiceTest` | `DavServiceTest` | `PrincipalsServiceTest` |
+
+### Known gaps (skipped tests)
+
+Each is a `->skip('Known …')` test that states the wanted behavior; it
+turns green once the gap is fixed (remove the `skip`).
+
+- `ContactDTO::parseVCard()` ignores grouped properties (`item1.ADR`) and
+  does not unfold continuation lines.
+- Calendars accept VEVENT and VTODO: `createCalendarCustom()`'s
+  `components` key is not mapped by sabre (pinned in `CalDavProtocolTest`;
+  VTODOs are skipped by the API listing).
+- A pending calendar invite already grants DAV access; any authenticated
+  user can read another user's free/busy and list every principal (emails)
+  and object name.
+
 ## Caveats
 
 - Time: Carbon's `now()` is real unless the test freezes it; a test whose
@@ -191,7 +268,7 @@ describe('Client contract', function () {
   caught with `Notification::fake()`/`Queue::fake()`/`Bus::fake()` (8 files).
 - The DAV SQLite file is shared by all tests in a process; the transaction
   wrapper handles isolation, but a test that commits through SabreDAV
-  directly must clean up.
+  directly must clean up. `davRequest()` stays inside the transaction.
 - `tests/Feature/` is not a home for anything; new HTTP tests go next to
   their module.
 - New dev dependencies are installed only with approval (`docs/AGENTS.md`).
