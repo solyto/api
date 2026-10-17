@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Sabre\DAV\Server;
 use Sabre\DAV\ServerPlugin;
+use Sabre\HTTP\RequestInterface;
 
 class CacheInvalidationPlugin extends ServerPlugin
 {
@@ -25,6 +26,7 @@ class CacheInvalidationPlugin extends ServerPlugin
         $server->on('afterWriteContent', [$this, 'onCalendarObjectWrite']);
         $server->on('afterUnbind',       [$this, 'onAfterUnbind']);
         $server->on('afterBind',         [$this, 'onAfterBind']);
+        $server->on('afterMethod:PROPPATCH', [$this, 'onAfterPropPatch']);
     }
 
     public function getPluginName(): string
@@ -75,6 +77,19 @@ class CacheInvalidationPlugin extends ServerPlugin
     public function onAfterBind(string $uri): void
     {
         $parts = $this->parsePath($uri);
+
+        if (count($parts) === 3 && $parts[0] === 'calendars') {
+            $this->invalidateCalendarsForEmail($parts[1]);
+        }
+
+        if (count($parts) === 3 && $parts[0] === 'addressbooks') {
+            $this->invalidateAddressBooksForEmail($parts[1]);
+        }
+    }
+
+    public function onAfterPropPatch(RequestInterface $request): void
+    {
+        $parts = $this->parsePath($request->getPath());
 
         if (count($parts) === 3 && $parts[0] === 'calendars') {
             $this->invalidateCalendarsForEmail($parts[1]);
