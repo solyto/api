@@ -1,5 +1,8 @@
 * text=auto eol=lf
 
+# iCalendar/vCard fixtures keep their CRLF line endings (RFC 5545/6350).
+/tests/Fixtures/dav/** -text
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html
