@@ -328,6 +328,105 @@ describe('Events: editing a series through one of its occurrences', function () 
     });
 });
 
+describe('Events: changing only one occurrence through the API', function () {
+    beforeEach(function () {
+        $this->instanceId = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+    });
+
+    function occurrenceRequest(\Tests\TestCase $test, string $method, string $uri, string $isoDate, array $fields = []): \Sabre\VObject\Component\VCalendar
+    {
+        $url = '/api/v1/calendars/'.$test->instanceId.'/events/'.$uri.'/occurrence/'.rawurlencode($isoDate);
+        $response = $method === 'DELETE'
+            ? $test->actingAs($test->user, 'sanctum')->deleteJson($url)
+            : $test->actingAs($test->user, 'sanctum')->putJson($url, array_merge(['is_all_day' => false, 'calendar_id' => $test->instanceId, 'etag' => 'unused'], $fields));
+        $response->assertStatus(200);
+
+        return \Sabre\VObject\Reader::read(davRequest($test->user, 'GET', 'calendars/'.$test->user->email.'/my-calendar/'.$uri)->getBodyAsString());
+    }
+
+    function exceptionsOf(\Sabre\VObject\Component\VCalendar $vcalendar): array
+    {
+        return collect($vcalendar->select('VEVENT'))->filter(fn ($vevent) => isset($vevent->{'RECURRENCE-ID'}))->values()->all();
+    }
+
+    it('lists the original slot of a moved occurrence', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        expect(apiEvents($this, $this->user)->map(fn (array $e) => $e['start_date'].' / '.$e['original_start_date'])->all())->toBe([
+            '2030-10-14T09:00:00 / 2030-10-14T09:00:00',
+            '2030-10-16T11:00:00 / 2030-10-16T09:00:00',
+            '2030-10-17T09:00:00 / 2030-10-17T09:00:00',
+        ]);
+    });
+
+    it('edits a moved occurrence in place, addressed by its original slot or by its moved time', function (string $isoDate) {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        $exceptions = exceptionsOf(occurrenceRequest($this, 'PUT', 'series.ics', $isoDate, [
+            'title' => 'Renamed', 'start_date' => '2030-10-16 11:30:00', 'end_date' => '2030-10-16 11:45:00',
+        ]));
+
+        expect($exceptions)->toHaveCount(1)
+            ->and($exceptions[0]->{'RECURRENCE-ID'}->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-16 09:00')
+            ->and($exceptions[0]->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-16 11:30')
+            ->and((string) $exceptions[0]->SUMMARY)->toBe('Renamed');
+    })->with(['original slot' => '2030-10-16T09:00:00.000Z', 'moved time' => '2030-10-16T11:00:00.000Z']);
+
+    it('deletes a moved occurrence completely, addressed by its original slot or by its moved time', function (string $isoDate) {
+        davRequest($this->user, 'PUT', $this->calendar.'series.ics', seriesWithMovedDate(), ['Content-Type' => 'text/calendar']);
+
+        $vcalendar = occurrenceRequest($this, 'DELETE', 'series.ics', $isoDate);
+        $exdates = collect($vcalendar->VEVENT->select('EXDATE'))->map(fn ($exdate) => $exdate->getDateTime()->format('Y-m-d H:i'))->all();
+
+        expect(exceptionsOf($vcalendar))->toBe([])
+            ->and($exdates)->toBe(['2030-10-15 09:00', '2030-10-16 09:00'])
+            ->and(apiEvents($this, $this->user)->pluck('start_date')->all())->toBe(['2030-10-14T09:00:00', '2030-10-17T09:00:00']);
+    })->with(['original slot' => '2030-10-16T09:00:00.000Z', 'moved time' => '2030-10-16T11:00:00.000Z']);
+
+    it('carries the reminder of the series into a new exception', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'daily.ics', davIcs('daily', 'Standup', '20301014T090000Z', '20301014T091500Z', [
+            'RRULE:FREQ=DAILY;COUNT=4', 'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'TRIGGER:-PT10M', 'END:VALARM',
+        ]), ['Content-Type' => 'text/calendar']);
+
+        $exceptions = exceptionsOf(occurrenceRequest($this, 'PUT', 'daily.ics', '2030-10-17T09:00:00.000Z', [
+            'title' => 'Standup (late)', 'start_date' => '2030-10-17 10:00:00', 'end_date' => '2030-10-17 10:15:00',
+        ]));
+
+        expect($exceptions)->toHaveCount(1)
+            ->and(isset($exceptions[0]->VALARM))->toBeTrue()
+            ->and(isset($exceptions[0]->RRULE))->toBeFalse();
+    });
+
+    it('stores a moved time correctly when the user is in another zone than the series', function () {
+        $this->user->settings()->update(['timezone' => 'Europe/Berlin']);
+        davRequest($this->user, 'PUT', $this->calendar.'utc.ics', davIcs('utc', 'Standup', '20301014T070000Z', '20301014T071500Z', [
+            'RRULE:FREQ=DAILY;COUNT=4',
+        ]), ['Content-Type' => 'text/calendar']);
+
+        $exceptions = exceptionsOf(occurrenceRequest($this, 'PUT', 'utc.ics', '2030-10-16T07:00:00.000Z', [
+            'title' => 'Standup', 'start_date' => '2030-10-16 11:00:00', 'end_date' => '2030-10-16 11:15:00',
+        ]));
+
+        expect($exceptions[0]->DTSTART->getDateTime()->setTimezone(new \DateTimeZone('Europe/Berlin'))->format('Y-m-d H:i'))->toBe('2030-10-16 11:00');
+    });
+
+    it('deletes the right day of an all-day series in every time zone', function (string $timezone, string $isoDate) {
+        $this->user->settings()->update(['timezone' => $timezone]);
+        davRequest($this->user, 'PUT', $this->calendar.'bins.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:bins', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;VALUE=DATE:20301007', 'DTEND;VALUE=DATE:20301008', 'RRULE:FREQ=WEEKLY;COUNT=3', 'SUMMARY:Bin day', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        $vcalendar = occurrenceRequest($this, 'DELETE', 'bins.ics', $isoDate);
+
+        expect((string) $vcalendar->VEVENT->EXDATE)->toBe('20301014');
+    })->with([
+        'east of UTC' => ['Europe/Berlin', '2030-10-13T22:00:00.000Z'],
+        'UTC' => ['UTC', '2030-10-14T00:00:00.000Z'],
+        'west of UTC' => ['America/New_York', '2030-10-14T04:00:00.000Z'],
+    ]);
+});
+
 describe('Calendars: DAV and API agree', function () {
     it('lists a calendar created over DAV after the API listing was cached', function () {
         $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->assertJsonCount(1, 'data');
