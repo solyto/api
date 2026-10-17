@@ -10,6 +10,9 @@
     <testsuite name="Api">
       <directory>app/Api/*/Tests</directory>
     </testsuite>
+    <testsuite name="Dav">
+      <directory>app/Dav/Tests</directory>
+    </testsuite>
     <testsuite name="Plugins">
       <directory>app/Plugins/Tests</directory>
       <directory>app/Plugins/*/Tests</directory>

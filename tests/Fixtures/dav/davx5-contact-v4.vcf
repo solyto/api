@@ -1,0 +1,16 @@
+BEGIN:VCARD
+VERSION:4.0
+PRODID:ez-vcard 0.12.1
+UID:urn:uuid:9f8e7d6c-5b4a-4321-9876-0fedcba98765
+FN:Ana María García
+N:García;Ana María;;;
+TEL;TYPE=cell;VALUE=uri:tel:+34-600-123-456
+EMAIL;TYPE=home:ana@example.es
+item2.TEL:+34 911 234 567
+item2.X-ABLABEL:Office
+ADR;TYPE=work:;;Calle Mayor 1;Madrid;;28013;España
+NOTE:Prefers WhatsApp over phone calls. Speaks Spanish\, English and some G
+ erman. Ask about the marathon in April.
+BDAY:19900215
+REV:20301001T120000Z
+END:VCARD
