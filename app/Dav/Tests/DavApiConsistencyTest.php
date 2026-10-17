@@ -280,6 +280,12 @@ describe('Events: editing a series through one of its occurrences', function () 
             ->and($vevent->DTEND->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 10:15');
     });
 
+    it('accepts the dates in the format the app sends them', function () {
+        $vevent = apiEdit($this, 'series.ics', seriesEdit('2030-10-16T10:00:00', '2030-10-16T10:15:00', '2030-10-16T09:00:00'))->VEVENT;
+
+        expect($vevent->DTSTART->getDateTime()->format('Y-m-d H:i'))->toBe('2030-10-14 10:00');
+    });
+
     it('moves the whole series by the day an occurrence was dragged', function () {
         $vevent = apiEdit($this, 'series.ics', seriesEdit('2030-10-18 09:00:00', '2030-10-18 09:15:00', '2030-10-17 09:00:00'))->VEVENT;
 
