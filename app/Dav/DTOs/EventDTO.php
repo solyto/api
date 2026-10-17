@@ -118,6 +118,7 @@ class EventDTO
     {
         $data = $request->validated();
         $userTz = new \DateTimeZone($user->settings->timezone);
+        $seriesStart = $this->startDate;
 
         $this->title = $data['title'];
         $this->description = $data['description'] ?? $this->description;
@@ -134,6 +135,22 @@ class EventDTO
                 $data['end_date'],
                 $userTz
             );
+        }
+
+        // A series edited through one of its occurrences: start_date is that
+        // occurrence's new start, so the series moves by the same wall-clock
+        // difference instead of starting at the occurrence.
+        if (isset($data['occurrence_start_date']) && $seriesStart && $this->startDate && $this->endDate) {
+            $wallClock = static fn (\DateTimeInterface $date): \DateTimeImmutable => new \DateTimeImmutable($date->format('Y-m-d H:i:s'), new \DateTimeZone('UTC'));
+            $occurrenceStart = new \DateTime($data['occurrence_start_date'], $userTz);
+            $shift = $wallClock($this->startDate)->getTimestamp() - $wallClock($occurrenceStart)->getTimestamp();
+            $duration = $wallClock($this->endDate)->getTimestamp() - $wallClock($this->startDate)->getTimestamp();
+            // All-day dates are floating; converting them could change the day.
+            $base = ($data['is_all_day'] ?? false) ? $seriesStart : \DateTime::createFromInterface($seriesStart)->setTimezone($userTz);
+            $start = $wallClock($base)->modify("{$shift} seconds");
+
+            $this->startDate = new \DateTime($start->format('Y-m-d H:i:s'), $userTz);
+            $this->endDate = new \DateTime($start->modify("{$duration} seconds")->format('Y-m-d H:i:s'), $userTz);
         }
 
         if (isset($data['recurrence_end'])) {

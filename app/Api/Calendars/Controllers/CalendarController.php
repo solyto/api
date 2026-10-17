@@ -338,6 +338,7 @@ class CalendarController
      *             @OA\Property(property="is_recurring", type="boolean", example=false),
      *             @OA\Property(property="recurrence_rule", type="string", nullable=true, example="FREQ=WEEKLY"),
      *             @OA\Property(property="recurrence_end", type="string", format="date", nullable=true, example="2024-12-31"),
+     *             @OA\Property(property="occurrence_start_date", type="string", format="date", nullable=true, example="2024-01-17 10:00:00", description="For a series edit: the listed start of the occurrence that was edited. The series moves by the difference between start_date and this value; without it, start_date becomes the series start."),
      *             @OA\Property(property="etag", type="string", example="abc123")
      *         )
      *     ),
