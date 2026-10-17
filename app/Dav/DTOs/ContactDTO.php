@@ -275,7 +275,24 @@ class ContactDTO
 
     public static function parseVCard(string $vcard, bool $includePhoto = true): array
     {
-        $lines = explode("\n", str_replace(["\r\n","\r"], "\n", $vcard));
+        // Unfold continuation lines (RFC 6350 3.2). PHOTO keeps its folded
+        // lines, which the photo handling below collects as they are.
+        $lines = [];
+        $photoOpen = false;
+        foreach (explode("\n", str_replace(["\r\n","\r"], "\n", $vcard)) as $rawLine) {
+            $isContinuation = $lines !== [] && (str_starts_with($rawLine, ' ') || str_starts_with($rawLine, "\t"));
+
+            if ($isContinuation && !$photoOpen) {
+                $lines[array_key_last($lines)] .= substr($rawLine, 1);
+                continue;
+            }
+            if (!$isContinuation) {
+                $photoOpen = (bool) preg_match('/^([A-Za-z0-9-]+\.)?PHOTO[;:]/i', $rawLine);
+            }
+
+            $lines[] = $rawLine;
+        }
+
         $result = [
             'full_name' => null,
             'first_name' => null,
@@ -302,7 +319,8 @@ class ContactDTO
         $isPhoto = false;
 
         foreach ($lines as $line) {
-            $line = rtrim($line);
+            // Grouped properties (item1.ADR, item2.TEL) are read like plain ones.
+            $line = preg_replace('/^[A-Za-z0-9-]+\.(?=[A-Za-z])/', '', rtrim($line));
 
             if (str_starts_with($line, 'PHOTO')) {
                 $isPhoto = true;

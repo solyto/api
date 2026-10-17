@@ -12,6 +12,7 @@ use App\Shared\Services\UserCacheService;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class CalendarImport
 {
@@ -87,6 +88,11 @@ class CalendarImport
             try {
                 $this->calendars->create($user, CalendarDTO::fromRequest($calendar));
             } catch (\Exception $e) {
+                Log::channel('dav')->warning('Calendar import skipped a calendar', [
+                    'user_id'  => $user->id,
+                    'calendar' => $calendar['name'],
+                    'error'    => $e->getMessage(),
+                ]);
                 continue;
             }
 
@@ -126,6 +132,12 @@ class CalendarImport
                 try {
                     $this->calendars->events()->create($c, EventDTO::fromImport($event, $c));
                 } catch (\Exception $e) {
+                    Log::channel('dav')->warning('Calendar import skipped an event', [
+                        'user_id'  => $user->id,
+                        'calendar' => $calendar['name'],
+                        'event'    => $event['uid'] ?? null,
+                        'error'    => $e->getMessage(),
+                    ]);
                     continue;
                 }
 

@@ -5,6 +5,7 @@ use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -144,6 +145,24 @@ describe('Calendar import', function () {
         app(DavService::class)->import()->calendars()->start($user, REMOTE, 'alice', 'app-password');
     })->throws(ImportException::class);
 
+    it('logs a calendar it has to skip', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', ['Personal' => []]);
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
+        app(DavService::class)->calendars()->create($user, \App\Dav\DTOs\CalendarDTO::fromRequest(['name' => 'Personal']));
+
+        Log::shouldReceive('channel')->with('dav')->andReturnSelf();
+        Log::shouldReceive('warning')->once()->with('Calendar import skipped a calendar', Mockery::on(
+            fn (array $context) => $context['user_id'] === $user->id && $context['calendar'] === 'Personal' && ! str_contains(json_encode($context), 'app-password')
+        ));
+
+        $import->importCalendars($user, $import->getState($user->id));
+
+        expect($import->getState($user->id)->calendarsDone)->toBe(0);
+    });
+
     it('imports events with escaped text without losing them', function () {
         $user = davUser();
         fakeRemoteDav('calendars', ['Personal' => [
@@ -161,6 +180,26 @@ describe('Calendar import', function () {
 });
 
 describe('Contact import', function () {
+    it('logs an address book it has to skip', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+        app(DavService::class)->addressBooks()->create($user, new \App\Dav\DTOs\AddressBookDTO(
+            id: 0, principalUri: 'principals/'.$user->email, uri: 'friends', displayName: 'Friends', description: null, color: null,
+        ));
+
+        Log::shouldReceive('channel')->with('dav')->andReturnSelf();
+        Log::shouldReceive('warning')->once()->with('Contact import skipped an address book', Mockery::on(
+            fn (array $context) => $context['user_id'] === $user->id && $context['address_book'] === 'Friends'
+        ));
+
+        $import->importAddressBooks($user, $import->getState($user->id));
+
+        expect($import->getState($user->id)->addressBooksDone)->toBe(0);
+    });
+
     it('imports the selected address book with its contacts', function () {
         $user = davUser();
         fakeRemoteDav('addressbooks', [
