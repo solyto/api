@@ -3,7 +3,10 @@
 namespace App\Api\Export\Services;
 
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\EventDTO;
 use App\Dav\Services\DavService;
+use Sabre\VObject\Component\VCalendar;
+use Sabre\VObject\Reader;
 
 class CalendarExportService
 {
@@ -11,37 +14,66 @@ class CalendarExportService
         private readonly DavService $davService
     ) {}
 
+    /**
+     * Writes one iCalendar file with every calendar's objects as they are
+     * stored (UIDs, exceptions, alarms, attendees, tasks), each time zone once.
+     */
     public function export(User $user, string $path): void
     {
-        $calendars = $this->davService->calendars()->list($user);
+        // Like the calendar view: calendars from unanswered invites are not the user's yet.
+        $calendars = array_filter($this->davService->calendars()->list($user), fn ($calendar) => $calendar->inviteStatus !== 'pending');
 
         $header = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Solyto//Export//EN\r\nCALSCALE:GREGORIAN\r\n";
         $timezones = '';
-        $events = '';
+        $components = '';
         $addedTimezones = [];
+        $usedUids = [];
 
         foreach ($calendars as $calendar) {
             foreach ($this->davService->calendars()->events()->list($calendar) as $event) {
-                $vcal = $event->toVCal();
+                $vcalendar = $this->readStored($event);
 
-                if (preg_match_all('/BEGIN:VTIMEZONE.*?END:VTIMEZONE/s', $vcal, $tzMatches)) {
-                    foreach ($tzMatches[0] as $tzBlock) {
-                        if (preg_match('/TZID:(.+)/', $tzBlock, $m)) {
-                            $tzId = trim($m[1]);
-                            if (!isset($addedTimezones[$tzId])) {
-                                $addedTimezones[$tzId] = true;
-                                $timezones .= $tzBlock."\r\n";
-                            }
-                        }
+                foreach ($vcalendar->select('VTIMEZONE') as $vtimezone) {
+                    $tzId = (string) $vtimezone->TZID;
+                    if (!isset($addedTimezones[$tzId])) {
+                        $addedTimezones[$tzId] = true;
+                        $timezones .= $vtimezone->serialize();
                     }
                 }
 
-                if (preg_match('/BEGIN:VEVENT.*?END:VEVENT/s', $vcal, $veventMatch)) {
-                    $events .= $veventMatch[0]."\r\n";
+                // Two objects with one UID would overwrite each other on import.
+                $objectUids = [];
+                foreach ([...$vcalendar->select('VEVENT'), ...$vcalendar->select('VTODO')] as $component) {
+                    $uid = (string) $component->UID;
+                    if (isset($usedUids[$uid])) {
+                        $component->UID = $uid.'-'.$calendar->instanceId.'-'.$event->id;
+                    }
+                    $objectUids[$uid] = true;
+                    $components .= $component->serialize();
                 }
+                $usedUids += $objectUids;
             }
         }
 
-        file_put_contents($path, $header.$timezones.$events."END:VCALENDAR\r\n");
+        file_put_contents($path, $header.$timezones.$components."END:VCALENDAR\r\n");
+    }
+
+    /**
+     * The stored object, or one rebuilt from the event when there is nothing
+     * readable stored.
+     */
+    private function readStored(EventDTO $event): VCalendar
+    {
+        try {
+            $vcalendar = $event->storedData ? Reader::read($event->storedData) : null;
+            if ($vcalendar instanceof VCalendar) {
+                return $vcalendar;
+            }
+        } catch (\Throwable) {
+            // Unreadable stored data: rebuilt from the event below.
+        }
+
+        /** @var VCalendar */
+        return Reader::read($event->toVCal());
     }
 }

@@ -16,6 +16,25 @@ use Sabre\VObject\Reader;
 
 class AppCalendarsPDO extends SabreBackend
 {
+    /**
+     * Calendars shared with the principal reach DAV clients only once the
+     * invite is accepted, as in the app. listCalendarsCustom() reads the
+     * parent directly, so the app still sees pending invites.
+     */
+    public function getCalendarsForUser($principalUri)
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1 AND share_invitestatus <> ?'
+        );
+        $stmt->execute([$principalUri, \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED]);
+        $notAccepted = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+        return array_values(array_filter(
+            parent::getCalendarsForUser($principalUri),
+            fn (array $calendar) => !in_array($calendar['id'][1], $notAccepted, true)
+        ));
+    }
+
     public function listCalendarsCustom(string $principalUri): array
     {
         $entries = parent::getCalendarsForUser($principalUri);
@@ -203,7 +222,14 @@ SQL
         $events = [];
 
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-            $events[] = EventDTO::fromSabre($row, $calendar);
+            $row['calendardata'] = is_resource($row['calendardata'])
+                ? stream_get_contents($row['calendardata'])
+                : $row['calendardata'];
+
+            // Used by the calendar export, which writes the stored objects.
+            $event = EventDTO::fromSabre($row, $calendar);
+            $event->storedData = $row['calendardata'];
+            $events[] = $event;
         }
 
         return $events;
@@ -241,7 +267,8 @@ SQL
 
             $vObj = \Sabre\VObject\Reader::read($vCalData);
 
-            foreach ($vObj->VEVENT as $vevent) {
+            // Calendars also accept VTODOs from DAV clients; they have no VEVENT.
+            foreach ($vObj->VEVENT ?? [] as $vevent) {
                 $startOrig = $vevent->DTSTART->getDateTime();
                 $endOrig   = isset($vevent->DTEND) ? $vevent->DTEND->getDateTime() : $startOrig;
                 $isAllDay = $vevent->DTSTART->getValueType() === 'DATE';
@@ -303,6 +330,15 @@ SQL
 
                         $occurrence = $iterator->getEventObject();
 
+                        // The occurrence's original slot, which differs from its
+                        // start once it was moved; clients address it by this.
+                        $originalStart = isset($occurrence->{'RECURRENCE-ID'})
+                            ? $occurrence->{'RECURRENCE-ID'}->getDateTime()
+                            : $occStart;
+                        if ($isAllDay) {
+                            $originalStart = new \DateTimeImmutable($originalStart->format('Y-m-d H:i:s'), $queryTz);
+                        }
+
                         $eventDto = EventDTO::fromSabre([
                             'id' => $obj['id'],
                             'uri' => $uri,
@@ -310,7 +346,7 @@ SQL
                             'calendardata' => $occurrence->serialize(),
                         ], $calendar);
 
-                        $eventDto->originalStartDate = clone $occStart;
+                        $eventDto->originalStartDate = \DateTime::createFromInterface($originalStart);
                         $eventDto->recurrenceRule = $rrule;
                         $eventDto->recurrenceEnd = $rruleEnd;
 
@@ -344,20 +380,28 @@ SQL
     {
         $stmt = $this->pdo->prepare('SELECT id, uri, lastmodified, etag, calendarid, size, calendardata, componenttype FROM '.$this->calendarObjectTableName.' WHERE calendarid = ? AND uri = ? LIMIT 1');
         $stmt->execute([$calendar->calendarId, $uri]);
-        $row = $stmt->fetch();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row) {
             return null;
         }
 
-        return EventDTO::fromSabre($row, $calendar);
+        $row['calendardata'] = is_resource($row['calendardata'])
+            ? stream_get_contents($row['calendardata'])
+            : $row['calendardata'];
+
+        $event = EventDTO::fromSabre($row, $calendar);
+        $event->storedData = $row['calendardata'];
+
+        return $event;
     }
 
     public function createEventCustom(CalendarDTO $calendar, EventDTO $dto): ?string
     {
         $uri = bin2hex(Str::random(16)) . '.ics';
 
-        return parent::createCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri, $dto->toVCal()) ? $uri : null;
+        // An event moved here from another calendar keeps its stored data.
+        return parent::createCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri, $dto->toVCalForUpdate()) ? $uri : null;
     }
 
     public function importEventCustom(CalendarDTO $calendar, string $vCal): ?string
@@ -369,7 +413,7 @@ SQL
 
     public function updateEventCustom(CalendarDTO $calendar, EventDTO $dto): bool
     {
-        return parent::updateCalendarObject([$calendar->calendarId, $calendar->instanceId], $dto->uri, $dto->toVCal()) !== null;
+        return parent::updateCalendarObject([$calendar->calendarId, $calendar->instanceId], $dto->uri, $dto->toVCalForUpdate()) !== null;
     }
 
     public function deleteEventCustom(CalendarDTO $calendar, EventDTO $dto): bool
@@ -413,7 +457,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
                     $updateStmt->execute([
                         $sharee->access,
                         $sharee->properties['{DAV:}displayname'] ?? null,
-                        $sharee->inviteStatus ?: $oldSharee->inviteStatus,
+                        // Sharing again changes the access, not the sharee's answer.
+                        $oldSharee->inviteStatus ?: $sharee->inviteStatus,
                         $calendarId,
                         $sharee->href,
                     ]);
@@ -520,34 +565,13 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     }
 
     /**
-     * Delete a single occurrence from a recurring event by adding EXDATE.
+     * Delete a single occurrence from a recurring event: an EXDATE for its
+     * original slot, and its exception VEVENT if it was moved or edited.
      * This does NOT modify the master event's other properties.
      */
     public function deleteOccurrenceCustom(CalendarDTO $calendar, string $uri, \DateTimeInterface $occurrenceDate): bool
     {
-        $obj = $this->getCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri);
-
-        if (!$obj) {
-            return false;
-        }
-
-        $vCalData = is_resource($obj['calendardata'])
-            ? stream_get_contents($obj['calendardata'])
-            : $obj['calendardata'];
-
-        if (!$vCalData) {
-            return false;
-        }
-
-        $vCal = Reader::read($vCalData);
-        $masterEvent = null;
-
-        foreach ($vCal->VEVENT as $vevent) {
-            if (!isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->RRULE)) {
-                $masterEvent = $vevent;
-                break;
-            }
-        }
+        [$vCal, $masterEvent] = $this->readRecurringObject($calendar, $uri);
 
         if (!$masterEvent) {
             return false;
@@ -555,15 +579,18 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
         $isAllDay = $masterEvent->DTSTART->getValueType() === 'DATE';
         $tz = $masterEvent->DTSTART->getDateTime()->getTimezone();
-
-        $occInTz = \DateTime::createFromInterface($occurrenceDate)->setTimezone($tz);
+        $slot = $this->resolveOccurrenceSlot($vCal, $masterEvent, $occurrenceDate, $isAllDay);
 
         if ($isAllDay) {
-            $exdateValue = $occInTz->format('Ymd');
-            $masterEvent->add('EXDATE', $exdateValue, ['VALUE' => 'DATE']);
+            $masterEvent->add('EXDATE', $slot->format('Ymd'), ['VALUE' => 'DATE']);
         } else {
-            $exdateValue = $occInTz->format('Ymd\THis');
-            $masterEvent->add('EXDATE', $exdateValue, ['TZID' => $tz->getName()]);
+            $slotInTz = \DateTime::createFromInterface($slot)->setTimezone($tz);
+            $masterEvent->add('EXDATE', $slotInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+        }
+
+        $existing = $this->findException($vCal, $slot, $isAllDay);
+        if ($existing) {
+            $vCal->remove($existing);
         }
 
         return parent::updateCalendarObject(
@@ -574,8 +601,10 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     }
 
     /**
-     * Update a single occurrence of a recurring event by adding an exception VEVENT with RECURRENCE-ID.
-     * This does NOT modify the master event.
+     * Update a single occurrence of a recurring event through an exception
+     * VEVENT with RECURRENCE-ID: the occurrence's existing exception if it was
+     * already moved or edited, otherwise a copy of the master, so alarms and
+     * other client data carry over. This does NOT modify the master event.
      */
     public function updateOccurrenceCustom(
         CalendarDTO $calendar,
@@ -583,10 +612,77 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         \DateTimeInterface $occurrenceDate,
         EventDTO $updatedData
     ): bool {
+        [$vCal, $masterEvent] = $this->readRecurringObject($calendar, $uri);
+
+        if (!$masterEvent || !isset($masterEvent->UID) || !$updatedData->startDate) {
+            return false;
+        }
+
+        $isAllDay = $masterEvent->DTSTART->getValueType() === 'DATE';
+        $tz = $masterEvent->DTSTART->getDateTime()->getTimezone();
+        $slot = $this->resolveOccurrenceSlot($vCal, $masterEvent, $occurrenceDate, $isAllDay);
+
+        $exceptionEvent = $this->findException($vCal, $slot, $isAllDay);
+        if (!$exceptionEvent) {
+            $exceptionEvent = clone $masterEvent;
+            foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE'] as $name) {
+                $exceptionEvent->remove($name);
+            }
+            if ($isAllDay) {
+                $exceptionEvent->add('RECURRENCE-ID', $slot->format('Ymd'), ['VALUE' => 'DATE']);
+            } else {
+                $slotInTz = \DateTime::createFromInterface($slot)->setTimezone($tz);
+                $exceptionEvent->add('RECURRENCE-ID', $slotInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+            }
+            $vCal->add($exceptionEvent);
+        }
+
+        $exceptionEvent->SUMMARY = $updatedData->title;
+        $exceptionEvent->DTSTAMP = gmdate('Ymd\THis\Z');
+        $exceptionEvent->remove('DTSTART');
+        $exceptionEvent->remove('DTEND');
+        $exceptionEvent->remove('DURATION');
+
+        if ($isAllDay) {
+            $exceptionEvent->add('DTSTART', $updatedData->startDate->format('Ymd'), ['VALUE' => 'DATE']);
+            if ($updatedData->endDate) {
+                $end = \DateTime::createFromInterface($updatedData->endDate)->modify('+1 day');
+                $exceptionEvent->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
+            }
+        } else {
+            // The request's times are in the user's zone; store them in the series' zone.
+            $startInTz = \DateTime::createFromInterface($updatedData->startDate)->setTimezone($tz);
+            $exceptionEvent->add('DTSTART', $startInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+            if ($updatedData->endDate) {
+                $endInTz = \DateTime::createFromInterface($updatedData->endDate)->setTimezone($tz);
+                $exceptionEvent->add('DTEND', $endInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+            }
+        }
+
+        foreach (['DESCRIPTION' => $updatedData->description, 'LOCATION' => $updatedData->location] as $name => $value) {
+            if ($value) {
+                $exceptionEvent->{$name} = $value;
+            } else {
+                $exceptionEvent->remove($name);
+            }
+        }
+
+        return parent::updateCalendarObject(
+            [$calendar->calendarId, $calendar->instanceId],
+            $uri,
+            $vCal->serialize()
+        ) !== null;
+    }
+
+    /**
+     * @return array{0: ?\Sabre\VObject\Component\VCalendar, 1: ?\Sabre\VObject\Component\VEvent}
+     */
+    private function readRecurringObject(CalendarDTO $calendar, string $uri): array
+    {
         $obj = $this->getCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri);
 
         if (!$obj) {
-            return false;
+            return [null, null];
         }
 
         $vCalData = is_resource($obj['calendardata'])
@@ -594,63 +690,70 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             : $obj['calendardata'];
 
         if (!$vCalData) {
-            return false;
+            return [null, null];
         }
 
         $vCal = Reader::read($vCalData);
-        $masterEvent = null;
-        $uid = null;
 
-        foreach ($vCal->VEVENT as $vevent) {
+        foreach ($vCal->VEVENT ?? [] as $vevent) {
             if (!isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->RRULE)) {
-                $masterEvent = $vevent;
-                $uid = (string) $vevent->UID;
-                break;
+                return [$vCal, $vevent];
             }
         }
 
-        if (!$masterEvent || !$uid) {
-            return false;
+        return [$vCal, null];
+    }
+
+    /**
+     * The original slot (RECURRENCE-ID) of the occurrence a client means by
+     * $occurrenceDate, in this order: an exception's RECURRENCE-ID, a regular
+     * occurrence of the series, an exception moved to that time (older
+     * clients sent the moved time), else $occurrenceDate itself.
+     */
+    private function resolveOccurrenceSlot(\Sabre\VObject\Component\VCalendar $vCal, \Sabre\VObject\Component\VEvent $masterEvent, \DateTimeInterface $occurrenceDate, bool $isAllDay): \DateTimeInterface
+    {
+        $matches = static fn (\DateTimeInterface $date): bool => $isAllDay
+            ? $date->format('Ymd') === $occurrenceDate->format('Ymd')
+            : $date->getTimestamp() === $occurrenceDate->getTimestamp();
+
+        $exception = $this->findException($vCal, $occurrenceDate, $isAllDay);
+        if ($exception) {
+            return $exception->{'RECURRENCE-ID'}->getDateTime();
         }
 
-        $isAllDay = $masterEvent->DTSTART->getValueType() === 'DATE';
-        $tz = $masterEvent->DTSTART->getDateTime()->getTimezone();
-
-        $occInTz = \DateTime::createFromInterface($occurrenceDate)->setTimezone($tz);
-
-        $exceptionEvent = $vCal->createComponent('VEVENT');
-        $exceptionEvent->UID = $uid;
-        $exceptionEvent->DTSTAMP = gmdate('Ymd\THis\Z');
-        $exceptionEvent->SUMMARY = $updatedData->title;
-
-        if ($isAllDay) {
-            $exceptionEvent->add('RECURRENCE-ID', $occInTz->format('Ymd'), ['VALUE' => 'DATE']);
-            $exceptionEvent->add('DTSTART', $updatedData->startDate->format('Ymd'), ['VALUE' => 'DATE']);
-            if ($updatedData->endDate) {
-                $end = (clone $updatedData->endDate)->modify('+1 day');
-                $exceptionEvent->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
+        $series = new \Sabre\VObject\Recur\EventIterator([$masterEvent]);
+        $series->fastForward(\DateTime::createFromInterface($occurrenceDate)->modify('-1 day'));
+        while ($series->valid() && $series->getDtStart() <= \DateTime::createFromInterface($occurrenceDate)->modify('+1 day')) {
+            if ($matches($series->getDtStart())) {
+                return $occurrenceDate;
             }
-        } else {
-            $exceptionEvent->add('RECURRENCE-ID', $occInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-            $exceptionEvent->add('DTSTART', $updatedData->startDate->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-            if ($updatedData->endDate) {
-                $exceptionEvent->add('DTEND', $updatedData->endDate->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+            $series->next();
+        }
+
+        foreach ($vCal->select('VEVENT') as $vevent) {
+            if (isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->DTSTART) && $matches($vevent->DTSTART->getDateTime())) {
+                return $vevent->{'RECURRENCE-ID'}->getDateTime();
             }
         }
 
-        if ($updatedData->description) {
-            $exceptionEvent->DESCRIPTION = $updatedData->description;
-        }
-        if ($updatedData->location) {
-            $exceptionEvent->LOCATION = $updatedData->location;
+        return $occurrenceDate;
+    }
+
+    private function findException(\Sabre\VObject\Component\VCalendar $vCal, \DateTimeInterface $slot, bool $isAllDay): ?\Sabre\VObject\Component\VEvent
+    {
+        foreach ($vCal->select('VEVENT') as $vevent) {
+            if (!isset($vevent->{'RECURRENCE-ID'})) {
+                continue;
+            }
+            $recurrenceId = $vevent->{'RECURRENCE-ID'}->getDateTime();
+            $same = $isAllDay
+                ? $recurrenceId->format('Ymd') === $slot->format('Ymd')
+                : $recurrenceId->getTimestamp() === $slot->getTimestamp();
+            if ($same) {
+                return $vevent;
+            }
         }
 
-        $vCal->add($exceptionEvent);
-
-        return parent::updateCalendarObject(
-            [$calendar->calendarId, $calendar->instanceId],
-            $uri,
-            $vCal->serialize()
-        ) !== null;
+        return null;
     }
 }

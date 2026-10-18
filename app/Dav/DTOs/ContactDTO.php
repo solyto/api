@@ -275,7 +275,24 @@ class ContactDTO
 
     public static function parseVCard(string $vcard, bool $includePhoto = true): array
     {
-        $lines = explode("\n", str_replace(["\r\n","\r"], "\n", $vcard));
+        // Unfold continuation lines (RFC 6350 3.2). PHOTO keeps its folded
+        // lines, which the photo handling below collects as they are.
+        $lines = [];
+        $photoOpen = false;
+        foreach (explode("\n", str_replace(["\r\n","\r"], "\n", $vcard)) as $rawLine) {
+            $isContinuation = $lines !== [] && (str_starts_with($rawLine, ' ') || str_starts_with($rawLine, "\t"));
+
+            if ($isContinuation && !$photoOpen) {
+                $lines[array_key_last($lines)] .= substr($rawLine, 1);
+                continue;
+            }
+            if (!$isContinuation) {
+                $photoOpen = (bool) preg_match('/^([A-Za-z0-9-]+\.)?PHOTO[;:]/i', $rawLine);
+            }
+
+            $lines[] = $rawLine;
+        }
+
         $result = [
             'full_name' => null,
             'first_name' => null,
@@ -302,7 +319,17 @@ class ContactDTO
         $isPhoto = false;
 
         foreach ($lines as $line) {
-            $line = rtrim($line);
+            // Grouped properties (item1.ADR, item2.TEL) are read like plain ones.
+            $line = preg_replace('/^[A-Za-z0-9-]+\.(?=[A-Za-z])/', '', rtrim($line));
+            // Property names are case-insensitive, and parameters on the plain
+            // text properties (FN;CHARSET=UTF-8:...) do not change their value.
+            $line = preg_replace_callback('/^([A-Za-z][A-Za-z0-9-]*)(;[^:]*)?:/', static function (array $m): string {
+                $name = strtoupper($m[1]);
+
+                return in_array($name, ['FN', 'N', 'ORG', 'NOTE', 'CATEGORIES', 'UID', 'URI'], true)
+                    ? $name.':'
+                    : $name.($m[2] ?? '').':';
+            }, $line);
 
             if (str_starts_with($line, 'PHOTO')) {
                 $isPhoto = true;
@@ -370,7 +397,7 @@ class ContactDTO
                 $result['postal_code'] = $parts[$offset + 3] ?? null;
                 $result['country'] = $parts[$offset + 4] ?? null;
             }
-            elseif (str_starts_with($line, 'uri:')) $result['uri'] = self::unescapeText(substr($line, 4));
+            elseif (str_starts_with($line, 'URI:')) $result['uri'] = self::unescapeText(substr($line, 4));
             elseif (str_starts_with($line, 'UID:')) $result['uid'] = self::unescapeText(substr($line, 4));
         }
 

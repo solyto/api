@@ -11,6 +11,7 @@ use App\Shared\Services\UserCacheService;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ContactImport
 {
@@ -84,9 +85,13 @@ class ContactImport
 
             try {
                 unset($addressBook['url']);
-                echo 'Importing address book ' . $addressBook['display_name'] . "\n";
                 $this->addressBooks->create($user, AddressBookDTO::fromRequest($addressBook));
             } catch (\Exception $e) {
+                Log::channel('dav')->warning('Contact import skipped an address book', [
+                    'user_id'      => $user->id,
+                    'address_book' => $addressBook['display_name'],
+                    'error'        => $e->getMessage(),
+                ]);
                 continue;
             }
 
@@ -126,6 +131,11 @@ class ContactImport
                 try {
                     $this->addressBooks->contacts()->import($a, $contact);
                 } catch (\Exception $e) {
+                    Log::channel('dav')->warning('Contact import skipped a contact', [
+                        'user_id'      => $user->id,
+                        'address_book' => $addressBook['display_name'],
+                        'error'        => $e->getMessage(),
+                    ]);
                     continue;
                 }
 
