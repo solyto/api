@@ -1,6 +1,8 @@
 <?php
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Http;
 
 describe('Generate example notifications command', function () {
     it('generates 3 unread notifications of different types for the given email', function () {
@@ -34,5 +36,56 @@ describe('Generate example notifications command', function () {
             ->assertSuccessful();
 
         expect(DatabaseNotification::count())->toBe(0);
+    });
+});
+
+describe('Test ntfy command', function () {
+    beforeEach(function () {
+        config([
+            'services.ntfy.url' => 'https://ntfy.example.test',
+            'services.ntfy.topic' => 'solyto-admin',
+        ]);
+        Http::fake();
+    });
+
+    it('publishes a test notification to the default topic', function () {
+        $this->artisan('app:notifications:test-ntfy')
+            ->expectsOutputToContain('Test notification published to topic solyto-admin.')
+            ->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) =>
+            $request->url() === 'https://ntfy.example.test'
+            && $request['topic'] === 'solyto-admin'
+            && $request['title'] === 'Test notification'
+        );
+    });
+
+    it('publishes to the given topic', function () {
+        $this->artisan('app:notifications:test-ntfy', ['topic' => 'solyto-traffic'])
+            ->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-traffic');
+    });
+
+    it('fails without sending when ntfy is not configured', function () {
+        config(['services.ntfy.url' => null]);
+
+        $this->artisan('app:notifications:test-ntfy')
+            ->expectsOutputToContain('ntfy is not configured')
+            ->assertFailed();
+
+        Http::assertNothingSent();
+    });
+
+    it('fails without sending when no topic is available', function () {
+        config(['services.ntfy.topic' => null]);
+
+        $this->artisan('app:notifications:test-ntfy')
+            ->expectsOutputToContain('No topic given')
+            ->assertFailed();
+
+        Http::assertNothingSent();
     });
 });
