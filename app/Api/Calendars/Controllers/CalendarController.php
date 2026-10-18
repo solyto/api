@@ -338,6 +338,7 @@ class CalendarController
      *             @OA\Property(property="is_recurring", type="boolean", example=false),
      *             @OA\Property(property="recurrence_rule", type="string", nullable=true, example="FREQ=WEEKLY"),
      *             @OA\Property(property="recurrence_end", type="string", format="date", nullable=true, example="2024-12-31"),
+     *             @OA\Property(property="occurrence_start_date", type="string", format="date", nullable=true, example="2024-01-17 10:00:00", description="For a series edit: the listed start of the occurrence that was edited. The series moves by the difference between start_date and this value; without it, start_date becomes the series start."),
      *             @OA\Property(property="etag", type="string", example="abc123")
      *         )
      *     ),
@@ -523,7 +524,9 @@ class CalendarController
             return ApiResponse::error('Event is not recurring', 400);
         }
 
-        $parsedDate = new \DateTime($occurrenceDate, new \DateTimeZone($request->user()->settings->timezone));
+        // The frontend sends UTC (toISOString()); all-day slots need the user's local date.
+        $userTz = new \DateTimeZone($request->user()->settings->timezone);
+        $parsedDate = (new \DateTime($occurrenceDate, $userTz))->setTimezone($userTz);
 
         if (! $this->calendarService->destroyEventOccurrence($request->user(), $calendar, $eventUri, $parsedDate)) {
             return ApiResponse::error('Error deleting occurrence', 500);
@@ -617,7 +620,9 @@ class CalendarController
             return ApiResponse::error('Event is not recurring', 400);
         }
 
-        $parsedDate = new \DateTime($occurrenceDate, new \DateTimeZone($request->user()->settings->timezone));
+        // The frontend sends UTC (toISOString()); all-day slots need the user's local date.
+        $userTz = new \DateTimeZone($request->user()->settings->timezone);
+        $parsedDate = (new \DateTime($occurrenceDate, $userTz))->setTimezone($userTz);
         $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
 
         if (! $this->calendarService->updateEventOccurrence($request->user(), $calendar, $eventUri, $parsedDate, $dto)) {

@@ -23,6 +23,7 @@ class FeedService
     private const int CACHE_TTL_FEED_ITEMS = 3600;
     private const int MAX_ERROR_LENGTH = 500;
     private const int MAX_DESCRIPTION_LENGTH = 1000;
+    private const int MAX_ITEM_ID_LENGTH = 255;
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -264,6 +265,21 @@ class FeedService
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $userId]);
     }
 
+    /**
+     * Some feeds use very long GUIDs (Google News: 600+ chars), which don't fit
+     * the feed_item_id column and fail the whole sync. Those are stored as a
+     * hash instead, so the same GUID always maps to the same row. Shorter ids
+     * stay as they are, so existing rows keep matching.
+     */
+    private function storedItemId(?string $id): ?string
+    {
+        if ($id === null || strlen($id) <= self::MAX_ITEM_ID_LENGTH) {
+            return $id;
+        }
+
+        return 'sha1:'.sha1($id);
+    }
+
     private function sanitizeText(?string $value): ?string
     {
         if ($value === null) {
@@ -314,7 +330,7 @@ class FeedService
 
             $feedItem = FeedItem::firstOrNew([
                 'feed_id'      => $feedId,
-                'feed_item_id' => $item->get_id(),
+                'feed_item_id' => $this->storedItemId($item->get_id()),
             ]);
 
             if (!$feedItem->exists) {

@@ -5,9 +5,20 @@ namespace App\Dav\DTOs;
 use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Str;
+use Sabre\VObject\Component\VCalendar;
+use Sabre\VObject\Component\VEvent;
+use Sabre\VObject\Reader;
+use Sabre\VObject\TimeZoneUtil;
 
 class EventDTO
 {
+    /**
+     * The stored iCalendar object, set only when a single event is read for
+     * an edit (AppCalendarsPDO::getEventByUriCustom()); listings and caches
+     * never carry it.
+     */
+    public ?string $storedData = null;
+
     public function __construct(
         public ?int $id,
         public string $title,
@@ -107,6 +118,7 @@ class EventDTO
     {
         $data = $request->validated();
         $userTz = new \DateTimeZone($user->settings->timezone);
+        $seriesStart = $this->startDate;
 
         $this->title = $data['title'];
         $this->description = $data['description'] ?? $this->description;
@@ -125,6 +137,22 @@ class EventDTO
             );
         }
 
+        // A series edited through one of its occurrences: start_date is that
+        // occurrence's new start, so the series moves by the same wall-clock
+        // difference instead of starting at the occurrence.
+        if (isset($data['occurrence_start_date']) && $seriesStart && $this->startDate && $this->endDate) {
+            $wallClock = static fn (\DateTimeInterface $date): \DateTimeImmutable => new \DateTimeImmutable($date->format('Y-m-d H:i:s'), new \DateTimeZone('UTC'));
+            $occurrenceStart = new \DateTime($data['occurrence_start_date'], $userTz);
+            $shift = $wallClock($this->startDate)->getTimestamp() - $wallClock($occurrenceStart)->getTimestamp();
+            $duration = $wallClock($this->endDate)->getTimestamp() - $wallClock($this->startDate)->getTimestamp();
+            // All-day dates are floating; converting them could change the day.
+            $base = ($data['is_all_day'] ?? false) ? $seriesStart : \DateTime::createFromInterface($seriesStart)->setTimezone($userTz);
+            $start = $wallClock($base)->modify("{$shift} seconds");
+
+            $this->startDate = new \DateTime($start->format('Y-m-d H:i:s'), $userTz);
+            $this->endDate = new \DateTime($start->modify("{$duration} seconds")->format('Y-m-d H:i:s'), $userTz);
+        }
+
         if (isset($data['recurrence_end'])) {
             $this->recurrenceEnd = new \DateTime(
                 $data['recurrence_end'],
@@ -134,7 +162,14 @@ class EventDTO
 
         $this->isAllDay = $data['is_all_day'] ?? $this->isAllDay;
         $this->location = $data['location'] ?? $this->location;
-        $this->recurrenceRule = $data['recurrence_rule'] ?? $this->recurrenceRule;
+        // The form switches repetition off with is_recurring: false (and no
+        // rule); without is_recurring the stored rule stays.
+        if (array_key_exists('is_recurring', $data) && !$data['is_recurring']) {
+            $this->recurrenceRule = null;
+            $this->recurrenceEnd = null;
+        } else {
+            $this->recurrenceRule = $data['recurrence_rule'] ?? $this->recurrenceRule;
+        }
 
         $this->timezone = $user->settings->timezone; // always use user’s timezone
         $this->etag = $data['etag'] ?? $this->etag;
@@ -143,7 +178,8 @@ class EventDTO
 
     public static function parseVCal(string $vCalData): array
     {
-        $lines = explode("\n", str_replace("\r\n", "\n", $vCalData));
+        // Unfold continuation lines (RFC 5545 3.1) before reading properties.
+        $lines = explode("\n", preg_replace("/\n[ \t]/", '', str_replace("\r\n", "\n", $vCalData)));
         $data = [
             'title' => null,
             'description' => null,
@@ -159,31 +195,31 @@ class EventDTO
 
         $currentTz = null;
 
-        foreach ($lines as $line) {
-            $line = trim($line);
+        foreach (self::selectEventLines($lines) as $line) {
+            [$name, $params, $value] = self::splitContentLine(trim($line));
 
             // TZID from VTIMEZONE block or DTSTART/DTEND
-            if (preg_match('/^TZID:(.+)$/', $line, $matches)) {
-                $currentTz = $matches[1];
+            if ($name === 'TZID') {
+                $currentTz = TimeZoneUtil::getTimeZone($value)->getName();
                 $data['timezone'] = $currentTz;
                 continue;
             }
 
-            if (str_starts_with($line, 'SUMMARY:')) {
-                $data['title'] = substr($line, 8);
-            } elseif (str_starts_with($line, 'DESCRIPTION:')) {
-                $data['description'] = substr($line, 12);
-            } elseif (str_starts_with($line, 'LOCATION:')) {
-                $data['location'] = substr($line, 9);
-            } elseif (str_starts_with($line, 'RRULE:')) {
-                $data['recurrence_rule'] = substr($line, 6);
-            } elseif (str_starts_with($line, 'DTSTART')) {
-                $isAllDay = str_contains($line, 'VALUE=DATE');
-                $dateStr = substr($line, strpos($line, ':') + 1);
+            if ($name === 'SUMMARY') {
+                $data['title'] = self::unescapeText($value);
+            } elseif ($name === 'DESCRIPTION') {
+                $data['description'] = self::unescapeText($value);
+            } elseif ($name === 'LOCATION') {
+                $data['location'] = self::unescapeText($value);
+            } elseif ($name === 'RRULE') {
+                $data['recurrence_rule'] = $value;
+            } elseif ($name === 'DTSTART') {
+                $isAllDay = str_contains($params, 'VALUE=DATE');
+                $dateStr = $value;
 
-                if (preg_match('/TZID=([^:]+):/', $line, $matches)) {
-                    $tz = new \DateTimeZone($matches[1]);
-                    $data['timezone'] = $matches[1];
+                if (preg_match('/TZID="?([^";]+)"?/', $params, $matches)) {
+                    $tz = TimeZoneUtil::getTimeZone($matches[1]);
+                    $data['timezone'] = $tz->getName();
                 } elseif ($currentTz) {
                     $tz = new \DateTimeZone($currentTz);
                 } else {
@@ -208,13 +244,13 @@ class EventDTO
                 }
 
                 $data['is_all_day'] = $isAllDay;
-            } elseif (str_starts_with($line, 'DTEND')) {
-                $isAllDay = str_contains($line, 'VALUE=DATE');
-                $dateStr = substr($line, strpos($line, ':') + 1);
+            } elseif ($name === 'DTEND') {
+                $isAllDay = str_contains($params, 'VALUE=DATE');
+                $dateStr = $value;
 
-                if (preg_match('/TZID=([^:]+):/', $line, $matches)) {
-                    $tz = new \DateTimeZone($matches[1]);
-                    $data['timezone'] = $matches[1];
+                if (preg_match('/TZID="?([^";]+)"?/', $params, $matches)) {
+                    $tz = TimeZoneUtil::getTimeZone($matches[1]);
+                    $data['timezone'] = $tz->getName();
                 } elseif ($currentTz) {
                     $tz = new \DateTimeZone($currentTz);
                 } else {
@@ -247,7 +283,95 @@ class EventDTO
         return $data;
     }
 
+    /**
+     * Pick the lines to read: the TZID lines of the VTIMEZONE blocks and the
+     * properties of the master VEVENT (the one without RECURRENCE-ID), leaving
+     * out nested components such as VALARM. Data without a VEVENT is read as is.
+     *
+     * @param  string[]  $lines
+     * @return string[]
+     */
+    private static function selectEventLines(array $lines): array
+    {
+        $tzidLines = [];
+        $events = [];
+        $current = null;
+        $components = [];
 
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if (stripos($line, 'BEGIN:') === 0) {
+                $components[] = strtoupper(substr($line, 6));
+                if (end($components) === 'VEVENT') {
+                    $current = [];
+                }
+                continue;
+            }
+
+            if (stripos($line, 'END:') === 0) {
+                if (array_pop($components) === 'VEVENT' && $current !== null) {
+                    $events[] = $current;
+                    $current = null;
+                }
+                continue;
+            }
+
+            $component = end($components);
+            if ($component === 'VEVENT' && $current !== null) {
+                $current[] = $line;
+            } elseif ($component === 'VTIMEZONE' && stripos($line, 'TZID:') === 0) {
+                $tzidLines[] = $line;
+            }
+        }
+
+        if ($events === []) {
+            return $lines;
+        }
+
+        $isException = static fn (array $event): bool => collect($event)
+            ->contains(fn (string $line) => stripos($line, 'RECURRENCE-ID') === 0);
+        $master = collect($events)->first(fn (array $event) => !$isException($event)) ?? $events[0];
+
+        return [...$tzidLines, ...$master];
+    }
+
+    /**
+     * Split a content line into its upper-cased name, its raw parameters and
+     * its value; the value starts at the first colon outside a quoted
+     * parameter (TZID="W. Europe Standard Time").
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private static function splitContentLine(string $line): array
+    {
+        $inQuotes = false;
+
+        for ($i = 0, $length = strlen($line); $i < $length; $i++) {
+            if ($line[$i] === '"') {
+                $inQuotes = !$inQuotes;
+            } elseif ($line[$i] === ':' && !$inQuotes) {
+                $head = substr($line, 0, $i);
+                $semicolon = strpos($head, ';');
+
+                return [
+                    strtoupper($semicolon === false ? $head : substr($head, 0, $semicolon)),
+                    $semicolon === false ? '' : substr($head, $semicolon + 1),
+                    substr($line, $i + 1),
+                ];
+            }
+        }
+
+        return [strtoupper($line), '', ''];
+    }
+
+    private static function unescapeText(string $value): string
+    {
+        return preg_replace_callback('/\\\\(.)/', static fn(array $m) => match ($m[1]) {
+            'n', 'N' => "\n",
+            default => $m[1],
+        }, $value);
+    }
 
     public function toVCal(): string
     {
@@ -322,6 +446,122 @@ class EventDTO
         $lines[] = 'END:VCALENDAR';
 
         return implode("\r\n", $lines) . "\r\n";
+    }
+
+    /**
+     * The iCalendar to store for an edit: the stored object with this event's
+     * fields applied to its master VEVENT, so the UID, VALARMs, attendees and
+     * other client data survive. EXDATE, RDATE and RECURRENCE-ID exceptions
+     * survive too, unless the series stops recurring or its start moves (they
+     * would no longer match). Without usable stored data this is toVCal().
+     */
+    public function toVCalForUpdate(): string
+    {
+        if (!$this->storedData || !$this->startDate) {
+            return $this->toVCal();
+        }
+
+        try {
+            $vcalendar = Reader::read($this->storedData);
+        } catch (\Throwable) {
+            return $this->toVCal();
+        }
+
+        $master = null;
+        foreach ($vcalendar->VEVENT ?? [] as $vevent) {
+            if (!isset($vevent->{'RECURRENCE-ID'})) {
+                $master = $vevent;
+                break;
+            }
+        }
+
+        if (!$vcalendar instanceof VCalendar || !$master instanceof VEvent) {
+            return $this->toVCal();
+        }
+
+        $dropExceptions = !$this->recurrenceRule || $this->startMovedFrom($master);
+
+        $master->SUMMARY = $this->title;
+        foreach (['DESCRIPTION' => $this->description, 'LOCATION' => $this->location] as $name => $value) {
+            if ($value) {
+                $master->{$name} = $value;
+            } else {
+                $master->remove($name);
+            }
+        }
+
+        $master->remove('DTSTART');
+        $master->remove('DTEND');
+        $master->remove('DURATION');
+        if ($this->isAllDay) {
+            $master->add('DTSTART', $this->startDate->format('Ymd'), ['VALUE' => 'DATE']);
+            if ($this->endDate) {
+                $end = \DateTime::createFromInterface($this->endDate)->modify('+1 day'); // exclusive
+                $master->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
+            }
+        } else {
+            $master->add('DTSTART', $this->startDate->format('Ymd\THis'), ['TZID' => $this->startDate->getTimezone()->getName()]);
+            $this->addMissingTimeZone($vcalendar, $this->startDate);
+            if ($this->endDate) {
+                $master->add('DTEND', $this->endDate->format('Ymd\THis'), ['TZID' => $this->endDate->getTimezone()->getName()]);
+                $this->addMissingTimeZone($vcalendar, $this->endDate);
+            }
+        }
+
+        if ($this->recurrenceRule) {
+            $master->RRULE = $this->recurrenceRule;
+        } else {
+            $master->remove('RRULE');
+        }
+
+        if ($dropExceptions) {
+            $master->remove('EXDATE');
+            $master->remove('RDATE');
+            foreach ($vcalendar->select('VEVENT') as $vevent) {
+                if ($vevent !== $master) {
+                    $vcalendar->remove($vevent);
+                }
+            }
+        }
+
+        $now = gmdate('Ymd\THis\Z');
+        $master->DTSTAMP = $now;
+        $master->{'LAST-MODIFIED'} = $now;
+        $master->SEQUENCE = isset($master->SEQUENCE) ? (int) (string) $master->SEQUENCE + 1 : 1;
+
+        return $vcalendar->serialize();
+    }
+
+    private function startMovedFrom(VEvent $master): bool
+    {
+        if (!isset($master->DTSTART)) {
+            return true;
+        }
+
+        $wasAllDay = $master->DTSTART->getValueType() === 'DATE';
+        if ($wasAllDay !== $this->isAllDay) {
+            return true;
+        }
+
+        $storedStart = $master->DTSTART->getDateTime();
+
+        return $this->isAllDay
+            ? $storedStart->format('Ymd') !== $this->startDate->format('Ymd')
+            : $storedStart->getTimestamp() !== $this->startDate->getTimestamp();
+    }
+
+    private function addMissingTimeZone(VCalendar $vcalendar, \DateTimeInterface $date): void
+    {
+        $tzName = $date->getTimezone()->getName();
+
+        foreach ($vcalendar->select('VTIMEZONE') as $vtimezone) {
+            if ((string) $vtimezone->TZID === $tzName) {
+                return;
+            }
+        }
+
+        $generated = Reader::read("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n".$this->generateVTimeZone($date->getTimezone(), $date)."\r\nEND:VCALENDAR\r\n");
+        $vcalendar->add(clone $generated->VTIMEZONE);
     }
 
     /**
