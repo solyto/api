@@ -3,7 +3,7 @@
 date: 2026-10-14
 branch: `report/contain_ntfy-connection` (job `contain`), tree at `3c733ec`
 scope: How could solyto send notifications for certain events (e.g. user registration, new dev requests) to an ntfy server, reusing the existing notification channels, without the feature being on by default (especially on self-hosted instances)? Written for the maintainer, who makes the product decisions. This report only describes options. No application code, config, migrations, routes or lang files were changed. Implementation goes to a follow-up job.
-read: false
+read: true
 
 ## Summary
 

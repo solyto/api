@@ -3,7 +3,7 @@
 date: 2026-10-14
 branch: `feature/sheet_analyze-bot-traffic` (job `sheet`), tree at `e790cf8`
 scope: Develop a strategy to identify bot traffic, e.g. accounts that register to run an AI crawling service through solyto, before it causes bad performance. Written for the maintainer, who makes the product decisions. This report only describes the current state, signals and options. No application code, config, migrations, routes or lang files were changed. Detection or limiting code goes to follow-up jobs.
-read: false
+read: true
 
 ## Summary
 

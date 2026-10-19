@@ -3,7 +3,7 @@
 date: 2026-10-14
 branch: `feature/scope_report-vtodo` (job `scope`), tree at `aff643a`
 scope: Can solyto offer CalDAV sync of todos as VTODO components, and if so, how? Written for the maintainer, who makes the product decisions. This report only describes options. No application code, migrations, config, routes or DAV wiring were changed. Implementation goes to a follow-up job.
-read: false
+read: true
 
 ## Summary
 
