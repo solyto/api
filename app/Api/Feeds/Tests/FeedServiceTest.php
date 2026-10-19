@@ -48,4 +48,23 @@ describe('FeedService', function () {
         expect($items[0]->description)->toBe('<p>short</p>');
         expect($items[1]->description)->toBeNull();
     });
+
+    it('stores overlong item ids as a stable hash so the sync does not fail', function () {
+        $feed = Feed::factory()->create();
+        // Google News GUIDs are 600+ chars, more than the varchar(255) column holds
+        $longId = 'CBMi'.str_repeat('x', 614);
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->twice()->andReturn([
+            feedItemDouble('<p>news</p>', $longId),
+            feedItemDouble('<p>short</p>'),
+        ]);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        app(FeedService::class)->syncFeed($feed->id);
+        app(FeedService::class)->syncFeed($feed->id);
+
+        $ids = FeedItem::pluck('feed_item_id')->sort()->values()->all();
+        expect($ids)->toBe(['https://example.com/post-1', 'sha1:'.sha1($longId)]);
+    });
 });
