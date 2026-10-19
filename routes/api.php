@@ -81,6 +81,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('throttle:auth-login')->post('verify', [AuthController::class, 'verify']);
         Route::middleware('throttle:auth-password-reset')->post('forgot-password', [AuthController::class, 'forgotPassword']);
         Route::middleware('throttle:auth-password-reset')->post('reset-password', [AuthController::class, 'resetPassword']);
+        Route::middleware('throttle:account-deletion')->post('confirm-account-deletion', [AuthController::class, 'confirmAccountDeletion']);
         Route::middleware('throttle:auth-passkey')->post('passkey/authenticate-options', [PasskeyController::class, 'authenticationOptions']);
         Route::middleware('throttle:auth-passkey')->post('passkey/authenticate', [PasskeyController::class, 'authenticate']);
     });
@@ -106,6 +107,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('me', [UserController::class, 'me']);
         Route::post('me/profile-image', [UserController::class, 'updateProfileImage']);
         Route::put('change-password', [UserController::class, 'changePassword']);
+        Route::middleware('throttle:account-deletion')->post('me/deletion-request', [UserController::class, 'requestDeletion']);
         Route::get('{user}/public-profile', [UserController::class, 'publicProfile']);
 
         Route::prefix('me/settings')->group(function () {

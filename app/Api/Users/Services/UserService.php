@@ -3,14 +3,19 @@
 namespace App\Api\Users\Services;
 
 use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Users\Mails\AccountDeletionMail;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 
 class UserService
@@ -48,6 +53,8 @@ class UserService
     private const array USER_CACHE_PREFIX_KEYS = [
         'calendar_events', 'contacts', 'event_attachment_notes', 'event_attachment_todos',
     ];
+
+    private const string DELETION_BROKER = 'account_deletions';
 
     public function __construct(
         private readonly DavService $davService,
@@ -138,6 +145,59 @@ class UserService
         return [...$dav, ...$app, ...$files, 'cache_keys_flushed' => $cacheKeys];
     }
 
+    /**
+     * Self-service deletion after the password and typed confirmation were
+     * checked. With confirmation on and mail configured it mails a link and
+     * deletes nothing until the token comes back through confirmDeletion()
+     * (a new request replaces the previous token); otherwise it deletes
+     * right away, so instances without mail still let users leave.
+     *
+     * @return 'email_sent'|'deleted'
+     */
+    public function requestDeletion(User $user, string $platform): string
+    {
+        if (!$this->deletionRequiresEmail()) {
+            if (config('auth.policy.account_deletion_confirmation')) {
+                Log::warning('Account deletion confirmation is enabled but mail is not configured; deleting without an email link.');
+            }
+
+            $this->destroy($user);
+
+            return 'deleted';
+        }
+
+        Mail::to($user->email)->send(new AccountDeletionMail(
+            user: $user,
+            token: $this->deletionBroker()->createToken($user),
+            email: $user->email,
+            platform: $platform,
+            language: $user->settings->language ?? 'en'
+        ));
+
+        return 'email_sent';
+    }
+
+    public function deletionRequiresEmail(): bool
+    {
+        return config('auth.policy.account_deletion_confirmation') && $this->mailConfigured();
+    }
+
+    /**
+     * @throws \RuntimeException when the token is unknown, expired or not the user's
+     */
+    public function confirmDeletion(string $token, string $email): void
+    {
+        $broker = $this->deletionBroker();
+        $user = User::where('email', $email)->first();
+
+        if (!$user || !$broker->tokenExists($user, $token)) {
+            throw new \RuntimeException('invalid_token');
+        }
+
+        $broker->deleteToken($user);
+        $this->destroy($user);
+    }
+
     public function changePassword(User $user, string $newPassword): void
     {
         $user->update(['password' => Hash::make($newPassword)]);
@@ -167,6 +227,35 @@ class UserService
     public function publicProfile(User $user): User
     {
         return $user;
+    }
+
+    /**
+     * Mailgun is the only transport the stack wires up; a self-hosted
+     * install ships without its domain and secret. Any other mailer was
+     * chosen explicitly by the operator and is trusted.
+     */
+    private function mailConfigured(): bool
+    {
+        if (empty(config('mail.from.address'))) {
+            return false;
+        }
+
+        if (config('mail.default') !== 'mailgun') {
+            return true;
+        }
+
+        return !empty(config('services.mailgun.domain')) && !empty(config('services.mailgun.secret'));
+    }
+
+    private function deletionBroker(): PasswordBroker
+    {
+        $broker = Password::broker(self::DELETION_BROKER);
+
+        if (!$broker instanceof PasswordBroker) {
+            throw new \LogicException('The account deletion broker must be a password broker.');
+        }
+
+        return $broker;
     }
 
     private function forgetUserCache(User $user): int

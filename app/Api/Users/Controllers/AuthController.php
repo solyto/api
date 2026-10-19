@@ -3,6 +3,7 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
 use App\Api\Users\Requests\LoginRequest;
 use App\Api\Users\Requests\RegisterRequest;
@@ -11,6 +12,7 @@ use App\Api\Users\Requests\VerifyRequest;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\AuthService;
 use App\Api\Users\Services\PasswordService;
+use App\Api\Users\Services\UserService;
 use App\Shared\Enums\AuthPlatformEnum;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ class AuthController
     public function __construct(
         private readonly AuthService $authService,
         private readonly PasswordService $passwordService,
+        private readonly UserService $userService,
     ) {}
 
     /**
@@ -355,5 +358,46 @@ class AuthController
         }
 
         return ApiResponse::success(null, 'Password reset successfully. You can now log in.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/auth/confirm-account-deletion",
+     *     operationId="authConfirmAccountDeletion",
+     *     summary="Permanently delete an account with the token from the deletion confirmation mail",
+     *     tags={"Auth"},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"token","email"},
+     *
+     *             @OA\Property(property="token", type="string"),
+     *             @OA\Property(property="email", type="string", format="email")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Account deleted",
+     *
+     *         @OA\JsonContent(ref="#/components/schemas/SuccessResponse")
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated - invalid_token (unknown, expired or already used)", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function confirmAccountDeletion(ConfirmAccountDeletionRequest $request): JsonResponse
+    {
+        try {
+            $this->userService->confirmDeletion($request->validated('token'), $request->validated('email'));
+        } catch (\RuntimeException $e) {
+            return ApiResponse::error('This deletion link is invalid or has expired.', 401, ['invalid_token']);
+        }
+
+        return ApiResponse::success(null, 'Your account has been deleted.');
     }
 }

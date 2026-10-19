@@ -97,6 +97,15 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // Self-service account deletion links: a hashed token per user in the
+        // cache (no table), valid for 60 minutes, replaced by a new request.
+        'account_deletions' => [
+            'provider' => 'users',
+            'driver' => 'cache',
+            'expire' => 60,
+            'throttle' => 0,
+        ],
     ],
 
     /*
@@ -116,6 +125,9 @@ return [
         'min_length' => env('PASSWORD_MIN_LENGTH', 12),
         'uncompromised' => env('PASSWORD_UNCOMPROMISED', true),
         'confirmation' => env('EMAIL_CONFIRMATION', true),
+        // Self-service deletion asks for an email link only when this is on
+        // AND mail is configured; otherwise password + typed DELETE deletes.
+        'account_deletion_confirmation' => env('ACCOUNT_DELETION_CONFIRMATION', true),
     ]
 
 ];
