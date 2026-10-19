@@ -56,5 +56,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth-passkey', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        RateLimiter::for('account-deletion', function (Request $request) {
+            return Limit::perHour(5)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }
