@@ -2,7 +2,7 @@
 
 date: 2026-10-14
 scope: How can the API keep working for frontend builds that users have not updated (F-Droid / mobile / desktop), while the web frontend keeps deploying in lock-step with the API? Covers the API's current compatibility surface, the kinds of change that broke or would break old clients in this repo's history (tags 1.0.10 → `main`), candidate strategies, a proposed release/deployment process, and follow-up jobs. Written for the maintainer. This report changes no code, config, routes, migrations or deployment files. Everything it proposes is a follow-up job.
-read: false
+read: true
 
 ## Summary
 
