@@ -11,6 +11,7 @@ use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
+use App\Api\Users\Services\UserService;
 use App\Dav\DTOs\ContactDTO;
 use App\Dav\DTOs\EventDTO;
 use App\Dav\Models\Principal;
@@ -118,12 +119,6 @@ describe('app:users:delete', function () {
             'calendarorder' => 0,
             'lastmodified' => time(),
         ]);
-        $pgsql->table('propertystorage')->insert([
-            'path' => 'calendars/'.$user->email.'/'.$calendar->uri,
-            'name' => '{DAV:}displayname',
-            'valuetype' => 1,
-            'value' => 'My Calendar',
-        ]);
 
         Storage::fake('user_data');
         Storage::fake('private_user_data');
@@ -179,9 +174,7 @@ describe('app:users:delete', function () {
             ->and($pgsql->table('addressbooks')->where('principaluri', $principalUri)->count())->toBe(0)
             ->and($pgsql->table('cards')->count())->toBe(0)
             ->and($pgsql->table('calendarsubscriptions')->where('principaluri', $principalUri)->count())->toBe(0)
-            ->and($pgsql->table('schedulingobjects')->where('principaluri', $principalUri)->count())->toBe(0)
-            ->and($pgsql->table('propertystorage')->where('path', 'like', 'calendars/'.$user->email.'%')->count())->toBe(0)
-            ->and($pgsql->table('propertystorage')->where('path', 'like', 'addressbooks/'.$user->email.'%')->count())->toBe(0);
+            ->and($pgsql->table('schedulingobjects')->where('principaluri', $principalUri)->count())->toBe(0);
 
         Storage::disk('user_data')->assertMissing($user->id.'/profile/avatar.jpg');
         Storage::disk('private_user_data')->assertMissing($user->id.'/contacts/'.$todo->id.'.jpg');
@@ -224,4 +217,64 @@ describe('app:users:delete', function () {
 
         Storage::disk('user_data')->assertExists($user->id.'/profile/avatar.jpg');
     });
+
+    it('keeps the owner\'s calendar when a user it was shared with is deleted', function () {
+        $owner = makeUser(['email' => 'owner@example.com']);
+        $sharee = makeUser(['email' => 'sharee@example.com']);
+
+        $dav = app(DavService::class);
+        $dav->principals()->create($owner->email);
+        $dav->principals()->create($sharee->email);
+
+        $calendar = $dav->calendars()->list($owner)[0];
+        $dav->calendars()->events()->create($calendar, EventDTO::fromRequest([
+            'title' => 'Owner meeting',
+            'start_date' => now()->addDay()->format('Y-m-d H:i:s'),
+            'end_date' => now()->addDay()->addHour()->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+        ], $calendar, $owner));
+        $dav->calendars()->sharing()->inviteUser($calendar, $owner, $sharee);
+
+        $pgsql = DB::connection('pgsql');
+        expect($pgsql->table('calendarinstances')->where('calendarid', $calendar->calendarId)->where('principaluri', 'principals/'.$sharee->email)->count())->toBe(1);
+
+        app(UserService::class)->destroy($sharee);
+
+        expect($pgsql->table('calendars')->where('id', $calendar->calendarId)->count())->toBe(1)
+            ->and($pgsql->table('calendarobjects')->where('calendarid', $calendar->calendarId)->count())->toBe(1)
+            ->and($pgsql->table('calendarinstances')->where('calendarid', $calendar->calendarId)->where('principaluri', 'principals/'.$owner->email)->count())->toBe(1)
+            ->and($pgsql->table('calendarinstances')->where('principaluri', 'principals/'.$sharee->email)->count())->toBe(0);
+    });
+
+    it('keeps other users\' files', function () {
+        $user = makeUser();
+        $other = makeUser();
+
+        Storage::fake('user_data');
+        Storage::fake('private_user_data');
+        Storage::disk('user_data')->put($user->id.'/profile/avatar.jpg', 'bytes');
+        Storage::disk('user_data')->put($other->id.'/profile/avatar.jpg', 'bytes');
+        Storage::disk('private_user_data')->put($other->id.'/contacts/photo.jpg', 'bytes');
+
+        app(UserService::class)->destroy($user);
+
+        Storage::disk('user_data')->assertMissing($user->id.'/profile/avatar.jpg');
+        Storage::disk('user_data')->assertExists($other->id.'/profile/avatar.jpg');
+        Storage::disk('private_user_data')->assertExists($other->id.'/contacts/photo.jpg');
+    });
+
+    it('refuses to delete anything for a user without a valid id', function (string $id) {
+        $other = makeUser();
+
+        Storage::fake('user_data');
+        Storage::disk('user_data')->put($other->id.'/profile/avatar.jpg', 'bytes');
+
+        $user = new User(['email' => $other->email]);
+        $user->id = $id;
+
+        expect(fn () => app(UserService::class)->destroy($user))->toThrow(\LogicException::class);
+
+        expect($other->fresh())->not->toBeNull();
+        Storage::disk('user_data')->assertExists($other->id.'/profile/avatar.jpg');
+    })->with(['', '.', '../']);
 });

@@ -49,7 +49,7 @@ class DeleteUser extends Command
 
         $summary = $users->destroy($user);
 
-        $this->info("DAV: deleted {$summary['owned_calendars']} owned calendar(s), removed {$summary['shared_instances']} shared instance(s), {$summary['address_books']} address book(s), {$summary['calendar_subscriptions']} subscription(s), {$summary['scheduling_objects']} scheduling object(s), {$summary['property_rows']} property row(s), principal: {$this->yesNo($summary['principal'])}");
+        $this->info("DAV: deleted {$summary['owned_calendars']} owned calendar(s), removed {$summary['shared_instances']} shared instance(s), {$summary['address_books']} address book(s), {$summary['calendar_subscriptions']} subscription(s), {$summary['scheduling_objects']} scheduling object(s), principal: {$this->yesNo($summary['principal'])}");
         $this->info("App: anonymised {$summary['dev_requests_anonymised']} dev request(s), deleted {$summary['auth_tokens']} auth token(s), {$summary['notifications']} notification(s), {$summary['push_subscriptions']} push subscription(s), {$summary['verification_tokens']} verification token(s), {$summary['password_reset_tokens']} password reset token(s), {$summary['sessions']} session(s)");
         $this->info('User row deleted (cascades remove todos, notes, contacts, feeds, libraries, finances, time tracking, and the rest).');
         $this->info('Files: deleted user_data directory ('.$this->yesNo($summary['user_data_files']).'), private_user_data directory ('.$this->yesNo($summary['private_user_data_files']).')');
