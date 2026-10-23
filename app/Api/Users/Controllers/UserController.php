@@ -127,10 +127,9 @@ class UserController
      *         required=true,
      *
      *         @OA\JsonContent(
-     *             required={"password","confirmation"},
+     *             required={"password"},
      *
      *             @OA\Property(property="password", type="string", description="Current password"),
-     *             @OA\Property(property="confirmation", type="string", enum={"DELETE"}),
      *             @OA\Property(property="platform", type="string", enum={"web","mobile","desktop"}, nullable=true)
      *         )
      *     ),

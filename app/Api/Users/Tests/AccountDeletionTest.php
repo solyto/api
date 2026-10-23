@@ -17,7 +17,6 @@ function requestDeletionToken(User $user): string
     test()->actingAs($user, 'sanctum')
         ->postJson('/api/v1/users/me/deletion-request', [
             'password' => 'secret-password',
-            'confirmation' => 'DELETE',
         ])
         ->assertStatus(200);
 
@@ -39,7 +38,6 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'secret-password',
-                'confirmation' => 'DELETE',
                 'platform' => 'mobile',
             ])
             ->assertStatus(200)
@@ -63,28 +61,12 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'wrong-password',
-                'confirmation' => 'DELETE',
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('password');
 
         Mail::assertNothingSent();
     });
-
-    it('rejects a missing or wrong confirmation word', function (?string $confirmation) {
-        Mail::fake();
-        $user = makeUser(['password' => Hash::make('secret-password')]);
-
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/users/me/deletion-request', array_filter([
-                'password' => 'secret-password',
-                'confirmation' => $confirmation,
-            ]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('confirmation');
-
-        Mail::assertNothingSent();
-    })->with([null, 'delete', 'yes']);
 
     it('forbids super administrators', function () {
         Mail::fake();
@@ -93,7 +75,6 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'secret-password',
-                'confirmation' => 'DELETE',
             ])
             ->assertStatus(403);
 
@@ -109,7 +90,6 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'secret-password',
-                'confirmation' => 'DELETE',
             ])
             ->assertStatus(200)
             ->assertJsonPath('data.status', 'deleted');
@@ -133,7 +113,6 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'secret-password',
-                'confirmation' => 'DELETE',
             ])
             ->assertStatus(200)
             ->assertJsonPath('data.status', 'deleted');
@@ -143,17 +122,16 @@ describe('POST /api/v1/users/me/deletion-request', function () {
             ->and($warnings)->toContain('Account deletion confirmation is enabled but mail is not configured; deleting without an email link.');
     });
 
-    it('still validates password and confirmation without email confirmation', function () {
+    it('still validates the password without email confirmation', function () {
         config(['auth.policy.account_deletion_confirmation' => false]);
         $user = makeUser(['password' => Hash::make('secret-password')]);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'wrong-password',
-                'confirmation' => 'delete',
             ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['password', 'confirmation']);
+            ->assertJsonValidationErrors('password');
 
         expect(User::find($user->id))->not->toBeNull();
     });
@@ -161,7 +139,6 @@ describe('POST /api/v1/users/me/deletion-request', function () {
     it('requires authentication', function () {
         $this->postJson('/api/v1/users/me/deletion-request', [
             'password' => 'secret-password',
-            'confirmation' => 'DELETE',
         ])->assertStatus(401);
     });
 
@@ -172,12 +149,12 @@ describe('POST /api/v1/users/me/deletion-request', function () {
 
         foreach (range(1, 5) as $ignored) {
             $this->actingAs($user, 'sanctum')
-                ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password', 'confirmation' => 'DELETE'])
+                ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
                 ->assertStatus(200);
         }
 
         $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password', 'confirmation' => 'DELETE'])
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
             ->assertStatus(429)
             ->assertJsonPath('success', false);
     });

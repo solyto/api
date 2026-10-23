@@ -70,17 +70,6 @@ class DavService
             ->where('principaluri', $principalUri)
             ->delete();
 
-        $email = $user->email;
-        $propertyRows = DB::connection('pgsql')
-            ->table('propertystorage')
-            ->where(function ($query) use ($email) {
-                $query->where('path', 'calendars/'.$email)
-                    ->orWhere('path', 'like', 'calendars/'.$email.'/%')
-                    ->orWhere('path', 'addressbooks/'.$email)
-                    ->orWhere('path', 'like', 'addressbooks/'.$email.'/%');
-            })
-            ->delete();
-
         $principal = $this->principals->delete($user->email);
 
         return [
@@ -89,7 +78,6 @@ class DavService
             'address_books' => $addressBooks,
             'calendar_subscriptions' => $subscriptions,
             'scheduling_objects' => $schedulingObjects,
-            'property_rows' => $propertyRows,
             'principal' => $principal,
         ];
     }

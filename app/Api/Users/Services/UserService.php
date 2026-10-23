@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class UserService
 {
@@ -95,6 +96,12 @@ class UserService
      */
     public function destroy(User $user): array
     {
+        // The storage directories are deleted by user id: an empty id would
+        // wipe every user's files, so nothing runs without a valid one.
+        if (!Str::isUuid($user->id)) {
+            throw new \LogicException('Refusing to delete a user without a valid id.');
+        }
+
         $dav = $this->davService->deleteForUser($user);
 
         $app = DB::transaction(function () use ($user): array {
@@ -146,8 +153,8 @@ class UserService
     }
 
     /**
-     * Self-service deletion after the password and typed confirmation were
-     * checked. With confirmation on and mail configured it mails a link and
+     * Self-service deletion after the password was checked. With
+     * confirmation on and mail configured it mails a link and
      * deletes nothing until the token comes back through confirmDeletion()
      * (a new request replaces the previous token); otherwise it deletes
      * right away, so instances without mail still let users leave.

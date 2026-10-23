@@ -10,7 +10,6 @@ class RequestAccountDeletionRequest extends FormRequest
     {
         return [
             'password' => 'required|string|current_password:sanctum',
-            'confirmation' => 'required|string|in:DELETE',
             'platform' => 'sometimes|nullable|string|in:web,mobile,desktop',
         ];
     }
@@ -19,7 +18,6 @@ class RequestAccountDeletionRequest extends FormRequest
     {
         return [
             'password.current_password' => 'The password is incorrect.',
-            'confirmation.in' => 'Type DELETE to confirm.',
         ];
     }
 }
