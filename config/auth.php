@@ -125,8 +125,6 @@ return [
         'min_length' => env('PASSWORD_MIN_LENGTH', 12),
         'uncompromised' => env('PASSWORD_UNCOMPROMISED', true),
         'confirmation' => env('EMAIL_CONFIRMATION', true),
-        // Self-service deletion asks for an email link only when this is on
-        // AND mail is configured; otherwise password + typed DELETE deletes.
         'account_deletion_confirmation' => env('ACCOUNT_DELETION_CONFIRMATION', true),
     ]
 
