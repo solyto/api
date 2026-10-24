@@ -3,6 +3,7 @@
 namespace App\Api\Users\Services;
 
 use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Mails\AccountDeletionMail;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
@@ -198,7 +199,7 @@ class UserService
         $user = User::where('email', $email)->first();
 
         if (!$user || !$broker->tokenExists($user, $token)) {
-            throw new \RuntimeException('invalid_token');
+            throw new InvalidDeletionTokenException();
         }
 
         $broker->deleteToken($user);

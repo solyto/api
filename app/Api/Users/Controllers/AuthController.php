@@ -3,6 +3,7 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
 use App\Api\Users\Requests\LoginRequest;
@@ -394,7 +395,7 @@ class AuthController
     {
         try {
             $this->userService->confirmDeletion($request->validated('token'), $request->validated('email'));
-        } catch (\RuntimeException $e) {
+        } catch (InvalidDeletionTokenException $e) {
             return ApiResponse::error('This deletion link is invalid or has expired.', 401, ['invalid_token']);
         }
 
