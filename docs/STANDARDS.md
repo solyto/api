@@ -842,9 +842,18 @@ What gets a test and how: `docs/TESTING.md`.
 ### 12.10 Localisation
 
 User-facing copy (notifications, mails, bot replies) comes from
-`resources/lang/{en,de,fr,es}` through `__()` / the `SolytoMessage` enum
+`resources/lang/{en,de,fr,es,it}` through `__()` / the `SolytoMessage` enum
 (rule 9.4). API `message` strings in the envelope are English and are not
 translated (Decisions).
+
+New strings are written in `en` and translated by the `translator` agent
+following `docs/I18N.md` (voice, placeholders, glossary), not improvised per
+change.
+
+The supported languages are `config('app.locales')`; code that checks or
+picks a language reads that list instead of repeating it.
+
+Check: `grep -rn "'en', 'de'" app` → 0.
 
 ### 12.11 Renaming a feature updates the stored navigation settings in PHP
 

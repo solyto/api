@@ -18,7 +18,7 @@ abstract class BaseNotification extends Notification
     protected function resolveLocale(object $notifiable): string
     {
         $lang = $notifiable->settings?->language;
-        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
+        return in_array($lang, config('app.locales')) ? $lang : 'en';
     }
 
     protected function withLocale(object $notifiable, callable $callback): mixed

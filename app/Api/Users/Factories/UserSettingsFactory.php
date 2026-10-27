@@ -19,7 +19,7 @@ class UserSettingsFactory extends Factory
             'timezone' => $this->faker->randomElement(['Europe/Berlin', 'UTC', 'America/New_York', 'Asia/Tokyo']),
             'date_format' => $this->faker->randomElement(['Y-m-d', 'd/m/Y', 'm/d/Y']),
             'time_format' => $this->faker->randomElement(['24h', '12h']),
-            'language' => $this->faker->randomElement(['en', 'de', 'fr', 'es']),
+            'language' => $this->faker->randomElement(config('app.locales')),
             'first_visit' => false,
             'check_in_settings' => [],
             'weather_city' => $this->faker->optional(0.5)->city(),

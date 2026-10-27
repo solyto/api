@@ -48,7 +48,7 @@ frontend repository. AGPL-3.0.
 - `app/Bots/` is the Telegram bot framework (`SolytoBot` with a state machine in `State/` and translation-key messages), wired via `config/telegram.php` and the `webhooks/telegram/solyto/{token}` route.
 - Background work is queued (Redis) and scheduled in `routes/console.php` (hourly feed sync, daily release grabs, retention/cleanup jobs, daily reminders).
 - Secrets and third-party API keys (Hardcover, TMDB, Discogs, Mailgun, imgproxy, AI, bot tokens, ...) are read at runtime from Docker secrets via `App\Shared\Helpers\DockerSecretHelper`, not from `.env`.
-- Tests are Pest: co-located in `app/Api/<Module>/Tests` plus `tests/Feature` and `tests/Unit`; they run against in-memory SQLite (see `tests/TestCase.php`). UI copy is localized in `resources/lang/{en,de,fr,es}`.
+- Tests are Pest: co-located in `app/Api/<Module>/Tests` plus `tests/Feature` and `tests/Unit`; they run against in-memory SQLite (see `tests/TestCase.php`). UI copy is localized in `resources/lang/{en,de,fr,es,it}`; the supported list is `config('app.locales')`.
 
 ## Conventions
 New or AI-generated code follows [docs/STANDARDS.md](./STANDARDS.md) instead of generic Laravel patterns: numbered, checkable rules (controllers and routing, OpenAPI annotations, requests and validation, services, models, resources, errors, caching, jobs, comments, formatting, architecture conventions), plus `## Decisions` and `## Open questions`. Tests follow [docs/TESTING.md](./TESTING.md). Known cleanups live in [docs/backlog/](./backlog/) (manigot backlog entries); how the standards are maintained is in [docs/STANDARDS_WORKFLOW.md](./STANDARDS_WORKFLOW.md). Where anything older disagrees with `STANDARDS.md`, `STANDARDS.md` wins.
@@ -72,5 +72,6 @@ A job is not done until `composer test` and `composer analyse` both exit 0 in th
 - NEVER commit or print secrets: `.env` / `.env.testing` contents and anything read through `DockerSecretHelper` (API keys, bot tokens) must stay out of code, logs, and diffs
 - NEVER change the `pgsql` (DAV) connection, its schema, or the DAV routes without flagging it — SabreDAV backends depend on that layout
 - When scope is unclear: ask, don't guess
+- When adding or changing user-facing strings (notifications, mails, bot replies), write `en` and hand the other locales to the `translator` agent (`docs/agents/translator.md`, rules in `docs/I18N.md`); don't translate on the fly
 - Do not refactor things unrelated to the current task
 - Do not add abstractions not already present in the codebase

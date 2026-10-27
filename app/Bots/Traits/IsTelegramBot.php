@@ -92,7 +92,7 @@ trait IsTelegramBot
     {
         $langCode = $this->request->get('message')['from']['language_code'] ?? 'en';
         $lang = substr($langCode, 0, 2);
-        return in_array($lang, ['en', 'de', 'fr', 'es']) ? $lang : 'en';
+        return in_array($lang, config('app.locales')) ? $lang : 'en';
     }
 
     public function getMessageId(): ?int

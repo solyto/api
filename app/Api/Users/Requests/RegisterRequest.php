@@ -3,6 +3,7 @@
 namespace App\Api\Users\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class RegisterRequest extends FormRequest
@@ -13,7 +14,7 @@ class RegisterRequest extends FormRequest
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Password::defaults()],
-            'language' => 'sometimes|nullable|string|in:en,de,fr,es',
+            'language' => ['sometimes', 'nullable', 'string', Rule::in(config('app.locales'))],
             'platform' => 'sometimes|nullable|string|in:web,mobile,desktop',
         ];
     }
