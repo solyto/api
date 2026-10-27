@@ -26,10 +26,10 @@ return [
     'daily_check_in_reminder_body'   => 'Hast du deinen täglichen Check-in bereits abgeschlossen?',
 
     // Daily Day Reminder
-    'daily_day_reminder_title'       => 'Dein bevorstehender Tag',
+    'daily_day_reminder_title'       => 'Dein Tag heute',
     'daily_day_reminder_tasks'       => 'Aufgaben (:count):',
     'daily_day_reminder_events'      => 'Termine (:count):',
-    'daily_day_reminder_clear'       => 'Du hast einen freien Tag vor dir!',
+    'daily_day_reminder_clear'       => 'Heute steht nichts an!',
 
     // Export
     'export_ready_title'             => 'Export fertig',
@@ -51,7 +51,7 @@ return [
     'action_view_profile'            => 'Profil öffnen',
     'action_download_export'         => 'Export herunterladen',
     'action_open_settings'           => 'Einstellungen öffnen',
-    'action_open_app'                => 'Solyto öffnen',
+    'action_open_app'                => 'solyto öffnen',
 
     // Mail greetings
     'greeting_morning'               => 'Guten Morgen!',

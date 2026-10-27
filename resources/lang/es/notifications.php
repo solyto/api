@@ -2,15 +2,15 @@
 
 return [
     // Friend Request
-    'friend_request_title'           => 'Nueva solicitud de amistad',
+    'friend_request_title'           => 'Solicitud de amistad',
     'friend_request_body'            => 'Has recibido una nueva solicitud de amistad de :name.',
 
     // Music Release
-    'music_release_title'            => 'Nuevo lanzamiento musical',
+    'music_release_title'            => 'Nuevo álbum',
     'music_release_body'             => ':artist lanzó un nuevo álbum: :title.',
 
     // Book Release
-    'book_release_title'             => 'Nuevo lanzamiento de libro',
+    'book_release_title'             => 'Nuevo libro',
     'book_release_body'              => ':author publicó un nuevo libro: :title.',
 
     // Calendar Share
@@ -18,11 +18,11 @@ return [
     'calendar_share_body'            => ':sender ha compartido el calendario «:calendar» contigo.',
 
     // Dev Request Comment
-    'dev_request_comment_title'      => 'Nuevo comentario en solicitud de desarrollo',
+    'dev_request_comment_title'      => 'Comentario en solicitud de desarrollo',
     'dev_request_comment_body'       => ':commenter ha comentado: :title.',
 
     // Daily Check-in Reminder
-    'daily_check_in_reminder_title'  => 'Recordatorio de Check-in Diario',
+    'daily_check_in_reminder_title'  => 'Recordatorio diario de check-in',
     'daily_check_in_reminder_body'   => '¿Has completado tu check-in diario?',
 
     // Daily Day Reminder
@@ -38,7 +38,7 @@ return [
     'export_failed_body'             => 'Tu exportación de datos no pudo completarse. Por favor, inténtalo de nuevo.',
 
     // Screen Release
-    'screen_release_title'           => 'Nuevo estreno en pantalla',
+    'screen_release_title'           => 'Nuevo estreno',
     'screen_release_body'            => ':title se estrena el :date.',
 
     // Action labels
@@ -46,12 +46,12 @@ return [
     'action_check_in'                => 'Hacer check-in',
     'action_view_calendars'          => 'Ver calendarios',
     'action_view_releases'           => 'Ver lanzamientos',
-    'action_view_dev_requests'       => 'Ver solicitudes dev',
+    'action_view_dev_requests'       => 'Ver solicitudes',
     'action_view_calendar'           => 'Ver calendario',
     'action_view_profile'            => 'Ver perfil',
     'action_download_export'         => 'Descargar exportación',
     'action_open_settings'           => 'Abrir ajustes',
-    'action_open_app'                => 'Abrir Solyto',
+    'action_open_app'                => 'Abrir solyto',
 
     // Mail greetings
     'greeting_morning'               => '¡Buenos días!',

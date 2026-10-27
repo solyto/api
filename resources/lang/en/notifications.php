@@ -51,7 +51,7 @@ return [
     'action_view_profile'            => 'View Profile',
     'action_download_export'         => 'Download Export',
     'action_open_settings'           => 'Open Settings',
-    'action_open_app'                => 'Open Solyto',
+    'action_open_app'                => 'Open solyto',
 
     // Mail greetings
     'greeting_morning'               => 'Good Morning!',
