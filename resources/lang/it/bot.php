@@ -23,7 +23,7 @@ return [
     'added_feed'              => 'Fatto. Iscrizione al feed aggiunta.',
     'added_clipboard'         => 'Fatto. Aggiunto ai tuoi appunti.',
     'choose_type'             => "Come devo aggiungerlo?\n\nScegli una delle opzioni qui sotto.",
-    'add_failed'              => 'Non è stato possibile aggiungerlo. Prova con un altro link o dammi più dettagli?',
+    'add_failed'              => 'Non sono riuscito ad aggiungerlo. Prova con un altro link o dammi più dettagli?',
     'no_link'                 => 'Scusa, non ho trovato nessun link.',
     'no_todo'                 => 'Non ho trovato nessuna attività valida, scusami tanto..',
     'empty_day'               => 'Sembra che oggi non ci siano attività né appuntamenti!',

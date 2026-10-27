@@ -29,7 +29,7 @@ return [
     'daily_day_reminder_title'       => 'La tua giornata',
     'daily_day_reminder_tasks'       => 'Attività (:count):',
     'daily_day_reminder_events'      => 'Eventi (:count):',
-    'daily_day_reminder_clear'       => 'Oggi hai la giornata libera!',
+    'daily_day_reminder_clear'       => 'Oggi non hai impegni!',
 
     // Export
     'export_ready_title'             => 'Esportazione pronta',
@@ -51,7 +51,7 @@ return [
     'action_view_profile'            => 'Apri profilo',
     'action_download_export'         => 'Scarica esportazione',
     'action_open_settings'           => 'Apri impostazioni',
-    'action_open_app'                => 'Apri Solyto',
+    'action_open_app'                => 'Apri solyto',
 
     // Mail greetings
     'greeting_morning'               => 'Buongiorno!',
