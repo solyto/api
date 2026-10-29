@@ -180,20 +180,15 @@ class QuickAddService
             return null;
         }
 
-        $data = [
+        return $service->create($user, [
             'title' => $dto->getTitle(),
             'author' => $dto->getAuthor(),
             'pages' => $dto->getPageCount(),
             'cover_path' => $dto->getCover(),
             'link' => $dto->getUrl(),
             'publication_year' => $dto->getReleaseDate()?->year,
-        ];
-
-        if (method_exists($dto, 'getDescription')) {
-            $data['summary'] = $dto->getDescription();
-        }
-
-        return $service->create($user, $data);
+            'summary' => $dto->getDescription(),
+        ]);
     }
 
     private function commitMovie(User $user, string $url): ?LibraryMovie
@@ -233,11 +228,9 @@ class QuickAddService
             'platform' => $isBgg ? 'boardgame' : 'pc',
             'cover_path' => $dto->getCover(),
             'link' => $dto->getUrl(),
-            'developer' => $isBgg ? $dto->getDesigner() : $dto->getDeveloper(),
+            'developer' => $dto->getDeveloper(),
             'publisher' => $dto->getPublisher(),
-            'publication_year' => $isBgg
-                ? $dto->getPublicationYear()
-                : (is_string($dto->getReleaseDate()) ? (int) substr($dto->getReleaseDate(), 0, 4) : null),
+            'publication_year' => $dto->getPublicationYear(),
         ]);
     }
 

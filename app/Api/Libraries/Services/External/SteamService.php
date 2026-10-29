@@ -5,8 +5,6 @@ namespace App\Api\Libraries\Services\External;
 use App\Api\Libraries\DTOs\GameReleaseDTO;
 use App\Api\Libraries\DTOs\GameSearchResultDTO;
 use App\Api\Libraries\Enums\GameServiceEnum;
-use Carbon\Carbon;
-use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -40,11 +38,11 @@ class SteamService
             $releaseDate = $result['release_date']['date'];
         }
 
+        // Steam sends "24 Feb, 2017" or "Feb 24, 2017"; Carbon::parse() reads the
+        // year after a comma as a time of day, so take the four-digit year directly.
         $publicationYear = null;
-        if ($releaseDate) {
-            try {
-                $publicationYear = Carbon::parse($releaseDate)->year;
-            } catch (InvalidFormatException) {}
+        if ($releaseDate && preg_match('/\b(\d{4})\b/', $releaseDate, $matches)) {
+            $publicationYear = (int) $matches[1];
         }
 
         $genres = [];
