@@ -118,7 +118,7 @@ trait IsTelegramBot
         }
 
         preg_match_all('/\/\w+/', $message, $matches);
-        return $matches[0] ?? [];
+        return $matches[0];
     }
 
     public function hasCommand(string $text): bool
