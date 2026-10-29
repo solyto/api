@@ -19,18 +19,6 @@ parameters:
 			path: app/Api/CheckIn/Resources/CheckInResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Api\\Contacts\\Resources\\ContactPhotoResource\:\:\$photo\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Contacts/Resources/ContactPhotoResource.php
-
-		-
-			message: '#^Method App\\Api\\Contacts\\Resources\\ContactResource\:\:convertImageString\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: app/Api/Contacts/Resources/ContactResource.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vote_type\.$#'
 			identifier: property.notFound
 			count: 1

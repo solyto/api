@@ -722,9 +722,8 @@ blocks. (`tests/TestCase.php` is the one file with prose docblocks and
 earns them.)
 
 Check: `grep -rn '@param\|@return' app/Api app/Shared | grep -v 'array<'` → 0 today.
-`grep -rLE '@mixin' $(grep -rl 'extends JsonResource' app)` → 7 today: resources
-that read arrays, their own properties or `$this->resource` directly, and
-the unused `ContactPhotoResource`.
+`grep -rLE '@mixin' $(grep -rl 'extends JsonResource' app)` → 6 today: resources
+that read arrays, their own properties or `$this->resource` directly.
 
 ## 11. Formatting
 
