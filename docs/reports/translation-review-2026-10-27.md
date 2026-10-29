@@ -1,3 +1,4 @@
+read: true
 # Translation review: de, fr, es, it vs. en
 
 Date: 2026-10-27
