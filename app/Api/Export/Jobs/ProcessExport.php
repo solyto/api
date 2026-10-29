@@ -4,7 +4,6 @@ namespace App\Api\Export\Jobs;
 
 use App\Api\Export\Services\ExportService;
 use App\Api\Users\Models\User;
-use App\Dav\Services\DavService;
 use App\Shared\Models\ExportJob;
 use App\Shared\Notifications\ExportReadyNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +35,7 @@ class ProcessExport implements ShouldQueue
         $job->update(['status' => 'in_progress']);
 
         try {
-            $service = new ExportService($user, $job, app(DavService::class));
+            $service = new ExportService($user, $job);
             $service->export();
 
             $job->update(['status' => 'completed']);

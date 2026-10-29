@@ -3,7 +3,6 @@
 namespace App\Api\Export\Services;
 
 use App\Api\Users\Models\User;
-use App\Dav\Services\DavService;
 use App\Shared\Models\ExportJob;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
@@ -31,7 +30,6 @@ class ExportService
     public function __construct(
         private readonly User $user,
         private readonly ExportJob $job,
-        private readonly DavService $davService,
     ) {}
 
     public function export(): string
