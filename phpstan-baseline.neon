@@ -79,12 +79,6 @@ parameters:
 			path: app/Api/Users/Notifications/DailyDayReminderNotification.php
 
 		-
-			message: '#^Negated boolean expression is always false\.$#'
-			identifier: booleanNot.alwaysFalse
-			count: 2
-			path: app/Api/Users/Services/AuthService.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\PasswordBroker\:\:createToken\(\)\.$#'
 			identifier: method.notFound
 			count: 1
