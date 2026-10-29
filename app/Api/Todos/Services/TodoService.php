@@ -137,14 +137,9 @@ class TodoService
             try {
                 $date = Carbon::createFromFormat($format, $value);
 
-                if (strlen($format) === 5) {
-                    $currentYear = now()->year;
-                    $twoDigitYear = (int) $date->format('y');
-                    $fullYear = (int) ($currentYear / 100) * 100 + $twoDigitYear;
-                    if ($fullYear < $currentYear) {
-                        $fullYear += 100;
-                    }
-                    $date->setYear($fullYear);
+                // "d.m.Y" also accepts "15.03.25" as year 25; put two-digit years in the current century.
+                if ($date->year < 100) {
+                    $date->setYear((int) (now()->year / 100) * 100 + $date->year);
                 }
 
                 return $date->format('Y-m-d');
