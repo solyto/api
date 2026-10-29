@@ -17,14 +17,12 @@ class UserVerification extends Mailable
     private readonly User $user;
     private readonly VerificationToken $verificationToken;
     private readonly string $platform;
-    private readonly string $language;
 
     public function __construct(User $user, VerificationToken $verificationToken, string $platform = 'web', string $language = 'en')
     {
         $this->user = $user;
         $this->verificationToken = $verificationToken;
         $this->platform = $platform;
-        $this->language = $language;
         $this->locale = $language;
     }
 

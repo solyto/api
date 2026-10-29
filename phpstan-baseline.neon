@@ -3181,12 +3181,6 @@ parameters:
 			path: app/Api/Users/Controllers/PasskeyController.php
 
 		-
-			message: '#^Property App\\Api\\Users\\Mails\\UserVerification\:\:\$language is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Api/Users/Mails/UserVerification.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\Users\\Models\\FriendRequest\:\:\$direction\.$#'
 			identifier: property.notFound
 			count: 2
