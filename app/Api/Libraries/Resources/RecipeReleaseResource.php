@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\RecipeReleaseDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +23,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="servings", type="integer", nullable=true),
  *     @OA\Property(property="tags", type="array", @OA\Items(type="string"))
  * )
+ *
+ * @mixin RecipeReleaseDTO
  */
 class RecipeReleaseResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Resources;
 
+use App\Api\Users\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,6 +14,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="name", type="string"),
  *     @OA\Property(property="profile_image_path", type="string", format="uri", nullable=true)
  * )
+ *
+ * @mixin User
  */
 class FriendResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace App\Api\Contacts\Resources;
 
+use App\Dav\DTOs\ContactDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,6 +32,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="country", type="string", nullable=true),
  *     @OA\Property(property="etag", type="string")
  * )
+ *
+ * @mixin ContactDTO
  */
 class ContactResource extends JsonResource
 {

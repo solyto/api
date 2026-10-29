@@ -4,6 +4,7 @@ namespace App\Api\Users\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Notifications\DatabaseNotification;
 
 /**
  * @OA\Schema(
@@ -16,6 +17,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="read_at", type="string", format="date-time", nullable=true),
  *     @OA\Property(property="created_at", type="string", format="date-time")
  * )
+ *
+ * @mixin DatabaseNotification
  */
 class NotificationResource extends JsonResource
 {

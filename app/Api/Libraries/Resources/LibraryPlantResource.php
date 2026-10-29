@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\Models\LibraryPlant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,6 +25,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
+ *
+ * @mixin LibraryPlant
  */
 class LibraryPlantResource extends JsonResource
 {

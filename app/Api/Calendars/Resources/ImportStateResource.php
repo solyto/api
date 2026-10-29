@@ -2,6 +2,7 @@
 
 namespace App\Api\Calendars\Resources;
 
+use App\Dav\DTOs\CalendarImportDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="events_count", type="integer"),
  *     @OA\Property(property="events_done", type="integer")
  * )
+ *
+ * @mixin CalendarImportDTO
  */
 class ImportStateResource extends JsonResource
 {

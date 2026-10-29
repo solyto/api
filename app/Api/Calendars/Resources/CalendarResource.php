@@ -2,6 +2,7 @@
 
 namespace App\Api\Calendars\Resources;
 
+use App\Dav\DTOs\CalendarDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="invite_status", type="string", nullable=true),
  *     @OA\Property(property="share_token", type="string", nullable=true)
  * )
+ *
+ * @mixin CalendarDTO
  */
 class CalendarResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace App\Api\DevRequests\Resources;
 
+use App\Api\DevRequests\Models\DevRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="user_vote", type="string", enum={"up","down"}, nullable=true),
  *     @OA\Property(property="comment_count", type="integer")
  * )
+ *
+ * @mixin DevRequest
  */
 class DevRequestResource extends JsonResource
 {

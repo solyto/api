@@ -2,6 +2,7 @@
 
 namespace App\Api\Notes\Resources;
 
+use App\Api\Notes\Models\NoteCategory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="updated_at", type="string", format="date-time"),
  *     @OA\Property(property="children", type="array", @OA\Items(ref="#/components/schemas/NoteCategory"), nullable=true)
  * )
+ *
+ * @mixin NoteCategory
  */
 class NoteCategoryResource extends JsonResource
 {

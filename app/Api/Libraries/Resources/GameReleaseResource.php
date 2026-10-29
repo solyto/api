@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\GameReleaseDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="publisher", type="string", nullable=true),
  *     @OA\Property(property="genres", type="array", @OA\Items(type="string"))
  * )
+ *
+ * @mixin GameReleaseDTO
  */
 class GameReleaseResource extends JsonResource
 {

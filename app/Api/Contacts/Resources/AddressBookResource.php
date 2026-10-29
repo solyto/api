@@ -2,6 +2,7 @@
 
 namespace App\Api\Contacts\Resources;
 
+use App\Dav\DTOs\AddressBookDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="description", type="string", nullable=true),
  *     @OA\Property(property="color", type="string")
  * )
+ *
+ * @mixin AddressBookDTO
  */
 class AddressBookResource extends JsonResource
 {

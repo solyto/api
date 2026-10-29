@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Resources;
 
+use App\Api\Users\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
+ *
+ * @mixin User
  */
 class UserResource extends JsonResource
 {

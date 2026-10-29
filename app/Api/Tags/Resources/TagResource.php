@@ -2,6 +2,7 @@
 
 namespace App\Api\Tags\Resources;
 
+use App\Api\Tags\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
+ *
+ * @mixin Tag
  */
 class TagResource extends JsonResource
 {

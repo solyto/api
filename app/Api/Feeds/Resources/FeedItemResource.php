@@ -2,6 +2,7 @@
 
 namespace App\Api\Feeds\Resources;
 
+use App\Api\Feeds\Models\FeedItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="feed_id", type="integer"),
  *     @OA\Property(property="published_at", type="string", format="date-time", nullable=true)
  * )
+ *
+ * @mixin FeedItem
  */
 class FeedItemResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\MovieSearchResultDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,6 +17,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="provider", type="string"),
  *     @OA\Property(property="url", type="string", format="uri")
  * )
+ *
+ * @mixin MovieSearchResultDTO
  */
 class MovieSearchResultResource extends JsonResource
 {

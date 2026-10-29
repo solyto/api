@@ -2,6 +2,7 @@
 
 namespace App\Api\Contacts\Resources;
 
+use App\Dav\DTOs\AddressBookImportDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="contacts_count", type="integer"),
  *     @OA\Property(property="contacts_done", type="integer")
  * )
+ *
+ * @mixin AddressBookImportDTO
  */
 class ImportStateResource extends JsonResource
 {

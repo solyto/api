@@ -2,6 +2,7 @@
 
 namespace App\Api\Notifications\Resources;
 
+use App\Api\Users\Models\UserNotificationSettings;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -45,6 +46,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="movie_release_push", type="boolean"),
  *     @OA\Property(property="movie_release_telegram", type="boolean")
  * )
+ *
+ * @mixin UserNotificationSettings
  */
 class NotificationSettingsResource extends JsonResource
 {

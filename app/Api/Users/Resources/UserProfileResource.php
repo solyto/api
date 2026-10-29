@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Resources;
 
+use App\Api\Users\Models\UserProfile;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  *     @OA\Property(property="profile_image_path", type="string", nullable=true)
  * )
+ *
+ * @mixin UserProfile
  */
 class UserProfileResource extends JsonResource
 {

@@ -3,6 +3,7 @@
 namespace App\Api\Calendars\Resources;
 
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\EventDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -27,6 +28,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="calendar_name", type="string"),
  *     @OA\Property(property="calendar_color", type="string")
  * )
+ *
+ * @mixin EventDTO
  */
 class EventResource extends JsonResource
 {

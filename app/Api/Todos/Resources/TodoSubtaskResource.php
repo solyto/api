@@ -2,6 +2,7 @@
 
 namespace App\Api\Todos\Resources;
 
+use App\Api\Todos\Models\TodoSubtask;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
+ *
+ * @mixin TodoSubtask
  */
 class TodoSubtaskResource extends JsonResource
 {

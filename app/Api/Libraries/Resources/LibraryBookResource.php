@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Tags\Resources\TagResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -32,6 +33,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
+ *
+ * @mixin LibraryBook
  */
 class LibraryBookResource extends JsonResource
 {
