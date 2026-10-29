@@ -40,7 +40,7 @@ class ProcessExport implements ShouldQueue
 
             $job->update(['status' => 'completed']);
 
-            $user->notify(new ExportReadyNotification((string) $job->id, true));
+            $user->notify(new ExportReadyNotification(true));
         } catch (\Throwable $e) {
             $job->update(['status' => 'failed']);
 
@@ -49,7 +49,7 @@ class ProcessExport implements ShouldQueue
                 Storage::disk('user_data')->delete($relativePath);
             }
 
-            $user->notify(new ExportReadyNotification((string) $job->id, false));
+            $user->notify(new ExportReadyNotification(false));
 
             throw $e;
         }

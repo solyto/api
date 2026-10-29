@@ -9,7 +9,6 @@ use NotificationChannels\WebPush\WebPushMessage;
 class ExportReadyNotification extends BaseNotification
 {
     public function __construct(
-        private readonly string $exportId,
         private readonly bool $success = true,
     ) {}
 
