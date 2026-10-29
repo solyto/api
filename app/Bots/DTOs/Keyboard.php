@@ -4,8 +4,7 @@ namespace App\Bots\DTOs;
 
 class Keyboard
 {
-    private array $rows;
-    private array $buttons;
+    private array $rows = [];
 
     public static function make(): self
     {

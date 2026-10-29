@@ -5,6 +5,10 @@ use App\Bots\DTOs\Keyboard;
 covers(Keyboard::class);
 
 describe('Keyboard DTO', function () {
+    it('returns no rows for a keyboard without rows', function () {
+        expect(Keyboard::make()->asArray())->toBe([]);
+    });
+
     it('creates an empty keyboard', function () {
         $keyboard = Keyboard::make()->withRow([]);
 
