@@ -8,6 +8,7 @@ use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
 use App\Api\Users\Requests\LoginRequest;
 use App\Api\Users\Requests\RegisterRequest;
+use App\Api\Users\Requests\ResendVerificationRequest;
 use App\Api\Users\Requests\ResetPasswordRequest;
 use App\Api\Users\Requests\VerifyRequest;
 use App\Api\Users\Resources\UserResource;
@@ -337,6 +338,42 @@ class AuthController
         }
 
         return ApiResponse::success(null, 'Token revoked successfully');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/auth/resend-verification",
+     *     operationId="authResendVerification",
+     *     summary="Send a new verification mail to an unverified account",
+     *     tags={"Auth"},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="platform", type="string", enum={"web","mobile","desktop"}, nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Generic response, whether or not the account exists or is already verified",
+     *
+     *         @OA\JsonContent(ref="#/components/schemas/SuccessResponse")
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function resendVerification(ResendVerificationRequest $request): JsonResponse
+    {
+        $this->authService->resendVerification($request->validated('email'), $request->validated('platform'));
+
+        return ApiResponse::success(null, 'If an unverified account exists for this email, a new verification link has been sent.');
     }
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse

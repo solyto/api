@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Telescope\TelescopeServiceProvider;
 
@@ -51,6 +52,13 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth-password-reset', function (Request $request) {
             return Limit::perHour(10)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-verification-resend', function (Request $request) {
+            return [
+                Limit::perHour(3)->by('resend:email:' . Str::lower((string) $request->email)),
+                Limit::perHour(10)->by('resend:ip:' . $request->ip()),
+            ];
         });
 
         RateLimiter::for('auth-passkey', function (Request $request) {
