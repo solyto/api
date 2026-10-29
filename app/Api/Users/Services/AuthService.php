@@ -24,10 +24,6 @@ class AuthService
             'role' => 'user',
         ]);
 
-        if (!$user) {
-            throw new \RuntimeException('Failed to create user.');
-        }
-
         if (!empty($data['language'])) {
             $user->settings()->update(['language' => $data['language']]);
         }
@@ -37,11 +33,6 @@ class AuthService
             'token' => Str::random(40),
             'expires_at' => now()->addHours(24),
         ]);
-
-        if (!$verificationToken) {
-            $user->delete();
-            throw new \RuntimeException('Failed to create verification token.');
-        }
 
         Mail::to($user->email)->send(new UserVerification($user, $verificationToken, $data['platform'] ?? 'web', $data['language'] ?? 'en'));
 
