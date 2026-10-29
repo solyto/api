@@ -16,7 +16,7 @@ class CheckInExportService
             'Date', 'Mood', 'Water', 'Sports', 'Sleep', 'Dreams',
             'Work', 'Food Quality', 'Food Amount', 'Menstruation', 'Alcohol', 'Smoking', 'Social Life',
         ], $checkIns->map(fn ($checkIn) => [
-            $checkIn->date?->format('Y-m-d'),
+            $checkIn->date->format('Y-m-d'),
             $checkIn->mood,
             $checkIn->water,
             $checkIn->sports,

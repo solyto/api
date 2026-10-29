@@ -23,7 +23,7 @@ class PasswordService
             token: Password::broker()->createToken($user),
             email: $user->email,
             platform: $platform ?? 'web',
-            language: $user->settings?->language ?? 'en'
+            language: $user->settings->language ?? 'en'
         ));
     }
 

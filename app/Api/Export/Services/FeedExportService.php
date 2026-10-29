@@ -21,8 +21,8 @@ class FeedExportService
             .'    <body>'."\n";
 
         foreach ($subscriptions as $sub) {
-            $title = htmlspecialchars($sub->title ?? $sub->feed?->title ?? '');
-            $url = htmlspecialchars($sub->feed?->url ?? '');
+            $title = htmlspecialchars($sub->title ?? $sub->feed->title ?? '');
+            $url = htmlspecialchars($sub->feed->url ?? '');
             $xml .= '        <outline type="rss" text="'.$title.'" title="'.$title.'" xmlUrl="'.$url.'" />'."\n";
         }
 
