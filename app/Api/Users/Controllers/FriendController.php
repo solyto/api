@@ -149,9 +149,9 @@ class FriendController
     {
         abort_unless($request->user()->id === $friendRequest->receiver_id, 403);
 
-        $friend = $this->friendService->acceptFriendRequest($friendRequest);
+        $this->friendService->acceptFriendRequest($friendRequest);
 
-        return ApiResponse::success(new FriendResource($friend), 'Friend request accepted successfully.');
+        return ApiResponse::success(new FriendResource($friendRequest->sender), 'Friend request accepted successfully.');
     }
 
     /**
