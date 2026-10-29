@@ -2,6 +2,7 @@
 
 namespace App\Shared\Services;
 
+use Illuminate\Cache\RedisStore;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Psr\SimpleCache\InvalidArgumentException;
@@ -86,7 +87,11 @@ class UserCacheService
     public function forgetByPrefix(array $identifiers): void
     {
         try {
-            $store = Cache::store($this->storeName);
+            $store = Cache::store($this->storeName)->getStore();
+            if (! $store instanceof RedisStore) {
+                return;
+            }
+
             $prefix = $store->getPrefix().$this->getKey($identifiers).'_';
             $redis = $store->connection();
             $keys = $redis->keys($prefix.'*');

@@ -11,9 +11,3 @@ parameters:
 			identifier: property.notFound
 			count: 2
 			path: app/Api/Users/Notifications/DailyDayReminderNotification.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Cache\\Repository\:\:connection\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Shared/Services/UserCacheService.php
