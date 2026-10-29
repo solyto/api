@@ -55,6 +55,11 @@ class UserSettingsService
         $user->settings()->update(['time_format' => $timeFormat]);
     }
 
+    public function updateWeekStart(User $user, string $weekStart): void
+    {
+        $user->settings()->update(['week_start' => $weekStart]);
+    }
+
     public function updateWeatherCity(User $user, array $data): void
     {
         $user->settings()->update([

@@ -24,6 +24,7 @@ class UserSettings extends Model
         'timezone',
         'date_format',
         'time_format',
+        'week_start',
         'language',
         'first_visit',
         'check_in_settings',

@@ -15,6 +15,7 @@ use App\Api\Users\Requests\UpdateTimeFormatRequest;
 use App\Api\Users\Requests\UpdateTimezoneRequest;
 use App\Api\Users\Requests\UpdateWeatherCityRequest;
 use App\Api\Users\Requests\UpdateWeatherTemperatureUnitRequest;
+use App\Api\Users\Requests\UpdateWeekStartRequest;
 use App\Api\Users\Services\UserSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -214,6 +215,43 @@ class UserSettingsController
         $this->userSettingsService->updateTimeFormat($request->user(), $request->validated('time_format'));
 
         return ApiResponse::success(null, 'Time format updated successfully.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/users/me/settings/week-start",
+     *     operationId="userSettingsUpdateWeekStart",
+     *     summary="Update first day of the week setting",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"week_start"},
+     *
+     *             @OA\Property(property="week_start", type="string", enum={"monday","sunday"})
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Week start updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateWeekStart(UpdateWeekStartRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateWeekStart($request->user(), $request->validated('week_start'));
+
+        return ApiResponse::success(null, 'Week start updated successfully.');
     }
 
     /**
