@@ -183,6 +183,21 @@ describe('POST /v1/auth/login', function () {
             'password' => 'password1234',
         ])->assertJsonStructure(['data' => ['token_expires_at']]);
     });
+
+    it('returns a coded 429 with retry_after when throttled', function () {
+        $credentials = ['email' => 'throttled@example.com', 'password' => 'wrong-password'];
+
+        foreach (range(1, 5) as $ignored) {
+            $this->postJson('/api/v1/auth/login', $credentials)->assertStatus(401);
+        }
+
+        $response = $this->postJson('/api/v1/auth/login', $credentials)
+            ->assertStatus(429)
+            ->assertJsonPath('errors', ['too_many_requests'])
+            ->assertHeader('Retry-After');
+
+        expect($response->json('meta.retry_after'))->toBeInt()->toBeGreaterThan(0);
+    });
 });
 
 describe('Authenticated auth endpoints', function () {

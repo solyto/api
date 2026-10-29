@@ -36,7 +36,13 @@ namespace App\OpenApi;
  *     @OA\Property(property="success", type="boolean", example=false),
  *     @OA\Property(property="message", type="string", example="An error occurred"),
  *     @OA\Property(property="timestamp", type="string", format="date-time"),
- *     @OA\Property(property="errors", type="object", nullable=true)
+ *     @OA\Property(property="errors", type="object", nullable=true),
+ *     @OA\Property(
+ *         property="meta",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="retry_after", type="integer", nullable=true, description="Seconds until a rate-limited request may be retried (429 only)")
+ *     )
  * )
  *
  * @OA\Schema(

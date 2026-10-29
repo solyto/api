@@ -81,7 +81,9 @@ return Application::configure(basePath: dirname(__DIR__))
                   }
 
                   if ($e instanceof ThrottleRequestsException) {
-                      return ApiResponse::error('Too many requests. Please slow down.', 429);
+                      return ApiResponse::error('Too many requests. Please slow down.', 429, ['too_many_requests'],
+                          meta: ['retry_after' => (int) ($e->getHeaders()['Retry-After'] ?? 0) ?: null])
+                          ->withHeaders($e->getHeaders());
                   }
 
                   if ($e instanceof HttpException) {
