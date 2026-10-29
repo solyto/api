@@ -166,13 +166,37 @@ describe('POST /v1/auth/login', function () {
         ])->assertStatus(401);
     });
 
-    it('returns 401 for an unverified user when confirmation is required', function () {
+    it('returns 401 with email_unverified for an unverified user when confirmation is required', function () {
+        User::factory()->unverified()->create(['email' => 'unverified@example.com', 'password' => Hash::make('password1234')]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'unverified@example.com',
+            'password' => 'password1234',
+        ])->assertStatus(401)
+            ->assertJsonPath('errors', ['email_unverified']);
+    });
+
+    it('returns a plain 401 for an unverified user with a wrong password', function () {
+        User::factory()->unverified()->create(['email' => 'unverified@example.com', 'password' => Hash::make('password1234')]);
+
+        $response = $this->postJson('/api/v1/auth/login', [
+            'email' => 'unverified@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(401);
+
+        expect($response->json('errors') ?? [])->not->toContain('email_unverified');
+    });
+
+    it('logs in an unverified user when confirmation is off', function () {
+        config(['auth.policy.confirmation' => false]);
         $user = User::factory()->unverified()->create(['email' => 'unverified@example.com', 'password' => Hash::make('password1234')]);
 
         $this->postJson('/api/v1/auth/login', [
             'email' => 'unverified@example.com',
             'password' => 'password1234',
-        ])->assertStatus(401);
+        ])->assertStatus(200)
+            ->assertJsonPath('data.user.id', $user->id)
+            ->assertJsonStructure(['data' => ['token']]);
     });
 
     it('creates a web token with 7 day expiry by default', function () {

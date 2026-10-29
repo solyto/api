@@ -3,6 +3,7 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Exceptions\EmailUnverifiedException;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
@@ -101,13 +102,15 @@ class AuthController
      *         )
      *     ),
      *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=401, description="Unauthenticated; errors contains email_unverified when the credentials are correct but the email is not verified", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function login(LoginRequest $request): JsonResponse
     {
         try {
             $user = $request->authenticate();
+        } catch (EmailUnverifiedException) {
+            return ApiResponse::error('Please verify your email address first.', 401, ['email_unverified']);
         } catch (ValidationException $e) {
             report($e);
             return ApiResponse::unauthorized();
