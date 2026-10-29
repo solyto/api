@@ -455,7 +455,7 @@ class CalendarController
             return ApiResponse::error('Error deleting event', 500);
         }
 
-        $this->attachmentService->deleteAllForEvent($request->user(), $event->id);
+        $this->attachmentService->deleteAllForEvent($request->user(), (string) $event->id);
 
         return ApiResponse::success(null, 'Event deleted successfully.');
     }

@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Parameter \#2 \$eventId of method App\\Api\\Calendars\\Services\\EventAttachmentService\:\:deleteAllForEvent\(\) expects string, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Api/Calendars/Controllers/CalendarController.php
-
-		-
 			message: '#^Strict comparison using \!\=\= between App\\Api\\Feeds\\Models\\Feed and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
