@@ -13,7 +13,7 @@ class ConversationActionDTO
         public ConversationStateRoleEnum $role = ConversationStateRoleEnum::SYSTEM
     ) {}
 
-    public function getRole(): string
+    public function getRole(): ConversationStateRoleEnum
     {
         return $this->role;
     }

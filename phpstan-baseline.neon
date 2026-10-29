@@ -97,12 +97,6 @@ parameters:
 			path: app/Api/Users/Services/PasswordService.php
 
 		-
-			message: '#^Method App\\Bots\\DTOs\\ConversationActionDTO\:\:getRole\(\) should return string but returns App\\Bots\\Enums\\ConversationStateRoleEnum\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Bots/DTOs/ConversationActionDTO.php
-
-		-
 			message: '#^Property App\\Bots\\DTOs\\Keyboard\:\:\$buttons is unused\.$#'
 			identifier: property.unused
 			count: 1
