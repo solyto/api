@@ -44,7 +44,9 @@ class SolytoBot implements BotInterface
 
     public function entrypoint(): void
     {
-        $this->auth();
+        if (!$this->auth()) {
+            return;
+        }
 
         $this->state->addUserTextEvent($this->getMessage())
                     ->addActionEvent(SolytoBotEvent::WELCOME->value)
@@ -85,7 +87,9 @@ class SolytoBot implements BotInterface
 
     public function dayCommand(): void
     {
-        $this->auth();
+        if (!$this->auth()) {
+            return;
+        }
 
         $todos = $this->gateway->dueTodos();
         $appointments = $this->gateway->todayAppointments();
@@ -114,7 +118,9 @@ class SolytoBot implements BotInterface
 
     public function todosCommand(): void
     {
-        $this->auth();
+        if (!$this->auth()) {
+            return;
+        }
 
         $todos = $this->gateway->todos();
 
@@ -179,7 +185,9 @@ class SolytoBot implements BotInterface
 
     public function handleQuickAddTypeSelection(): void
     {
-        $this->auth();
+        if (!$this->auth()) {
+            return;
+        }
 
         $selectedLabel = trim((string) $this->getMessage());
 
@@ -246,7 +254,7 @@ class SolytoBot implements BotInterface
         };
     }
 
-    private function auth(): void
+    private function auth(): bool
     {
         $this->connection = TelegramBotConnection::forChatId((string) $this->getChatId())->first();
 
@@ -256,18 +264,20 @@ class SolytoBot implements BotInterface
                         ->store();
 
             $this->replyWithText(SolytoMessage::WELCOME_UNREGISTERED->trans());
-            exit(1);
+            return false;
         }
 
         $user = User::find($this->connection->user_id);
         if ($user === null) {
             $this->replyWithText(SolytoMessage::ERROR->trans());
-            exit(1);
+            return false;
         }
 
         $lang = $user->settings->language ?? 'en';
         app()->setLocale(in_array($lang, config('app.locales')) ? $lang : 'en');
 
         $this->gateway->setUser($user);
+
+        return true;
     }
 }

@@ -79,7 +79,7 @@ describe('SolytoBot connect flow', function () {
         ]);
 
         expect($connection->fresh()->is_confirmed)->toBeTrue();
-        expect($connection->fresh()->chat_id)->toBe('12345');
+        expect($connection->fresh()->chat_id)->toBe(12345);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
     });
@@ -141,7 +141,7 @@ describe('SolytoBot quick-add flow', function () {
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sendMessage')
-                && str_contains($request['text'] ?? '', 'Solyto');
+                && ($request['text'] ?? '') === SolytoMessage::WELCOME_UNREGISTERED->trans();
         });
     });
 });

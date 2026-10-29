@@ -13,6 +13,9 @@
     <testsuite name="Dav">
       <directory>app/Dav/Tests</directory>
     </testsuite>
+    <testsuite name="Bots">
+      <directory>app/Bots/Tests</directory>
+    </testsuite>
     <testsuite name="Plugins">
       <directory>app/Plugins/Tests</directory>
       <directory>app/Plugins/*/Tests</directory>

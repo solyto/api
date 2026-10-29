@@ -16,8 +16,8 @@ Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
 
 ## Layout and suites
 
-`phpunit.xml` defines three suites; `pest.php` (root) lists the same
-directories plus `app/Bots/Tests` for Pest's own discovery:
+`phpunit.xml` defines the suites below; `pest.php` (root) lists the same
+directories for Pest's own discovery:
 
 | Suite (`phpunit.xml`) | Path | What lives there |
 | --- | --- | --- |
@@ -25,7 +25,8 @@ directories plus `app/Bots/Tests` for Pest's own discovery:
 | `Feature` | `tests/Feature/` | **empty** (only `.gitkeep`); keep it empty — feature tests are co-located |
 | `Dav` | `app/Dav/Tests/` | DAV service, protocol, isolation, client fixtures (see [DAV tests](#dav-tests)) |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
-| — (Pest only) | `app/Bots/Tests/` | bot state machine; not in `phpunit.xml`, so `composer test` does not run it |
+| `Bots` | `app/Bots/Tests/` | bot state machine and commands |
+| `Plugins` | `app/Plugins/Tests/`, `app/Plugins/*/Tests/` | the plugin framework and each plugin |
 
 Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
 `goodreads_book.html`) and `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`).
