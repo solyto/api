@@ -18,11 +18,13 @@ class CalendarEventTodo extends Model
         'user_id',
     ];
 
+    /** @return BelongsTo<Todo, $this> */
     public function todo(): BelongsTo
     {
         return $this->belongsTo(Todo::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

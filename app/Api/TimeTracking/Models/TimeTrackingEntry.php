@@ -39,11 +39,13 @@ class TimeTrackingEntry extends Model
         'has_exact_times' => 'boolean',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<TimeTrackingProject, $this> */
     public function project(): BelongsTo
     {
         return $this->belongsTo(TimeTrackingProject::class, 'project_id');

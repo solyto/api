@@ -30,11 +30,13 @@ class Friend extends Model
         'friends_since' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user1(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id_1');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user2(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id_2');

@@ -34,6 +34,7 @@ class Budget extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -44,6 +45,7 @@ class Budget extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return HasMany<BudgetValue, $this> */
     public function values(): HasMany
     {
         return $this->hasMany(BudgetValue::class);

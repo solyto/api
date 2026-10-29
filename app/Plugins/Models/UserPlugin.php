@@ -34,6 +34,7 @@ class UserPlugin extends Model
         'settings' => 'array',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

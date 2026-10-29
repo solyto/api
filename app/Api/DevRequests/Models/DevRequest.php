@@ -37,16 +37,19 @@ class DevRequest extends Model
         return DevRequestFactory::new();
     }
 
+    /** @return HasMany<DevRequestVote, $this> */
     public function votes(): HasMany
     {
         return $this->hasMany(DevRequestVote::class);
     }
 
+    /** @return HasMany<DevRequestComment, $this> */
     public function comments(): HasMany
     {
         return $this->hasMany(DevRequestComment::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function createdByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');

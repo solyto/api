@@ -50,6 +50,7 @@ class LibraryBook extends Model
         'finished_at' => 'date',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -60,11 +61,13 @@ class LibraryBook extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'tag_book', 'book_id', 'tag_id')->withTimestamps();
     }
 
+    /** @return BelongsToMany<LibraryBookGenre, $this> */
     public function genres(): BelongsToMany
     {
         return $this->belongsToMany(LibraryBookGenre::class, 'library_genre_book', 'book_id', 'genre_id');

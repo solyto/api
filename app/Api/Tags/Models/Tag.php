@@ -29,6 +29,7 @@ class Tag extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

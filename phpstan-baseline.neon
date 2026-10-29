@@ -1,46 +1,16 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Calendars/Controllers/CalendarController.php
-
-		-
 			message: '#^Parameter \#2 \$eventId of method App\\Api\\Calendars\\Services\\EventAttachmentService\:\:deleteAllForEvent\(\) expects string, int\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Api/Calendars/Controllers/CalendarController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vote_type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/DevRequests/Resources/DevRequestResource.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:notify\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Api/DevRequests/Services/DevRequestService.php
-
-		-
 			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Api/Export/Services/CheckInExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Export/Services/FeedExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$url\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Export/Services/FeedExportService.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
@@ -55,58 +25,10 @@ parameters:
 			path: app/Api/Export/Services/FeedExportService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$date\.$#'
-			identifier: property.notFound
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Api/Export/Services/FinanceWealthExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$value\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Export/Services/FinanceWealthExportService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/Export/Services/FinanceWealthExportService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,App\\Api\\Finances\\Models\\WealthField\>\:\:flatMap\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/Export/Services/FinanceWealthExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Export/Services/TimeTrackingExportService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Api\\TimeTracking\\Models\\TimeTrackingEntry\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/Export/Services/TimeTrackingExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_completed\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Export/Services/TodoExportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Export/Services/TodoExportService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Api\\Todos\\Models\\Todo\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/Export/Services/TodoExportService.php
 
 		-
 			message: '#^Access to an undefined property App\\Api\\Feeds\\Resources\\FeedResource\:\:\$description\.$#'
@@ -119,42 +41,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Api/Feeds/Resources/FeedSubscriptionResource.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$subscriptions_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$url\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Api\\Feeds\\Models\\FeedSubscription\>\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/Feeds/Services/FeedService.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between App\\Api\\Feeds\\Models\\Feed and null will always evaluate to true\.$#'
@@ -181,30 +67,6 @@ parameters:
 			path: app/Api/Notifications/Commands/GenerateExampleNotificationsCommand.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categories\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/TimeTracking/Services/TimeTrackingService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/TimeTracking/Services/TimeTrackingService.php
-
-		-
-			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Api/TimeTracking/Services/TimeTrackingService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Todos/Services/TodoService.php
-
-		-
 			message: '#^Match expression does not handle remaining value\: null$#'
 			identifier: match.unhandled
 			count: 1
@@ -215,42 +77,6 @@ parameters:
 			identifier: identical.alwaysTrue
 			count: 1
 			path: app/Api/Todos/Services/TodoService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Commands/SendDailyCheckInRemindersCommand.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:notify\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Api/Users/Commands/SendDailyCheckInRemindersCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Users/Commands/SendDailyDayRemindersCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Commands/SendDailyDayRemindersCommand.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:notify\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Api/Users/Commands/SendDailyDayRemindersCommand.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: string, name\: string, created_at\: Carbon\\Carbon\|null, last_used_at\: string\|null, transports\: string\|null\}, Closure\(App\\Api\\Users\\Models\\Passkey\)\: array\{id\: string, name\: string, created_at\: Carbon\\Carbon\|null, last_used_at\: string\|null, transports\: string\|null\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Api/Users/Controllers/PasskeyController.php
 
 		-
 			message: '#^Access to an undefined property App\\Api\\Users\\Models\\FriendRequest\:\:\$direction\.$#'
@@ -271,52 +97,10 @@ parameters:
 			path: app/Api/Users/Notifications/DailyDayReminderNotification.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/FriendRequestResource.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/FriendRequestResource.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$profile\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/FriendRequestResource.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$profile_image_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Resources/FriendResource.php
-
-		-
 			message: '#^Negated boolean expression is always false\.$#'
 			identifier: booleanNot.alwaysFalse
 			count: 2
 			path: app/Api/Users/Services/AuthService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$credential_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Services/PasskeyService.php
-
-		-
-			message: '#^Parameter \#1 \$user of method App\\Api\\Users\\Services\\AuthService\:\:createToken\(\) expects App\\Api\\Users\\Models\\User, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Api/Users/Services/PasskeyService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$language\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Users/Services/PasswordService.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\PasswordBroker\:\:createToken\(\)\.$#'
@@ -329,24 +113,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Api/Users/Services/PasswordService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$weather_city\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Weather/Controllers/WeatherController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$weather_latitude\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Weather/Controllers/WeatherController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$weather_longitude\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Weather/Controllers/WeatherController.php
 
 		-
 			message: '#^Method App\\Shared\\Services\\TelegramBotService\:\:getStatus\(\) invoked with 1 parameter, 0 required\.$#'
@@ -365,12 +131,6 @@ parameters:
 			identifier: property.unused
 			count: 1
 			path: app/Bots/DTOs/Keyboard.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$language\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Bots/SolytoBot.php
 
 		-
 			message: '#^Parameter \#1 \$chatId of method App\\Bots\\SolytoBot\:\:initState\(\) expects string, int\|null given\.$#'
@@ -409,26 +169,14 @@ parameters:
 			path: app/Bots/Traits/IsTelegramBot.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_confirmed\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Shared/Notifications/BaseNotification.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$chat_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Shared/Notifications/Channels/TelegramChannel.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_confirmed\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Shared/Notifications/Channels/TelegramChannel.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Notifications\\Notification\:\:toTelegram\(\)\.$#'
 			identifier: method.notFound
+			count: 1
+			path: app/Shared/Notifications/Channels/TelegramChannel.php
+
+		-
+			message: '#^Parameter \#1 \$chatId of method App\\Shared\\Services\\TelegramBotService\:\:sendText\(\) expects string, int\<min, \-1\>\|int\<1, max\> given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Shared/Notifications/Channels/TelegramChannel.php
 

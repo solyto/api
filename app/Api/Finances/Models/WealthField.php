@@ -31,6 +31,7 @@ class WealthField extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -41,6 +42,7 @@ class WealthField extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return HasMany<WealthValue, $this> */
     public function values(): HasMany
     {
         return $this->hasMany(WealthValue::class, 'field_id');

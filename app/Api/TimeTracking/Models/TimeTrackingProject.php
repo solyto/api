@@ -30,11 +30,13 @@ class TimeTrackingProject extends Model
         'user_id',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsToMany<TimeTrackingCategory, $this> */
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -45,6 +47,7 @@ class TimeTrackingProject extends Model
         );
     }
 
+    /** @return HasMany<TimeTrackingEntry, $this> */
     public function entries(): HasMany
     {
         return $this->hasMany(TimeTrackingEntry::class, 'project_id');

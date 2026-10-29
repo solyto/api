@@ -22,6 +22,7 @@ class ExportJob extends Model
         'features' => 'json',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

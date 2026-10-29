@@ -29,6 +29,7 @@ class TodoSubtask extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<Todo, $this> */
     public function todo(): BelongsTo
     {
         return $this->belongsTo(Todo::class);

@@ -27,11 +27,13 @@ class TimeTrackingCategory extends Model
         'user_id',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsToMany<TimeTrackingProject, $this> */
     public function projects(): BelongsToMany
     {
         return $this->belongsToMany(

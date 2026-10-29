@@ -43,6 +43,7 @@ class LibraryMusic extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -53,6 +54,7 @@ class LibraryMusic extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsToMany<LibraryMusicGenre, $this> */
     public function genres(): BelongsToMany
     {
         return $this->belongsToMany(LibraryMusicGenre::class, 'library_genre_music', 'music_id', 'genre_id');

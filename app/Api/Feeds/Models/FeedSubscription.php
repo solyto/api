@@ -34,11 +34,13 @@ class FeedSubscription extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<Feed, $this> */
     public function feed(): BelongsTo
     {
         return $this->belongsTo(Feed::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

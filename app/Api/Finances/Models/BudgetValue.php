@@ -31,6 +31,7 @@ class BudgetValue extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<Budget, $this> */
     public function budget(): BelongsTo
     {
         return $this->belongsTo(Budget::class);

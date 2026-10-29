@@ -74,26 +74,31 @@ class User extends Authenticatable
         return $this->role === 'super_admin';
     }
 
+    /** @return HasOne<UserProfile, $this> */
     public function profile(): HasOne
     {
         return $this->hasOne(UserProfile::class);
     }
 
+    /** @return HasOne<UserSettings, $this> */
     public function settings(): HasOne
     {
         return $this->hasOne(UserSettings::class);
     }
 
+    /** @return HasOne<UserNotificationSettings, $this> */
     public function notificationSettings(): HasOne
     {
         return $this->hasOne(UserNotificationSettings::class);
     }
 
+    /** @return HasOne<TelegramBotConnection, $this> */
     public function telegramConnection(): HasOne
     {
         return $this->hasOne(TelegramBotConnection::class);
     }
 
+    /** @return HasMany<Passkey, $this> */
     public function passkeys(): HasMany
     {
         return $this->hasMany(Passkey::class);
@@ -112,12 +117,14 @@ class User extends Authenticatable
             });
     }
 
+    /** @return HasMany<FriendRequest, $this> */
     public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(FriendRequest::class, 'sender_id')
             ->with(['receiver.profile']);
     }
 
+    /** @return HasMany<FriendRequest, $this> */
     public function receivedFriendRequests(): HasMany
     {
         return $this->hasMany(FriendRequest::class, 'receiver_id')
