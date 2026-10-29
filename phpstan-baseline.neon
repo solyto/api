@@ -13,18 +13,6 @@ parameters:
 			path: app/Api/Todos/Services/TodoService.php
 
 		-
-			message: '#^Access to an undefined property App\\Api\\Users\\Models\\FriendRequest\:\:\$direction\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Users/Models/User.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Users\\Models\\FriendRequest\:\:\$other_user\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Users/Models/User.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
 			identifier: property.notFound
 			count: 2
