@@ -43,6 +43,52 @@ describe('DevRequest CRUD', function () {
     });
 });
 
+describe('DevRequest fixed_in_version', function () {
+    it('lets an admin set fixed_in_version', function () {
+        $admin = makeUser(['role' => 'admin']);
+        $devRequest = DevRequest::factory()->create(['status' => 'completed']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => '1.2.0'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.fixed_in_version', '1.2.0');
+
+        expect($devRequest->fresh()->fixed_in_version)->toBe('1.2.0');
+    });
+
+    it('lets an admin clear fixed_in_version with null', function () {
+        $admin = makeUser(['role' => 'admin']);
+        $devRequest = DevRequest::factory()->create(['status' => 'completed', 'fixed_in_version' => '1.2.0']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => null])
+            ->assertStatus(200)
+            ->assertJsonPath('data.fixed_in_version', null);
+
+        expect($devRequest->fresh()->fixed_in_version)->toBeNull();
+    });
+
+    it('forbids a non-admin from setting fixed_in_version', function () {
+        $user = makeUser();
+        $devRequest = DevRequest::factory()->create(['status' => 'completed', 'fixed_in_version' => '1.1.0']);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => '1.2.0']), 403);
+
+        expect($devRequest->fresh()->fixed_in_version)->toBe('1.1.0');
+    });
+
+    it('rejects an invalid fixed_in_version format', function (string $version) {
+        $admin = makeUser(['role' => 'admin']);
+        $devRequest = DevRequest::factory()->create(['status' => 'completed']);
+
+        expectApiError($this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => $version]), 422);
+
+        expect($devRequest->fresh()->fixed_in_version)->toBeNull();
+    })->with(['v1.2', '1.2-beta', '1..2', '1.2.', '123456789.123456789.1']);
+});
+
 describe('DevRequest voting', function () {
     it('allows a user to vote once', function () {
         $user = makeUser();

@@ -25,6 +25,7 @@ class DevRequest extends Model
         'url',
         'priority',
         'created_by_user_id',
+        'fixed_in_version',
     ];
 
     protected $casts = [

@@ -16,6 +16,7 @@ class UpdateDevRequestRequest extends FormRequest
             'screenshot' => 'sometimes|nullable|string|max:255',
             'priority' => 'sometimes|nullable|integer|min:1|max:5',
             'url' => 'sometimes|nullable|string|max:255|url',
+            'fixed_in_version' => 'sometimes|nullable|string|max:20|regex:/^\d+(\.\d+)*$/',
         ];
     }
 }
