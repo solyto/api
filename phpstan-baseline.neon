@@ -109,12 +109,6 @@ parameters:
 			path: app/Api/Users/Services/PasswordService.php
 
 		-
-			message: '#^Method App\\Shared\\Services\\TelegramBotService\:\:getStatus\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: app/Bots/Commands/TelegramBotStatus.php
-
-		-
 			message: '#^Method App\\Bots\\DTOs\\ConversationActionDTO\:\:getRole\(\) should return string but returns App\\Bots\\Enums\\ConversationStateRoleEnum\.$#'
 			identifier: return.type
 			count: 1

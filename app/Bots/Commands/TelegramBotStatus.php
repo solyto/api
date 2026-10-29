@@ -31,10 +31,11 @@ class TelegramBotStatus extends Command
     {
         $bot = $this->selectBot();
         $service = new TelegramBotService($bot['telegram_token']);
-        $info = $service->getStatus($bot);
+        $info = $service->getStatus();
 
         if ($info === null) {
-            $this->error('Could not data from Telegram.');
+            $this->error('Could not get data from Telegram.');
+            return;
         }
 
         $this->info(json_encode($info, JSON_PRETTY_PRINT));
