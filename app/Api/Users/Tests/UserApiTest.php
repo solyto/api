@@ -280,6 +280,35 @@ describe('User settings endpoints', function () {
         expect($user->fresh()->settings->time_format)->toBe('H:i');
     });
 
+    it('updates week start', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/week-start', ['week_start' => 'sunday'])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->week_start)->toBe('sunday');
+    });
+
+    it('rejects an invalid week start', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/week-start', ['week_start' => 'saturday'])
+            ->assertStatus(422);
+
+        expect($user->fresh()->settings->week_start)->toBe('monday');
+    });
+
+    it('returns monday as the default week start', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200)
+            ->assertJsonPath('data.settings.week_start', 'monday');
+    });
+
     it('updates weather city', function () {
         $user = makeUser();
 

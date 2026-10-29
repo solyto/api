@@ -116,6 +116,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::put('language', [UserSettingsController::class, 'updateLanguage']);
             Route::put('date-format', [UserSettingsController::class, 'updateDateFormat']);
             Route::put('time-format', [UserSettingsController::class, 'updateTimeFormat']);
+            Route::put('week-start', [UserSettingsController::class, 'updateWeekStart']);
             Route::put('weather-city', [UserSettingsController::class, 'updateWeatherCity']);
             Route::put('weather-temperature-unit', [UserSettingsController::class, 'updateWeatherTemperatureUnit']);
             Route::put('complete-onboarding', [UserSettingsController::class, 'completeOnboarding']);
