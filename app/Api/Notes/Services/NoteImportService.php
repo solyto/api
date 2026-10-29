@@ -53,7 +53,7 @@ class NoteImportService
         return true;
     }
 
-    private function processZipEntry(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId = null, &$processed): void
+    private function processZipEntry(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId, &$processed): void
     {
         $isDirectory = str_ends_with($path, '/');
         $parentPath = substr($path, 0, strrpos($path, '/', -2) + 1);
@@ -69,7 +69,7 @@ class NoteImportService
         }
     }
 
-    private function processDir(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId = null, &$processed)
+    private function processDir(\ZipArchive $zip, string $path, string $userId, ?int $parentCategoryId, &$processed)
     {
         $dirname = rtrim($path, '/');
 

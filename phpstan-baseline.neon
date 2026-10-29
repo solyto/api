@@ -43,12 +43,6 @@ parameters:
 			path: app/Api/Libraries/Services/External/GoodreadsService.php
 
 		-
-			message: '#^Deprecated in PHP 8\.1\: Required parameter \$processed follows optional parameter \$parentCategoryId\.$#'
-			identifier: parameter.requiredAfterOptional
-			count: 2
-			path: app/Api/Notes/Services/NoteImportService.php
-
-		-
 			message: '#^Strict comparison using \=\=\= between int\|string and null will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
