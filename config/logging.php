@@ -94,9 +94,10 @@ return [
         ],
 
         'dav' => [
-            'driver' => 'single',
+            'driver' => 'daily',
             'path' => storage_path('logs/dav.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => env('DAV_LOG_LEVEL', 'warning'),
+            'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
         ],
 
