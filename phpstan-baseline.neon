@@ -31,18 +31,6 @@ parameters:
 			path: app/Api/Export/Services/FinanceWealthExportService.php
 
 		-
-			message: '#^Access to an undefined property App\\Api\\Feeds\\Resources\\FeedResource\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Resources/FeedResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Api\\Feeds\\Resources\\FeedSubscriptionResource\:\:\$keywords\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Api/Feeds/Resources/FeedSubscriptionResource.php
-
-		-
 			message: '#^Strict comparison using \!\=\= between App\\Api\\Feeds\\Models\\Feed and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1

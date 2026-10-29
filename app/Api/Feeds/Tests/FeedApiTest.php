@@ -37,6 +37,18 @@ describe('Feed subscriptions CRUD', function () {
         expect(FeedSubscription::count())->toBe(0);
     });
 
+    it('returns the stored whitelist and blacklist', function () {
+        $user = makeUser();
+        $subscription = FeedSubscription::factory()->forUser($user)
+            ->withWhitelist(['php', 'laravel'])->withBlacklist(['ads'])->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/subscriptions/'.$subscription->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.whitelist', 'php,laravel')
+            ->assertJsonPath('data.blacklist', 'ads');
+    });
+
     it('stores a subscription and syncs the feed', function () {
         Queue::fake();
         $user = makeUser();
