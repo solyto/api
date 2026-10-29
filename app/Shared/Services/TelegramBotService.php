@@ -13,7 +13,7 @@ class TelegramBotService
         $this->baseUrl = sprintf(config('services.telegram.api.base_url'), $accessToken);
     }
 
-    public function sendText(string $chatId, string $content): bool
+    public function sendText(int $chatId, string $content): bool
     {
         $response = Http::post($this->baseUrl . 'sendMessage', [
             'chat_id' => $chatId,
@@ -23,7 +23,7 @@ class TelegramBotService
         return $response->successful();
     }
 
-    public function sendTextWithKeyboard(string $chatId, string $content, array $keyboard): bool
+    public function sendTextWithKeyboard(int $chatId, string $content, array $keyboard): bool
     {
         $response = Http::post($this->baseUrl . 'sendMessage', [
             'chat_id' => $chatId,

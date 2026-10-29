@@ -8,7 +8,7 @@ trait HasConversationState
 {
     protected ConversationState $state;
 
-    protected function initState(string $chatId, string $botName): void
+    protected function initState(int $chatId, string $botName): void
     {
         $identifier = $chatId . '_' . $botName;
         $this->state = ConversationState::loadOrMake($identifier);
