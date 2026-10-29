@@ -374,6 +374,32 @@ describe('POST /v1/auth/reset-password', function () {
         expect(Hash::check('newpassword123', $user->fresh()->password))->toBeTrue();
     });
 
+    it('resets the password with the token from the reset mail', function () {
+        Mail::fake();
+        makeUser(['email' => 'roundtrip@example.com', 'password' => Hash::make('oldpassword123')]);
+
+        $this->postJson('/api/v1/auth/forgot-password', ['email' => 'roundtrip@example.com'])->assertStatus(200);
+
+        $token = null;
+        Mail::assertSent(\App\Api\Users\Mails\PasswordResetMail::class, function ($mail) use (&$token) {
+            $token = $mail->content()->with['token'];
+
+            return true;
+        });
+
+        $this->postJson('/api/v1/auth/reset-password', [
+            'token' => $token,
+            'email' => 'roundtrip@example.com',
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ])->assertStatus(200)->assertJsonPath('success', true);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'roundtrip@example.com',
+            'password' => 'newpassword123',
+        ])->assertStatus(200)->assertJsonPath('success', true);
+    });
+
     it('rejects an invalid token', function () {
         makeUser(['email' => 'resetpw@example.com']);
 
