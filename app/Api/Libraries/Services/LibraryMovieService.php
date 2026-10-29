@@ -131,7 +131,7 @@ class LibraryMovieService
             if (empty($results)) {
                 return [];
             }
-            $videos = $this->tmdbService->getMovieVideos($results[0]['id']);
+            $videos = $this->tmdbService->getMovieVideos(array_values($results)[0]->getId());
         }
 
         return collect($videos ?? [])
