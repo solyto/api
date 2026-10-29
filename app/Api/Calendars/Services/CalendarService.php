@@ -9,6 +9,7 @@ use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class CalendarService
@@ -126,6 +127,31 @@ class CalendarService
                     $calendar,
                     new \DateTime('today', $timezone),
                     new \DateTime('today', $timezone)->modify('+ 3 days')
+                )
+            ));
+        }
+
+        return $events;
+    }
+
+    /**
+     * @return array<int, EventDTO>
+     */
+    public function listTodayEvents(User $user): array
+    {
+        $today = Carbon::today($user->settings->timezone ?? 'UTC');
+
+        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
+        $events = [];
+
+        foreach ($calendars as $calendar) {
+            $events = array_merge($events, $this->cache->remember(
+                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'today', $today->toDateString()],
+                self::CACHE_TTL_EVENTS_CURRENT,
+                fn() => $this->dav->calendars()->events()->listExpanded(
+                    $calendar,
+                    $today->toDateTime(),
+                    $today->copy()->addDay()->toDateTime()
                 )
             ));
         }

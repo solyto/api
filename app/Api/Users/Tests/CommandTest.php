@@ -112,6 +112,45 @@ describe('Daily reminder commands', function () {
         Notification::assertSentTo($user, DailyDayReminderNotification::class);
     });
 
+    it('lists today\'s calendar events in the day reminder', function (string $timezone, string $utcNow) {
+        Notification::fake();
+        Carbon::setTestNow($utcNow);
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => $timezone]);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $instanceId = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $storeEvent = function (array $payload) use ($user, $instanceId) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge($payload, [
+                    'calendar_id' => $instanceId,
+                ]))
+                ->assertStatus(201);
+        };
+
+        $today = today($timezone)->toDateString();
+        $yesterday = today($timezone)->subDay()->toDateString();
+        $tomorrow = today($timezone)->addDay()->toDateString();
+
+        $storeEvent(['title' => 'Dentist', 'start_date' => $today.' 09:30', 'end_date' => $today.' 10:30', 'is_all_day' => false]);
+        $storeEvent(['title' => 'Holiday', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Standup', 'start_date' => $yesterday.' 08:00', 'end_date' => $yesterday.' 08:15', 'is_all_day' => false, 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
+        $storeEvent(['title' => 'Tomorrow Meeting', 'start_date' => $tomorrow.' 09:00', 'end_date' => $tomorrow.' 10:00', 'is_all_day' => false]);
+
+        $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
+
+        Notification::assertSentTo($user, DailyDayReminderNotification::class, function (DailyDayReminderNotification $notification) {
+            return $notification->events->pluck('title')->sort()->values()->all() === ['Dentist', 'Holiday', 'Standup'];
+        });
+    })->with([
+        'UTC' => ['UTC', '2026-08-14 07:00:00'],
+        'Europe/Berlin' => ['Europe/Berlin', '2026-08-14 05:00:00'],
+    ]);
+
     it('sends daily check-in reminders at 20:00', function () {
         Notification::fake();
         Carbon::setTestNow('2026-08-14 20:00:00');

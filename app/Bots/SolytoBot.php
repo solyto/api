@@ -100,12 +100,13 @@ class SolytoBot implements BotInterface
         }
 
         $dayMessage = SolytoMessage::DAY->trans();
+        $timezone = $this->connection->user->settings->timezone ?? 'UTC';
 
         foreach ($appointments as $appointment) {
-            if ($appointment->is_all_day) {
+            if ($appointment->isAllDay) {
                 $dayMessage .= '- ' . $appointment->title . "\n";
             } else {
-                $dayMessage .= '- ' . Carbon::createFromTimestamp($appointment->start_date)->format('H:i') . ' ' . $appointment->title . "\n";
+                $dayMessage .= '- ' . Carbon::instance($appointment->startDate)->setTimezone($timezone)->format('H:i') . ' ' . $appointment->title . "\n";
             }
         }
 

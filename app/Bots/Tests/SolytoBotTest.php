@@ -201,6 +201,64 @@ describe('SolytoBot day and todos commands', function () {
     });
 });
 
+describe('SolytoBot day command with calendar events', function () {
+    afterEach(function () {
+        \Carbon\Carbon::setTestNow();
+    });
+
+    it('lists today\'s calendar events in the user timezone', function () {
+        \Carbon\Carbon::setTestNow('2026-08-14 05:00:00');
+        $timezone = 'Europe/Berlin';
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => $timezone]);
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '886', 'is_confirmed' => true]);
+
+        $instanceId = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $storeEvent = function (array $payload) use ($user, $instanceId) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge($payload, [
+                    'calendar_id' => $instanceId,
+                ]))
+                ->assertStatus(201);
+        };
+
+        $today = today($timezone)->toDateString();
+        $yesterday = today($timezone)->subDay()->toDateString();
+        $tomorrow = today($timezone)->addDay()->toDateString();
+
+        $storeEvent(['title' => 'Dentist', 'start_date' => $today.' 09:30', 'end_date' => $today.' 10:30', 'is_all_day' => false]);
+        $storeEvent(['title' => 'Holiday', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Standup', 'start_date' => $yesterday.' 08:00', 'end_date' => $yesterday.' 08:15', 'is_all_day' => false, 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
+        $storeEvent(['title' => 'Tomorrow Meeting', 'start_date' => $tomorrow.' 09:00', 'end_date' => $tomorrow.' 10:00', 'is_all_day' => false]);
+
+        app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
+            'update_id' => 1,
+            'message' => [
+                'message_id' => 1,
+                'chat' => ['id' => 886],
+                'from' => ['id' => 886, 'language_code' => 'en'],
+                'text' => '/day',
+            ],
+        ]));
+        $bot = new SolytoBot(app(IntegrationGateway::class));
+        $bot->handleWebhook(request());
+
+        Http::assertSent(function ($request) {
+            $text = $request['text'] ?? '';
+
+            return str_contains($request->url(), 'sendMessage')
+                && str_contains($text, '- Holiday')
+                && str_contains($text, '- 09:30 Dentist')
+                && str_contains($text, '- 08:00 Standup')
+                && !str_contains($text, 'Tomorrow Meeting');
+        });
+    });
+});
+
 describe('SolytoBot action routing', function () {
     function sendToBotWithAction(SolytoBot $bot, int $chatId, string $previousText, string $action, string $text): void
     {

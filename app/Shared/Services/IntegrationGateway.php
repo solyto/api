@@ -2,14 +2,14 @@
 
 namespace App\Shared\Services;
 
-use App\Api\Calendars\Models\CalendarEntry;
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\EventDTO;
 use App\Shared\Exceptions\IntegrationAuthException;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class IntegrationGateway
@@ -60,18 +60,14 @@ class IntegrationGateway
     }
 
     /**
+     * @return Collection<int, EventDTO>
      * @throws IntegrationAuthException
      */
     public function todayAppointments(): Collection
     {
         $this->checkAuth();
 
-        return CalendarEntry::forUser($this->user->id)
-            ->whereBetween('start_date', [
-                Carbon::today()->startOfDay()->timestamp,
-                Carbon::today()->endOfDay()->timestamp,
-            ])
-            ->get();
+        return collect(app(CalendarService::class)->listTodayEvents($this->user));
     }
 
     /**
