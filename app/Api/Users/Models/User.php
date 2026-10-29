@@ -135,23 +135,11 @@ class User extends Authenticatable
     {
         $sent = FriendRequest::where('sender_id', $this->id)
             ->with(['receiver.profile'])
-            ->get()
-            ->map(function ($request) {
-                $request->other_user = $request->receiver;
-                $request->direction = 'sent';
-
-                return $request;
-            });
+            ->get();
 
         $received = FriendRequest::where('receiver_id', $this->id)
             ->with(['sender.profile'])
-            ->get()
-            ->map(function ($request) {
-                $request->other_user = $request->sender;
-                $request->direction = 'received';
-
-                return $request;
-            });
+            ->get();
 
         return $sent->merge($received);
     }
