@@ -10,6 +10,10 @@ class TelegramChannel
 {
     public function send(User $notifiable, Notification $notification): void
     {
+        if (!method_exists($notification, 'toTelegram')) {
+            return;
+        }
+
         $connection = $notifiable->telegramConnection;
 
         if (!$connection || !$connection->is_confirmed || !$connection->chat_id) {
