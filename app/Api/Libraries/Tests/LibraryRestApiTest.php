@@ -128,6 +128,50 @@ describe('Library movies', function () {
         expect(LibraryMovie::count())->toBe(1);
         expect($movie->fresh()->genres)->toHaveCount(0);
     });
+    it('returns youtube trailers for a movie', function () {
+        Http::fake([
+            'https://api.themoviedb.org/3/search/movie*' => Http::response([
+                'results' => [
+                    ['id' => 1, 'title' => ''],
+                    ['id' => 438631, 'title' => 'Dune', 'release_date' => '2021-10-22'],
+                ],
+            ]),
+            'https://api.themoviedb.org/3/movie/438631/videos*' => Http::response([
+                'results' => [
+                    ['key' => 'abc', 'name' => 'Official Trailer', 'site' => 'YouTube', 'type' => 'Trailer'],
+                    ['key' => 'def', 'name' => 'Featurette', 'site' => 'YouTube', 'type' => 'Featurette'],
+                ],
+            ]),
+        ]);
+        $user = makeUser();
+        $movie = LibraryMovie::factory()->forUser($user)->create(['title' => 'Dune', 'category' => 'movie']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/movies/'.$movie->id.'/trailers')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.key', 'abc');
+    });
+
+    it('returns youtube trailers for a series', function () {
+        Http::fake([
+            'https://api.themoviedb.org/3/search/tv*' => Http::response([
+                'results' => [['id' => 1399, 'name' => 'Game of Thrones']],
+            ]),
+            'https://api.themoviedb.org/3/tv/1399/videos*' => Http::response([
+                'results' => [
+                    ['key' => 'ghi', 'name' => 'Season 1 Trailer', 'site' => 'YouTube', 'type' => 'Trailer'],
+                ],
+            ]),
+        ]);
+        $user = makeUser();
+        $movie = LibraryMovie::factory()->forUser($user)->create(['title' => 'Game of Thrones', 'category' => 'series']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/movies/'.$movie->id.'/trailers')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.key', 'ghi');
+    });
 });
 
 describe('Library links', function () {
