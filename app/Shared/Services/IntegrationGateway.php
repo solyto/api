@@ -3,6 +3,8 @@
 namespace App\Shared\Services;
 
 use App\Api\Calendars\Services\CalendarService;
+use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Services\CheckInService;
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
@@ -189,6 +191,33 @@ class IntegrationGateway
         }
 
         app(TimeTrackingService::class)->stopTimer($entry);
+    }
+
+    /**
+     * @throws IntegrationAuthException
+     */
+    public function checkInOn(string $date): ?CheckIn
+    {
+        $this->checkAuth();
+
+        return app(CheckInService::class)->find($this->user, $date);
+    }
+
+    /**
+     * @throws IntegrationAuthException
+     */
+    public function setCheckIn(string $date, string $tracker, ?int $value): void
+    {
+        $this->checkAuth();
+
+        $service = app(CheckInService::class);
+        $checkIn = $service->find($this->user, $date);
+
+        if ($checkIn) {
+            $service->update($this->user, $checkIn, [$tracker => $value]);
+        } elseif ($value !== null) {
+            $service->create($this->user, ['date' => $date, $tracker => $value]);
+        }
     }
 
     /**

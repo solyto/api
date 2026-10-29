@@ -18,9 +18,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class CheckInSettingsResource extends JsonResource
 {
-    private const DEFAULT_TRACKERS = ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount'];
+    public const DEFAULT_TRACKERS = ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount'];
 
-    private const DEFAULT_SPORTS = ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'];
+    public const DEFAULT_SPORTS = ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'];
 
     public function toArray(Request $request): array
     {
