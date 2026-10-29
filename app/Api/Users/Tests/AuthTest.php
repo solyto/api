@@ -347,6 +347,95 @@ describe('POST /v1/auth/verify', function () {
     });
 });
 
+describe('POST /v1/auth/resend-verification', function () {
+    it('replaces the token of an unverified user and queues one mail', function () {
+        Mail::fake();
+        $user = User::factory()->unverified()->create();
+        $old = VerificationToken::factory()->forUser($user)->create(['token' => 'old-token']);
+        $this->travel(10)->minutes();
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $new = VerificationToken::where('user_id', $user->id)->sole();
+        expect($new->token)->not->toBe('old-token');
+        expect($new->id)->toBe($old->id);
+
+        Mail::assertQueued(UserVerification::class, 1);
+        Mail::assertQueued(UserVerification::class, fn ($mail) => $mail->hasTo($user->email));
+
+        $this->postJson('/api/v1/auth/verify', [
+            'user_id' => $user->id,
+            'token' => 'old-token',
+        ])->assertStatus(401)
+            ->assertJsonPath('errors', ['token_mismatch']);
+    });
+
+    it('issues a token that verifies the account', function () {
+        Mail::fake();
+        $user = User::factory()->unverified()->create();
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email, 'platform' => 'mobile'])
+            ->assertOk();
+
+        $this->postJson('/api/v1/auth/verify', [
+            'user_id' => $user->id,
+            'token' => VerificationToken::where('user_id', $user->id)->sole()->token,
+        ])->assertStatus(201);
+
+        expect($user->fresh()->email_verified_at)->not->toBeNull();
+    });
+
+    it('returns the same response for unknown and verified emails without sending mail', function () {
+        Mail::fake();
+        $this->freezeTime();
+        $verified = makeUser();
+        $unverified = User::factory()->unverified()->create();
+
+        $expected = $this->postJson('/api/v1/auth/resend-verification', ['email' => $unverified->email])
+            ->assertOk()
+            ->json();
+        Mail::fake();
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => 'nobody@example.com'])
+            ->assertOk()
+            ->assertExactJson($expected);
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => $verified->email])
+            ->assertOk()
+            ->assertExactJson($expected);
+
+        Mail::assertNothingQueued();
+        Mail::assertNothingSent();
+        expect(VerificationToken::where('user_id', $verified->id)->exists())->toBeFalse();
+    });
+
+    it('sends nothing and keeps the token inside the cooldown', function () {
+        Mail::fake();
+        $user = User::factory()->unverified()->create();
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])->assertOk();
+        $token = VerificationToken::where('user_id', $user->id)->sole()->token;
+        $this->travel(4)->minutes();
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])->assertOk();
+
+        Mail::assertQueued(UserVerification::class, 1);
+        expect(VerificationToken::where('user_id', $user->id)->sole()->token)->toBe($token);
+    });
+
+    it('rate limits the fourth request for the same email regardless of casing', function () {
+        Mail::fake();
+
+        foreach (['someone@example.com', 'SOMEONE@example.com', 'Someone@Example.com'] as $email) {
+            $this->postJson('/api/v1/auth/resend-verification', ['email' => $email])->assertOk();
+        }
+
+        $this->postJson('/api/v1/auth/resend-verification', ['email' => 'someone@EXAMPLE.COM'])
+            ->assertStatus(429);
+    });
+});
+
 describe('POST /v1/auth/forgot-password', function () {
     it('sends a reset mail for an existing user', function () {
         Mail::fake();

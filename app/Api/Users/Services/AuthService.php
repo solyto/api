@@ -106,6 +106,28 @@ class AuthService
         return true;
     }
 
+    public function resendVerification(string $email, ?string $platform = null): void
+    {
+        $user = User::where('email', $email)->first();
+
+        if (!$user || $user->email_verified_at !== null) {
+            return;
+        }
+
+        $existing = VerificationToken::where('user_id', $user->id)->first();
+
+        if ($existing && $existing->updated_at?->gt(now()->subMinutes(5))) {
+            return;
+        }
+
+        $verificationToken = VerificationToken::updateOrCreate(
+            ['user_id' => $user->id],
+            ['token' => Str::random(40), 'expires_at' => now()->addHours(24)],
+        );
+
+        Mail::to($user->email)->queue(new UserVerification($user, $verificationToken, $platform ?? 'web', $user->settings->language ?? 'en'));
+    }
+
     public function listTokens(User $user): \Illuminate\Support\Collection
     {
         return $user->tokens()->get()->map(function ($token) use ($user) {
