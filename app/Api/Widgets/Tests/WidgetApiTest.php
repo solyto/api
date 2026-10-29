@@ -94,7 +94,7 @@ describe('GET /widgets/your-day', function () {
             ->and($data['generated_at'])->toBe('2026-08-14T07:00:00+00:00')
             ->and($data['labels'])->toBe(['title' => 'Your Day', 'empty' => 'Nothing on your plate today.'])
             ->and(collect($data['sections'])->pluck('key')->all())->toBe(['today', 'due', 'upcoming'])
-            ->and(collect($data['sections'])->pluck('title')->all())->toBe(['Events', 'Due Today', 'Coming Up'])
+            ->and(collect($data['sections'])->pluck('title')->all())->toBe(['Events', 'Due today', 'Coming up'])
             ->and(collect(widgetSection($data, 'today')['rows'])->pluck('title')->all())->toBe(['Holiday', 'Dentist'])
             ->and(collect(widgetSection($data, 'due')['rows'])->pluck('title')->all())->toBe(['Overdue', 'Due today'])
             ->and(collect(widgetSection($data, 'upcoming')['rows'])->pluck('title')->all())->toBe(['Trip', 'Meeting']);
