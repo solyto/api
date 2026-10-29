@@ -20,7 +20,7 @@ class PasswordService
 
         Mail::to($user->email)->send(new PasswordResetMail(
             user: $user,
-            token: Password::broker()->createToken($user),
+            token: Password::createToken($user),
             email: $user->email,
             platform: $platform ?? 'web',
             language: $user->settings->language ?? 'en'
