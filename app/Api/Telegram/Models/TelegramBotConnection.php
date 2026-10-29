@@ -36,6 +36,7 @@ class TelegramBotConnection extends Model
         'chat_id' => 'integer',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

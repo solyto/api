@@ -31,6 +31,7 @@ class WealthValue extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<WealthField, $this> */
     public function field(): BelongsTo
     {
         return $this->belongsTo(WealthField::class, 'field_id');

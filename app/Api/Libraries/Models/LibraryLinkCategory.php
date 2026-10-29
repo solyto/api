@@ -32,6 +32,7 @@ class LibraryLinkCategory extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -42,6 +43,7 @@ class LibraryLinkCategory extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return HasMany<LibraryLink, $this> */
     public function links(): HasMany
     {
         return $this->hasMany(LibraryLink::class, 'category_id');

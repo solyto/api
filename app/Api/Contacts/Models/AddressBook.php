@@ -31,6 +31,7 @@ class AddressBook extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -41,6 +42,7 @@ class AddressBook extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return HasMany<Contact, $this> */
     public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);

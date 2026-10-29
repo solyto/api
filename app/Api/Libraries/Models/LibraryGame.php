@@ -47,6 +47,7 @@ class LibraryGame extends Model
         'finished_at' => 'date',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -57,11 +58,13 @@ class LibraryGame extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'tag_game', 'game_id', 'tag_id')->withTimestamps();
     }
 
+    /** @return BelongsToMany<LibraryGameGenre, $this> */
     public function genres(): BelongsToMany
     {
         return $this->belongsToMany(LibraryGameGenre::class, 'library_genre_game', 'game_id', 'genre_id');

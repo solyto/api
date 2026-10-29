@@ -42,11 +42,13 @@ class Contact extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<AddressBook, $this> */
     public function addressBook(): BelongsTo
     {
         return $this->belongsTo(AddressBook::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

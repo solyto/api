@@ -32,6 +32,7 @@ class Calendar extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -42,6 +43,7 @@ class Calendar extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return HasMany<CalendarEntry, $this> */
     public function entries(): HasMany
     {
         return $this->hasMany(CalendarEntry::class);

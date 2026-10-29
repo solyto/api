@@ -65,6 +65,7 @@ class NoteCategory extends Model
         );
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -75,16 +76,19 @@ class NoteCategory extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsTo<NoteCategory, $this> */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(NoteCategory::class, 'parent_id');
     }
 
+    /** @return HasMany<NoteCategory, $this> */
     public function children(): HasMany
     {
         return $this->hasMany(NoteCategory::class, 'parent_id')->orderBy('sort_order');
     }
 
+    /** @return HasMany<NoteCategory, $this> */
     public function descendants(): HasMany
     {
         return $this->children()->with('descendants');

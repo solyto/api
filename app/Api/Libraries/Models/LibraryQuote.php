@@ -36,6 +36,7 @@ class LibraryQuote extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -46,6 +47,7 @@ class LibraryQuote extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'tag_quote', 'quote_id', 'tag_id')->withTimestamps();

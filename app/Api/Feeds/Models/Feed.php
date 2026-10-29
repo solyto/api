@@ -36,11 +36,13 @@ class Feed extends Model
         'last_synced_at' => 'datetime',
     ];
 
+    /** @return HasMany<FeedSubscription, $this> */
     public function subscriptions(): HasMany
     {
         return $this->hasMany(FeedSubscription::class, 'feed_id');
     }
 
+    /** @return HasMany<FeedItem, $this> */
     public function items(): HasMany
     {
         return $this->hasMany(FeedItem::class, 'feed_id');

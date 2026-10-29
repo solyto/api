@@ -36,6 +36,7 @@ class LibraryLink extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -46,11 +47,13 @@ class LibraryLink extends Model
         return $query->where('user_id', $userId);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'tag_link', 'link_id', 'tag_id')->withTimestamps();
     }
 
+    /** @return BelongsTo<LibraryLinkCategory, $this> */
     public function category(): BelongsTo
     {
         return $this->belongsTo(LibraryLinkCategory::class, 'category_id');

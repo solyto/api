@@ -35,16 +35,19 @@ class Note extends Model
         'is_favorite' => 'boolean',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<NoteCategory, $this> */
     public function category(): BelongsTo
     {
         return $this->belongsTo(NoteCategory::class);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'tag_note')

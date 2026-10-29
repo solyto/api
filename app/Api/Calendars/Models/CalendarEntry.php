@@ -44,11 +44,13 @@ class CalendarEntry extends Model
         'recurrend_end' => 'integer',
     ];
 
+    /** @return BelongsTo<Calendar, $this> */
     public function calendar(): BelongsTo
     {
         return $this->belongsTo(Calendar::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

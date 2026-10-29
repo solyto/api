@@ -30,11 +30,13 @@ class DevRequestVote extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<DevRequest, $this> */
     public function devRequest(): BelongsTo
     {
         return $this->belongsTo(DevRequest::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

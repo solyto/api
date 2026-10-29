@@ -52,27 +52,32 @@ class Todo extends Model
         'completed_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<TodoCategory, $this> */
     public function category(): BelongsTo
     {
         return $this->belongsTo(TodoCategory::class);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class)
             ->withTimestamps();
     }
 
+    /** @return HasMany<TodoSubtask, $this> */
     public function subtasks(): HasMany
     {
         return $this->hasMany(TodoSubtask::class);
     }
 
+    /** @return BelongsTo<Todo, $this> */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Todo::class, 'parent_task_id');
