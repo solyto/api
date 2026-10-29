@@ -88,12 +88,6 @@ class GenerateExampleNotificationsCommand extends Command
             placeholder: 'Type to search...',
         );
 
-        if ($userId === null) {
-            $this->warn('No user selected.');
-
-            return null;
-        }
-
         return User::find($userId);
     }
 }
