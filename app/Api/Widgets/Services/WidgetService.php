@@ -2,6 +2,8 @@
 
 namespace App\Api\Widgets\Services;
 
+use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Resources\CheckInSettingsResource;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
@@ -18,6 +20,11 @@ class WidgetService
     private const string DEFAULT_TIME_FORMAT = 'H:i';
     private const string DEFAULT_DATE_FORMAT = 'dd.mm.YYYY';
     private const string COLOR_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
+    public const array CHECK_IN_TRACKERS = ['mood', 'sleep', 'dreams', 'food_quality', 'food_amount', 'water', 'sports', 'work', 'menstruation', 'alcohol', 'smoking', 'social_life'];
+    public const array CHECK_IN_SPORTS = [1 => 'dumbbell', 2 => 'bike', 3 => 'mountain', 4 => 'footprints', 5 => 'waves_ladder', 6 => 'yoga'];
+    private const array CHECK_IN_COLORS = [1 => '#EF4444', 2 => '#F97316', 3 => '#3B82F6', 4 => '#86EFAC', 5 => '#22C55E'];
+    private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
+    private const string CHECK_IN_MENSTRUATION_COLOR = '#FB7185';
 
     public function __construct(private readonly IntegrationGateway $gateway) {}
 
@@ -118,6 +125,90 @@ class WidgetService
     {
         $this->gateway->setUser($user);
         $this->gateway->stopTimeTracking($entry);
+    }
+
+    public function checkIn(User $user): array
+    {
+        $this->gateway->setUser($user);
+
+        $timezone = $user->settings->timezone ?? 'UTC';
+        $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
+        $settings = $user->settings->check_in_settings ?? [];
+        $enabled = $settings['enabled_trackers'] ?? CheckInSettingsResource::DEFAULT_TRACKERS;
+        $sports = $settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS;
+
+        $now = CarbonImmutable::now($timezone);
+        $today = $now->startOfDay();
+        $checkIn = $this->gateway->checkInOn($today->toDateString());
+
+        $rows = collect(self::CHECK_IN_TRACKERS)
+            ->filter(fn (string $tracker) => in_array($tracker, $enabled, true))
+            ->map(fn (string $tracker) => $this->checkInRow($tracker, $this->checkInValue($checkIn, $tracker), $sports, $locale));
+
+        return [
+            'kind' => 'check-in',
+            'schema_version' => self::SCHEMA_VERSION,
+            'generated_at' => $now->toIso8601String(),
+            'refresh_at' => $today->addDay()->toIso8601String(),
+            'labels' => [
+                'title' => __('widgets.check_in_title', [], $locale),
+                'empty' => __('widgets.check_in_empty', [], $locale),
+            ],
+            'sections' => $rows->isEmpty() ? [] : [['key' => 'today', 'rows' => $rows->values()->all()]],
+        ];
+    }
+
+    public function setCheckIn(User $user, string $tracker, ?int $value): void
+    {
+        $this->gateway->setUser($user);
+        $this->gateway->setCheckIn(CarbonImmutable::now($user->settings->timezone ?? 'UTC')->toDateString(), $tracker, $value);
+    }
+
+    private function checkInRow(string $tracker, ?int $value, array $selectedSports, string $locale): array
+    {
+        return [
+            'id' => $tracker,
+            'title' => __('widgets.tracker_' . $tracker, [], $locale),
+            'all_day' => true,
+            'route' => ['key' => 'check_in'],
+            'action' => [
+                'type' => 'scale',
+                'key' => 'check_in.set',
+                'value' => $value,
+                'options' => match ($tracker) {
+                    'mood' => array_map(fn (int $option) => ['value' => $option, 'icon' => 'mood_' . $option, 'color' => self::CHECK_IN_COLORS[$option]], range(1, 5)),
+                    'sports' => $this->sportOptions($selectedSports, $value),
+                    default => array_map(fn (int $option) => [
+                        'value' => $option,
+                        'icon' => $tracker,
+                        'color' => $tracker === 'menstruation' ? self::CHECK_IN_MENSTRUATION_COLOR : self::CHECK_IN_COLORS[$option],
+                    ], range(1, 5)),
+                },
+            ],
+        ];
+    }
+
+    // Like the app: the selected sports in order, plus today's stored sport when it is no longer selected.
+    private function sportOptions(array $selectedSports, ?int $value): array
+    {
+        $ids = collect($selectedSports)
+            ->map(fn ($sport) => array_search($sport, self::CHECK_IN_SPORTS, true))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($value !== null && isset(self::CHECK_IN_SPORTS[$value]) && !$ids->contains($value)) {
+            $ids->push($value);
+        }
+
+        return $ids->map(fn (int $id) => ['value' => $id, 'icon' => 'sport_' . self::CHECK_IN_SPORTS[$id], 'color' => self::CHECK_IN_SPORTS_COLOR])->all();
+    }
+
+    private function checkInValue(?CheckIn $checkIn, string $tracker): ?int
+    {
+        $value = $checkIn?->getAttribute($tracker);
+
+        return is_numeric($value) ? (int) $value : null;
     }
 
     private function runningRow(TimeTrackingEntry $entry, string $timezone): array

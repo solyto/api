@@ -52,6 +52,7 @@ use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
 use App\Api\Widgets\Controllers\WidgetController;
+use App\Api\Widgets\Services\WidgetService;
 use App\Plugins\Controllers\UserPluginController;
 use App\Shared\Middleware\TrackApiTraffic;
 use Illuminate\Support\Facades\Route;
@@ -260,6 +261,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::post('actions/todo.complete/{todo}', [WidgetController::class, 'completeTodo'])->name('actions.todo-complete');
         Route::post('actions/time_tracking.start/{project}', [WidgetController::class, 'startTimeTracking'])->name('actions.time-tracking-start');
         Route::post('actions/time_tracking.stop/{entry}', [WidgetController::class, 'stopTimeTracking'])->name('actions.time-tracking-stop');
+        Route::get('check-in', [WidgetController::class, 'checkIn'])->name('check-in');
+        Route::post('actions/check_in.set/{tracker}', [WidgetController::class, 'setCheckIn'])
+            ->whereIn('tracker', WidgetService::CHECK_IN_TRACKERS)
+            ->name('actions.check-in-set');
     });
 
     Route::prefix('weather')->group(function () {

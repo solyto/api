@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\CheckIn\Models\CheckIn;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
@@ -93,6 +94,38 @@ function timeTrackingWidget($test, User $user, ?string $token = null): array
 function runningEntries(User $user)
 {
     return TimeTrackingEntry::forUser($user->id)->whereNull('stopped_at')->get();
+}
+
+function checkInWidget($test, User $user, ?string $token = null): array
+{
+    $response = widgetRequest($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/check-in');
+    expectApiSuccess($response);
+
+    return $response->json('data');
+}
+
+function checkInRow(array $data, string $tracker): ?array
+{
+    return collect(widgetSection($data, 'today')['rows'] ?? [])->firstWhere('id', $tracker);
+}
+
+function widgetCheckIn(User $user, string $date, array $values = []): CheckIn
+{
+    return CheckIn::factory()->forUser($user)->create(array_merge(
+        array_fill_keys(['mood', 'water', 'sports', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount', 'menstruation', 'alcohol', 'smoking', 'social_life'], null),
+        $values,
+        ['date' => $date],
+    ));
+}
+
+function setCheckIn($test, User $user, string $tracker, mixed $body, ?string $token = null)
+{
+    return widgetRequest($test, $token ?? sanctumToken($user))->postJson('/api/v1/widgets/actions/check_in.set/'.$tracker, $body);
+}
+
+function userCheckIns(User $user)
+{
+    return CheckIn::forUser($user->id)->get();
 }
 
 afterEach(function () {
@@ -550,5 +583,206 @@ describe('Time tracking widget routes and tokens', function () {
         expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/entries'), 401);
         expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/projects'), 401);
         expectApiError(widgetRequest($this, $token)->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 401);
+    });
+});
+
+describe('GET /widgets/check-in', function () {
+    it('returns the enabled trackers in the app order with today\'s values', function () {
+        Carbon::setTestNow('2026-08-14 10:00:00');
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => ['water', 'social_life', 'mood', 'unknown'], 'selected_sports' => []]]);
+        widgetCheckIn($user, '2026-08-14', ['mood' => 4]);
+        widgetCheckIn($user, '2026-08-13', ['water' => 2]);
+
+        $data = checkInWidget($this, $user);
+
+        expect($data)->toMatchArray([
+            'kind' => 'check-in',
+            'schema_version' => 1,
+            'refresh_at' => '2026-08-15T00:00:00+00:00',
+            'labels' => ['title' => 'Check-in', 'empty' => 'No trackers enabled.'],
+        ])
+            ->and(array_column($data['sections'], 'key'))->toBe(['today'])
+            ->and(collect($data['sections'][0]['rows'])->pluck('id')->all())->toBe(['mood', 'water', 'social_life'])
+            ->and(checkInRow($data, 'mood'))->toMatchArray([
+                'title' => 'Mood',
+                'all_day' => true,
+                'route' => ['key' => 'check_in'],
+            ])
+            ->and(checkInRow($data, 'mood')['action'])->toMatchArray(['type' => 'scale', 'key' => 'check_in.set', 'value' => 4])
+            ->and(checkInRow($data, 'water')['action'])->toHaveKey('value', null);
+    });
+
+    it('uses the default trackers and sports without settings', function () {
+        $user = widgetUser(['check_in_settings' => null]);
+
+        $data = checkInWidget($this, $user);
+
+        expect(collect(widgetSection($data, 'today')['rows'])->pluck('id')->all())
+            ->toBe(['mood', 'sleep', 'dreams', 'food_quality', 'food_amount', 'water', 'sports', 'work'])
+            ->and(collect(checkInRow($data, 'sports')['action']['options'])->pluck('icon')->all())
+            ->toBe(['sport_dumbbell', 'sport_bike', 'sport_mountain', 'sport_footprints', 'sport_waves_ladder']);
+    });
+
+    it('sends null values when there is no check-in today', function () {
+        $user = widgetUser();
+
+        $rows = widgetSection(checkInWidget($this, $user), 'today')['rows'];
+
+        expect(collect($rows)->pluck('action.value')->unique()->all())->toBe([null]);
+    });
+
+    it('leaves out the section when no tracker is enabled', function () {
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => [], 'selected_sports' => []]]);
+
+        expect(checkInWidget($this, $user)['sections'])->toBe([]);
+    });
+
+    it('builds the mood, other and menstruation options with their colors', function () {
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => ['mood', 'sleep', 'menstruation']]]);
+
+        $data = checkInWidget($this, $user);
+        $colors = ['#EF4444', '#F97316', '#3B82F6', '#86EFAC', '#22C55E'];
+
+        expect(checkInRow($data, 'mood')['action']['options'])->toBe(array_map(
+            fn (int $value) => ['value' => $value, 'icon' => 'mood_'.$value, 'color' => $colors[$value - 1]],
+            range(1, 5),
+        ))
+            ->and(checkInRow($data, 'sleep')['action']['options'])->toBe(array_map(
+                fn (int $value) => ['value' => $value, 'icon' => 'sleep', 'color' => $colors[$value - 1]],
+                range(1, 5),
+            ))
+            ->and(checkInRow($data, 'menstruation')['action']['options'])->toBe(array_map(
+                fn (int $value) => ['value' => $value, 'icon' => 'menstruation', 'color' => '#FB7185'],
+                range(1, 5),
+            ));
+    });
+
+    it('offers the selected sports in order plus today\'s sport when it is no longer selected', function () {
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => ['sports'], 'selected_sports' => ['yoga', 'bike', 'unknown']]]);
+        widgetCheckIn($user, today()->toDateString(), ['sports' => 3]);
+
+        $action = checkInRow(checkInWidget($this, $user), 'sports')['action'];
+
+        expect($action['value'])->toBe(3)
+            ->and($action['options'])->toBe([
+                ['value' => 6, 'icon' => 'sport_yoga', 'color' => '#1DBDA5'],
+                ['value' => 2, 'icon' => 'sport_bike', 'color' => '#1DBDA5'],
+                ['value' => 3, 'icon' => 'sport_mountain', 'color' => '#1DBDA5'],
+            ]);
+    });
+
+    it('takes today from the user timezone', function (string $timezone, int $mood, string $refreshAt) {
+        Carbon::setTestNow('2026-08-14 20:00:00');
+        $user = widgetUser(['timezone' => $timezone, 'check_in_settings' => ['enabled_trackers' => ['mood']]]);
+        widgetCheckIn($user, '2026-08-14', ['mood' => 1]);
+        widgetCheckIn($user, '2026-08-15', ['mood' => 5]);
+
+        $data = checkInWidget($this, $user);
+
+        expect(checkInRow($data, 'mood')['action']['value'])->toBe($mood)
+            ->and($data['refresh_at'])->toBe($refreshAt);
+    })->with([
+        'Pacific/Auckland' => ['Pacific/Auckland', 5, '2026-08-16T00:00:00+12:00'],
+        'America/Los_Angeles' => ['America/Los_Angeles', 1, '2026-08-15T00:00:00-07:00'],
+    ]);
+
+    it('follows the user language', function () {
+        $user = widgetUser(['language' => 'de', 'check_in_settings' => ['enabled_trackers' => ['mood']]]);
+
+        $data = checkInWidget($this, $user);
+
+        expect($data['labels']['title'])->toBe('Check-in')
+            ->and(checkInRow($data, 'mood')['title'])->toBe('Stimmung');
+    });
+});
+
+describe('POST /widgets/actions/check_in.set/{tracker}', function () {
+    it('creates today\'s check-in', function () {
+        Carbon::setTestNow('2026-08-14 20:00:00');
+        $user = widgetUser(['timezone' => 'Pacific/Auckland']);
+
+        expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 4]));
+
+        $checkIn = userCheckIns($user)->sole();
+        expect($checkIn->date->toDateString())->toBe('2026-08-15')
+            ->and((int) $checkIn->mood)->toBe(4);
+    });
+
+    it('updates today\'s check-in and keeps the other trackers', function () {
+        $user = widgetUser();
+        widgetCheckIn($user, today()->toDateString(), ['mood' => 2, 'water' => 3]);
+
+        expectApiSuccess(setCheckIn($this, $user, 'sports', ['value' => 6]));
+        expectApiSuccess(setCheckIn($this, $user, 'sports', ['value' => 6]));
+
+        $checkIn = userCheckIns($user)->sole();
+        expect((int) $checkIn->sports)->toBe(6)
+            ->and((int) $checkIn->mood)->toBe(2)
+            ->and((int) $checkIn->water)->toBe(3);
+    });
+
+    it('clears a tracker with null', function () {
+        $user = widgetUser();
+        widgetCheckIn($user, today()->toDateString(), ['mood' => 2]);
+
+        expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => null]));
+
+        expect(userCheckIns($user)->sole()->mood)->toBeNull();
+    });
+
+    it('creates no check-in when clearing without one', function () {
+        $user = widgetUser();
+
+        expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => null]));
+
+        expect(userCheckIns($user))->toHaveCount(0);
+    });
+
+    it('rejects invalid values with 422', function (string $tracker, array $body) {
+        $user = widgetUser();
+
+        expectApiError(setCheckIn($this, $user, $tracker, $body), 422);
+        expect(userCheckIns($user))->toHaveCount(0);
+    })->with([
+        '6 for mood' => ['mood', ['value' => 6]],
+        '0 for water' => ['water', ['value' => 0]],
+        '7 for sports' => ['sports', ['value' => 7]],
+        'a string' => ['mood', ['value' => 'abc']],
+        'no value' => ['mood', []],
+    ]);
+
+    it('answers 404 for an unknown tracker', function () {
+        $user = widgetUser();
+
+        expectApiError(setCheckIn($this, $user, 'coffee', ['value' => 3]), 404);
+    });
+
+    it('never touches another user\'s check-in', function () {
+        $user = widgetUser();
+        $other = widgetUser();
+        widgetCheckIn($other, today()->toDateString(), ['mood' => 1]);
+
+        expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 5]));
+
+        expect((int) userCheckIns($other)->sole()->mood)->toBe(1)
+            ->and((int) userCheckIns($user)->sole()->mood)->toBe(5);
+    });
+});
+
+describe('Check-in widget routes and tokens', function () {
+    it('work with a widget token and with a normal token', function (string $kind) {
+        $user = widgetUser();
+        $token = $kind === 'widget' ? widgetTokenFor($this, $user) : sanctumToken($user);
+
+        expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 3], $token));
+        expect(checkInRow(checkInWidget($this, $user, $token), 'mood')['action']['value'])->toBe(3);
+    })->with(['widget', 'normal']);
+
+    it('keeps a widget token out of the check-in routes', function () {
+        $user = widgetUser();
+        $token = widgetTokenFor($this, $user);
+
+        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/check-in'), 401);
+        expectApiError(widgetRequest($this, $token)->postJson('/api/v1/check-in', ['date' => today()->toDateString(), 'mood' => 3]), 401);
     });
 });

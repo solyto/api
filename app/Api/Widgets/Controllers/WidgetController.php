@@ -7,6 +7,8 @@ use App\Api\HandlesApiAuth;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
+use App\Api\Widgets\Requests\SetCheckInRequest;
+use App\Api\Widgets\Resources\CheckInWidgetResource;
 use App\Api\Widgets\Resources\TimeTrackingWidgetResource;
 use App\Api\Widgets\Resources\YourDayResource;
 use App\Api\Widgets\Services\WidgetService;
@@ -213,5 +215,91 @@ class WidgetController
         $this->widgetService->stopTimeTracking($request->user(), $entry);
 
         return ApiResponse::success(null, 'Timer stopped successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/widgets/check-in",
+     *     operationId="widgetsCheckIn",
+     *     summary="Check-in widget data: today's check-in for the enabled trackers with the values to tap, in the user's language and timezone",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Widget data retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", ref="#/components/schemas/CheckInWidget")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=426, description="Client version too old", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function checkIn(Request $request): JsonResponse
+    {
+        return ApiResponse::success(
+            new CheckInWidgetResource($this->widgetService->checkIn($request->user())),
+            'Widget data retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/widgets/actions/check_in.set/{tracker}",
+     *     operationId="widgetsCheckInSet",
+     *     summary="Set one tracker of today's check-in (user's timezone) from a widget, or clear it with null; setting the stored value again changes nothing",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="tracker",
+     *         in="path",
+     *         description="Tracker key",
+     *         required=true,
+     *
+     *         @OA\Schema(type="string", enum={"mood","sleep","dreams","food_quality","food_amount","water","sports","work","menstruation","alcohol","smoking","social_life"})
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"value"},
+     *
+     *             @OA\Property(property="value", type="integer", nullable=true, minimum=1, maximum=6, description="1-5 (sports: sport id 1-6), or null to clear", example=4)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Check-in saved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="object", nullable=true, example=null)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Unknown tracker", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Invalid value", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=426, description="Client version too old", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function setCheckIn(SetCheckInRequest $request, string $tracker): JsonResponse
+    {
+        $value = $request->validated('value');
+
+        $this->widgetService->setCheckIn($request->user(), $tracker, $value === null ? null : (int) $value);
+
+        return ApiResponse::success(null, 'Check-in saved successfully.');
     }
 }
