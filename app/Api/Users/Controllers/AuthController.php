@@ -5,6 +5,8 @@ namespace App\Api\Users\Controllers;
 use App\Api\ApiResponse;
 use App\Api\Users\Exceptions\EmailUnverifiedException;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
+use App\Api\Users\Exceptions\PersonalAccessTokenRequiredException;
+use App\Api\Users\Exceptions\WidgetTokenConflictException;
 use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
 use App\Api\Users\Requests\LoginRequest;
@@ -212,6 +214,49 @@ class AuthController
             array_merge(['user' => new UserResource($user)], $tokenData),
             'Token refreshed sucessfully.'
         );
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/auth/widget-token",
+     *     operationId="authWidgetToken",
+     *     summary="Issue a widget token bound to the current session",
+     *     description="Replaces the session's previous widget token. Valid only on widgets.* routes, shares the session's expiry and is revoked with it.",
+     *     tags={"Auth"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Widget token issued",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="token", type="string"),
+     *                 @OA\Property(property="token_type", type="string"),
+     *                 @OA\Property(property="token_expires_at", type="string", format="date-time", nullable=true)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="Forbidden - personal_access_token_required (cookie sessions cannot issue widget tokens)", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=409, description="Conflict - widget_token_conflict (a concurrent request issued one; retry)", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function widgetToken(Request $request): JsonResponse
+    {
+        try {
+            $tokenData = $this->authService->createWidgetToken($request->user());
+        } catch (PersonalAccessTokenRequiredException) {
+            return ApiResponse::error('A widget token can only be issued from a token session.', 403, ['personal_access_token_required']);
+        } catch (WidgetTokenConflictException) {
+            return ApiResponse::error('A widget token was issued concurrently. Please retry.', 409, ['widget_token_conflict']);
+        }
+
+        return ApiResponse::success($tokenData, 'Widget token issued.', 201);
     }
 
     /**

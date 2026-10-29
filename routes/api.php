@@ -93,6 +93,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::post('refresh', [AuthController::class, 'refresh']);
+        Route::middleware('throttle:widget-token')->post('widget-token', [AuthController::class, 'widgetToken']);
         Route::get('tokens', [AuthController::class, 'tokens']);
         Route::post('revoke-token', [AuthController::class, 'revokeToken']);
         Route::prefix('passkeys')->group(function () {

@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 use Laravel\Telescope\TelescopeServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -42,6 +44,12 @@ class AppServiceProvider extends ServiceProvider
         User::observe(UserObserver::class);
         Gate::policy(User::class, UserPolicy::class);
 
+        // The only place restricted (non-`*`) tokens are scoped: they work on `widgets.*` routes and nowhere else.
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid
+                && (in_array('*', $token->abilities ?? [], true) || (bool) request()->route()?->named('widgets.*'))
+        );
+
         RateLimiter::for('auth-login', function (Request $request) {
             return Limit::perMinute(5)->by($request->email ?: $request->ip());
         });
@@ -67,6 +75,10 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('account-deletion', function (Request $request) {
             return Limit::perHour(5)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('widget-token', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
     }
 }

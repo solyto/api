@@ -2,19 +2,29 @@
 
 namespace App\Api\Users\Services;
 
+use App\Api\Users\Exceptions\PersonalAccessTokenRequiredException;
+use App\Api\Users\Exceptions\WidgetTokenConflictException;
 use App\Api\Users\Mails\UserVerification;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Api\Users\Notifications\UserRegisteredNotification;
 use App\Shared\Enums\AuthPlatformEnum;
 use App\Shared\Notifications\Channels\NtfyChannel;
+use Illuminate\Database\DeadlockException;
+use Illuminate\Database\DetectsConcurrencyErrors;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthService
 {
+    use DetectsConcurrencyErrors;
+
     public function register(array $data): User
     {
         $user = User::create([
@@ -74,6 +84,49 @@ class AuthService
         return $this->createToken($user, $platform);
     }
 
+    /**
+     * Issue the session's restricted widget token, replacing any earlier one.
+     * It shares the session's expiry and is deleted with it (FK cascade).
+     *
+     * @return array{token: string, token_type: string, token_expires_at: ?string}
+     */
+    public function createWidgetToken(User $user): array
+    {
+        // Sanctum types this as PersonalAccessToken, but cookie sessions carry a TransientToken.
+        /** @var \Laravel\Sanctum\Contracts\HasAbilities $parent */
+        $parent = $user->currentAccessToken();
+
+        if (! $parent instanceof PersonalAccessToken) {
+            throw new PersonalAccessTokenRequiredException();
+        }
+
+        try {
+            $token = DB::transaction(function () use ($user, $parent) {
+                PersonalAccessToken::where('parent_token_id', $parent->id)->delete();
+
+                $newToken = $user->createToken('widget-token', ['widget'], $parent->expires_at);
+                $newToken->accessToken->forceFill(['parent_token_id' => $parent->id])->save();
+
+                return $newToken->plainTextToken;
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw new WidgetTokenConflictException();
+        } catch (QueryException|DeadlockException $e) {
+            // On InnoDB two concurrent issues can deadlock on the unique index gap instead.
+            if ($this->causedByConcurrencyError($e)) {
+                throw new WidgetTokenConflictException();
+            }
+
+            throw $e;
+        }
+
+        return [
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'token_expires_at' => $parent->expires_at?->toIso8601String(),
+        ];
+    }
+
     public function verify(array $data): bool
     {
         $user = User::where('id', $data['user_id'])->first();
@@ -130,7 +183,7 @@ class AuthService
 
     public function listTokens(User $user): \Illuminate\Support\Collection
     {
-        return $user->tokens()->get()->map(function ($token) use ($user) {
+        return $user->tokens()->whereNull('parent_token_id')->get()->map(function ($token) use ($user) {
             return [
                 'id' => $token->id,
                 'name' => $token->name,
@@ -143,7 +196,7 @@ class AuthService
 
     public function revokeToken(User $user, int $tokenId): ?bool
     {
-        $token = $user->tokens()->where('id', $tokenId)->first();
+        $token = $user->tokens()->whereNull('parent_token_id')->where('id', $tokenId)->first();
 
         if (!$token) {
             return null;
