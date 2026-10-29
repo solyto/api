@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
 
 class IntegrationGateway
 {
-    private ?User $user;
+    private ?User $user = null;
 
     public function setUser(User $user): void
     {
