@@ -9,4 +9,9 @@ return [
     'section_upcoming' => 'Próximos',
     'all_day'          => 'todo el día',
     'overdue'          => 'Atrasada · :date',
+    // Time tracking widget
+    'time_tracking_title' => 'Control de tiempo',
+    'time_tracking_empty' => 'Aún no hay proyectos.',
+    'section_running'     => 'En curso',
+    'section_projects'    => 'Proyectos',
 ];

@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="kind", type="string", example="your-day"),
  *     @OA\Property(property="schema_version", type="integer", example=1),
  *     @OA\Property(property="generated_at", type="string", format="date-time"),
- *     @OA\Property(property="refresh_at", type="string", format="date-time", description="Next local midnight in the user's timezone"),
+ *     @OA\Property(property="refresh_at", type="string", format="date-time", description="Optional; here the next local midnight in the user's timezone"),
  *     @OA\Property(property="labels", type="object",
  *         @OA\Property(property="title", type="string"),
  *         @OA\Property(property="empty", type="string", description="Shown when there are no sections")

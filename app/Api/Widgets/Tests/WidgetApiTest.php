@@ -1,5 +1,7 @@
 <?php
 
+use App\Api\TimeTracking\Models\TimeTrackingEntry;
+use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
 use Carbon\Carbon;
@@ -63,6 +65,34 @@ function yourDay($test, User $user): array
 function widgetSection(array $data, string $key): ?array
 {
     return collect($data['sections'])->firstWhere('key', $key);
+}
+
+function widgetProject(User $user, string $title, ?string $color = '#336699'): TimeTrackingProject
+{
+    return TimeTrackingProject::factory()->forUser($user)->create(['title' => $title, 'color' => $color]);
+}
+
+function widgetEntry(User $user, TimeTrackingProject $project, string $startedAt, bool $running = false, ?string $description = null): TimeTrackingEntry
+{
+    $factory = TimeTrackingEntry::factory()->forUser($user)->forProject($project);
+
+    return ($running ? $factory->running() : $factory)->create([
+        'started_at' => $startedAt,
+        'description' => $description,
+    ]);
+}
+
+function timeTrackingWidget($test, User $user, ?string $token = null): array
+{
+    $response = widgetRequest($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/time-tracking');
+    expectApiSuccess($response);
+
+    return $response->json('data');
+}
+
+function runningEntries(User $user)
+{
+    return TimeTrackingEntry::forUser($user->id)->whereNull('stopped_at')->get();
 }
 
 afterEach(function () {
@@ -289,5 +319,236 @@ describe('Widget routes and tokens', function () {
 
     it('rejects requests without a token', function () {
         expectApiError($this->getJson('/api/v1/widgets/your-day'), 401);
+    });
+});
+
+describe('GET /widgets/time-tracking', function () {
+    it('returns the running timer and the other projects', function () {
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        $user = widgetUser(['timezone' => 'Europe/Berlin']);
+        $writing = widgetProject($user, 'Writing', '#AA3300');
+        $reading = widgetProject($user, 'Reading');
+        widgetEntry($user, $reading, '2026-08-13 10:00:00');
+        $entry = widgetEntry($user, $writing, '2026-08-14 06:30:00', true, 'Chapter 3');
+
+        $data = timeTrackingWidget($this, $user);
+
+        expect($data['kind'])->toBe('time-tracking')
+            ->and($data['schema_version'])->toBe(1)
+            ->and($data['generated_at'])->toBe('2026-08-14T09:00:00+02:00')
+            ->and($data)->not->toHaveKey('refresh_at')
+            ->and($data['labels'])->toBe(['title' => 'Time Tracking', 'empty' => 'No projects yet.'])
+            ->and(collect($data['sections'])->pluck('key')->all())->toBe(['running', 'projects'])
+            ->and(widgetSection($data, 'running')['rows'])->toBe([[
+                'id' => $entry->id,
+                'title' => 'Writing',
+                'subtitle' => 'Chapter 3',
+                'at' => '2026-08-14T08:30:00+02:00',
+                'live' => 'elapsed',
+                'all_day' => false,
+                'color' => '#AA3300',
+                'icon' => 'timer',
+                'route' => ['key' => 'time_tracking_project', 'id' => $writing->id],
+                'action' => ['type' => 'button', 'key' => 'time_tracking.stop', 'icon' => 'stop'],
+            ]])
+            ->and(widgetSection($data, 'projects')['rows'])->toBe([[
+                'id' => $reading->id,
+                'title' => 'Reading',
+                'all_day' => false,
+                'color' => '#336699',
+                'route' => ['key' => 'time_tracking_project', 'id' => $reading->id],
+                'action' => ['type' => 'button', 'key' => 'time_tracking.start', 'icon' => 'play'],
+            ]]);
+    });
+
+    it('leaves out the running section and the subtitle when there is nothing to show', function () {
+        $user = widgetUser();
+        $project = widgetProject($user, 'Writing');
+        widgetEntry($user, $project, '2026-08-13 10:00:00');
+
+        $data = timeTrackingWidget($this, $user);
+
+        expect(collect($data['sections'])->pluck('key')->all())->toBe(['projects']);
+
+        $entry = widgetEntry($user, $project, now()->subHour()->toDateTimeString(), true);
+        $row = widgetSection(timeTrackingWidget($this, $user), 'running')['rows'][0];
+
+        expect($row['id'])->toBe($entry->id)
+            ->and($row)->not->toHaveKey('subtitle');
+    });
+
+    it('returns no sections without projects', function () {
+        $data = timeTrackingWidget($this, widgetUser());
+
+        expect($data['sections'])->toBe([]);
+    });
+
+    it('orders projects by last use, then unused ones by title, capped at 20', function () {
+        $user = widgetUser();
+        foreach (range(1, 22) as $i) {
+            widgetProject($user, sprintf('Unused %02d', $i));
+        }
+        $old = widgetProject($user, 'Old');
+        $recent = widgetProject($user, 'Recent');
+        $running = widgetProject($user, 'Running');
+        widgetEntry($user, $old, '2026-01-01 10:00:00');
+        widgetEntry($user, $old, '2026-02-01 10:00:00');
+        widgetEntry($user, $recent, '2026-07-01 10:00:00');
+        widgetEntry($user, $running, '2026-08-01 10:00:00', true);
+
+        $titles = collect(widgetSection(timeTrackingWidget($this, $user), 'projects')['rows'])->pluck('title');
+
+        expect($titles)->toHaveCount(20)
+            ->and($titles->take(4)->all())->toBe(['Recent', 'Old', 'Unused 01', 'Unused 02'])
+            ->and($titles->last())->toBe('Unused 18')
+            ->and($titles)->not->toContain('Running');
+    });
+
+    it('leaves out invalid colors', function (?string $color) {
+        $user = widgetUser();
+        widgetProject($user, 'Writing', $color);
+
+        expect(widgetSection(timeTrackingWidget($this, $user), 'projects')['rows'][0])->not->toHaveKey('color');
+    })->with([null, 'red', '#abc', '#GG0000', '336699']);
+
+    it('follows the user language', function () {
+        $user = widgetUser(['language' => 'de']);
+        $project = widgetProject($user, 'Writing');
+        widgetProject($user, 'Reading');
+        widgetEntry($user, $project, now()->subHour()->toDateTimeString(), true);
+
+        $data = timeTrackingWidget($this, $user);
+
+        expect($data['labels'])->toBe(['title' => 'Zeiterfassung', 'empty' => 'Noch keine Projekte.'])
+            ->and(collect($data['sections'])->pluck('title')->all())->toBe(['Läuft', 'Projekte']);
+    });
+});
+
+describe('POST /widgets/actions/time_tracking.start/{project}', function () {
+    it('starts a timer when none runs', function () {
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        $user = widgetUser();
+        $project = widgetProject($user, 'Writing');
+
+        $response = widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id);
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data', null);
+        $running = runningEntries($user)->sole();
+        expect($running->project_id)->toBe($project->id)
+            ->and($running->description)->toBeNull()
+            ->and($running->started_at->toDateTimeString())->toBe('2026-08-14 07:00:00');
+    });
+
+    it('switches from another running timer', function () {
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        $user = widgetUser();
+        $reading = widgetProject($user, 'Reading');
+        $writing = widgetProject($user, 'Writing');
+        $old = widgetEntry($user, $reading, '2026-08-14 06:15:00', true);
+
+        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$writing->id));
+
+        $old->refresh();
+        expect($old->stopped_at->toDateTimeString())->toBe('2026-08-14 07:00:00')
+            ->and($old->duration_minutes)->toBe(45)
+            ->and(runningEntries($user)->sole()->project_id)->toBe($writing->id);
+    });
+
+    it('changes nothing while the project\'s timer runs', function () {
+        $user = widgetUser();
+        $project = widgetProject($user, 'Writing');
+        $entry = widgetEntry($user, $project, now()->subHour()->toDateTimeString(), true);
+
+        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+
+        expect(runningEntries($user)->sole()->id)->toBe($entry->id)
+            ->and(TimeTrackingEntry::forUser($user->id)->count())->toBe(1);
+    });
+
+    it('never leaves two running timers', function () {
+        $user = widgetUser();
+        $token = sanctumToken($user);
+        $reading = widgetProject($user, 'Reading');
+        $writing = widgetProject($user, 'Writing');
+
+        foreach ([$reading, $reading, $writing, $reading, $writing, $writing] as $project) {
+            expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+            expect(runningEntries($user))->toHaveCount(1)
+                ->and(runningEntries($user)->first()->project_id)->toBe($project->id);
+        }
+    });
+
+    it('rejects another user\'s project with 403', function () {
+        $project = widgetProject(widgetUser(), 'Not yours');
+        $user = widgetUser();
+
+        expectApiError(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id), 403);
+        expect(TimeTrackingEntry::count())->toBe(0);
+    });
+
+    it('answers 404 for a missing project', function () {
+        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.start/'.Str::uuid()), 404);
+    });
+});
+
+describe('POST /widgets/actions/time_tracking.stop/{entry}', function () {
+    it('stops the running timer', function () {
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        $user = widgetUser();
+        $entry = widgetEntry($user, widgetProject($user, 'Writing'), '2026-08-14 05:00:00', true);
+
+        $response = widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id);
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data', null);
+        $entry->refresh();
+        expect($entry->stopped_at->toDateTimeString())->toBe('2026-08-14 07:00:00')
+            ->and($entry->duration_minutes)->toBe(120);
+    });
+
+    it('changes nothing when the entry is already stopped', function () {
+        $user = widgetUser();
+        $entry = widgetEntry($user, widgetProject($user, 'Writing'), '2026-08-13 10:00:00');
+        $before = $entry->only(['stopped_at', 'duration_minutes']);
+
+        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id));
+
+        expect($entry->fresh()->only(['stopped_at', 'duration_minutes']))->toEqual($before);
+    });
+
+    it('rejects another user\'s entry with 403', function () {
+        $owner = widgetUser();
+        $entry = widgetEntry($owner, widgetProject($owner, 'Not yours'), now()->subHour()->toDateTimeString(), true);
+
+        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id), 403);
+        expect($entry->fresh()->stopped_at)->toBeNull();
+    });
+
+    it('answers 404 for a missing entry', function () {
+        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.Str::uuid()), 404);
+    });
+});
+
+describe('Time tracking widget routes and tokens', function () {
+    it('work with a widget token and with a normal token', function (string $kind) {
+        $user = widgetUser();
+        $token = $kind === 'widget' ? widgetTokenFor($this, $user) : sanctumToken($user);
+        $project = widgetProject($user, 'Writing');
+
+        timeTrackingWidget($this, $user, $token);
+        expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+        expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.stop/'.runningEntries($user)->sole()->id));
+        expect(runningEntries($user))->toHaveCount(0);
+    })->with(['widget', 'normal']);
+
+    it('keeps a widget token out of the time tracking routes', function () {
+        $user = widgetUser();
+        $token = widgetTokenFor($this, $user);
+        $project = widgetProject($user, 'Writing');
+
+        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/entries'), 401);
+        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/projects'), 401);
+        expectApiError(widgetRequest($this, $token)->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 401);
     });
 });
