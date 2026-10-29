@@ -124,7 +124,8 @@ class DevRequestController
      *             @OA\Property(property="description", type="string"),
      *             @OA\Property(property="screenshot", type="string", maxLength=255, nullable=true),
      *             @OA\Property(property="priority", type="integer", minimum=1, maximum=5, nullable=true),
-     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true)
+     *             @OA\Property(property="url", type="string", maxLength=255, nullable=true),
+     *             @OA\Property(property="fixed_in_version", type="string", maxLength=20, pattern="^\d+(\.\d+)*$", nullable=true, example="1.2.0")
      *         )
      *     ),
      *
