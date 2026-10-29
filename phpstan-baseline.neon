@@ -7,30 +7,6 @@ parameters:
 			path: app/Api/Calendars/Controllers/CalendarController.php
 
 		-
-			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/Export/Services/CheckInExportService.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/Export/Services/FeedExportService.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>url" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/Export/Services/FeedExportService.php
-
-		-
-			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/Export/Services/FinanceWealthExportService.php
-
-		-
 			message: '#^Strict comparison using \!\=\= between App\\Api\\Feeds\\Models\\Feed and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
@@ -79,22 +55,10 @@ parameters:
 			path: app/Api/Users/Services/PasswordService.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>language" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/Users/Services/PasswordService.php
-
-		-
 			message: '#^Property App\\Bots\\DTOs\\Keyboard\:\:\$buttons is unused\.$#'
 			identifier: property.unused
 			count: 1
 			path: app/Bots/DTOs/Keyboard.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>language" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Bots/SolytoBot.php
 
 		-
 			message: '#^Offset 0 on array\{list\<string\>\} on left side of \?\? always exists and is not nullable\.$#'

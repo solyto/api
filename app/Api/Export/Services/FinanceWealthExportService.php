@@ -18,7 +18,7 @@ class FinanceWealthExportService
 
         CsvHelper::write($path, ['Field', 'Date', 'Value'], $fields->flatMap(fn ($field) => $field->values->map(fn ($value) => [
             $field->title,
-            $value->date?->format('Y-m-d'),
+            $value->date->format('Y-m-d'),
             $value->value,
         ])));
     }
