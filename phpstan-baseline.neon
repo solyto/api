@@ -1,7 +1,2 @@
 parameters:
-	ignoreErrors:
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Api/Users/Notifications/DailyDayReminderNotification.php
+	ignoreErrors: []

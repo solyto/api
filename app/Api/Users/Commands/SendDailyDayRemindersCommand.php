@@ -2,7 +2,7 @@
 
 namespace App\Api\Users\Commands;
 
-use App\Api\Calendars\Models\CalendarEntry;
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\UserNotificationSettings;
 use App\Api\Users\Notifications\DailyDayReminderNotification;
@@ -43,12 +43,7 @@ class SendDailyDayRemindersCommand extends Command
                 ->where('due_at', '<=', today($timezone))
                 ->get();
 
-            $dayStart = Carbon::now($timezone)->startOfDay()->timestamp;
-            $dayEnd = Carbon::now($timezone)->endOfDay()->timestamp;
-
-            $events = CalendarEntry::forUser($user->id)
-                ->whereBetween('start_date', [$dayStart, $dayEnd])
-                ->get();
+            $events = collect(app(CalendarService::class)->listTodayEvents($user));
 
             $user->notify(new DailyDayReminderNotification(
                 date: $now->toDateString(),

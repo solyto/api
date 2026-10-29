@@ -2,17 +2,24 @@
 
 namespace App\Api\Users\Notifications;
 
+use App\Api\Todos\Models\Todo;
+use App\Dav\DTOs\EventDTO;
 use App\Shared\Notifications\BaseNotification;
 use App\Shared\Notifications\Channels\TelegramMessage;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Notifications\Messages\MailMessage;
 use NotificationChannels\WebPush\WebPushMessage;
 
 class DailyDayReminderNotification extends BaseNotification
 {
+    /**
+     * @param EloquentCollection<int, Todo>|null $todos
+     * @param Collection<int, EventDTO>|null $events
+     */
     public function __construct(
         public string $date,
-        public ?Collection $todos = null,
+        public ?EloquentCollection $todos = null,
         public ?Collection $events = null
     ) {}
 
