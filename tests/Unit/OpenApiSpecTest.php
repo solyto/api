@@ -12,12 +12,7 @@ use OpenApi\Generator as OpenApiGenerator;
  * mismatch between the OpenAPI spec and the route table fails this test,
  * and so does fixing one of the listed entries without removing it.
  */
-// Kept by owner decision: documents a controller method that has no route
-// (LibraryMusicController::searchAlbumOnDeezer()). The method and its
-// annotation are left as they are for now.
-const OPENAPI_KNOWN_DRIFT = [
-    'GET api/v1/libraries/music/search/deezer/{artist}/{album}',
-];
+const OPENAPI_KNOWN_DRIFT = [];
 
 it('documents a route for every OpenAPI path operation', function () {
     $silentLogger = new class implements \Psr\Log\LoggerInterface

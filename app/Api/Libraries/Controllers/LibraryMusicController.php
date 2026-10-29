@@ -326,52 +326,6 @@ class LibraryMusicController
 
     /**
      * @OA\Get(
-     *     path="/libraries/music/search/deezer/{artist}/{album}",
-     *     operationId="searchAlbumOnDeezer",
-     *     tags={"Libraries - Music"},
-     *     security={{"sanctum": {}}},
-     *
-     *     @OA\Parameter(
-     *         name="artist",
-     *         in="path",
-     *         required=true,
-     *         description="Artist name",
-     *
-     *         @OA\Schema(type="string")
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="album",
-     *         in="path",
-     *         required=true,
-     *         description="Album name",
-     *
-     *         @OA\Schema(type="string")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Info from Deezer retrieved",
-     *
-     *         @OA\JsonContent(
-     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
-     *
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
-     * )
-     */
-    public function searchAlbumOnDeezer(Request $request, string $query): JsonResponse
-    {
-        $search = $this->libraryMusicService->searchOnDeezer($query);
-
-        return ApiResponse::success($search, 'Info from Deeezer retrieved.');
-    }
-
-    /**
-     * @OA\Get(
      *     path="/libraries/music/search/{service}/{query}",
      *     operationId="searchLibraryMusic",
      *     tags={"Libraries - Music"},
