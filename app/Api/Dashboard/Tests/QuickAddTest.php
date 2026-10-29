@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\Dashboard\Enums\QuickAddContentType;
+use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
@@ -128,6 +129,67 @@ describe('QuickAddService::commit', function () {
         expect($music->artist)->toBe('Radiohead');
         expect($music->publication_year)->toBe(1997);
         expect(LibraryMusic::where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('commits a steam url as a game', function () {
+        $user = makeUser();
+
+        Http::fake([
+            'https://store.steampowered.com/api/appdetails?appids=*' => Http::response([
+                '367520' => [
+                    'success' => true,
+                    'data' => [
+                        'type' => 'game',
+                        'name' => 'Hollow Knight',
+                        'developers' => ['Team Cherry'],
+                        'publishers' => ['Team Cherry'],
+                        'release_date' => ['date' => '24 Feb, 2017', 'coming_soon' => false],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $game = app(QuickAddService::class)->commit(
+            $user,
+            'https://store.steampowered.com/app/367520/Hollow_Knight/',
+            QuickAddContentType::Games,
+            []
+        );
+
+        expect($game)->toBeInstanceOf(LibraryGame::class);
+        expect($game->title)->toBe('Hollow Knight');
+        expect($game->platform)->toBe('pc');
+        expect($game->developer)->toBe('Team Cherry');
+        expect($game->publication_year)->toBe(2017);
+    });
+
+    it('commits a boardgamegeek url as a game', function () {
+        $user = makeUser();
+
+        Http::fake([
+            'https://boardgamegeek.com/xmlapi2/thing*' => Http::response(
+                '<?xml version="1.0" encoding="utf-8"?><items><item type="boardgame" id="174430">'
+                .'<name type="primary" value="Gloomhaven"/><yearpublished value="2017"/>'
+                .'<link type="boardgamedesigner" value="Isaac Childres"/>'
+                .'<link type="boardgamepublisher" value="Cephalofair Games"/>'
+                .'</item></items>',
+                200,
+                ['Content-Type' => 'application/xml']
+            ),
+        ]);
+
+        $game = app(QuickAddService::class)->commit(
+            $user,
+            'https://boardgamegeek.com/boardgame/174430/gloomhaven',
+            QuickAddContentType::Games,
+            []
+        );
+
+        expect($game)->toBeInstanceOf(LibraryGame::class);
+        expect($game->title)->toBe('Gloomhaven');
+        expect($game->platform)->toBe('boardgame');
+        expect($game->developer)->toBe('Isaac Childres');
+        expect($game->publication_year)->toBe(2017);
     });
 });
 

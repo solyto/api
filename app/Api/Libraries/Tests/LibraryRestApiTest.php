@@ -416,6 +416,7 @@ describe('External services', function () {
         expect($dto)->not->toBeNull();
         expect($dto->getTitle())->toBe('Hollow Knight');
         expect($dto->getDeveloper())->toBe('Team Cherry');
+        expect($dto->getPublicationYear())->toBe(2017);
     });
 
     it('imdb imports a movie from a title url', function () {
