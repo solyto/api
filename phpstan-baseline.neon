@@ -157,18 +157,6 @@ parameters:
 			path: app/Shared/Notifications/ExportReadyNotification.php
 
 		-
-			message: '#^Comparison operation "\>\=" between int\<100, max\> and 100 is always true\.$#'
-			identifier: greaterOrEqual.alwaysTrue
-			count: 1
-			path: app/Shared/Services/Images/ImgproxyDriver.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: app/Shared/Services/Images/ImgproxyDriver.php
-
-		-
 			message: '#^Property App\\Shared\\Services\\IntegrationGateway\:\:\$user \(App\\Api\\Users\\Models\\User\|null\) is never assigned null so it can be removed from the property type\.$#'
 			identifier: property.unusedType
 			count: 1
