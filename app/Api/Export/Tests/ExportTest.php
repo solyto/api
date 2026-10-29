@@ -45,15 +45,20 @@ describe('Export endpoints', function () {
 
     it('limits exports to once per day', function () {
         $user = makeUser();
+        $this->travelTo(now()->subHours(3));
         ExportJob::create([
             'user_id' => $user->id,
             'status' => 'completed',
             'features' => ['todos'],
         ]);
+        $this->travelBack();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/export', ['features' => ['todos']])
-            ->assertStatus(429);
+            ->assertStatus(429)
+            ->assertJsonPath('errors', ['export_rate_limited']);
+
+        expect($response->json('meta.retry_after'))->toBeInt()->toBeBetween(21 * 3600 - 5, 21 * 3600);
     });
 
     it('returns 404 for downloads of unknown jobs', function () {

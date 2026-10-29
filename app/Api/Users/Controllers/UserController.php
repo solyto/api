@@ -152,7 +152,7 @@ class UserController
      *
      *     @OA\Response(response=403, description="Super administrators cannot delete their own account", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
-     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function requestDeletion(RequestAccountDeletionRequest $request): JsonResponse

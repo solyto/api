@@ -28,12 +28,17 @@ class ExportController
 
         $recentExport = ExportJob::where('user_id', $request->user()->id)
             ->where('created_at', '>=', now()->subDay())
-            ->exists();
+            ->latest()
+            ->first();
 
         if ($recentExport) {
+            $retryAfter = (int) ceil(now()->diffInSeconds($recentExport->created_at->copy()->addDay()));
+
             return ApiResponse::error(
                 'You can only export once every 24 hours. Please try again later.',
-                429
+                429,
+                ['export_rate_limited'],
+                ['retry_after' => max(1, $retryAfter)]
             );
         }
 
