@@ -113,20 +113,19 @@ class CalendarService
 
     public function listWidgetEvents(User $user): array
     {
-        $timezone = new \DateTimeZone($user->settings->timezone ?? 'UTC');
-        $today = (new \DateTime('today', $timezone))->format('Y-m-d');
+        $today = Carbon::today($user->settings->timezone ?? 'UTC');
 
         $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $events = [];
 
         foreach ($calendars as $calendar) {
             $events = array_merge($events, $this->cache->remember(
-                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'widget', $today],
+                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'widget', $today->toDateString()],
                 self::CACHE_TTL_EVENTS_FUTURE,
                 fn() => $this->dav->calendars()->events()->listExpanded(
                     $calendar,
-                    new \DateTime('today', $timezone),
-                    new \DateTime('today', $timezone)->modify('+ 3 days')
+                    $today->toDateTime(),
+                    $today->copy()->addDays(3)->toDateTime()
                 )
             ));
         }

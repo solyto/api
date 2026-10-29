@@ -51,6 +51,7 @@ use App\Api\Users\Controllers\PasskeyController;
 use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
+use App\Api\Widgets\Controllers\WidgetController;
 use App\Plugins\Controllers\UserPluginController;
 use App\Shared\Middleware\TrackApiTraffic;
 use Illuminate\Support\Facades\Route;
@@ -251,6 +252,11 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::post('{contactUri}/photo', [ContactController::class, 'updateContactPhoto']);
             Route::delete('{contactUri}/photo', [ContactController::class, 'removeContactPhoto']);
         });
+    });
+
+    Route::prefix('widgets')->name('widgets.')->middleware('throttle:widgets')->group(function () {
+        Route::get('your-day', [WidgetController::class, 'yourDay'])->name('your-day');
+        Route::post('actions/todo.complete/{todo}', [WidgetController::class, 'completeTodo'])->name('actions.todo-complete');
     });
 
     Route::prefix('weather')->group(function () {
