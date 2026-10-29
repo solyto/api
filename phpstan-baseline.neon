@@ -91,30 +91,6 @@ parameters:
 			path: app/Bots/DTOs/Keyboard.php
 
 		-
-			message: '#^Parameter \#1 \$chatId of method App\\Bots\\SolytoBot\:\:initState\(\) expects string, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Bots/SolytoBot.php
-
-		-
-			message: '#^Parameter \#1 \$chatId of method App\\Shared\\Services\\TelegramBotService\:\:sendText\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Bots/SolytoBot.php
-
-		-
-			message: '#^Parameter \#1 \$chatId of method App\\Shared\\Services\\TelegramBotService\:\:sendText\(\) expects string, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Bots/SolytoBot.php
-
-		-
-			message: '#^Parameter \#1 \$chatId of method App\\Shared\\Services\\TelegramBotService\:\:sendTextWithKeyboard\(\) expects string, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Bots/SolytoBot.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>language" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -129,12 +105,6 @@ parameters:
 		-
 			message: '#^Call to an undefined method Illuminate\\Notifications\\Notification\:\:toTelegram\(\)\.$#'
 			identifier: method.notFound
-			count: 1
-			path: app/Shared/Notifications/Channels/TelegramChannel.php
-
-		-
-			message: '#^Parameter \#1 \$chatId of method App\\Shared\\Services\\TelegramBotService\:\:sendText\(\) expects string, int\<min, \-1\>\|int\<1, max\> given\.$#'
-			identifier: argument.type
 			count: 1
 			path: app/Shared/Notifications/Channels/TelegramChannel.php
 

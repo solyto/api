@@ -63,7 +63,7 @@ trait IsTelegramBot
         return $this->request->get('update_id');
     }
 
-    public function getChatId(): ?int
+    public function getChatId(): int
     {
         return $this->request->get('message')['chat']['id'];
     }
