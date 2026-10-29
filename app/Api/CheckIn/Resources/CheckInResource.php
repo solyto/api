@@ -41,7 +41,7 @@ class CheckInResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'date' => $this->date?->format('Y-m-d'),
+            'date' => $this->date->format('Y-m-d'),
             'mood' => $this->mood,
             'water' => $this->water,
             'sports' => $this->sports,

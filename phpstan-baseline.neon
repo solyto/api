@@ -13,12 +13,6 @@ parameters:
 			path: app/Api/Calendars/Controllers/CalendarController.php
 
 		-
-			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Api/CheckIn/Resources/CheckInResource.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vote_type\.$#'
 			identifier: property.notFound
 			count: 1
