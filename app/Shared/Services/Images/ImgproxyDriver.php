@@ -39,7 +39,7 @@ class ImgproxyDriver implements ImageDriverInterface
         $quality = 82;
         $width   = 800;
 
-        while ($width >= 100) {
+        while (true) {
             if (!$this->scaleToWidth($absolutePath, $width, $quality)) {
                 return false;
             }
@@ -50,14 +50,15 @@ class ImgproxyDriver implements ImageDriverInterface
                 return true;
             }
 
+            if ($width <= 100) {
+                return false;
+            }
+
             // Estimate next width using area-ratio heuristic, but always reduce by at least 20%
             $estimated = (int) ($width * sqrt($maxBytes / $size));
             $width     = min($estimated, (int) ($width * 0.8));
             $width     = max($width, 100);
         }
-
-        clearstatcache(true, $absolutePath);
-        return filesize($absolutePath) <= $maxBytes;
     }
 
     public function scaleToWidth(string $absolutePath, int $width, int $quality): bool
