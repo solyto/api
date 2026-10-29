@@ -27,7 +27,7 @@ return [
 
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'Dein Tag heute',
-    'daily_day_reminder_tasks'       => 'Aufgaben (:count):',
+    'daily_day_reminder_tasks'       => 'Todos (:count):',
     'daily_day_reminder_events'      => 'Termine (:count):',
     'daily_day_reminder_clear'       => 'Heute steht nichts an!',
 
