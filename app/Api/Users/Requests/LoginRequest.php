@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Requests;
 
+use App\Api\Users\Exceptions\EmailUnverifiedException;
 use App\Api\Users\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -29,9 +30,7 @@ class LoginRequest extends FormRequest
         $user = Auth::user();
 
         if (config('auth.policy.confirmation') && !$user->email_verified_at) {
-            throw ValidationException::withMessages([
-                'email' => ['Please verify your email address first.'],
-            ]);
+            throw new EmailUnverifiedException();
         }
 
         return $user;
