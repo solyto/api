@@ -655,22 +655,10 @@ parameters:
 			path: app/Api/DevRequests/Services/DevRequestService.php
 
 		-
-			message: '#^Class App\\Api\\Export\\Services\\ExportService constructor invoked with 2 parameters, 3 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: app/Api/Export/Commands/ExportUserData.php
-
-		-
 			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Api/Export/Services/CheckInExportService.php
-
-		-
-			message: '#^Property App\\Api\\Export\\Services\\ExportService\:\:\$davService is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Api/Export/Services/ExportService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
