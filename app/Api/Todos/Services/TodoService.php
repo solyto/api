@@ -206,6 +206,10 @@ class TodoService
 
     private function spawnNextOccurrence(Todo $todo): void
     {
+        if ($todo->recurrence_frequency === null) {
+            return;
+        }
+
         $dueAt = Carbon::parse($todo->due_at);
         $interval = max(1, (int) $todo->recurrence_interval);
         $today = Carbon::today();
