@@ -66,7 +66,7 @@ class AddressBooks
         return $this->get($user, $dto->id);
     }
 
-    public function delete(string $addressBookId): void
+    public function delete(int $addressBookId): void
     {
         $this->backend->deleteAddressBookCustom($addressBookId);
     }

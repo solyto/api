@@ -553,12 +553,6 @@ parameters:
 			path: app/Api/Contacts/Resources/ImportStateResource.php
 
 		-
-			message: '#^Parameter \#1 \$addressBookId of method App\\Dav\\Services\\AddressBooks\:\:delete\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Api/Contacts/Services/ContactService.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\DevRequests\\Resources\\DevRequestCommentResource\:\:\$content\.$#'
 			identifier: property.notFound
 			count: 1
