@@ -38,12 +38,12 @@ class FeedService
             return true;
         }
 
-        $feed = Feed::create([
+        Feed::create([
             'title' => $title,
             'url' => $url,
         ]);
 
-        return $feed !== null;
+        return true;
     }
 
     public function getTestFeedItems(string $url): array
