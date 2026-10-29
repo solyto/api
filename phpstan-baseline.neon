@@ -985,12 +985,6 @@ parameters:
 			path: app/Api/Finances/Resources/WealthValueResource.php
 
 		-
-			message: '#^Call to an undefined method App\\Api\\Libraries\\Services\\LibraryMusicService\:\:searchOnDeezer\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Api/Libraries/Controllers/LibraryMusicController.php
-
-		-
 			message: '#^Call to an undefined method App\\Api\\Libraries\\Resources\\BookReleaseResource\:\:getAuthor\(\)\.$#'
 			identifier: method.notFound
 			count: 1
