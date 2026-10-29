@@ -256,7 +256,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
 
     Route::prefix('widgets')->name('widgets.')->middleware('throttle:widgets')->group(function () {
         Route::get('your-day', [WidgetController::class, 'yourDay'])->name('your-day');
+        Route::get('time-tracking', [WidgetController::class, 'timeTracking'])->name('time-tracking');
         Route::post('actions/todo.complete/{todo}', [WidgetController::class, 'completeTodo'])->name('actions.todo-complete');
+        Route::post('actions/time_tracking.start/{project}', [WidgetController::class, 'startTimeTracking'])->name('actions.time-tracking-start');
+        Route::post('actions/time_tracking.stop/{entry}', [WidgetController::class, 'stopTimeTracking'])->name('actions.time-tracking-stop');
     });
 
     Route::prefix('weather')->group(function () {

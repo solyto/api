@@ -9,4 +9,9 @@ return [
     'section_upcoming' => 'Demnächst',
     'all_day'          => 'ganztägig',
     'overdue'          => 'Überfällig · :date',
+    // Time tracking widget
+    'time_tracking_title' => 'Zeiterfassung',
+    'time_tracking_empty' => 'Noch keine Projekte.',
+    'section_running'     => 'Läuft',
+    'section_projects'    => 'Projekte',
 ];
