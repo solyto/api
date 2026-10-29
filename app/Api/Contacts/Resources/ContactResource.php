@@ -54,7 +54,6 @@ class ContactResource extends JsonResource
             'phone' => $this->decodeJson($this->phone),
             'groups' => $this->decodeJson($this->groups),
             'organization' => $this->organization,
-            //            'photo' => $this->convertImageString($this->photo),
             'note' => $this->note,
             'street' => $this->street,
             'city' => $this->city,
@@ -63,24 +62,6 @@ class ContactResource extends JsonResource
             'country' => $this->country,
             'etag' => $this->etag,
         ];
-    }
-
-    private function convertImageString(?string $photo): ?string
-    {
-        if (empty($photo)) {
-            return null;
-        }
-
-        [$meta, $base64Data] = explode(':', $photo, 2);
-
-        $base64Data = preg_replace('/\s+/', '', $base64Data);
-
-        $type = 'image/jpeg';
-        if (preg_match('/TYPE=([A-Z0-9]+)/i', $meta, $matches)) {
-            $type = 'image/'.strtolower($matches[1]);
-        }
-
-        return 'data:'.$type.';base64,'.$base64Data;
     }
 
     private function decodeJson(?string $value): ?array
