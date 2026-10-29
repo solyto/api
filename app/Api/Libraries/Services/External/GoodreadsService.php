@@ -7,6 +7,7 @@ use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
 use Carbon\Exceptions\InvalidFormatException;
 use DOMDocument;
+use DOMElement;
 use DOMXPath;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -125,9 +126,9 @@ class GoodreadsService
 
     private function extractCoverImage(DOMXPath $xpath): ?string
     {
-        $imageNodes = $xpath->query('//div[@class="BookCover__image"]//img[@class="ResponsiveImage"]');
-        if ($imageNodes->length > 0) {
-            $src = $imageNodes->item(0)->getAttribute('src');
+        $image = $xpath->query('//div[@class="BookCover__image"]//img[@class="ResponsiveImage"]')->item(0);
+        if ($image instanceof DOMElement) {
+            $src = $image->getAttribute('src');
 
             if ($src && stripos($src, 'no-cover.png') === false) {
                 return $src;

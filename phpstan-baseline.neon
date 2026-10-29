@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Call to an undefined method DOMNameSpaceNode\|DOMNode\:\:getAttribute\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Api/Libraries/Services/External/GoodreadsService.php
-
-		-
 			message: '#^Match expression does not handle remaining value\: null$#'
 			identifier: match.unhandled
 			count: 1
