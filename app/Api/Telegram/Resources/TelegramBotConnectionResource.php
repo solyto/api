@@ -2,6 +2,7 @@
 
 namespace App\Api\Telegram\Resources;
 
+use App\Api\Telegram\Models\TelegramBotConnection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="your_day_alert", type="boolean"),
  *     @OA\Property(property="check_in_alert", type="boolean")
  * )
+ *
+ * @mixin TelegramBotConnection
  */
 class TelegramBotConnectionResource extends JsonResource
 {

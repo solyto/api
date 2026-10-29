@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\BookReleaseDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="release_date", type="string", format="date", nullable=true),
  *     @OA\Property(property="provider", type="string")
  * )
+ *
+ * @mixin BookReleaseDTO
  */
 class LibraryBookReleaseResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\MovieReleaseDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="url", type="string", format="uri"),
  *     @OA\Property(property="provider", type="string")
  * )
+ *
+ * @mixin MovieReleaseDTO
  */
 class LibraryMovieReleaseResource extends JsonResource
 {

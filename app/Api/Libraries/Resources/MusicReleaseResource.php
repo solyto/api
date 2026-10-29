@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Resources;
 
+use App\Api\Libraries\DTOs\MusicReleaseDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="genres", type="array", @OA\Items(type="string")),
  *     @OA\Property(property="record_type", type="string", nullable=true)
  * )
+ *
+ * @mixin MusicReleaseDTO
  */
 class MusicReleaseResource extends JsonResource
 {

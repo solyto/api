@@ -706,10 +706,14 @@ boundary, not the assertion).
 Not wanted: narration (`// fall through to strategy 2`), restating the
 code, `TODO` without an issue (0 today — keep it).
 
-### 10.2 Docblocks only for `@OA` and for a `@throws` the type system cannot say
+### 10.2 Docblocks only for `@OA`, `@mixin` on resources, and a `@throws` the type system cannot say
 
 Controllers carry the `@OA` operation; resources the `@OA\Schema`;
-`IntegrationGateway` methods `@throws IntegrationAuthException`. A
+`IntegrationGateway` methods `@throws IntegrationAuthException`. A resource
+that reads a wrapped model or DTO through `$this->` carries `@mixin <Class>`
+(imported, short name) after its `@OA\Schema`, so PHPStan sees the wrapped
+type (`TodoResource`, `CalendarResource` → `CalendarDTO`); resources that
+read arrays (`$this['x']`, `$this->resource['x']`) have none. A
 `@return array<string, mixed>` on `toArray()` (20 resources, Laravel's stub
 line) and `@return array<int, string>` where the generic shape is the
 information (`CheckInService.php:38`, `SyncFeed.php:32`) are fine; no
@@ -718,6 +722,9 @@ blocks. (`tests/TestCase.php` is the one file with prose docblocks and
 earns them.)
 
 Check: `grep -rn '@param\|@return' app/Api app/Shared | grep -v 'array<'` → 0 today.
+`grep -rLE '@mixin' $(grep -rl 'extends JsonResource' app)` → 7 today: resources
+that read arrays, their own properties or `$this->resource` directly, and
+the unused `ContactPhotoResource`.
 
 ## 11. Formatting
 

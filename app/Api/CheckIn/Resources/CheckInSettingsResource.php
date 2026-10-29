@@ -2,6 +2,7 @@
 
 namespace App\Api\CheckIn\Resources;
 
+use App\Api\Users\Models\UserSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,6 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="enabled_trackers", type="array", @OA\Items(type="string")),
  *     @OA\Property(property="selected_sports", type="array", @OA\Items(type="string"))
  * )
+ *
+ * @mixin UserSettings
  */
 class CheckInSettingsResource extends JsonResource
 {

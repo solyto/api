@@ -3,6 +3,7 @@
 namespace App\Api\Todos\Resources;
 
 use App\Api\Tags\Resources\TagResource;
+use App\Api\Todos\Models\Todo;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,6 +33,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="updated_at", type="string", format="date-time"),
  *     @OA\Property(property="completed_at", type="string", format="date-time", nullable=true)
  * )
+ *
+ * @mixin Todo
  */
 class TodoResource extends JsonResource
 {
