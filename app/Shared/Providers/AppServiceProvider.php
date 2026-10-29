@@ -80,5 +80,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('widget-token', function (Request $request) {
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
+
+        RateLimiter::for('widgets', function (Request $request) {
+            $token = $request->user()?->currentAccessToken();
+
+            return Limit::perMinute(60)->by($token instanceof PersonalAccessToken ? 'token:' . $token->id : ($request->user()?->id ?: $request->ip()));
+        });
     }
 }

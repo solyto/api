@@ -160,8 +160,10 @@ what keeps the generated names unique (`todos.index`, `notes.index`, …;
 without it all eleven would be `index`, `store`, …). No other route or group
 gets a name without a caller (`grep -rn "route('" app` finds only the
 Telegram webhook name from `routes/web.php`). Today: eleven named groups,
-each with one `apiResource('/', …)`; no other names (owner decision,
-2026-10-14). Route caching is not used, so duplicate names are harmless at
+each with one `apiResource('/', …)` (owner decision, 2026-10-14), plus the
+`widgets.` group, whose caller is the widget-token gate in
+`AppServiceProvider::boot()`: every route in it is named, because an
+unnamed one would answer 401 to a widget token. Route caching is not used, so duplicate names are harmless at
 runtime.
 
 Check: `grep -c 'Route::' routes/*.php` — only `api.php` and `web.php`

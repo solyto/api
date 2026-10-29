@@ -71,6 +71,49 @@ class IntegrationGateway
     }
 
     /**
+     * Not completed and due today or earlier in the user's timezone, oldest first.
+     *
+     * @return Collection<int, Todo>
+     * @throws IntegrationAuthException
+     */
+    public function dueTodosInUserTimezone(int $limit): Collection
+    {
+        $this->checkAuth();
+
+        return Todo::forUser($this->user->id)
+            ->where('is_completed', false)
+            ->whereDate('due_at', '<=', today($this->user->settings->timezone ?? 'UTC')->toDateString())
+            ->orderBy('due_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, EventDTO>
+     * @throws IntegrationAuthException
+     */
+    public function widgetEvents(): Collection
+    {
+        $this->checkAuth();
+
+        return collect(app(CalendarService::class)->listWidgetEvents($this->user));
+    }
+
+    /**
+     * @throws IntegrationAuthException
+     */
+    public function completeTodo(Todo $todo): Todo
+    {
+        $this->checkAuth();
+
+        if ($todo->is_completed) {
+            return $todo;
+        }
+
+        return app(TodoService::class)->update($todo, ['is_completed' => true]);
+    }
+
+    /**
      * @throws IntegrationAuthException
      */
     private function checkAuth(): void
