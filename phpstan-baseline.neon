@@ -37,12 +37,6 @@ parameters:
 			path: app/Shared/Notifications/Channels/TelegramChannel.php
 
 		-
-			message: '#^Property App\\Shared\\Notifications\\ExportReadyNotification\:\:\$exportId is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Shared/Notifications/ExportReadyNotification.php
-
-		-
 			message: '#^Property App\\Shared\\Services\\IntegrationGateway\:\:\$user \(App\\Api\\Users\\Models\\User\|null\) is never assigned null so it can be removed from the property type\.$#'
 			identifier: property.unusedType
 			count: 1
