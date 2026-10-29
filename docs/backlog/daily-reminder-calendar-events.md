@@ -41,8 +41,14 @@ Affected code:
    (and one tomorrow that must not appear) gets them in the reminder and in
    `/day`.
 4. Remove the PHPStan baseline entry for
-   `DailyDayReminderNotification.php` (`Model::$title`) if the typed events
-   clear it.
+   `DailyDayReminderNotification.php` (`Access to an undefined property
+   Illuminate\Database\Eloquent\Model::$title`, count 2). It is the last
+   entry in `phpstan-baseline.neon` and was kept only for this job: the
+   notification reads `$todo->title` and `$event->title` from untyped
+   collections. Once the events are `EventDTO`s, type the notification's
+   `todos`/`events` so PHPStan sees both, delete the entry, and confirm
+   `composer analyse` exits 0 with nothing ignored for this file.
+   `composer test` must exit 0 as well, including the new tests from step 3.
 5. Check whether anything else still reads `CalendarEntry`
    (`Calendar::entries()`, `CalendarEntryFactory`); if not, removing the
    model and the table is a separate, flagged change.
