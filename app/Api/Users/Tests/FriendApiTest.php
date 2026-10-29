@@ -74,7 +74,9 @@ describe('PUT /api/v1/friends/requests/{request}/accept', function () {
         $this->actingAs($receiver, 'sanctum')
             ->putJson('/api/v1/friends/requests/'.$request->id.'/accept')
             ->assertStatus(200)
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id', $sender->id)
+            ->assertJsonPath('data.name', $sender->name);
 
         expect($request->fresh()->status)->toBe('accepted');
         expect(Friend::where('user_id_1', $sender->id)->where('user_id_2', $receiver->id)->exists())->toBeTrue();
