@@ -2365,12 +2365,6 @@ parameters:
 			path: app/Api/Libraries/Services/External/GoodreadsService.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between int\<1, max\> and 0 will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 2
-			path: app/Api/Libraries/Services/LibraryReleases.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\Notes\\Resources\\NoteCategoryResource\:\:\$created_at\.$#'
 			identifier: property.notFound
 			count: 1

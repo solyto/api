@@ -59,7 +59,7 @@ class LibraryReleases
             $artistId = $search[0]['id'];
             $artistReleases = $this->deezerService->getNewReleases($artistId);
 
-            if (! $artistReleases || count($artistReleases) === 0) {
+            if (! $artistReleases) {
                 continue;
             }
 
@@ -111,7 +111,7 @@ class LibraryReleases
             $artistId = $search[0]['id'];
             $artistReleases = $this->spotifyService->getNewReleases($artistId);
 
-            if (! $artistReleases || count($artistReleases) === 0) {
+            if (! $artistReleases) {
                 continue;
             }
 
