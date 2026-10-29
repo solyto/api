@@ -301,6 +301,17 @@ describe('TodoService::parse', function () {
         expect($explicit['due_at'])->toBe('2026-12-24');
     });
 
+    it('keeps past years and puts two-digit years in the current century', function () {
+        $this->travelTo('2026-06-01');
+        $user = makeUser();
+        $service = app(TodoService::class);
+
+        expect($service->parse($user, ['title' => 'Task', 'due_at' => '2025-12-01'])['due_at'])->toBe('2025-12-01');
+        expect($service->parse($user, ['title' => 'Task due:15.03.2020'])['due_at'])->toBe('2020-03-15');
+        expect($service->parse($user, ['title' => 'Task due:15.03.25'])['due_at'])->toBe('2025-03-15');
+        expect($service->parse($user, ['title' => 'Task due:15.03.27'])['due_at'])->toBe('2027-03-15');
+    });
+
     it('parses repeat: and link: directives', function () {
         $user = makeUser();
 

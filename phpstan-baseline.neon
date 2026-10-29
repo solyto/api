@@ -73,12 +73,6 @@ parameters:
 			path: app/Api/Todos/Services/TodoService.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between 5 and 5 will always evaluate to true\.$#'
-			identifier: identical.alwaysTrue
-			count: 1
-			path: app/Api/Todos/Services/TodoService.php
-
-		-
 			message: '#^Access to an undefined property App\\Api\\Users\\Models\\FriendRequest\:\:\$direction\.$#'
 			identifier: property.notFound
 			count: 2
