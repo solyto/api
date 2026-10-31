@@ -32,14 +32,15 @@ class ExportController
             ->first();
 
         if ($recentExport) {
-            $retryAfter = (int) ceil(now()->diffInSeconds($recentExport->created_at->copy()->addDay()));
+            $retryAfter = max(1, (int) ceil(now()->diffInSeconds($recentExport->created_at->copy()->addDay())));
 
+            // export_rate_limited stays first: clients pick the message from errors[0].
             return ApiResponse::error(
                 'You can only export once every 24 hours. Please try again later.',
                 429,
-                ['export_rate_limited'],
-                ['retry_after' => max(1, $retryAfter)]
-            );
+                ['export_rate_limited', 'too_many_requests'],
+                ['retry_after' => $retryAfter]
+            )->header('Retry-After', (string) $retryAfter);
         }
 
         $job = ExportJob::create([

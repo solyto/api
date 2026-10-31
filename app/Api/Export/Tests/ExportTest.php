@@ -56,9 +56,10 @@ describe('Export endpoints', function () {
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/export', ['features' => ['todos']])
             ->assertStatus(429)
-            ->assertJsonPath('errors', ['export_rate_limited']);
+            ->assertJsonPath('errors', ['export_rate_limited', 'too_many_requests']);
 
-        expect($response->json('meta.retry_after'))->toBeInt()->toBeBetween(21 * 3600 - 5, 21 * 3600);
+        expect($response->json('meta.retry_after'))->toBeInt()->toBeBetween(21 * 3600 - 5, 21 * 3600)
+            ->and((int) $response->headers->get('Retry-After'))->toBe($response->json('meta.retry_after'));
     });
 
     it('returns 404 for downloads of unknown jobs', function () {
