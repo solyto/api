@@ -24,6 +24,7 @@ class FeedService
     private const int MAX_ERROR_LENGTH = 500;
     private const int MAX_DESCRIPTION_LENGTH = 1000;
     private const int MAX_ITEM_ID_LENGTH = 255;
+    private const int MAX_TITLE_DECODE_PASSES = 3;
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -291,14 +292,42 @@ class FeedService
     }
 
     /**
+     * SimplePie hands titles out as HTML ("LTE &amp; Solar"), but clients render
+     * them as plain text. Many feeds also encode their titles twice, which leaves
+     * "&amp;amp;" after SimplePie, so decoding repeats while it still changes
+     * something, capped so a pathological title can't loop for long.
+     */
+    private function plainTitle(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $title = strip_tags($value);
+
+        for ($pass = 0; $pass < self::MAX_TITLE_DECODE_PASSES; $pass++) {
+            $decoded = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+            if ($decoded === $title) {
+                break;
+            }
+
+            $title = $decoded;
+        }
+
+        return $this->sanitizeText($title);
+    }
+
+    /**
      * Some feeds (e.g. F-Droid's "This Week in F-Droid") ship the entire
      * newsletter as the item description. That overflows the feed_items TEXT
      * column and fails the whole sync, and the client only ever renders a
      * short preview — so descriptions are cut to a fixed length at ingest.
+     * Items without a summary get "" so the API always returns a string.
      */
-    private function truncateDescription(?string $value): ?string
+    private function truncateDescription(?string $value): string
     {
-        return $value === null ? null : Str::limit($value, self::MAX_DESCRIPTION_LENGTH);
+        return $value === null ? '' : Str::limit($value, self::MAX_DESCRIPTION_LENGTH);
     }
 
     /**
@@ -336,7 +365,7 @@ class FeedService
             if (!$feedItem->exists) {
                 try {
                     $feedItem->fill([
-                        'title'        => $this->sanitizeText($item->get_title()),
+                        'title'        => $this->plainTitle($item->get_title()),
                         'description'  => $this->truncateDescription($item->get_description()),
                         'link'         => $item->get_link(),
                         'image_url'    => $this->feedReader->extractImageUrl($item),
