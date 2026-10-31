@@ -1,10 +1,12 @@
 <?php
 
 use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Services\CheckInService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
+use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 
 function widgetUser(array $settings = []): User
@@ -755,6 +757,34 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
         $user = widgetUser();
 
         expectApiError(setCheckIn($this, $user, 'coffee', ['value' => 3]), 404);
+    });
+
+    it('applies the value when a concurrent request created today\'s check-in first', function () {
+        $user = widgetUser();
+        widgetCheckIn($user, today()->toDateString(), ['mood' => 2]);
+
+        // The first lookup misses the existing row, as if it was created right after it.
+        $this->app->instance(CheckInService::class, new class(app(UserCacheService::class)) extends CheckInService
+        {
+            private bool $missed = false;
+
+            public function find(User $user, string $date): ?CheckIn
+            {
+                if (!$this->missed) {
+                    $this->missed = true;
+
+                    return null;
+                }
+
+                return parent::find($user, $date);
+            }
+        });
+
+        expectApiSuccess(setCheckIn($this, $user, 'water', ['value' => 4]));
+
+        $checkIn = userCheckIns($user)->sole();
+        expect((int) $checkIn->water)->toBe(4)
+            ->and((int) $checkIn->mood)->toBe(2);
     });
 
     it('never touches another user\'s check-in', function () {
