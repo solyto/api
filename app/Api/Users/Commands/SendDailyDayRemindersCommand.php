@@ -38,20 +38,26 @@ class SendDailyDayRemindersCommand extends Command
                 continue;
             }
 
-            $todos = Todo::forUser($user->id)
-                ->where('is_completed', false)
-                ->where('due_at', '<=', today($timezone))
-                ->get();
+            // One user's failure (unreadable calendar data, a mail or Telegram
+            // outage) must not cost everyone after them their reminder.
+            try {
+                $todos = Todo::forUser($user->id)
+                    ->where('is_completed', false)
+                    ->where('due_at', '<=', today($timezone))
+                    ->get();
 
-            $events = collect(app(CalendarService::class)->listTodayEvents($user));
+                $events = collect(app(CalendarService::class)->listTodayEvents($user));
 
-            $user->notify(new DailyDayReminderNotification(
-                date: $now->toDateString(),
-                todos: $todos,
-                events: $events
-            ));
+                $user->notify(new DailyDayReminderNotification(
+                    date: $now->toDateString(),
+                    todos: $todos,
+                    events: $events
+                ));
 
-            $this->info("Sent daily day reminder to {$user->name}");
+                $this->info("Sent daily day reminder to {$user->name}");
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
     }
 }

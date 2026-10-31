@@ -1,11 +1,15 @@
 <?php
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Users\Models\UserNotificationSettings;
 use App\Api\Users\Notifications\DailyCheckInReminderNotification;
 use App\Api\Users\Notifications\DailyDayReminderNotification;
 use App\Dav\Models\Principal;
 use Carbon\Carbon;
+use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
 
 describe('User management commands', function () {
@@ -175,6 +179,55 @@ describe('Daily reminder commands', function () {
         $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
 
         Notification::assertNothingSent();
+    });
+
+    it('keeps sending day reminders when one user fails', function () {
+        Notification::fake();
+        Exceptions::fake();
+        Carbon::setTestNow('2026-08-14 07:00:00');
+
+        $broken = makeUser();
+        $broken->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($broken)->create();
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $this->mock(CalendarService::class)
+            ->shouldReceive('listTodayEvents')
+            ->andReturnUsing(fn ($u) => $u->is($broken) ? throw new RuntimeException('Unreadable calendar') : []);
+
+        $this->artisan('app:send-daily-day-reminders')->assertSuccessful();
+
+        Notification::assertNotSentTo($broken, DailyDayReminderNotification::class);
+        Notification::assertSentTo($user, DailyDayReminderNotification::class);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Unreadable calendar');
+    });
+
+    it('keeps sending check-in reminders when one user fails', function () {
+        Exceptions::fake();
+        Carbon::setTestNow('2026-08-14 20:00:00');
+
+        $broken = makeUser();
+        $broken->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($broken)->create();
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        Event::listen(NotificationSending::class, function (NotificationSending $event) use ($broken) {
+            if ($event->notifiable->is($broken)) {
+                throw new RuntimeException('Mail server down');
+            }
+        });
+
+        $this->artisan('app:send-daily-check-in-reminders')->assertSuccessful();
+
+        expect($broken->notifications()->count())->toBe(0);
+        expect($user->notifications()->where('type', 'daily_check_in_reminder')->count())->toBe(1);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Mail server down');
     });
 
     it('does not send check-in reminders outside 20:00', function () {
