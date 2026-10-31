@@ -16,6 +16,7 @@ class StoreLibraryLinkRequest extends FormRequest
             'cover_path' => 'nullable|string',
             'tags' => 'nullable|array',
             'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
+            'category_id' => ['nullable', Rule::exists('library_links_categories', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }

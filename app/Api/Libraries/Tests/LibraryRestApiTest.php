@@ -222,6 +222,41 @@ describe('Library links', function () {
         expect(LibraryLinkCategory::count())->toBe(0);
     });
 
+    it('stores a link in the given category', function () {
+        $user = makeUser();
+        $category = LibraryLinkCategory::factory()->forUser($user)->create();
+
+        $store = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['title' => 'Todos', 'url' => 'https://example.com/todos', 'category_id' => $category->id])
+            ->assertStatus(201)
+            ->assertJsonPath('data.category.id', $category->id);
+
+        expect(LibraryLink::find($store->json('data.id'))->category_id)->toBe($category->id);
+    });
+
+    it('stores a link without a category when category_id is null', function () {
+        $user = makeUser();
+
+        $store = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['title' => 'Todos', 'url' => 'https://example.com/todos', 'category_id' => null])
+            ->assertStatus(201)
+            ->assertJsonPath('data.category', null);
+
+        expect(LibraryLink::find($store->json('data.id'))->category_id)->toBeNull();
+    });
+
+    it('rejects another user\'s category on store', function () {
+        $user = makeUser();
+        $foreignCategory = LibraryLinkCategory::factory()->forUser(makeUser())->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['title' => 'Todos', 'url' => 'https://example.com/todos', 'category_id' => $foreignCategory->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category_id');
+
+        expect(LibraryLink::count())->toBe(0);
+    });
+
     it('rejects another user\'s tags and category on store and update', function () {
         $user = makeUser();
         $other = makeUser();
