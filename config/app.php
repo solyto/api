@@ -112,7 +112,7 @@ return [
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
     // Languages a user can pick; their strings live in resources/lang/<locale>.
-    'locales' => ['en', 'de', 'fr', 'es', 'it'],
+    'locales' => ['en', 'de', 'fr', 'es', 'it', 'ru'],
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
