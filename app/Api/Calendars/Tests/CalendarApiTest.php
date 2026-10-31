@@ -293,6 +293,44 @@ describe('Calendar events', function () {
         // days) lies outside the window, consistently with UTC users.
         expect($recurrenceStarts)->not->toContain($inThreeDays.'T00:00:00');
     });
+
+    it('lists only today\'s events for the daily reminder in the user timezone', function (string $timezone) {
+        $user = makeUser();
+        $user->settings()->update(['timezone' => $timezone]);
+
+        $instanceId = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->json('data')[0]['id'];
+
+        $storeEvent = function (array $payload) use ($user, $instanceId) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge($payload, [
+                    'calendar_id' => $instanceId,
+                ]))
+                ->assertStatus(201)
+                ->assertJsonPath('success', true);
+        };
+
+        $today = today($timezone)->toDateString();
+        $tomorrow = today($timezone)->addDay()->toDateString();
+        $yesterday = today($timezone)->subDay()->toDateString();
+
+        // Events starting exactly at the window end (the user's next
+        // midnight) belong to tomorrow, all-day ones included.
+        $storeEvent(['title' => 'Yesterday All Day', 'start_date' => $yesterday, 'end_date' => $yesterday, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Today All Day', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Today Late', 'start_date' => $today.' 23:00', 'end_date' => $today.' 23:30', 'is_all_day' => false]);
+        $storeEvent(['title' => 'Tomorrow All Day', 'start_date' => $tomorrow, 'end_date' => $tomorrow, 'is_all_day' => true]);
+        $storeEvent(['title' => 'Tomorrow Midnight', 'start_date' => $tomorrow.' 00:00', 'end_date' => $tomorrow.' 01:00', 'is_all_day' => false]);
+
+        $titles = collect(app(CalendarService::class)->listTodayEvents($user->fresh()))->pluck('title');
+
+        expect($titles)->toContain('Today All Day');
+        expect($titles)->toContain('Today Late');
+        expect($titles)->not->toContain('Yesterday All Day');
+        expect($titles)->not->toContain('Tomorrow All Day');
+        expect($titles)->not->toContain('Tomorrow Midnight');
+    })->with(['America/New_York', 'UTC', 'Europe/Berlin', 'Asia/Tokyo']);
 });
 
 describe('Event attachments', function () {
