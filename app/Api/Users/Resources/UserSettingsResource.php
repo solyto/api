@@ -12,7 +12,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @OA\Schema(
  *     schema="UserSettings",
  *
- *     @OA\Property(property="language", type="string", enum={"en","de","fr","es","it"}),
+ *     @OA\Property(property="language", type="string", enum={"en","de","fr","es","it","ru"}),
  *     @OA\Property(property="timezone", type="string"),
  *     @OA\Property(property="date_format", type="string"),
  *     @OA\Property(property="time_format", type="string"),
