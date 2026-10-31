@@ -283,6 +283,7 @@ SQL
                     if (!isset($vevent->DTEND)) {
                         $endOrig = $endOrig->modify('+1 day');
                     }
+                    $startOrig = new \DateTimeImmutable($startOrig->format('Y-m-d H:i:s'), $queryTz);
                     $endOrig = new \DateTimeImmutable($endOrig->format('Y-m-d H:i:s'), $queryTz);
                 }
 
@@ -356,9 +357,10 @@ SQL
                     }
                 } else if (!isset($vevent->{'RECURRENCE-ID'})) {
                     // Skip single-instance events outside the requested range.
-                    // An event ending exactly at the window start does not
-                    // overlap it (exclusive end, RFC 4791/5545).
-                    if ($endOrig <= $start || $startOrig > $end) {
+                    // An event ending exactly at the window start, or starting
+                    // exactly at the window end, does not overlap it
+                    // (exclusive end, RFC 4791/5545).
+                    if ($endOrig <= $start || $startOrig >= $end) {
                         continue;
                     }
 
