@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel>
+        <title>Golem-like Feed</title>
+        <link>https://www.golem.de</link>
+        <description>Items ending in a 1x1 tracking pixel, like Golem's</description>
+        <item>
+            <title>Article with content:encoded</title>
+            <link>https://www.golem.de/news/article-1.html</link>
+            <guid>https://www.golem.de/2610/214715.html</guid>
+            <description>Teaser text &lt;img src=&quot;https://cpx.golem.de/cpx.php?class=17&amp;amp;aid=214715&amp;amp;page=1&quot; alt=&quot;&quot; width=&quot;1&quot; height=&quot;1&quot; /&gt;</description>
+            <content:encoded><![CDATA[<img src="https://www.golem.de/2610/214715-606214-606212_rc.jpg" width="416" height="234" vspace="3" hspace="8" align="left">Teaser text <img src="https://cpx.golem.de/cpx.php?class=17&amp;aid=214715&amp;page=1" alt="" width="1" height="1" />]]></content:encoded>
+        </item>
+        <item>
+            <title>Article with only the pixel</title>
+            <link>https://www.golem.de/news/article-2.html</link>
+            <guid>https://www.golem.de/2610/214718.html</guid>
+            <description>Teaser text &lt;img src=&quot;https://cpx.golem.de/cpx.php?class=17&amp;amp;aid=214718&amp;amp;page=1&quot; alt=&quot;&quot; width=&quot;1&quot; height=&quot;1&quot; /&gt;</description>
+        </item>
+        <item>
+            <title>Article with an unsized tracker before the image</title>
+            <link>https://www.golem.de/news/article-3.html</link>
+            <guid>https://www.golem.de/2610/214720.html</guid>
+            <content:encoded><![CDATA[<img src="https://ssl-vg03.met.vgwort.de/na/abc123" alt=""><p>Text</p><img src="https://www.golem.de/2610/214720-1_rc.jpg?w=416&amp;h=234" alt="">]]></content:encoded>
+        </item>
+    </channel>
+</rss>
