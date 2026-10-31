@@ -36,11 +36,17 @@ class SendDailyCheckInRemindersCommand extends Command
                 continue;
             }
 
-            $user->notify(new DailyCheckInReminderNotification(
-                date: $now->toDateString()
-            ));
+            // One user's failure (a mail or Telegram outage) must not cost
+            // everyone after them their reminder.
+            try {
+                $user->notify(new DailyCheckInReminderNotification(
+                    date: $now->toDateString()
+                ));
 
-            $this->info("Sent daily check-in reminder to {$user->name}");
+                $this->info("Sent daily check-in reminder to {$user->name}");
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
     }
 }
