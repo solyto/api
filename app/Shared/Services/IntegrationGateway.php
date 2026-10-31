@@ -15,6 +15,7 @@ use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
 use App\Shared\Exceptions\IntegrationAuthException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -216,7 +217,15 @@ class IntegrationGateway
         if ($checkIn) {
             $service->update($this->user, $checkIn, [$tracker => $value]);
         } elseif ($value !== null) {
-            $service->create($this->user, ['date' => $date, $tracker => $value]);
+            try {
+                $service->create($this->user, ['date' => $date, $tracker => $value]);
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent request created today's check-in first; apply this value to it.
+                $checkIn = $service->find($this->user, $date);
+                if ($checkIn) {
+                    $service->update($this->user, $checkIn, [$tracker => $value]);
+                }
+            }
         }
     }
 
