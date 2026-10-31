@@ -134,7 +134,8 @@ class LibraryLinkController
      *             @OA\Property(property="url", type="string", format="uri", maxLength=255),
      *             @OA\Property(property="is_favorite", type="boolean"),
      *             @OA\Property(property="cover_path", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="tags", type="array", items={}, nullable=true)
+     *             @OA\Property(property="tags", type="array", items={}, nullable=true),
+     *             @OA\Property(property="category_id", type="integer", nullable=true)
      *         )
      *     ),
      *
@@ -186,7 +187,8 @@ class LibraryLinkController
      *             @OA\Property(property="url", type="string", format="uri", maxLength=255),
      *             @OA\Property(property="is_favorite", type="boolean"),
      *             @OA\Property(property="cover_path", type="string", maxLength=255, nullable=true),
-     *             @OA\Property(property="tags", type="array", items={}, nullable=true)
+     *             @OA\Property(property="tags", type="array", items={}, nullable=true),
+     *             @OA\Property(property="category_id", type="integer", nullable=true)
      *         )
      *     ),
      *
