@@ -96,7 +96,7 @@ class FeedService
             }
 
             $feed = Feed::create([
-                'title' => $feedData['title'] ?? $title,
+                'title' => $this->plainTitle($feedData['title']) ?: $title,
                 'url' => $url,
                 'created_by' => $userId,
             ]);
@@ -292,8 +292,8 @@ class FeedService
     }
 
     /**
-     * SimplePie hands titles out as HTML ("LTE &amp; Solar"), but clients render
-     * them as plain text. Many feeds also encode their titles twice, which leaves
+     * SimplePie hands item and feed titles out as HTML ("LTE &amp; Solar"), but
+     * clients render them as plain text. Many feeds also encode titles twice, which leaves
      * "&amp;amp;" after SimplePie, so decoding repeats while it still changes
      * something, capped so a pathological title can't loop for long.
      */

@@ -5,6 +5,7 @@ use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Feeds\Services\FeedService;
+use Illuminate\Support\Facades\Queue;
 
 function feedItemDouble(?string $description, string $id = 'https://example.com/post-1', string $title = 'A post'): \Mockery\MockInterface
 {
@@ -105,5 +106,20 @@ describe('FeedService', function () {
 
         $ids = FeedItem::pluck('feed_item_id')->sort()->values()->all();
         expect($ids)->toBe(['https://example.com/post-1', 'sha1:'.sha1($longId)]);
+    });
+
+    it('stores an encoded feed title as plain text when creating a subscription', function () {
+        Queue::fake();
+        $user = makeUser();
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getFeedData')->once()->andReturn([
+            'title' => 'Tom &amp; Jerry\'s Blog',
+            'items' => ['fake-item'],
+        ]);
+
+        app(FeedService::class)->createSubscription($user, 'My title', 'https://example.com/feed.xml', null, null);
+
+        expect(Feed::sole()->title)->toBe("Tom & Jerry's Blog");
     });
 });
