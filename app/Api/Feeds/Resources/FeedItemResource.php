@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="id", type="string"),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="link", type="string", format="uri"),
- *     @OA\Property(property="description", type="string", nullable=true),
+ *     @OA\Property(property="description", type="string"),
  *     @OA\Property(property="image_url", type="string", format="uri", nullable=true),
  *     @OA\Property(property="feed_id", type="integer"),
  *     @OA\Property(property="published_at", type="string", format="date-time", nullable=true)
