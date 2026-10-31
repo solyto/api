@@ -48,7 +48,7 @@ class AuthController
      *             @OA\Property(property="email", type="string", format="email", maxLength=255),
      *             @OA\Property(property="password", type="string"),
      *             @OA\Property(property="password_confirmation", type="string"),
-     *             @OA\Property(property="language", type="string", enum={"en","de","fr","es","it"})
+     *             @OA\Property(property="language", type="string", enum={"en","de","fr","es","it","ru"})
      *         )
      *     ),
      *
