@@ -27,7 +27,7 @@ class PushNotificationController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="string")
+     *             @OA\Property(property="data", type="object", @OA\Property(property="public_key", type="string"))
      *         )
      *     )
      * )
@@ -35,7 +35,7 @@ class PushNotificationController
     public function getPublicKey(): JsonResponse
     {
         return ApiResponse::success(
-            config('webpush.vapid.public_key'),
+            ['public_key' => config('webpush.vapid.public_key')],
             'Public key retrieved successfully.'
         );
     }
