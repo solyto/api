@@ -62,11 +62,13 @@ describe('Notification endpoints', function () {
 
     it('returns the vapid public key', function () {
         $user = makeUser();
+        config(['webpush.vapid.public_key' => 'test-public-key']);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/notifications/push/vapid-key')
             ->assertStatus(200)
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.public_key', 'test-public-key');
     });
 
     it('subscribes and unsubscribes a push subscription', function () {
