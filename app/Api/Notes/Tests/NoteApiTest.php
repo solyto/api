@@ -139,6 +139,28 @@ describe('Note categories CRUD', function () {
 
         expect(NoteCategory::where('title', 'Child')->exists())->toBeFalse();
     });
+
+    it('deletes subfolders and every note inside them with the category', function () {
+        $user = makeUser();
+        $parent = NoteCategory::factory()->forUser($user)->asRoot()->create();
+        $child = NoteCategory::factory()->forUser($user)->withParent($parent)->create();
+        $grandchild = NoteCategory::factory()->forUser($user)->withParent($child)->create();
+        $sibling = NoteCategory::factory()->forUser($user)->asRoot()->create();
+
+        $deleted = collect([$parent, $child, $grandchild])
+            ->map(fn(NoteCategory $category) => Note::factory()->forUser($user)->forCategory($category)->create());
+        $inSibling = Note::factory()->forUser($user)->forCategory($sibling)->create();
+        $unfiled = Note::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/notes/categories/'.$parent->id)
+            ->assertStatus(200);
+
+        expect(NoteCategory::whereKey([$parent->id, $child->id, $grandchild->id])->exists())->toBeFalse();
+        expect(Note::whereKey($deleted->pluck('id'))->exists())->toBeFalse();
+        expect(NoteCategory::whereKey($sibling->id)->exists())->toBeTrue();
+        expect(Note::whereKey([$inSibling->id, $unfiled->id])->count())->toBe(2);
+    });
 });
 
 describe('Journal folder', function () {
