@@ -171,14 +171,13 @@ describe('GET /widgets/your-day', function () {
             'at' => '2026-08-10',
             'all_day' => true,
             'icon' => 'todo',
-            'route' => ['key' => 'todo', 'id' => $overdue->id],
             'action' => ['type' => 'check', 'key' => 'todo.complete', 'checked' => false],
         ])->and(widgetSection($data, 'due')['rows'][1])->not->toHaveKey('subtitle');
 
         $upcoming = widgetSection($data, 'upcoming')['rows'];
         expect($upcoming[0]['time_label'])->toBe('15.08')
             ->and($upcoming[1]['time_label'])->toBe('15.08 09:00')
-            ->and($upcoming[1]['route'])->toBe(['key' => 'calendar']);
+            ->and($upcoming[1])->not->toHaveKey('route');
     });
 
     it('sends all-day events and todos as dates and timed events as timestamps', function () {
@@ -608,8 +607,8 @@ describe('GET /widgets/check-in', function () {
             ->and(checkInRow($data, 'mood'))->toMatchArray([
                 'title' => 'Mood',
                 'all_day' => true,
-                'route' => ['key' => 'check_in'],
             ])
+            ->and(checkInRow($data, 'mood'))->not->toHaveKey('route')
             ->and(checkInRow($data, 'mood')['action'])->toMatchArray(['type' => 'scale', 'key' => 'check_in.set', 'value' => 4])
             ->and(checkInRow($data, 'water')['action'])->toHaveKey('value', null);
     });

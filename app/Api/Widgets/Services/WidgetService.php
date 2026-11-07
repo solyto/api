@@ -170,7 +170,6 @@ class WidgetService
             'id' => $tracker,
             'title' => __('widgets.tracker_' . $tracker, [], $locale),
             'all_day' => true,
-            'route' => ['key' => 'check_in'],
             'action' => [
                 'type' => 'scale',
                 'key' => 'check_in.set',
@@ -264,7 +263,6 @@ class WidgetService
             'until' => $end ? ($event->isAllDay ? $end->toDateString() : $end->toIso8601String()) : null,
             'all_day' => $event->isAllDay,
             'icon' => 'event',
-            'route' => ['key' => 'calendar'],
         ]);
     }
 
@@ -279,7 +277,6 @@ class WidgetService
             'at' => $due->toDateString(),
             'all_day' => true,
             'icon' => 'todo',
-            'route' => ['key' => 'todo', 'id' => $todo->id],
             'action' => ['type' => 'check', 'key' => 'todo.complete', 'checked' => false],
         ]);
     }
