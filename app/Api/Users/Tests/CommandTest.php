@@ -6,10 +6,12 @@ use App\Api\Users\Notifications\DailyCheckInReminderNotification;
 use App\Api\Users\Notifications\DailyDayReminderNotification;
 use App\Dav\Models\Principal;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Request;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 
 describe('User management commands', function () {
@@ -241,5 +243,79 @@ describe('Daily reminder commands', function () {
         $this->artisan('app:send-daily-check-in-reminders')->assertSuccessful();
 
         Notification::assertNothingSent();
+    });
+});
+
+describe('Registrations report command', function () {
+    beforeEach(function () {
+        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
+        Http::fake();
+        Carbon::setTestNow('2026-08-14 08:00:00');
+    });
+
+    afterEach(function () {
+        Carbon::setTestNow();
+    });
+
+    it('reports only users registered in the last 24 hours', function () {
+        Carbon::setTestNow('2026-08-13 07:59:59');
+        makeUser();
+        Carbon::setTestNow('2026-08-13 08:00:00');
+        makeUser();
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        makeUser();
+        Carbon::setTestNow('2026-08-14 08:00:00');
+
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) =>
+            $request->url() === 'https://ntfy.example.test'
+            && $request['topic'] === 'solyto-admin'
+            && $request['title'] === 'Daily registrations'
+            && $request['message'] === '2 users registered in the last 24 hours.'
+        );
+    });
+
+    it('uses the singular for one registration', function () {
+        makeUser();
+
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request) => $request['message'] === '1 user registered in the last 24 hours.');
+    });
+
+    it('still reports when nobody registered', function () {
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request) => $request['message'] === '0 users registered in the last 24 hours.');
+    });
+
+    it('sends to the registrations topic when one is set', function () {
+        config(['services.ntfy.topics.registrations' => 'solyto-registrations']);
+
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-registrations');
+    });
+
+    it('sends nothing when ntfy is not configured', function () {
+        config(['services.ntfy.url' => null, 'services.ntfy.topic' => null]);
+
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertNothingSent();
+    });
+
+    it('keeps names and emails out of the message', function () {
+        makeUser(['name' => 'John Doe', 'email' => 'john@example.com']);
+
+        $this->artisan('app:users:report-registrations')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request) =>
+            !str_contains($request->body(), 'john@example.com')
+            && !str_contains($request->body(), 'John Doe')
+        );
     });
 });
