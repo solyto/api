@@ -5,8 +5,6 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Api\Users\Services\AuthService;
 use App\Shared\Enums\AuthPlatformEnum;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -79,67 +77,21 @@ describe('POST /v1/auth/register', function () {
     });
 });
 
-describe('POST /v1/auth/register ntfy announcement', function () {
-    $register = fn ($test) => $test->postJson('/api/v1/auth/register', [
-        'name' => 'John Doe',
-        'email' => 'john@example.com',
-        'password' => 'password1234',
-        'password_confirmation' => 'password1234',
-    ]);
-
-    beforeEach(function () {
+describe('POST /v1/auth/register ntfy', function () {
+    it('sends no ntfy message on registration', function () {
         Mail::fake();
-    });
-
-    it('sends nothing when ntfy is not configured', function () use ($register) {
-        config(['services.ntfy.url' => null, 'services.ntfy.topic' => null]);
+        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
         Http::fake();
 
-        $register($this)->assertStatus(201);
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'password' => 'password1234',
+            'password_confirmation' => 'password1234',
+        ])->assertStatus(201);
 
         Http::assertNothingSent();
     });
-
-    it('sends one anonymous message when ntfy is configured', function () use ($register) {
-        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
-        Http::fake();
-
-        $register($this)->assertStatus(201);
-
-        Http::assertSentCount(1);
-        Http::assertSent(fn (Request $request) =>
-            $request->url() === 'https://ntfy.example.test'
-            && $request['title'] === 'New user registered'
-            && !str_contains($request->body(), 'john@example.com')
-            && !str_contains($request->body(), 'John Doe')
-        );
-    });
-
-    it('sends to the registrations topic when one is set', function () use ($register) {
-        config([
-            'services.ntfy.url' => 'https://ntfy.example.test',
-            'services.ntfy.topic' => 'solyto-admin',
-            'services.ntfy.topics.registrations' => 'solyto-registrations',
-        ]);
-        Http::fake();
-
-        $register($this)->assertStatus(201);
-
-        Http::assertSentCount(1);
-        Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-registrations');
-    });
-
-    it('still registers the user when ntfy fails', function (Closure $fake) use ($register) {
-        config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
-        $fake();
-
-        $register($this)->assertStatus(201)->assertJsonPath('success', true);
-
-        expect(User::where('email', 'john@example.com')->exists())->toBeTrue();
-    })->with([
-        'error response' => fn () => fn () => Http::fake(['*' => Http::response('boom', 500)]),
-        'connection error' => fn () => fn () => Http::fake(fn () => throw new ConnectionException('Connection refused')),
-    ]);
 });
 
 describe('POST /v1/auth/login', function () {

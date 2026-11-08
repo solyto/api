@@ -28,6 +28,7 @@ Schedule::job(\App\Api\Libraries\Jobs\ScaleCovers::class)->dailyAt(3);
  * Users
  */
 Schedule::job(\App\Api\Users\Jobs\DeleteOldFriendRequests::class)->dailyAt(2);
+Schedule::command(\App\Api\Users\Commands\ReportRegistrationsCommand::class)->dailyAt(8);
 
 /*
  * Clipboard

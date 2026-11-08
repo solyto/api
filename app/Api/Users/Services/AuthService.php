@@ -7,9 +7,7 @@ use App\Api\Users\Exceptions\WidgetTokenConflictException;
 use App\Api\Users\Mails\UserVerification;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
-use App\Api\Users\Notifications\UserRegisteredNotification;
 use App\Shared\Enums\AuthPlatformEnum;
-use App\Shared\Notifications\Channels\NtfyChannel;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\QueryException;
@@ -17,7 +15,6 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -45,8 +42,6 @@ class AuthService
         ]);
 
         Mail::to($user->email)->send(new UserVerification($user, $verificationToken, $data['platform'] ?? 'web', $data['language'] ?? 'en'));
-
-        Notification::route(NtfyChannel::class, config('services.ntfy.topics.registrations') ?: config('services.ntfy.topic'))->notify(new UserRegisteredNotification());
 
         return $user;
     }
