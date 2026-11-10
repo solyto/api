@@ -198,39 +198,57 @@ class TmdbService
 
         $result = $this->get("/{$type}/{$id}", ['language' => 'en-US']);
 
+        if (!isset($result['id'])) {
+            return null;
+        }
+
+        return $this->buildDetailDTO($type, $result, (string) $result['id'], $url, MovieServiceEnum::TMDB->value);
+    }
+
+    /**
+     * Resolves an IMDb title ID (tt…) through TMDB, preferring a movie match over a TV match.
+     * The DTO keeps the IMDb ID, URL and provider.
+     */
+    public function importByImdbId(string $imdbId, string $url): ?MovieReleaseDTO
+    {
+        $found = $this->get("/find/{$imdbId}", ['external_source' => 'imdb_id', 'language' => 'en-US']);
+
+        if (!empty($found['movie_results'][0]['id'])) {
+            $type = 'movie';
+            $id = (int) $found['movie_results'][0]['id'];
+        } elseif (!empty($found['tv_results'][0]['id'])) {
+            $type = 'tv';
+            $id = (int) $found['tv_results'][0]['id'];
+        } else {
+            return null;
+        }
+
+        $result = $this->get("/{$type}/{$id}", ['language' => 'en-US']);
+
         if (!$result) {
             return null;
         }
 
+        return $this->buildDetailDTO($type, $result, $imdbId, $url, MovieServiceEnum::IMDB->value);
+    }
+
+    private function buildDetailDTO(string $type, array $result, string $id, string $url, string $provider): ?MovieReleaseDTO
+    {
+        $isMovie = $type === 'movie';
+        $date = $isMovie ? ($result['release_date'] ?? null) : ($result['first_air_date'] ?? null);
+
         try {
-            $genres = array_map(fn($g) => $g['name'], $result['genres'] ?? []);
-
-            if ($type === 'movie') {
-                return new MovieReleaseDTO(
-                    id: (string) $result['id'],
-                    title: $result['title'],
-                    url: $url,
-                    provider: MovieServiceEnum::TMDB->value,
-                    type: 'movie',
-                    description: $result['overview'] ?? null,
-                    cover: isset($result['poster_path']) ? self::IMAGE_BASE_URL . $result['poster_path'] : null,
-                    releaseYear: !empty($result['release_date']) ? (int) substr($result['release_date'], 0, 4) : null,
-                    runtime: $result['runtime'] ?? null,
-                    genres: $genres,
-                );
-            }
-
             return new MovieReleaseDTO(
-                id: (string) $result['id'],
-                title: $result['name'],
+                id: $id,
+                title: $isMovie ? $result['title'] : $result['name'],
                 url: $url,
-                provider: MovieServiceEnum::TMDB->value,
-                type: 'tv',
+                provider: $provider,
+                type: $isMovie ? 'movie' : 'tv',
                 description: $result['overview'] ?? null,
                 cover: isset($result['poster_path']) ? self::IMAGE_BASE_URL . $result['poster_path'] : null,
-                releaseYear: !empty($result['first_air_date']) ? (int) substr($result['first_air_date'], 0, 4) : null,
-                runtime: $result['episode_run_time'][0] ?? null,
-                genres: $genres,
+                releaseYear: !empty($date) ? (int) substr($date, 0, 4) : null,
+                runtime: $isMovie ? ($result['runtime'] ?? null) : ($result['episode_run_time'][0] ?? null),
+                genres: array_map(fn($g) => $g['name'], $result['genres'] ?? []),
             );
         } catch (\Exception) {
             return null;

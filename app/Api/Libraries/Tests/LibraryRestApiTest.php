@@ -455,16 +455,20 @@ describe('External services', function () {
     });
 
     it('imdb imports a movie from a title url', function () {
+        Http::preventStrayRequests();
         Http::fake([
-            'https://api.imdbapi.dev/titles/tt1160419' => Http::response([
-                'id' => 'tt1160419',
-                'primaryTitle' => 'Dune',
-                'type' => 'movie',
-                'plot' => 'A mythic journey.',
-                'primaryImage' => ['url' => 'https://img.example/dune.jpg'],
-                'startYear' => 2021,
-                'runtimeSeconds' => 9300,
-                'genres' => ['Sci-Fi'],
+            'https://api.themoviedb.org/3/find/tt1160419*' => Http::response([
+                'movie_results' => [['id' => 438631]],
+                'tv_results' => [],
+            ]),
+            'https://api.themoviedb.org/3/movie/438631*' => Http::response([
+                'id' => 438631,
+                'title' => 'Dune',
+                'overview' => 'A mythic journey.',
+                'poster_path' => '/dune.jpg',
+                'release_date' => '2021-09-15',
+                'runtime' => 155,
+                'genres' => [['name' => 'Science Fiction']],
             ]),
         ]);
 
@@ -474,6 +478,83 @@ describe('External services', function () {
         expect($dto->getTitle())->toBe('Dune');
         expect($dto->getReleaseYear())->toBe(2021);
         expect($dto->getRuntime())->toBe(155);
+        expect($dto->getId())->toBe('tt1160419');
+        expect($dto->getProvider())->toBe('imdb');
+        expect($dto->getLink())->toBe('https://www.imdb.com/title/tt1160419');
+    });
+
+    it('imdb imports a series from a title url', function () {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.themoviedb.org/3/find/tt0944947*' => Http::response([
+                'movie_results' => [],
+                'tv_results' => [['id' => 1399]],
+            ]),
+            'https://api.themoviedb.org/3/tv/1399*' => Http::response([
+                'id' => 1399,
+                'name' => 'Game of Thrones',
+                'overview' => null,
+                'first_air_date' => '2011-04-17',
+                'episode_run_time' => [60],
+                'genres' => [['name' => 'Drama']],
+            ]),
+        ]);
+
+        $dto = app(ImdbService::class)->importFromUrl('https://www.imdb.com/title/tt0944947/');
+
+        expect($dto)->not->toBeNull();
+        expect($dto->getTitle())->toBe('Game of Thrones');
+        expect($dto->getType())->toBe('tv');
+        expect($dto->getDescription())->toBeNull();
+        expect($dto->getReleaseYear())->toBe(2011);
+        expect($dto->getRuntime())->toBe(60);
+        expect($dto->getId())->toBe('tt0944947');
+    });
+
+    it('imdb returns null when tmdb has no match', function () {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.themoviedb.org/3/find/tt0000000*' => Http::response([
+                'movie_results' => [],
+                'tv_results' => [],
+            ]),
+        ]);
+
+        expect(app(ImdbService::class)->importFromUrl('https://www.imdb.com/title/tt0000000/'))->toBeNull();
+    });
+
+    it('imdb returns null for a non-title url', function () {
+        Http::preventStrayRequests();
+        Http::fake();
+
+        expect(app(ImdbService::class)->importFromUrl('https://www.imdb.com/name/nm0000123/'))->toBeNull();
+        Http::assertNothingSent();
+    });
+
+    it('imports a movie from an imdb url through the endpoint', function () {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.themoviedb.org/3/find/tt1160419*' => Http::response([
+                'movie_results' => [['id' => 438631]],
+                'tv_results' => [],
+            ]),
+            'https://api.themoviedb.org/3/movie/438631*' => Http::response([
+                'id' => 438631,
+                'title' => 'Dune',
+                'release_date' => '2021-09-15',
+                'runtime' => 155,
+                'genres' => [],
+            ]),
+        ]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/libraries/movies/import/imdb', ['url' => 'https://www.imdb.com/title/tt1160419/'])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id', 'tt1160419')
+            ->assertJsonPath('data.title', 'Dune')
+            ->assertJsonPath('data.provider', 'imdb')
+            ->assertJsonPath('data.release_year', 2021);
     });
 
     it('tmdb searches movies', function () {
