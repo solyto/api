@@ -32,7 +32,7 @@ readonly class MovieReleaseDTO
         return $this->url;
     }
 
-    public function getType(): string
+    public function getType(): ?string
     {
         return $this->type;
     }
@@ -42,7 +42,7 @@ readonly class MovieReleaseDTO
         return $this->cover;
     }
 
-    public function getReleaseYear(): int
+    public function getReleaseYear(): ?int
     {
         return $this->releaseYear;
     }
@@ -57,7 +57,7 @@ readonly class MovieReleaseDTO
         return $this->genres;
     }
 
-    public function getDescription(): string
+    public function getDescription(): ?string
     {
         return $this->description;
     }
