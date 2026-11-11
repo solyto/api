@@ -635,6 +635,16 @@ describe('CacheInvalidationPlugin', function () {
         Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->userId === $this->user->id);
     })->with(['PUT', 'DELETE']);
 
+    it('queues one delayed calendar refresh for a burst of DAV event writes', function () {
+        foreach (['a', 'b', 'c'] as $uid) {
+            davRequest($this->user, 'PUT', $this->calendar.$uid.'.ics', davIcs($uid), ['Content-Type' => 'text/calendar']);
+        }
+
+        $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendarId])->times(3);
+        Queue::assertPushed(RefreshCalendarCache::class, 1);
+        Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->delay !== null);
+    });
+
     it('drops the cached calendar list when a calendar is created or deleted over DAV', function () {
         davRequest($this->user, 'MKCALENDAR', 'calendars/'.$this->user->email.'/work/');
         davRequest($this->user, 'DELETE', 'calendars/'.$this->user->email.'/work/');

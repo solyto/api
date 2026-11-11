@@ -3,7 +3,7 @@
 date: 2026-11-11
 branch: `main`, tree at `e249b72`
 scope: Performance of `AppCalendarsPDO::getExpandedEventsCustom`, the one function behind every API event listing (month view, widget, "today", daily reminders, cache refresh). Written for the maintainer. No application code, config, migrations or DAV wiring were changed. A throwaway probe test was run and deleted.
-read: false
+read: true
 
 ## Summary
 

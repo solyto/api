@@ -124,7 +124,7 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar]);
-            RefreshCalendarCache::dispatch($userId);
+            RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendar events', [
                 'email'       => $email,
@@ -146,7 +146,7 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
-            RefreshCalendarCache::dispatch($userId);
+            RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendars', [
                 'email' => $email,
