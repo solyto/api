@@ -179,7 +179,7 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_CONTACTS, $userId, $addressBookId]);
-            RefreshContactsCache::dispatch($userId);
+            RefreshContactsCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for contacts', [
                 'email'          => $email,
@@ -201,7 +201,7 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $userId]);
-            RefreshContactsCache::dispatch($userId);
+            RefreshContactsCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for address books', [
                 'email' => $email,
