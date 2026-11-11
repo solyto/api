@@ -659,6 +659,16 @@ describe('CacheInvalidationPlugin', function () {
         Queue::assertPushed(RefreshContactsCache::class, fn (RefreshContactsCache $job) => $job->userId === $this->user->id);
     });
 
+    it('queues one delayed contacts refresh for a burst of DAV card writes', function () {
+        foreach (['a', 'b', 'c'] as $uid) {
+            davRequest($this->user, 'PUT', $this->addressBook.$uid.'.vcf', davVcard($uid), ['Content-Type' => 'text/vcard']);
+        }
+
+        $this->cache->shouldHaveReceived('forget')->with(['contacts', $this->user->id, $this->addressBookId])->times(3);
+        Queue::assertPushed(RefreshContactsCache::class, 1);
+        Queue::assertPushed(RefreshContactsCache::class, fn (RefreshContactsCache $job) => $job->delay !== null);
+    });
+
     it('drops the cached address book list when an address book is created over DAV', function () {
         davRequest($this->user, 'MKCOL', 'addressbooks/'.$this->user->email.'/work/', '<?xml version="1.0"?>'
             .'<d:mkcol xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav"><d:set><d:prop>'
