@@ -3,7 +3,7 @@
 date: 2026-11-08
 branch: `report/immediate_including-external-calendars-via-dav` (job `immediate`), tree at `6d7fdfc`
 scope: How can users include an external calendar (Nextcloud, or any CalDAV/ICS source) in solyto? This report looks at the legacy Nextcloud integration, the current DAV setup, and provider-neutral options. It's written for the maintainer, who makes the product decisions. No application code, migrations, config, routes or DAV wiring were changed.
-read: false
+read: true
 
 ## Summary
 
