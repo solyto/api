@@ -66,6 +66,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Last Used Tracking
+    |--------------------------------------------------------------------------
+    |
+    | Disabled: Sanctum would update last_used_at on every request. The
+    | RecordClientVersion middleware writes it instead, throttled.
+    |
+    */
+
+    'last_used_at' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Sanctum Middleware
     |--------------------------------------------------------------------------
     |

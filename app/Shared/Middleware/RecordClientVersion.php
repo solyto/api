@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RecordClientVersion
 {
+    private const int LAST_USED_THRESHOLD_MINUTES = 5;
+
     public function handle(Request $request, Closure $next): Response
     {
         if ($this->isBelowMinimum($request)) {
@@ -21,19 +23,32 @@ class RecordClientVersion
 
         // Runs after $next: the api group runs before the route's auth:sanctum,
         // so the user and token are only resolved once the route has handled it.
-        $version = ClientVersionHelper::fromRequest($request);
-        if ($version === null) {
+        // Unsaved tokens: Sanctum::actingAs() mocks one, and logout/refresh delete it.
+        $token = $request->user()?->currentAccessToken();
+        if (!$token instanceof PersonalAccessToken || !$token->exists) {
             return $response;
         }
 
-        $token = $request->user()?->currentAccessToken();
-        if (!$token instanceof PersonalAccessToken || $token->client_version === $version) {
+        $changes = [];
+
+        // Replaces Sanctum's per-request write (disabled in config/sanctum.php).
+        $staleBefore = now()->subMinutes(self::LAST_USED_THRESHOLD_MINUTES);
+        if ($token->last_used_at === null || $token->last_used_at->lt($staleBefore)) {
+            $changes['last_used_at'] = now();
+        }
+
+        $version = ClientVersionHelper::fromRequest($request);
+        if ($version !== null && $token->client_version !== $version) {
+            $changes['client_version'] = $version;
+        }
+
+        if ($changes === []) {
             return $response;
         }
 
         // A query update, not save(): logout/refresh delete this token during the
         // request, and save() on a deleted model would re-insert it.
-        PersonalAccessToken::whereKey($token->getKey())->update(['client_version' => $version]);
+        PersonalAccessToken::whereKey($token->getKey())->update($changes);
 
         return $response;
     }
