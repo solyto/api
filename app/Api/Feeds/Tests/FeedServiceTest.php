@@ -5,6 +5,7 @@ use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Feeds\Services\FeedService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 
 function feedItemDouble(?string $description, string $id = 'https://example.com/post-1', string $title = 'A post'): \Mockery\MockInterface
@@ -17,6 +18,13 @@ function feedItemDouble(?string $description, string $id = 'https://example.com/
     $item->shouldReceive('get_description')->andReturn($description);
 
     return $item;
+}
+
+function seedFeedItemsCache(Feed $feed): bool
+{
+    app(FeedService::class)->getFeedItems($feed->id);
+
+    return Cache::store('user_data')->has('feed_items_v2_'.$feed->id);
 }
 
 describe('FeedService', function () {
@@ -121,5 +129,56 @@ describe('FeedService', function () {
         app(FeedService::class)->createSubscription($user, 'My title', 'https://example.com/feed.xml', null, null);
 
         expect(Feed::sole()->title)->toBe("Tom & Jerry's Blog");
+    });
+});
+
+describe('FeedService sync cache invalidation', function () {
+    it('keeps the feed items cache when every item already exists', function () {
+        $feed = Feed::factory()->create();
+        FeedItem::factory()->forFeed($feed)->create(['feed_item_id' => 'https://example.com/post-1', 'image_url' => null]);
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn([feedItemDouble('<p>news</p>')]);
+        $reader->shouldReceive('extractImageUrl')->never();
+
+        expect(seedFeedItemsCache($feed))->toBeTrue();
+
+        expect(app(FeedService::class)->syncFeed($feed->id))->toBeTrue();
+
+        expect(Cache::store('user_data')->has('feed_items_v2_'.$feed->id))->toBeTrue();
+    });
+
+    it('forgets the feed items cache when a sync stores a new item', function () {
+        $feed = Feed::factory()->create();
+        FeedItem::factory()->forFeed($feed)->create(['feed_item_id' => 'https://example.com/post-1']);
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn([
+            feedItemDouble('<p>news</p>'),
+            feedItemDouble('<p>new</p>', 'https://example.com/post-2'),
+        ]);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        expect(seedFeedItemsCache($feed))->toBeTrue();
+
+        app(FeedService::class)->syncFeed($feed->id);
+
+        expect(Cache::store('user_data')->has('feed_items_v2_'.$feed->id))->toBeFalse();
+    });
+
+    it('forgets the feed items cache when a backfill adds an image', function () {
+        $feed = Feed::factory()->create();
+        FeedItem::factory()->forFeed($feed)->create(['feed_item_id' => 'https://example.com/post-1', 'image_url' => null]);
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn([feedItemDouble('<p>news</p>')]);
+        $reader->shouldReceive('extractImageUrl')->once()->andReturn('https://cdn.example/new.jpg');
+
+        expect(seedFeedItemsCache($feed))->toBeTrue();
+
+        app(FeedService::class)->syncFeed($feed->id, backfillImages: true);
+
+        expect(Cache::store('user_data')->has('feed_items_v2_'.$feed->id))->toBeFalse();
+        expect(FeedItem::sole()->image_url)->toBe('https://cdn.example/new.jpg');
     });
 });

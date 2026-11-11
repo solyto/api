@@ -11,6 +11,7 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -18,9 +19,9 @@ use Illuminate\Support\Str;
 class FeedService
 {
     private const string CACHE_KEY_USER_FEEDS = 'user_feeds';
-    private const string CACHE_KEY_FEED_ITEMS = 'feed_items';
+    private const string CACHE_KEY_FEED_ITEMS = 'feed_items_v2';
     private const int CACHE_TTL_USER_FEEDS = 86400;
-    private const int CACHE_TTL_FEED_ITEMS = 3600;
+    private const int CACHE_TTL_FEED_ITEMS = 86400;
     private const int MAX_ERROR_LENGTH = 500;
     private const int MAX_DESCRIPTION_LENGTH = 1000;
     private const int MAX_ITEM_ID_LENGTH = 255;
@@ -55,7 +56,7 @@ class FeedService
             $items = $this->getFeedItems($feed->id);
 
             if ($items->isNotEmpty()) {
-                return $items->map(fn($item) => [
+                return $this->hydrateFeedItems($items)->map(fn($item) => [
                     'id'           => $item->feed_item_id,
                     'title'        => $item->title,
                     'link'         => $item->link,
@@ -124,8 +125,12 @@ class FeedService
 
         $items = collect();
 
-        foreach ($subscriptions as $subscription) {
-            $feedItems = $this->getFeedItems($subscription->feed_id);
+        $cached = $this->cache->many(
+            $subscriptions->map(fn (FeedSubscription $s) => [self::CACHE_KEY_FEED_ITEMS, $s->feed_id])->all()
+        );
+
+        foreach ($subscriptions as $index => $subscription) {
+            $feedItems = $cached[$index] ?? $this->getFeedItems($subscription->feed_id);
 
             $items = $items->merge(
                 $this->filterFeedItems($feedItems, $subscription)
@@ -136,10 +141,19 @@ class FeedService
         $sorted = $items->sortByDesc('published_at');
 
         $page = $limit === null
-            ? $sorted->values()
-            : $sorted->slice($offset, $limit)->values();
+            ? $sorted
+            : $sorted->slice($offset, $limit);
 
-        return ['items' => $page, 'counts' => $counts];
+        return ['items' => $this->hydrateFeedItems($page), 'counts' => $counts];
+    }
+
+    /**
+     * @param  Collection<int, \stdClass>  $rows
+     * @return EloquentCollection<int, FeedItem>
+     */
+    private function hydrateFeedItems(Collection $rows): EloquentCollection
+    {
+        return FeedItem::hydrate($rows->map(fn (\stdClass $row) => (array) $row)->values()->all());
     }
 
     public function getUserFeeds(string $userId): Collection
@@ -151,29 +165,67 @@ class FeedService
         );
     }
 
+    /**
+     * @param  Collection<int, \stdClass>  $items
+     * @return Collection<int, \stdClass>
+     */
     public function filterFeedItems(Collection $items, FeedSubscription $subscription): Collection
     {
-        return $items->filter(function ($item) use ($subscription) {
+        $whitelist = $this->parseKeywords($subscription->whitelist);
+        $blacklist = $this->parseKeywords($subscription->blacklist);
+
+        if ($whitelist === null && $blacklist === null) {
+            return $items;
+        }
+
+        return $items->filter(function ($item) use ($whitelist, $blacklist) {
             $text = strtolower($item->title . ' ' . $item->description);
 
-            if ($subscription->whitelist) {
-                $keywords = array_map('strtolower', explode(',', $subscription->whitelist));
-                if (!collect($keywords)->contains(fn($keyword) => str_contains($text, trim($keyword)))) {
-                    return false;
-                }
+            if ($whitelist !== null && !$this->containsAny($text, $whitelist)) {
+                return false;
             }
 
-            if ($subscription->blacklist) {
-                $keywords = array_map('strtolower', explode(',', $subscription->blacklist));
-                if (collect($keywords)->contains(fn($keyword) => str_contains($text, trim($keyword)))) {
-                    return false;
-                }
+            if ($blacklist !== null && $this->containsAny($text, $blacklist)) {
+                return false;
             }
 
             return true;
         });
     }
 
+    /**
+     * @return list<string>|null
+     */
+    private function parseKeywords(?string $list): ?array
+    {
+        if (!$list) {
+            return null;
+        }
+
+        return array_map(fn (string $keyword) => trim(strtolower($keyword)), explode(',', $list));
+    }
+
+    /**
+     * @param  list<string>  $keywords
+     */
+    private function containsAny(string $text, array $keywords): bool
+    {
+        foreach ($keywords as $keyword) {
+            if (str_contains($text, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Raw rows, not models: serialized models are ~3x the size and every page
+     * unserializes all of them, and sorting on the raw published_at string
+     * avoids building a Carbon per item. Callers hydrate what they return.
+     *
+     * @return Collection<int, \stdClass>
+     */
     public function getFeedItems(string $feedId): Collection
     {
         return $this->cache->remember(
@@ -181,6 +233,7 @@ class FeedService
             self::CACHE_TTL_FEED_ITEMS,
             fn() => FeedItem::where('feed_id', $feedId)
                 ->orderBy('published_at', 'desc')
+                ->toBase()
                 ->get()
         );
     }
@@ -352,6 +405,8 @@ class FeedService
             return false;
         }
 
+        $changed = false;
+
         foreach ($items as $item) {
             if (empty($item->get_link())) {
                 continue;
@@ -372,8 +427,11 @@ class FeedService
                         'published_at' => $this->resolvePublishedAt($item),
                     ])->save();
                 } catch (UniqueConstraintViolationException) {
-                    // A concurrent sync stored this item first, nothing left to do.
+                    // A concurrent sync stored this item first; its cache may
+                    // already have been rebuilt without it, so still invalidate.
                 }
+
+                $changed = true;
 
                 continue;
             }
@@ -382,13 +440,16 @@ class FeedService
                 $imageUrl = $this->feedReader->extractImageUrl($item);
                 if ($imageUrl) {
                     $feedItem->update(['image_url' => $imageUrl]);
+                    $changed = true;
                 }
             }
         }
 
         $feed->update(['last_synced_at' => Carbon::now(), 'last_error' => null]);
 
-        $this->forgetFeedItemsCache($feedId);
+        if ($changed) {
+            $this->forgetFeedItemsCache($feedId);
+        }
 
         return true;
     }

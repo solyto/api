@@ -43,6 +43,32 @@ class UserCacheService
         }
     }
 
+    /**
+     * One round trip for several keys. Results keep the keys of
+     * $identifierLists; misses and falsy values are null, like get().
+     *
+     * @param  array<array-key, array<int, string>>  $identifierLists
+     * @return array<array-key, mixed>
+     */
+    public function many(array $identifierLists): array
+    {
+        $keys = array_map(fn (array $identifiers) => $this->getKey($identifiers), $identifierLists);
+
+        if ($keys === []) {
+            return [];
+        }
+
+        try {
+            $values = Cache::store($this->storeName)->many(array_values($keys));
+        } catch (InvalidArgumentException $e) {
+            Log::channel('cache')->warning('Cache many failed', ['keys' => array_values($keys), 'error' => $e->getMessage()]);
+
+            return array_fill_keys(array_keys($keys), null);
+        }
+
+        return array_map(fn (string $key) => ($values[$key] ?? null) ?: null, $keys);
+    }
+
     public function has(array $identifiers): bool
     {
         try {
