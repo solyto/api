@@ -44,3 +44,23 @@ describe('UserCacheService::remember', function () {
         expect($result)->toBe(['fresh']);
     });
 });
+
+describe('UserCacheService::many', function () {
+    it('returns hits by the caller\'s keys and null for misses and falsy values', function () {
+        $cache = new UserCacheService();
+        $cache->store(['many', 'a'], 60, ['a-value']);
+        $cache->store(['many', 'falsy'], 60, []);
+
+        $result = $cache->many([
+            'first' => ['many', 'a'],
+            'second' => ['many', 'missing'],
+            'third' => ['many', 'falsy'],
+        ]);
+
+        expect($result)->toBe(['first' => ['a-value'], 'second' => null, 'third' => null]);
+    });
+
+    it('returns an empty array for no keys', function () {
+        expect((new UserCacheService())->many([]))->toBe([]);
+    });
+});
