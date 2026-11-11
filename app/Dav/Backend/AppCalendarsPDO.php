@@ -235,31 +235,36 @@ SQL
         return $events;
     }
 
+    /**
+     * The VEVENT objects that may overlap the window, read in one query.
+     * Sabre stores floating all-day DATE values as UTC, up to 14 h off the
+     * user's wall clock, so the bounds are padded by a day; the caller's
+     * occurrence loop is the exact filter.
+     *
+     * @return array<int, array{id: int|string, uri: string, etag: string, calendardata: string|null}>
+     */
+    public function getEventObjectsInRange(CalendarDTO $calendar, \DateTimeInterface $start, \DateTimeInterface $end): array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, uri, etag, calendardata FROM '.$this->calendarObjectTableName." WHERE calendarid = ? AND componenttype = 'VEVENT' AND lastoccurence > ? AND firstoccurence < ?");
+        $stmt->execute([$calendar->calendarId, $start->getTimestamp() - 86400, $end->getTimestamp() + 86400]);
+
+        // Quoted like Sabre's getCalendarObject(), which this read replaced.
+        return array_map(fn (array $row) => [
+            'id' => $row['id'],
+            'uri' => $row['uri'],
+            'etag' => '"'.$row['etag'].'"',
+            'calendardata' => is_resource($row['calendardata'])
+                ? stream_get_contents($row['calendardata'])
+                : $row['calendardata'],
+        ], $stmt->fetchAll(\PDO::FETCH_ASSOC));
+    }
+
     public function getExpandedEventsCustom(CalendarDTO $calendar, \DateTimeInterface $start, \DateTimeInterface $end): array
     {
-        $filters = [
-            'name' => 'VEVENT',
-            'prop-filters' => [],
-            'comp-filters' => [],
-            'time-range' => [
-                'start' => $start,
-                'end'   => $end,
-            ],
-        ];
-
-        $uris = parent::calendarQuery(
-            [$calendar->calendarId, $calendar->instanceId],
-            $filters
-        );
-
         $events = [];
 
-        foreach ($uris as $uri) {
-            $obj = $this->getCalendarObject([$calendar->calendarId, $calendar->instanceId], $uri);
-
-            $vCalData = is_resource($obj['calendardata'])
-                ? stream_get_contents($obj['calendardata'])
-                : $obj['calendardata'];
+        foreach ($this->getEventObjectsInRange($calendar, $start, $end) as $obj) {
+            $vCalData = $obj['calendardata'];
 
             if (!$vCalData) {
                 continue;
@@ -342,7 +347,7 @@ SQL
 
                         $eventDto = EventDTO::fromSabre([
                             'id' => $obj['id'],
-                            'uri' => $uri,
+                            'uri' => $obj['uri'],
                             'etag' => $obj['etag'],
                             'calendardata' => $occurrence->serialize(),
                         ], $calendar);
@@ -366,7 +371,7 @@ SQL
 
                     $events[] = EventDTO::fromSabre([
                         'id' => $obj['id'],
-                        'uri' => $uri,
+                        'uri' => $obj['uri'],
                         'etag' => $obj['etag'],
                         'calendardata' => $vevent->serialize(),
                     ], $calendar);
