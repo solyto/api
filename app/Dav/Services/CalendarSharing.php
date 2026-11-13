@@ -41,9 +41,10 @@ class CalendarSharing
     }
 
     /**
-     * Accept the user's pending invite; false if they have none with this token
+     * Accept the user's pending invite and return its calendar id; null if
+     * they have none with this token
      */
-    public function acceptInvite(User $user, string $shareToken): bool
+    public function acceptInvite(User $user, string $shareToken): ?int
     {
         return $this->backend->acceptShare(DavHelper::getPrincipalUri($user), $shareToken);
     }
@@ -78,6 +79,21 @@ class CalendarSharing
         return collect($calendars)->filter(function (CalendarDTO $calendar) {
             return $calendar->inviteStatus === 'accepted';
         });
+    }
+
+    /**
+     * User ids of the owner and the accepted sharees of a calendar
+     *
+     * @return array<int, string>
+     */
+    public function listMemberIds(int $calendarId): array
+    {
+        return $this->backend->getCalendarMemberIds($calendarId);
+    }
+
+    public function ownerId(int $calendarId): ?string
+    {
+        return $this->backend->getCalendarOwnerId($calendarId);
     }
 
     /**

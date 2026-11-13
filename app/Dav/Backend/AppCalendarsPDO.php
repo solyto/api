@@ -46,9 +46,18 @@ class AppCalendarsPDO extends SabreBackend
              WHERE ci.id = ?'
         );
 
+        // parent::getCalendarsForUser() names its own columns.
+        $flagged = $this->pdo->prepare(
+            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access = 1 AND solyto_shared'
+        );
+        $flagged->execute([$principalUri]);
+        $sharedOwnInstances = array_map('intval', $flagged->fetchAll(\PDO::FETCH_COLUMN));
+
         $calendars = [];
 
         foreach ($entries as $entry) {
+            $entry['solyto-shared'] = in_array($entry['id'][1], $sharedOwnInstances, true);
+
             if ((int) ($entry['share-access'] ?? 0) > 1) {
                 $stmt->execute([$entry['id'][1]]);
                 if ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
@@ -74,6 +83,7 @@ class AppCalendarsPDO extends SabreBackend
         $fields[] = 'principaluri';
         $fields[] = 'transparent';
         $fields[] = 'access';
+        $fields[] = 'solyto_shared';
 
         $fields = implode(', ', $fields);
         $stmt = $this->pdo->prepare(<<<SQL
@@ -110,6 +120,7 @@ SQL
         if ($row['access'] > 1) {
             $calendar['read-only'] = \Sabre\DAV\Sharing\Plugin::ACCESS_READ === (int) $row['access'];
         }
+        $calendar['solyto-shared'] = (bool) $row['solyto_shared'];
 
         foreach ($this->propertyMap as $xmlName => $dbName) {
             $calendar[$xmlName] = $row[$dbName];
@@ -128,6 +139,7 @@ SQL
         $fields[] = 'principaluri';
         $fields[] = 'transparent';
         $fields[] = 'access';
+        $fields[] = 'solyto_shared';
 
         $fields = implode(', ', $fields);
         $stmt = $this->pdo->prepare(<<<SQL
@@ -164,6 +176,7 @@ SQL
         if ($row['access'] > 1) {
             $calendar['read-only'] = \Sabre\DAV\Sharing\Plugin::ACCESS_READ === (int) $row['access'];
         }
+        $calendar['solyto-shared'] = (bool) $row['solyto_shared'];
 
         foreach ($this->propertyMap as $xmlName => $dbName) {
             $calendar[$xmlName] = $row[$dbName];
@@ -207,6 +220,10 @@ SQL
     public function deleteCalendarCustom(CalendarDTO $calendar): void
     {
         parent::deleteCalendar([$calendar->calendarId, $calendar->instanceId]);
+
+        if ($calendar->isShared) {
+            $this->recomputeSharedFlag($calendar->calendarId);
+        }
     }
 
     public function getCalendarInvitesCustom(string $principalUri): array
@@ -507,16 +524,30 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
     /**
      * The token is the sharee's mailto: href, not a secret, so the update is
-     * scoped to the caller's own pending instance. Returns false if none matched.
+     * scoped to the caller's own pending instance. Returns the calendar id,
+     * or null if none matched.
      */
-    public function acceptShare(string $principalUri, string $shareToken): bool
+    public function acceptShare(string $principalUri, string $shareToken): ?int
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = 2 WHERE share_href = ? AND principaluri = ? AND share_invitestatus = 1'
+            'SELECT id, calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND share_invitestatus = 1'
         );
         $stmt->execute([$shareToken, $principalUri]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        return $stmt->rowCount() > 0;
+        if (!$row) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = 2 WHERE id = ?'
+        );
+        $stmt->execute([$row['id']]);
+
+        $calendarId = (int) $row['calendarid'];
+        $this->recomputeSharedFlag($calendarId);
+
+        return $calendarId;
     }
 
     /**
@@ -540,16 +571,54 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND principaluri = ? AND access > 1'
         );
         $stmt->execute([$calendarId, $principalUri]);
+
+        $this->recomputeSharedFlag($calendarId);
     }
 
     public function deleteSharedInstancesCustom(string $principalUri): int
     {
         $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1'
+        );
+        $stmt->execute([$principalUri]);
+        $calendarIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+        $stmt = $this->pdo->prepare(
             'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1'
         );
         $stmt->execute([$principalUri]);
+        $deleted = $stmt->rowCount();
 
-        return $stmt->rowCount();
+        foreach ($calendarIds as $calendarId) {
+            $this->recomputeSharedFlag($calendarId);
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * The owner plus accepted sharees: the users who load the calendar's events.
+     *
+     * @return array<int, string>
+     */
+    public function getCalendarMemberIds(int $calendarId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND (access = 1 OR share_invitestatus = 2)'
+        );
+        $stmt->execute([$calendarId]);
+
+        return $this->userIdsForPrincipals($stmt->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    public function getCalendarOwnerId(int $calendarId): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND access = 1'
+        );
+        $stmt->execute([$calendarId]);
+
+        return $this->userIdsForPrincipals($stmt->fetchAll(\PDO::FETCH_COLUMN))[0] ?? null;
     }
 
     public function getCalendarSharees(int $calendarId): array
@@ -691,6 +760,36 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             $uri,
             $vCal->serialize()
         ) !== null;
+    }
+
+    /**
+     * @param array<int, string> $principalUris
+     * @return array<int, string>
+     */
+    private function userIdsForPrincipals(array $principalUris): array
+    {
+        if ($principalUris === []) {
+            return [];
+        }
+
+        $emails = array_map(fn (string $uri) => str_replace('principals/', '', $uri), $principalUris);
+
+        return User::whereIn('email', $emails)->pluck('id')->all();
+    }
+
+    /**
+     * Recomputed rather than toggled, so the owner's solyto_shared can't
+     * drift from the accepted sharee rows.
+     */
+    private function recomputeSharedFlag(int $calendarId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE ' . $this->calendarInstancesTableName . ' SET solyto_shared = EXISTS(
+                SELECT 1 FROM ' . $this->calendarInstancesTableName . ' s
+                WHERE s.calendarid = ? AND s.access > 1 AND s.share_invitestatus = 2
+            ) WHERE calendarid = ? AND access = 1'
+        );
+        $stmt->execute([$calendarId, $calendarId]);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Dav\Plugins;
 
+use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Jobs\RefreshCalendarCache;
 use App\Api\Contacts\Jobs\RefreshContactsCache;
 use App\Shared\Services\UserCacheService;
@@ -105,15 +106,17 @@ class CacheInvalidationPlugin extends ServerPlugin
         try {
             $principalUri = 'principals/' . $email;
 
-            $calendar = DB::connection('pgsql')
+            $instance = DB::connection('pgsql')
                 ->table('calendarinstances')
                 ->where('principaluri', $principalUri)
                 ->where('uri', $calendarUri)
-                ->value('calendarid');
+                ->first(['calendarid', 'access', 'solyto_shared']);
 
-            if ($calendar === null) {
+            if ($instance === null) {
                 return;
             }
+
+            $calendar = (int) $instance->calendarid;
 
             $userId = DB::table('users')
                 ->where('email', $email)
@@ -125,6 +128,10 @@ class CacheInvalidationPlugin extends ServerPlugin
 
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar]);
             RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
+
+            if ((int) $instance->access > 1 || (bool) $instance->solyto_shared) {
+                InvalidateSharedCalendarCache::dispatch($calendar)->delay(now()->addSeconds(10));
+            }
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendar events', [
                 'email'       => $email,

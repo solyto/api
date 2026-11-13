@@ -805,7 +805,7 @@ class CalendarController
             return ApiResponse::error('User does not exist', 404);
         }
 
-        $this->calendarService->revokeShare($calendar, $recipient);
+        $this->calendarService->revokeShare($request->user(), $calendar, $recipient);
 
         return ApiResponse::success(null, 'Share revoked successfully.');
     }

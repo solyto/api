@@ -5,6 +5,7 @@ namespace App\Api\Calendars\Services;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Calendars\Exceptions\CalendarInviteNotFoundException;
 use App\Api\Calendars\Exceptions\CalendarNotFoundException;
+use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
@@ -16,7 +17,7 @@ use Illuminate\Support\Collection;
 class CalendarService
 {
     private const string CACHE_KEY_CALENDARS = 'calendars';
-    private const string CACHE_KEY_EVENTS = 'calendar_events';
+    public const string CACHE_KEY_EVENTS = 'calendar_events';
     private const int CACHE_TTL = 86400;
     private const int CACHE_TTL_EVENTS_PAST = 604800;
     private const int CACHE_TTL_EVENTS_CURRENT = 900;
@@ -168,6 +169,9 @@ class CalendarService
     {
         $event = $this->dav->calendars()->events()->create($calendar, $dto);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+        if ($event !== null) {
+            $this->invalidateSharedCalendar($calendar);
+        }
         return $event;
     }
 
@@ -180,6 +184,8 @@ class CalendarService
         $this->dav->calendars()->events()->delete($from, $event);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $from->calendarId]);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $to->calendarId]);
+        $this->invalidateSharedCalendar($from);
+        $this->invalidateSharedCalendar($to);
         return $newEvent;
     }
 
@@ -188,6 +194,7 @@ class CalendarService
         $updated = $this->dav->calendars()->events()->update($calendar, $event);
         if ($updated !== null) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->invalidateSharedCalendar($calendar);
         }
         return $updated;
     }
@@ -197,6 +204,7 @@ class CalendarService
         $success = $this->dav->calendars()->events()->delete($calendar, $event);
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->invalidateSharedCalendar($calendar);
         }
         return $success;
     }
@@ -206,6 +214,7 @@ class CalendarService
         $success = $this->dav->calendars()->events()->deleteOccurrence($calendar, $eventUri, $date);
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->invalidateSharedCalendar($calendar);
         }
         return $success;
     }
@@ -215,6 +224,7 @@ class CalendarService
         $success = $this->dav->calendars()->events()->updateOccurrence($calendar, $eventUri, $date, $dto);
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->invalidateSharedCalendar($calendar);
         }
         return $success;
     }
@@ -230,16 +240,20 @@ class CalendarService
         return $this->dav->calendars()->sharing()->listSharees($calendar);
     }
 
-    public function revokeShare(CalendarDTO $calendar, User $recipient): void
+    public function revokeShare(User $owner, CalendarDTO $calendar, User $recipient): void
     {
         $this->dav->calendars()->sharing()->revokeShare($calendar->calendarId, $recipient);
+        $this->cache->forget([self::CACHE_KEY_CALENDARS, $owner->id]);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $recipient->id, $calendar->calendarId]);
     }
 
     public function unsubscribe(User $user, CalendarDTO $calendar): void
     {
+        $ownerId = $this->dav->calendars()->sharing()->ownerId($calendar->calendarId);
+
         $this->dav->calendars()->delete($calendar);
+        $this->forgetCalendarList($ownerId);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
     }
@@ -254,10 +268,13 @@ class CalendarService
      */
     public function acceptInvite(User $user, string $token): void
     {
-        if (! $this->dav->calendars()->sharing()->acceptInvite($user, $token)) {
+        $calendarId = $this->dav->calendars()->sharing()->acceptInvite($user, $token);
+
+        if ($calendarId === null) {
             throw new CalendarInviteNotFoundException();
         }
 
+        $this->forgetCalendarList($this->dav->calendars()->sharing()->ownerId($calendarId));
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 
@@ -271,5 +288,22 @@ class CalendarService
         }
 
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
+    }
+
+    private function invalidateSharedCalendar(CalendarDTO $calendar): void
+    {
+        if ($calendar->isShared || $calendar->solytoShared) {
+            InvalidateSharedCalendarCache::dispatch($calendar->calendarId);
+        }
+    }
+
+    /**
+     * The owner's cached list carries solytoShared, which a share change flips.
+     */
+    private function forgetCalendarList(?string $userId): void
+    {
+        if ($userId !== null) {
+            $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
+        }
     }
 }

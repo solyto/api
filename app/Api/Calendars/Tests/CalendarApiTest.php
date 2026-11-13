@@ -1,12 +1,18 @@
 <?php
 
+use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Models\Calendar;
 use App\Api\Calendars\Models\CalendarEntry;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\Friend;
+use App\Api\Users\Models\User;
+use App\Dav\Services\DavService;
+use App\Shared\Services\UserCacheService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 describe('Calendar CRUD', function () {
     it('lists calendars including the default one', function () {
@@ -581,5 +587,162 @@ describe('Calendar invites', function () {
             ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept'), 404);
 
         expect(($this->inviteStatus)())->toBe(2);
+    });
+});
+
+describe('Shared calendar cache invalidation', function () {
+    beforeEach(function () {
+        // forgetByPrefix() needs Redis and is a no-op on the test array
+        // store; this double does the same prefix delete on the array store.
+        // Bound before the first request, which caches the controller.
+        $this->app->instance(UserCacheService::class, new class extends UserCacheService
+        {
+            public function forgetByPrefix(array $identifiers): void
+            {
+                $store = Cache::store('user_data');
+                $prefix = implode('_', $identifiers).'_';
+
+                foreach (array_keys($store->getStore()->all(false)) as $key) {
+                    if (str_starts_with($key, $prefix)) {
+                        $store->forget($key);
+                    }
+                }
+            }
+        });
+
+        $this->owner = makeUser();
+        $this->sharee = makeUser();
+        Friend::factory()->forUsers($this->owner, $this->sharee)->create();
+
+        $this->ownerInstance = $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $this->calendarId = app(DavService::class)->calendars()->get($this->owner, $this->ownerInstance)->calendarId;
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$this->ownerInstance.'/share', ['friend_id' => $this->sharee->id])
+            ->assertStatus(200);
+
+        $this->accept = fn () => $this->actingAs($this->sharee, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.rawurlencode('mailto:'.$this->sharee->email).'/accept')
+            ->assertStatus(200);
+        $this->shareeInstance = fn () => collect($this->actingAs($this->sharee, 'sanctum')->getJson('/api/v1/calendars')->json('data'))
+            ->firstWhere('is_shared', true)['id'];
+        $this->storeEvent = fn (User $user, int $instanceId, string $title = 'Shared') => $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$instanceId.'/events', [
+                'title' => $title,
+                'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $instanceId,
+            ])
+            ->assertStatus(201)
+            ->json('data');
+        $this->monthTitles = fn (User $user) => collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
+            ->assertStatus(200)
+            ->json('data'))->pluck('title');
+    });
+
+    it('queues an invalidation when the owner writes to a shared calendar', function () {
+        ($this->accept)();
+        Queue::fake([InvalidateSharedCalendarCache::class]);
+
+        ($this->storeEvent)($this->owner, $this->ownerInstance);
+
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, fn ($job) => $job->calendarId === $this->calendarId);
+    });
+
+    it('queues an invalidation when a sharee writes to a shared calendar', function () {
+        ($this->accept)();
+        Queue::fake([InvalidateSharedCalendarCache::class]);
+
+        ($this->storeEvent)($this->sharee, ($this->shareeInstance)());
+
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, fn ($job) => $job->calendarId === $this->calendarId);
+    });
+
+    it('queues an invalidation when an event in a shared calendar is updated or deleted', function (string $method) {
+        ($this->accept)();
+        $event = ($this->storeEvent)($this->owner, $this->ownerInstance);
+        Queue::fake([InvalidateSharedCalendarCache::class]);
+
+        $this->actingAs($this->owner, 'sanctum')->json($method, '/api/v1/calendars/'.$this->ownerInstance.'/events/'.$event['uri'], [
+            'title' => 'Renamed',
+            'start_date' => $event['start_date'],
+            'end_date' => $event['end_date'],
+            'is_all_day' => false,
+            'calendar_id' => $this->ownerInstance,
+            'etag' => $event['etag'],
+        ])->assertStatus(200);
+
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, fn ($job) => $job->calendarId === $this->calendarId);
+    })->with(['PUT', 'DELETE']);
+
+    it('queues nothing for a calendar without accepted sharees', function () {
+        $loner = makeUser();
+        $instance = $this->actingAs($loner, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        Queue::fake([InvalidateSharedCalendarCache::class]);
+
+        ($this->storeEvent)($loner, $instance);
+        ($this->storeEvent)($this->owner, $this->ownerInstance);
+
+        Queue::assertNotPushed(InvalidateSharedCalendarCache::class);
+    });
+
+    it('queues one invalidation when an event moves from a shared into an unshared calendar', function () {
+        ($this->accept)();
+        $event = ($this->storeEvent)($this->owner, $this->ownerInstance);
+        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/calendars', ['name' => 'Private'])->assertStatus(201);
+        $private = collect($this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Private')['id'];
+        Queue::fake([InvalidateSharedCalendarCache::class]);
+
+        $this->actingAs($this->owner, 'sanctum')->putJson('/api/v1/calendars/'.$this->ownerInstance.'/events/'.$event['uri'], [
+            'title' => 'Moved',
+            'start_date' => $event['start_date'],
+            'end_date' => $event['end_date'],
+            'is_all_day' => false,
+            'calendar_id' => $private,
+            'etag' => $event['etag'],
+        ])->assertStatus(200);
+
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, 1);
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, fn ($job) => $job->calendarId === $this->calendarId);
+    });
+
+    it('shows a sharee\'s new event to the owner on the next load, and the reverse', function () {
+        ($this->accept)();
+        $shareeInstance = ($this->shareeInstance)();
+        // An empty month isn't cached, so warm both caches with one event.
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'Seed');
+        expect(($this->monthTitles)($this->owner))->toContain('Seed')
+            ->and(($this->monthTitles)($this->sharee))->toContain('Seed');
+
+        ($this->storeEvent)($this->sharee, $shareeInstance, 'From sharee');
+        expect(($this->monthTitles)($this->owner))->toContain('From sharee');
+
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'From owner');
+        expect(($this->monthTitles)($this->sharee))->toContain('From owner');
+    });
+
+    it('keeps the owner\'s cached calendar list in step with accept and revoke', function () {
+        $service = app(CalendarService::class);
+        expect($service->list($this->owner)[0]->solytoShared)->toBeFalse();
+
+        ($this->accept)();
+        expect($service->list($this->owner)[0]->solytoShared)->toBeTrue();
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$this->ownerInstance.'/share/'.$this->sharee->id)
+            ->assertStatus(200);
+        expect($service->list($this->owner)[0]->solytoShared)->toBeFalse();
+    });
+
+    it('clears the owner\'s cached shared flag when the sharee unsubscribes', function () {
+        ($this->accept)();
+        $service = app(CalendarService::class);
+        expect($service->list($this->owner)[0]->solytoShared)->toBeTrue();
+
+        $this->actingAs($this->sharee, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.($this->shareeInstance)().'/unsubscribe')
+            ->assertStatus(200);
+        expect($service->list($this->owner)[0]->solytoShared)->toBeFalse();
     });
 });

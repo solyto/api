@@ -21,6 +21,7 @@ class CalendarDTO
         public int $order = 0,
         public ?string $inviteStatus = null,
         public ?string $shareToken = null,
+        public bool $solytoShared = false,
     ) {}
 
     public static function fromSabre(array $data): self
@@ -50,6 +51,7 @@ class CalendarDTO
             order: (int) ($data['{http://apple.com/ns/ical/}calendar-order'] ?? 0),
             inviteStatus: $inviteStatus,
             shareToken: $data['share-href'] ?? null,
+            solytoShared: $data['solyto-shared'] ?? false,
         );
     }
 
