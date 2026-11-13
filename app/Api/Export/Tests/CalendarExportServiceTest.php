@@ -91,7 +91,7 @@ describe('Calendar export', function () {
 
         expect(count(exportCalendars($this->user)->select('VEVENT')))->toBe(0);
 
-        app(\App\Dav\Services\DavService::class)->calendars()->sharing()->acceptInvite('mailto:'.$this->user->email);
+        app(\App\Dav\Services\DavService::class)->calendars()->sharing()->acceptInvite($this->user, 'mailto:'.$this->user->email);
 
         expect((string) exportCalendars($this->user)->VEVENT->SUMMARY)->toBe('Owner event');
     });

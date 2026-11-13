@@ -136,7 +136,7 @@ describe('CalendarSharing', function () {
         $invites = $sharing->listInvites($recipient);
         expect($invites)->toHaveCount(1);
 
-        $sharing->acceptInvite($invites->first()->shareToken);
+        $sharing->acceptInvite($recipient, $invites->first()->shareToken);
 
         $accepted = $sharing->listAcceptedShares($recipient);
         expect($accepted)->toHaveCount(1);
@@ -161,7 +161,7 @@ describe('per-user DAV deletion', function () {
 
         $dav->calendars()->sharing()->inviteUser($calendar, $owner, $sharee);
         $invite = $dav->calendars()->sharing()->listInvites($sharee)->first();
-        $dav->calendars()->sharing()->acceptInvite($invite->shareToken);
+        $dav->calendars()->sharing()->acceptInvite($sharee, $invite->shareToken);
 
         $summary = $dav->deleteForUser($sharee);
 
@@ -188,7 +188,7 @@ describe('per-user DAV deletion', function () {
         $calendar = $dav->calendars()->list($owner)[0];
         $dav->calendars()->sharing()->inviteUser($calendar, $owner, $sharee);
         $invite = $dav->calendars()->sharing()->listInvites($sharee)->first();
-        $dav->calendars()->sharing()->acceptInvite($invite->shareToken);
+        $dav->calendars()->sharing()->acceptInvite($sharee, $invite->shareToken);
 
         $summary = $dav->deleteForUser($owner);
 

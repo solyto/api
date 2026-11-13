@@ -24,7 +24,7 @@ function shareCalendar(User $owner, User $sharee, bool $writeAccess, bool $accep
     (new AppCalendarsPDO(DB::connection('pgsql')->getPdo()))->shareCalendarWithUserCustom($owner, $sharee, $calendar, $writeAccess);
 
     if ($accept) {
-        $dav->calendars()->sharing()->acceptInvite('mailto:'.$sharee->email);
+        $dav->calendars()->sharing()->acceptInvite($sharee, 'mailto:'.$sharee->email);
     }
 
     return 'calendars/'.$sharee->email.'/'.sharedInstanceUri($sharee).'/';
@@ -239,7 +239,7 @@ describe('DAV calendar sharing', function () {
     it('removes access when the invite is declined', function () {
         $shared = shareCalendar($this->owner, $this->other, true, accept: false);
 
-        app(DavService::class)->calendars()->sharing()->declineInvite('mailto:'.$this->other->email);
+        app(DavService::class)->calendars()->sharing()->declineInvite($this->other, 'mailto:'.$this->other->email);
 
         expect(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(404);
     });
@@ -274,7 +274,7 @@ describe('DAV calendar sharing', function () {
         $sharing = app(DavService::class)->calendars()->sharing();
 
         $beforeAccept = davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus();
-        $sharing->acceptInvite('mailto:'.$this->other->email);
+        $sharing->acceptInvite($this->other, 'mailto:'.$this->other->email);
 
         expect($response->getStatus())->toBeLessThan(300)
             ->and($beforeAccept)->toBe(404)
