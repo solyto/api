@@ -3,6 +3,8 @@
 use App\Api\ApiResponse;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
+use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
+use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Shared\Middleware\RecordClientVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -44,6 +46,9 @@ return Application::configure(basePath: dirname(__DIR__))
               __DIR__.'/../app/Plugins/Ai/Commands',
           ])
           ->withExceptions(function ($exceptions) {
+              // RemoteCalDavClient already logs the failing host; a user's server being down is not an app error.
+              $exceptions->dontReport([ExternalCalendarPreconditionFailedException::class, ExternalCalendarUnavailableException::class]);
+
               $exceptions->render(function (Throwable $e, Request $request) {
                   $isApi = $request->is('api/*') || $request->expectsJson();
 
@@ -99,6 +104,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof AddressBookAlreadyExistsException) {
                       return ApiResponse::error('Address Book already exists.', 409);
+                  }
+
+                  if ($e instanceof ExternalCalendarPreconditionFailedException) {
+                      return ApiResponse::error('The event was changed on its server.', 412);
+                  }
+
+                  if ($e instanceof ExternalCalendarUnavailableException) {
+                      return ApiResponse::error('The calendar server is unavailable.', 503);
                   }
 
                   return ApiResponse::serverError('An unexpected error occurred.');

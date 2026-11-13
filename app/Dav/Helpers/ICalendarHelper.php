@@ -8,55 +8,6 @@ use Sabre\VObject\Reader;
 
 class ICalendarHelper
 {
-    public function parseCalendarsFromXml(string $responseBody, string $baseUrl): array
-    {
-        $calendars = [];
-
-        try {
-            $dom = new \DOMDocument;
-
-            if (! @$dom->loadXML($responseBody)) {
-                Log::error('Failed to parse calendars XML', [
-                    'body' => $responseBody,
-                    'libxml_errors' => libxml_get_errors(),
-                ]);
-
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $xpath->registerNamespace('d', 'DAV:');
-            $xpath->registerNamespace('c', 'urn:ietf:params:xml:ns:caldav');
-
-            $responses = $xpath->query('//d:response');
-
-            foreach ($responses as $response) {
-                $href = $xpath->query('.//d:href', $response)->item(0);
-                $resourceType = $xpath->query('.//d:resourcetype/c:calendar', $response);
-
-                if ($resourceType->length > 0 && $href) {
-                    $displayName = $xpath->query('.//d:displayname', $response)->item(0);
-
-                    $color = '#e5e7eb';
-                    $colorNode = $xpath->query('.//*[local-name()="calendar-color"]', $response)->item(0);
-                    if ($colorNode) {
-                        $color = $colorNode->textContent;
-                    }
-
-                    $calendars[] = [
-                        'url' => UrlHelper::getBaseUrl($baseUrl).$href->textContent,
-                        'name' => $displayName ? $displayName->textContent : 'Unnamed Calendar',
-                        'color' => $color,
-                    ];
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Error parsing calendars XML: '.$e->getMessage());
-        }
-
-        return $calendars;
-    }
-
     public function parseEntriesFromXml($responseBody, $calendarName): array
     {
         $events = [];
@@ -179,54 +130,6 @@ class ICalendarHelper
         return $dtStart && ! $dtStart->hasTime();
     }
 
-    public function parseCalendarHomeFromXml(string $xml, string $baseUrl): array
-    {
-        try {
-            $dom = new \DOMDocument;
-
-            if (! @$dom->loadXML($xml)) {
-                Log::error('Failed to parse calendar home XML', ['body' => $xml]);
-
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $xpath->registerNamespace('d', 'DAV:');
-            $xpath->registerNamespace('cal', 'urn:ietf:params:xml:ns:caldav');
-
-            $nodes = $xpath->query('//cal:calendar-home-set/d:href');
-
-            $homes = [];
-            foreach ($nodes as $node) {
-                $homes[] = [
-                    'url' => rtrim(UrlHelper::getBaseUrl($baseUrl), '/').$node->textContent,
-                ];
-            }
-
-            return $homes;
-        } catch (\Exception $e) {
-            Log::error('Error parsing calendar home XML: '.$e->getMessage());
-
-            return [];
-        }
-    }
-
-    public static function getCalendarsXml(): string
-    {
-        return '<?xml version="1.0" encoding="UTF-8"?>
-            <d:propfind
-                xmlns:d="DAV:"
-                xmlns:cal="urn:ietf:params:xml:ns:caldav"
-                xmlns:ical="http://apple.com/ns/ical/">
-                <d:prop>
-                    <d:displayname />
-                    <d:resourcetype />
-                    <cal:supported-calendar-component-set />
-                    <ical:calendar-color />
-                </d:prop>
-            </d:propfind>';
-    }
-
     public static function getEntriesXml(): string
     {
         $start = Carbon::now()->subYears(10)->startOfDay()->format('Ymd\THis\Z');
@@ -246,15 +149,5 @@ class ICalendarHelper
                     </c:comp-filter>
                 </c:filter>
             </c:calendar-query>';
-    }
-
-    public static function getCalendarHomeDiscoveryXml(): string
-    {
-        return '<?xml version="1.0" encoding="UTF-8"?>
-        <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
-            <d:prop>
-                <cal:calendar-home-set />
-            </d:prop>
-        </d:propfind>';
     }
 }

@@ -4,51 +4,6 @@ use App\Dav\Helpers\ICalendarHelper;
 
 covers(ICalendarHelper::class);
 
-describe('ICalendarHelper::parseCalendarsFromXml', function () {
-    it('parses calendars from a multistatus response', function () {
-        $xml = <<<'XML'
-<?xml version="1.0"?>
-<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:ical="http://apple.com/ns/ical/">
-  <d:response>
-    <d:href>/calendars/john/private/</d:href>
-    <d:propstat>
-      <d:prop>
-        <d:displayname>Private</d:displayname>
-        <d:resourcetype><c:calendar/></d:resourcetype>
-        <ical:calendar-color>#FF0000</ical:calendar-color>
-      </d:prop>
-      <d:status>HTTP/1.1 200 OK</d:status>
-    </d:propstat>
-  </d:response>
-  <d:response>
-    <d:href>/calendars/john/work/</d:href>
-    <d:propstat>
-      <d:prop>
-        <d:resourcetype><c:calendar/></d:resourcetype>
-      </d:prop>
-      <d:status>HTTP/1.1 200 OK</d:status>
-    </d:propstat>
-  </d:response>
-</d:multistatus>
-XML;
-
-        $calendars = (new ICalendarHelper)->parseCalendarsFromXml($xml, 'https://dav.example.com');
-
-        expect($calendars)->toHaveCount(2);
-        expect($calendars[0])->toBe([
-            'url' => 'https://dav.example.com/calendars/john/private/',
-            'name' => 'Private',
-            'color' => '#FF0000',
-        ]);
-        expect($calendars[1]['name'])->toBe('Unnamed Calendar');
-        expect($calendars[1]['color'])->toBe('#e5e7eb');
-    });
-
-    it('returns an empty array for invalid xml', function () {
-        expect((new ICalendarHelper)->parseCalendarsFromXml('not xml', 'https://x.com'))->toBe([]);
-    });
-});
-
 describe('ICalendarHelper::parseEntriesFromXml', function () {
     it('parses calendar events from a query response', function () {
         $ical = <<<'ICS'
@@ -165,53 +120,12 @@ ICS;
     });
 });
 
-describe('ICalendarHelper::parseCalendarHomeFromXml', function () {
-    it('parses the calendar home set', function () {
-        $xml = <<<'XML'
-<?xml version="1.0"?>
-<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
-  <d:response>
-    <d:href>/remote.php/dav/</d:href>
-    <d:propstat>
-      <d:prop>
-        <cal:calendar-home-set>
-          <d:href>/remote.php/dav/calendars/john/</d:href>
-        </cal:calendar-home-set>
-      </d:prop>
-      <d:status>HTTP/1.1 200 OK</d:status>
-    </d:propstat>
-  </d:response>
-</d:multistatus>
-XML;
-
-        $homes = (new ICalendarHelper)->parseCalendarHomeFromXml($xml, 'https://nc.example.com');
-
-        expect($homes)->toHaveCount(1);
-        expect($homes[0]['url'])->toBe('https://nc.example.com/remote.php/dav/calendars/john/');
-    });
-});
-
 describe('ICalendarHelper xml builders', function () {
-    it('builds the calendars propfind xml', function () {
-        $xml = ICalendarHelper::getCalendarsXml();
-
-        expect($xml)->toBeString();
-        expect($xml)->toContain('propfind');
-        expect($xml)->toContain('calendar-color');
-    });
-
     it('builds the entries query xml with a time range', function () {
         $xml = ICalendarHelper::getEntriesXml();
 
         expect($xml)->toBeString();
         expect($xml)->toContain('calendar-query');
         expect($xml)->toContain('time-range');
-    });
-
-    it('builds the calendar home discovery xml', function () {
-        $xml = ICalendarHelper::getCalendarHomeDiscoveryXml();
-
-        expect($xml)->toBeString();
-        expect($xml)->toContain('calendar-home-set');
     });
 });

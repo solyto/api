@@ -82,6 +82,11 @@ class Calendars
         return $this->get($user, $calendarId);
     }
 
+    public function forgetExternal(int $calendarId): void
+    {
+        $this->backend->forgetExternal($calendarId);
+    }
+
     public function updateOrder(int $instanceId, int $order): void
     {
         $this->backend->updateCalendarOrderCustom($instanceId, $order);

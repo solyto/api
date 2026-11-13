@@ -246,6 +246,21 @@ describe('app:users:delete', function () {
             ->and($pgsql->table('calendarinstances')->where('principaluri', 'principals/'.$sharee->email)->count())->toBe(0);
     });
 
+    it('removes external calendars locally and leaves their server alone', function () {
+        $user = davUser();
+        $remote = (new \Tests\Support\FakeCalDavServer())->fake();
+        $calendar = externalCalendar($user, $remote);
+        $remote->put('a.ics', davIcs('a'));
+
+        app(UserService::class)->destroy($user);
+
+        expect(\App\Api\Calendars\Models\ExternalCalendarAccount::count())->toBe(0)
+            ->and(\App\Api\Calendars\Models\ExternalCalendar::count())->toBe(0)
+            ->and(DB::connection('pgsql')->table('calendars')->where('id', $calendar->calendarId)->count())->toBe(0)
+            ->and($remote->objects)->toHaveKey('a.ics')
+            ->and(collect($remote->requests)->filter(fn ($r) => $r->method() === 'DELETE'))->toBeEmpty();
+    });
+
     it('keeps other users\' files', function () {
         $user = makeUser();
         $other = makeUser();

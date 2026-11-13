@@ -191,3 +191,24 @@ function davVcard(string $uid, string $fullName = 'Jane Doe', array $extra = [])
 
     return implode("\r\n", $lines)."\r\n";
 }
+
+/**
+ * Connect a native calendar row of the user to the fake remote collection,
+ * as the connect flow does, and return it.
+ */
+function externalCalendar(User $user, \Tests\Support\FakeCalDavServer $server, string $name = 'Remote', string $password = 'app-password'): \App\Dav\DTOs\CalendarDTO
+{
+    $calendar = app(\App\Dav\Services\DavService::class)->calendars()->create($user, \App\Dav\DTOs\CalendarDTO::fromRequest(['name' => $name]));
+    $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create([
+        'server_url' => \Tests\Support\FakeCalDavServer::ORIGIN.'/',
+        'username' => 'alice',
+        'password' => $password,
+    ]);
+    \App\Api\Calendars\Models\ExternalCalendar::factory()->forAccount($account)->create([
+        'remote_url' => $server->url(),
+        'calendar_id' => $calendar->calendarId,
+        'instance_id' => $calendar->instanceId,
+    ]);
+
+    return app(\App\Dav\Services\DavService::class)->calendars()->get($user, $calendar->instanceId);
+}

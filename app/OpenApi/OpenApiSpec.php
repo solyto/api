@@ -58,6 +58,12 @@ namespace App\OpenApi;
  * )
  *
  * @OA\Schema(
+ *     schema="EventListingMeta",
+ *
+ *     @OA\Property(property="unavailable_calendars", type="array", description="Ids of external calendars whose server could not be reached; their events are missing from data", @OA\Items(type="integer"))
+ * )
+ *
+ * @OA\Schema(
  *     schema="ValidationErrorResponse",
  *
  *     @OA\Property(property="success", type="boolean", example=false),

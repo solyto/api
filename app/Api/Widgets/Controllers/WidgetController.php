@@ -36,7 +36,8 @@ class WidgetController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/YourDayWidget")
+     *             @OA\Property(property="data", ref="#/components/schemas/YourDayWidget"),
+     *             @OA\Property(property="meta", ref="#/components/schemas/EventListingMeta")
      *         )
      *     ),
      *
@@ -49,7 +50,8 @@ class WidgetController
     {
         return ApiResponse::success(
             new YourDayResource($this->widgetService->yourDay($request->user())),
-            'Widget data retrieved successfully.'
+            'Widget data retrieved successfully.',
+            meta: ['unavailable_calendars' => $this->widgetService->unavailableCalendars()]
         );
     }
 

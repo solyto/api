@@ -99,6 +99,10 @@ abstract class TestCase extends BaseTestCase
             };
         });
 
+        // No test resolves real DNS: the outbound URL guard sees every host
+        // name as one public address. IP literals are still checked as is.
+        $app->instance(\App\Shared\Services\OutboundUrlGuard::class, new \App\Shared\Services\OutboundUrlGuard(fn () => ['93.184.216.34']));
+
         // Wrap the DAV connection in a transaction per test as well, so DAV
         // writes don't leak across tests in the same process.
         $this->connectionsToTransact = ['sqlite', 'pgsql'];

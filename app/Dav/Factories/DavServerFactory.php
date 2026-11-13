@@ -13,6 +13,7 @@ use Sabre\DAVACL\Plugin as AclPlugin;
 use Sabre\DAVACL\PrincipalBackend\PDO as PrincipalBackend;
 use Sabre\DAVACL\PrincipalCollection;
 use App\Dav\Plugins\CacheInvalidationPlugin;
+use App\Dav\Plugins\ExternalPreconditionsPlugin;
 use App\Dav\Plugins\PrivacyPlugin;
 use Sabre\CalDAV\Backend\PDO as CalDAVBackend;
 use Sabre\CalDAV\Plugin as CalDAVPlugin;
@@ -56,6 +57,7 @@ class DavServerFactory
         $server->addPlugin(new \Sabre\DAV\Sharing\Plugin());
         $server->addPlugin(new \Sabre\CalDAV\SharingPlugin());
         $server->addPlugin(app()->make(CacheInvalidationPlugin::class));
+        $server->addPlugin(new ExternalPreconditionsPlugin($caldavBackend));
 
         return $server;
     }

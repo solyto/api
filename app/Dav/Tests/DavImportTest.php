@@ -179,6 +179,59 @@ describe('Calendar import', function () {
     });
 });
 
+describe('Calendar discovery', function () {
+    it('finds calendars through .well-known, the current user principal and the home set', function () {
+        $user = davUser();
+        Http::fake(function (Request $request) {
+            $url = $request->url();
+
+            return match (true) {
+                $url === 'https://cal.example.org/.well-known/caldav' => Http::response('', 301, ['Location' => '/dav/']),
+                $url === 'https://cal.example.org/dav/' => Http::response(multistatus(remoteResponse('/dav/', '<d:current-user-principal><d:href>/dav/principals/bob/</d:href></d:current-user-principal>')), 207),
+                $url === 'https://cal.example.org/dav/principals/bob/' => Http::response(multistatus(remoteResponse('/dav/principals/bob/', '<cal:calendar-home-set><d:href>/dav/cal/bob/</d:href></cal:calendar-home-set>')), 207),
+                $url === 'https://cal.example.org/dav/cal/bob/' => Http::response(multistatus(
+                    remoteResponse('/dav/cal/bob/', '<d:resourcetype><d:collection/></d:resourcetype>')
+                    .remoteResponse('/dav/cal/bob/home/', '<d:displayname>Home</d:displayname><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>')
+                ), 207),
+                default => Http::response('', 404),
+            };
+        });
+
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, 'https://cal.example.org', 'bob', 'app-password');
+
+        expect($import->getState($user->id)->calendars)->toBe([
+            ['url' => 'https://cal.example.org/dav/cal/bob/home/', 'name' => 'Home', 'color' => '#e5e7eb'],
+        ]);
+    });
+
+    it('keeps the app password out of the cached import state in plaintext', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', ['Personal' => []]);
+
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+
+        expect(serialize($import->getState($user->id)))->not->toContain('app-password');
+    });
+
+    it('refuses private and loopback servers', function (string $url) {
+        $user = davUser();
+        Http::fake();
+
+        try {
+            app(DavService::class)->import()->calendars()->start($user, $url, 'alice', 'app-password');
+        } finally {
+            Http::assertNothingSent();
+        }
+    })->with([
+        'loopback' => 'http://127.0.0.1/dav/',
+        'private' => 'https://10.0.0.5/dav/',
+        'link-local' => 'http://169.254.169.254/latest/',
+        'ipv6 loopback' => 'http://[::1]/dav/',
+    ])->throws(ImportException::class);
+});
+
 describe('Contact import', function () {
     it('logs an address book it has to skip', function () {
         $user = davUser();

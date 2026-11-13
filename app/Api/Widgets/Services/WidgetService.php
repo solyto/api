@@ -74,6 +74,14 @@ class WidgetService
         ];
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function unavailableCalendars(): array
+    {
+        return $this->gateway->unavailableCalendars();
+    }
+
     public function completeTodo(User $user, Todo $todo): void
     {
         $this->gateway->setUser($user);

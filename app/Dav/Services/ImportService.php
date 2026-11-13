@@ -15,7 +15,7 @@ class ImportService
         UserCacheService $cache
     )
     {
-        $this->calendars = new CalendarImport($calendars, $cache);
+        $this->calendars = new CalendarImport($calendars, $cache, app(RemoteCalDavClient::class));
         $this->addressBooks = new ContactImport($addressBooks, $cache);
     }
 

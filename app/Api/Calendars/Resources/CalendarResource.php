@@ -19,7 +19,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="is_shared", type="boolean"),
  *     @OA\Property(property="share_owner", type="string", nullable=true),
  *     @OA\Property(property="invite_status", type="string", nullable=true),
- *     @OA\Property(property="share_token", type="string", nullable=true)
+ *     @OA\Property(property="share_token", type="string", nullable=true),
+ *     @OA\Property(property="is_external", type="boolean", description="Connected from the user's own CalDAV server; its events are read and written there"),
+ *     @OA\Property(property="is_unavailable", type="boolean", description="External calendar whose server could not be reached by the last event listing")
  * )
  *
  * @mixin CalendarDTO
@@ -39,6 +41,8 @@ class CalendarResource extends JsonResource
             'share_owner' => $this->shareOwner,
             'invite_status' => $this->inviteStatus,
             'share_token' => $this->shareToken,
+            'is_external' => $this->isExternal,
+            'is_unavailable' => $this->isUnavailable,
         ];
     }
 }
