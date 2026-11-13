@@ -1,7 +1,7 @@
 # Report: Time-tracking project list loads every entry to compute one number
 
 date: 2026-11-13
-read: false
+read: true
 branch: `main`, tree at `f4688cf`
 scope: Performance of `GET /time-tracking/projects` and the other project responses in `TimeTrackingService`. Written for the maintainer. No application code, config or migrations were changed. A throwaway probe test was run and then deleted.
 
