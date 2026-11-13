@@ -42,6 +42,7 @@ const MIGRATION_COMPATIBILITY_ALLOWLIST = [
     '2026_10_14_000002_drop_openai_api_key_and_ai_enabled_from_user_settings.php' => '`remove-user-openai-key`: 1.0.15 doesn\'t read either column (owner, 2026-10-14)',
     '2026_10_15_000001_add_unique_date_to_wealth_values.php' => 'job `river`: drops only same-day duplicate wealth values and keeps the newest, so 1.0.15 still lists every day and its latest value (owner, 2026-10-15)',
     '2026_11_06_000001_add_category_foreign_key_to_notes.php' => 'only nulls category_id on notes whose folder no longer exists; 1.0.15–1.1.1 then list them at the root instead of nowhere. The new cascade (folder delete removes its notes) is accepted for old builds (owner, 2026-11-06)',
+    '2026_11_13_000001_add_solyto_shared_to_calendarinstances.php' => 'job `extend`: additive DAV-only column plus index; the backfill touches only the new column, which no resource exposes (owner, 2026-11-13)',
 ];
 
 const MIGRATION_COMPATIBILITY_BASELINE = 'tests/Fixtures/client-contract/1.0.15-migrations.txt';

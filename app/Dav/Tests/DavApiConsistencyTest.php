@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Jobs\RefreshCalendarCache;
 use App\Api\Contacts\Jobs\RefreshContactsCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -675,6 +676,33 @@ describe('CacheInvalidationPlugin', function () {
             .'<d:resourcetype><d:collection/><card:addressbook/></d:resourcetype></d:prop></d:set></d:mkcol>');
 
         $this->cache->shouldHaveReceived('forget')->with(['address_books', $this->user->id])->once();
+    });
+
+    it('queues a shared calendar invalidation on a DAV write to a shared calendar', function (string $writer, string $method) {
+        $sharee = davUser();
+        $dav = app(\App\Dav\Services\DavService::class);
+        $sharing = $dav->calendars()->sharing();
+        $sharing->inviteUser($dav->calendars()->list($this->user)[0], $this->user, $sharee);
+        $sharing->acceptInvite($sharee, 'mailto:'.$sharee->email);
+
+        [$user, $path] = $writer === 'owner'
+            ? [$this->user, $this->calendar]
+            : [$sharee, 'calendars/'.$sharee->email.'/'.collect($dav->calendars()->list($sharee))->firstWhere('isShared', true)->uri.'/'];
+
+        davRequest($user, 'PUT', $path.'a.ics', davIcs('a'), ['Content-Type' => 'text/calendar']);
+        if ($method === 'DELETE') {
+            Queue::fake();
+            davRequest($user, 'DELETE', $path.'a.ics');
+        }
+
+        Queue::assertPushed(InvalidateSharedCalendarCache::class, fn (InvalidateSharedCalendarCache $job) => $job->calendarId === $this->calendarId && $job->delay !== null);
+    })->with(['owner', 'sharee'])->with(['PUT', 'DELETE']);
+
+    it('queues no shared calendar invalidation for an unshared calendar', function () {
+        davRequest($this->user, 'PUT', $this->calendar.'a.ics', davIcs('a'), ['Content-Type' => 'text/calendar']);
+        davRequest($this->user, 'DELETE', $this->calendar.'a.ics');
+
+        Queue::assertNotPushed(InvalidateSharedCalendarCache::class);
     });
 
     it('touches no cache and queues nothing for a rejected write', function () {
