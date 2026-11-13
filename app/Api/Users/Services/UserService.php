@@ -35,7 +35,7 @@ class UserService
         'music', 'music_recommendations', 'music_releases', 'note_categories',
         'note_categories_hidden', 'notes', 'notes_hidden', 'notes_newest', 'plants', 'quotes',
         'recipes', 'shortcuts', 'tags', 'todo_categories', 'todo_workspaces', 'todos',
-        'todos_due', 'tt_categories', 'tt_entries', 'tt_projects', 'user_feeds', 'wealth_fields',
+        'todos_due', 'tt_categories', 'tt_entries', 'tt_projects_v2', 'user_feeds', 'wealth_fields',
     ];
 
     /**

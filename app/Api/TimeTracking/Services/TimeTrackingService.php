@@ -14,7 +14,7 @@ class TimeTrackingService
 {
     private const string CACHE_KEY_ENTRIES = 'tt_entries';
     private const string CACHE_KEY_CATEGORIES = 'tt_categories';
-    private const string CACHE_KEY_PROJECTS = 'tt_projects';
+    private const string CACHE_KEY_PROJECTS = 'tt_projects_v2';
     private const int CACHE_TTL_ENTRIES = 300;
     private const int CACHE_TTL = 86400;
 
@@ -184,14 +184,15 @@ class TimeTrackingService
             [self::CACHE_KEY_PROJECTS, $user->id],
             self::CACHE_TTL,
             fn() => TimeTrackingProject::forUser($user->id)
-                ->with(['categories', 'entries'])
+                ->with('categories')
+                ->withSum('entries', 'duration_minutes')
                 ->get()
         );
     }
 
     public function findProject(TimeTrackingProject $project): TimeTrackingProject
     {
-        $project->load(['categories', 'entries']);
+        $project->load('categories')->loadSum('entries', 'duration_minutes');
 
         return $project;
     }
@@ -204,7 +205,7 @@ class TimeTrackingService
 
         $project = TimeTrackingProject::create($data);
         $project->categories()->sync($categoryIds);
-        $project->load(['categories', 'entries']);
+        $project->load('categories')->loadSum('entries', 'duration_minutes');
 
         $this->forgetUser($user->id);
 
@@ -223,7 +224,7 @@ class TimeTrackingService
             $project->categories()->sync($categoryIds);
         }
 
-        $project->load(['categories', 'entries']);
+        $project->load('categories')->loadSum('entries', 'duration_minutes');
 
         $this->forgetUser($userId);
 

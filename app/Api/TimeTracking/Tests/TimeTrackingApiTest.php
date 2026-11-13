@@ -71,6 +71,44 @@ describe('Time tracking categories and projects', function () {
             ->assertJsonPath('data.color', '#445566');
     });
 
+    it('returns total_duration 0 for a project without entries', function () {
+        $user = makeUser();
+
+        $store = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/projects', ['title' => 'Empty'])
+            ->assertStatus(201)
+            ->assertJsonPath('data.total_duration', 0);
+
+        $projectId = $store->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/projects')
+            ->assertJsonPath('data.0.total_duration', 0);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/projects/'.$projectId)
+            ->assertJsonPath('data.total_duration', 0);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/projects/'.$projectId, ['title' => 'Still empty'])
+            ->assertJsonPath('data.total_duration', 0);
+    });
+
+    it('sums entry durations into total_duration on show and update', function () {
+        $user = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($user)->create();
+        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create(['duration_minutes' => 30]);
+        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create(['duration_minutes' => 45]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/projects/'.$project->id)
+            ->assertJsonPath('data.total_duration', 75);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/projects/'.$project->id, ['title' => 'Renamed'])
+            ->assertJsonPath('data.total_duration', 75);
+    });
+
     it('rejects another user\'s categories on project store and update', function () {
         $user = makeUser();
         $other = makeUser();
@@ -120,6 +158,17 @@ describe('Time tracking entries', function () {
             ->assertStatus(200);
 
         expect(TimeTrackingEntry::count())->toBe(0);
+    });
+
+    it('leaves total_duration out of the project nested in an entry', function () {
+        $user = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($user)->create();
+        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create(['duration_minutes' => 30]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries')
+            ->assertJsonPath('data.0.project.id', $project->id)
+            ->assertJsonMissingPath('data.0.project.total_duration');
     });
 
     it('updates the has_exact_times flag on an entry', function () {
