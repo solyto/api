@@ -6,7 +6,7 @@ date: 2026-11-13
 
 ## Summary
 
-Report-only job. The deliverable is [`report.md`](./report.md). It covers
+Report-only job. The deliverable is [`file-dav-2026-11-13.md`](../../../reports/file-dav-2026-11-13.md). It covers
 how Solyto could offer WebDAV file sync, as a native sabre/dav file tree,
 a separate WebDAV service, or by pointing to or integrating an external
 Nextcloud. It separates the generic-WebDAV client tier from the
