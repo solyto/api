@@ -6,6 +6,7 @@ use App\Api\Calendars\Services\CalendarService;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\Friend;
+use Illuminate\Support\Facades\DB;
 
 describe('Calendar CRUD', function () {
     it('lists calendars including the default one', function () {
@@ -506,5 +507,79 @@ describe('Calendar tenant isolation', function () {
             ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
             ->json('data'))->pluck('title');
         expect($otherTitles)->toContain('Private Meeting');
+    });
+});
+
+describe('Calendar invites', function () {
+    // The invite token is the recipient's mailto: href, so anyone who knows
+    // their email can build it. Accept and decline must only act on the
+    // caller's own pending invite.
+    beforeEach(function () {
+        $this->owner = makeUser();
+        $this->recipient = makeUser();
+        $this->other = makeUser();
+        Friend::factory()->forUsers($this->owner, $this->recipient)->create();
+
+        $calendarId = $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0]['id'];
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$calendarId.'/share', ['friend_id' => $this->recipient->id])
+            ->assertStatus(200);
+
+        $this->token = rawurlencode('mailto:'.$this->recipient->email);
+        $this->inviteStatus = fn () => DB::connection('pgsql')->table('calendarinstances')
+            ->where('principaluri', 'principals/'.$this->recipient->email)
+            ->where('access', '>', 1)
+            ->value('share_invitestatus');
+    });
+
+    it('lets the recipient accept their invite', function () {
+        expectApiSuccess($this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept'), 200);
+
+        expect(($this->inviteStatus)())->toBe(2);
+    });
+
+    it('lets the recipient decline their invite', function () {
+        expectApiSuccess($this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/decline'), 200);
+
+        expect(($this->inviteStatus)())->toBeNull();
+    });
+
+    it('does not let another user accept someone else\'s invite', function () {
+        expectApiError($this->actingAs($this->other, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept')
+            ->assertJsonPath('message', 'Invite does not exist'), 404);
+
+        expect(($this->inviteStatus)())->toBe(1);
+    });
+
+    it('does not let another user decline someone else\'s invite', function () {
+        expectApiError($this->actingAs($this->other, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/decline'), 404);
+
+        expect(($this->inviteStatus)())->toBe(1);
+    });
+
+    it('does not delete an accepted share on decline', function () {
+        $this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept')
+            ->assertStatus(200);
+
+        expectApiError($this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/decline'), 404);
+
+        expect(($this->inviteStatus)())->toBe(2);
+    });
+
+    it('answers a second accept with 404 and keeps the share accepted', function () {
+        $this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept')
+            ->assertStatus(200);
+
+        expectApiError($this->actingAs($this->recipient, 'sanctum')
+            ->putJson('/api/v1/calendars/invites/'.$this->token.'/accept'), 404);
+
+        expect(($this->inviteStatus)())->toBe(2);
     });
 });

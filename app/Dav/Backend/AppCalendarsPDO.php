@@ -505,20 +505,32 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         ]);
     }
 
-    public function acceptShare(string $shareToken): void
+    /**
+     * The token is the sharee's mailto: href, not a secret, so the update is
+     * scoped to the caller's own pending instance. Returns false if none matched.
+     */
+    public function acceptShare(string $principalUri, string $shareToken): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = 2 WHERE share_href = ?'
+            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = 2 WHERE share_href = ? AND principaluri = ? AND share_invitestatus = 1'
         );
-        $stmt->execute([$shareToken]);
+        $stmt->execute([$shareToken, $principalUri]);
+
+        return $stmt->rowCount() > 0;
     }
 
-    public function declineShare(string $shareToken): void
+    /**
+     * Scoped like acceptShare(). Only a pending invite can be declined; an
+     * accepted share is left through unsubscribe.
+     */
+    public function declineShare(string $principalUri, string $shareToken): bool
     {
         $stmt = $this->pdo->prepare(
-            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ?'
+            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND access > 1 AND share_invitestatus = 1'
         );
-        $stmt->execute([$shareToken]);
+        $stmt->execute([$shareToken, $principalUri]);
+
+        return $stmt->rowCount() > 0;
     }
 
     public function unshareCalendar(int $calendarId, string $recipientEmail): void

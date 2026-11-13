@@ -3,6 +3,7 @@
 namespace App\Api\Calendars\Services;
 
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
+use App\Api\Calendars\Exceptions\CalendarInviteNotFoundException;
 use App\Api\Calendars\Exceptions\CalendarNotFoundException;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
@@ -248,15 +249,27 @@ class CalendarService
         return $this->dav->calendars()->sharing()->listInvites($user);
     }
 
+    /**
+     * @throws CalendarInviteNotFoundException
+     */
     public function acceptInvite(User $user, string $token): void
     {
-        $this->dav->calendars()->sharing()->acceptInvite($token);
+        if (! $this->dav->calendars()->sharing()->acceptInvite($user, $token)) {
+            throw new CalendarInviteNotFoundException();
+        }
+
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 
+    /**
+     * @throws CalendarInviteNotFoundException
+     */
     public function declineInvite(User $user, string $token): void
     {
-        $this->dav->calendars()->sharing()->declineInvite($token);
+        if (! $this->dav->calendars()->sharing()->declineInvite($user, $token)) {
+            throw new CalendarInviteNotFoundException();
+        }
+
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 }

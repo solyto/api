@@ -41,19 +41,19 @@ class CalendarSharing
     }
 
     /**
-     * Accept an invite
+     * Accept the user's pending invite; false if they have none with this token
      */
-    public function acceptInvite(string $shareToken): void
+    public function acceptInvite(User $user, string $shareToken): bool
     {
-        $this->backend->acceptShare($shareToken);
+        return $this->backend->acceptShare(DavHelper::getPrincipalUri($user), $shareToken);
     }
 
     /**
-     * Decline an invite
+     * Decline the user's pending invite; false if they have none with this token
      */
-    public function declineInvite(string $shareToken): void
+    public function declineInvite(User $user, string $shareToken): bool
     {
-        $this->backend->declineShare($shareToken);
+        return $this->backend->declineShare(DavHelper::getPrincipalUri($user), $shareToken);
     }
 
     /**
