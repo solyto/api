@@ -219,10 +219,9 @@ wasteful.
 
 ## Out of scope
 
-- The invite accept/decline authorization fix
-  ([[calendar-invite-reply-authorization]]). Do that first: step 2 hooks
-  into `acceptShare()`, and the flag must not be settable by other users'
-  requests.
+- The invite accept/decline authorization fix: done in `88963e4`
+  (`acceptShare()` / `declineShare()` are scoped to the caller's own pending
+  invite), so step 2 can hook into `acceptShare()` safely.
 - Sharing a second calendar with the same person returns 500 (unique
   `(principaluri, share_href)` index + `mailto:` hrefs, inherited from
   Sabre's schema).
