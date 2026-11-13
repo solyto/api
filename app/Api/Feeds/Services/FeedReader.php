@@ -47,6 +47,29 @@ class FeedReader
     }
 
     /**
+     * A fresh SimplePie per call: raw data set on the shared instance would
+     * stay there and be served to every later getFeedData() call.
+     */
+    public function parseFeedData(string $content): array|false
+    {
+        $pie = new SimplePie;
+        $pie->enable_cache(false);
+        $pie->set_raw_data($content);
+        $pie->init();
+
+        $items = $pie->get_items();
+
+        if (empty($items)) {
+            return false;
+        }
+
+        return [
+            'title' => $pie->get_title() ?: null,
+            'items' => $items,
+        ];
+    }
+
+    /**
      * Hosts that only serve tracking pixels. Their images are skipped even when
      * no size is given, so clients never load the tracker. VG Wort counts reads
      * for German publishers on per-server subdomains, hence the suffix match.

@@ -82,6 +82,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perHour(5)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('feeds-import', function (Request $request) {
+            return Limit::perHour(20)->by($request->user()->id);
+        });
+
         RateLimiter::for('widget-token', function (Request $request) {
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
