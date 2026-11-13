@@ -1,6 +1,7 @@
 # Report: Feed retention deletes items that the next sync re-inserts
 
 date: 2026-11-12
+read: true
 branch: `main`, tree at `ff71085`
 scope: Interaction between the nightly `DeleteOldFeedItems` job and the hourly `SyncFeed` job. Written for the maintainer. No application code, config or migrations were changed. A throwaway probe test was run and then deleted.
 
