@@ -13,6 +13,7 @@ use App\Api\Dashboard\Controllers\QuickAddController as DashboardQuickAddControl
 use App\Api\DevRequests\Controllers\DevRequestController;
 use App\Api\Export\Controllers\ExportController;
 use App\Api\Feeds\Controllers\FeedController;
+use App\Api\Feeds\Controllers\FeedImportController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
 use App\Api\Integrations\Controllers\IntegrationController;
@@ -388,6 +389,12 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('search', [FeedController::class, 'searchFeeds']);
         Route::get('friends', [FeedController::class, 'friendFeeds']);
         Route::post('test', [FeedController::class, 'testFeed']);
+
+        Route::prefix('import')->group(function () {
+            Route::middleware('throttle:feeds-import')->post('', [FeedImportController::class, 'start']);
+            Route::post('select', [FeedImportController::class, 'select']);
+            Route::get('state', [FeedImportController::class, 'state']);
+        });
 
         Route::prefix('subscriptions')->group(function () {
             Route::get('', [FeedController::class, 'listSubscriptions']);

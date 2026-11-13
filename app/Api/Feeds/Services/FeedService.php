@@ -82,7 +82,27 @@ class FeedService
      */
     public function createSubscription(User $user, string $title, string $url, ?string $whitelist, ?string $blacklist): FeedSubscription
     {
-        $userId = $user->id;
+        return $this->subscribe($user->id, $title, $url, fn () => $this->feedReader->getFeedData($url), $whitelist, $blacklist);
+    }
+
+    /**
+     * $feedData is what FeedReader::parseFeedData() returned for $url, or
+     * null when the Feed row already exists and nothing was fetched.
+     *
+     * @throws FeedException
+     */
+    public function createImportedSubscription(User $user, string $title, string $url, array|false|null $feedData): FeedSubscription
+    {
+        return $this->subscribe($user->id, $title, $url, fn () => $feedData ?? false, null, null);
+    }
+
+    /**
+     * @param  \Closure(): (array|false)  $fetchFeedData  only called when the Feed row does not exist yet
+     *
+     * @throws FeedException
+     */
+    private function subscribe(string $userId, string $title, string $url, \Closure $fetchFeedData, ?string $whitelist, ?string $blacklist): FeedSubscription
+    {
         $feed = Feed::where('url', $url)->first();
 
         if ($feed && FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
@@ -90,7 +110,7 @@ class FeedService
         }
 
         if (!$feed) {
-            $feedData = $this->feedReader->getFeedData($url);
+            $feedData = $fetchFeedData();
 
             if (!$feedData || empty($feedData['items'])) {
                 throw new FeedException('Failed to fetch feed items from RSS');
@@ -349,8 +369,9 @@ class FeedService
      * clients render them as plain text. Many feeds also encode titles twice, which leaves
      * "&amp;amp;" after SimplePie, so decoding repeats while it still changes
      * something, capped so a pathological title can't loop for long.
+     * Public because OpmlImportService cleans OPML titles the same way.
      */
-    private function plainTitle(?string $value): ?string
+    public function plainTitle(?string $value): ?string
     {
         if ($value === null) {
             return null;
