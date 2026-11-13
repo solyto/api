@@ -9,19 +9,25 @@ use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
+use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 
 class CalendarService
 {
     private const string CACHE_KEY_CALENDARS = 'calendars';
     public const string CACHE_KEY_EVENTS = 'calendar_events';
+    private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
     private const int CACHE_TTL = 86400;
     private const int CACHE_TTL_EVENTS_PAST = 604800;
     private const int CACHE_TTL_EVENTS_CURRENT = 900;
     private const int CACHE_TTL_EVENTS_FUTURE = 3600;
+
+    /** @var array<int, int> */
+    private array $unavailable = [];
 
     public function __construct(
         private readonly DavService $dav,
@@ -30,8 +36,19 @@ class CalendarService
 
     public function list(User $user): array
     {
-        return $this->cache->remember([self::CACHE_KEY_CALENDARS, $user->id], self::CACHE_TTL,
+        $calendars = $this->cache->remember([self::CACHE_KEY_CALENDARS, $user->id], self::CACHE_TTL,
             fn() => $this->dav->calendars()->list($user));
+
+        return array_map(function (CalendarDTO $calendar) use ($user) {
+            if (!$calendar->isExternal || !$this->cache->get([self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId])) {
+                return $calendar;
+            }
+
+            $calendar = clone $calendar;
+            $calendar->isUnavailable = true;
+
+            return $calendar;
+        }, $calendars);
     }
 
     public function get(User $user, int $instanceId): ?CalendarDTO
@@ -72,6 +89,16 @@ class CalendarService
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 
+    /**
+     * Called once a calendar was linked to a remote collection, so it is
+     * read as external from now on.
+     */
+    public function markExternal(User $user, CalendarDTO $calendar): void
+    {
+        $this->dav->calendars()->forgetExternal($calendar->calendarId);
+        $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
+    }
+
     public function updateOrder(User $user, array $orderedIds): void
     {
         foreach ($orderedIds as $index => $instanceId) {
@@ -89,7 +116,6 @@ class CalendarService
 
     public function listEvents(User $user, string $yearMonth): array
     {
-        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $now = date('Y-m');
         $ttl = match(true) {
             $yearMonth < $now   => self::CACHE_TTL_EVENTS_PAST,
@@ -97,42 +123,26 @@ class CalendarService
             default             => self::CACHE_TTL_EVENTS_FUTURE,
         };
 
-        $events = [];
-        foreach ($calendars as $calendar) {
-            $events = array_merge($events, $this->cache->remember(
-                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, $yearMonth],
-                $ttl,
-                fn() => $this->dav->calendars()->events()->listExpanded(
-                    $calendar,
-                    new \DateTime($yearMonth . '-01 00:00:00')->modify('- 3 months'),
-                    new \DateTime($yearMonth . '-01 23:59:59')->modify('last day of this month')->modify('+ 3 months')
-                )
-            ));
-        }
-
-        return $events;
+        return $this->collectEvents(
+            $user,
+            [$yearMonth],
+            $ttl,
+            new \DateTime($yearMonth . '-01 00:00:00')->modify('- 3 months'),
+            new \DateTime($yearMonth . '-01 23:59:59')->modify('last day of this month')->modify('+ 3 months')
+        );
     }
 
     public function listWidgetEvents(User $user): array
     {
         $today = Carbon::today($user->settings->timezone ?? 'UTC');
 
-        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
-        $events = [];
-
-        foreach ($calendars as $calendar) {
-            $events = array_merge($events, $this->cache->remember(
-                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'widget', $today->toDateString()],
-                self::CACHE_TTL_EVENTS_FUTURE,
-                fn() => $this->dav->calendars()->events()->listExpanded(
-                    $calendar,
-                    $today->toDateTime(),
-                    $today->copy()->addDays(3)->toDateTime()
-                )
-            ));
-        }
-
-        return $events;
+        return $this->collectEvents(
+            $user,
+            ['widget', $today->toDateString()],
+            self::CACHE_TTL_EVENTS_FUTURE,
+            $today->toDateTime(),
+            $today->copy()->addDays(3)->toDateTime()
+        );
     }
 
     /**
@@ -142,19 +152,65 @@ class CalendarService
     {
         $today = Carbon::today($user->settings->timezone ?? 'UTC');
 
+        return $this->collectEvents(
+            $user,
+            ['today', $today->toDateString()],
+            self::CACHE_TTL_EVENTS_CURRENT,
+            $today->toDateTime(),
+            $today->copy()->addDay()->toDateTime()
+        );
+    }
+
+    /**
+     * Instance ids of the external calendars the last event listing had to
+     * leave out because their server was unreachable.
+     *
+     * @return array<int, int>
+     */
+    public function unavailableCalendars(): array
+    {
+        return $this->unavailable;
+    }
+
+    /**
+     * Remote changes never invalidate the cache of an external calendar, so
+     * its entries live for the short external TTL. An unreachable external
+     * calendar is left out and reported, and flagged in list() until a
+     * listing reaches it again; the failure itself is not cached.
+     *
+     * @param  array<int, string>  $keySuffix
+     * @return array<int, EventDTO>
+     */
+    private function collectEvents(User $user, array $keySuffix, int $ttl, \DateTime $start, \DateTime $end): array
+    {
         $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
+        $this->unavailable = [];
         $events = [];
 
         foreach ($calendars as $calendar) {
-            $events = array_merge($events, $this->cache->remember(
-                [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, 'today', $today->toDateString()],
-                self::CACHE_TTL_EVENTS_CURRENT,
-                fn() => $this->dav->calendars()->events()->listExpanded(
-                    $calendar,
-                    $today->toDateTime(),
-                    $today->copy()->addDay()->toDateTime()
-                )
-            ));
+            if (!$calendar->isExternal) {
+                $events = array_merge($events, $this->cache->remember(
+                    [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix],
+                    $ttl,
+                    fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)
+                ));
+                continue;
+            }
+
+            $externalTtl = (int) config('calendars.external.cache_ttl');
+            $unavailableKey = [self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId];
+
+            try {
+                $events = array_merge($events, $this->cache->remember(
+                    [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix],
+                    $externalTtl,
+                    fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)
+                ));
+                $this->cache->forget($unavailableKey);
+            } catch (ExternalCalendarUnavailableException) {
+                $this->unavailable[] = $calendar->instanceId;
+                $this->cache->store($unavailableKey, $externalTtl, time());
+            }
         }
 
         return $events;
@@ -229,23 +285,46 @@ class CalendarService
         return $success;
     }
 
+    /**
+     * @throws AuthorizationException
+     */
     public function share(CalendarDTO $calendar, User $owner, User $recipient): void
     {
+        $this->assertShareable($calendar);
         $this->dav->calendars()->sharing()->inviteUser($calendar, $owner, $recipient);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
     }
 
+    /**
+     * @throws AuthorizationException
+     */
     public function listSharees(CalendarDTO $calendar): array
     {
+        $this->assertShareable($calendar);
+
         return $this->dav->calendars()->sharing()->listSharees($calendar);
     }
 
+    /**
+     * @throws AuthorizationException
+     */
     public function revokeShare(User $owner, CalendarDTO $calendar, User $recipient): void
     {
+        $this->assertShareable($calendar);
         $this->dav->calendars()->sharing()->revokeShare($calendar->calendarId, $recipient);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $owner->id]);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
         $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $recipient->id, $calendar->calendarId]);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function assertShareable(CalendarDTO $calendar): void
+    {
+        if ($calendar->isExternal) {
+            throw new AuthorizationException('External calendars cannot be shared.');
+        }
     }
 
     public function unsubscribe(User $user, CalendarDTO $calendar): void

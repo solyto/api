@@ -104,4 +104,18 @@ describe('Calendar export', function () {
 
         expect($errors)->toBe([]);
     });
+
+    it('exports the events of an external calendar from its server and skips an unreachable one', function () {
+        $remote = (new \Tests\Support\FakeCalDavServer())->fake();
+        externalCalendar($this->user, $remote);
+        $remote->put('remote.ics', davIcs('remote-uid', 'From the server'));
+
+        $summaries = collect(exportCalendars($this->user)->select('VEVENT'))->map(fn ($event) => (string) $event->SUMMARY);
+
+        expect($summaries->all())->toContain('From the server');
+
+        $remote->down = true;
+
+        expect(collect(exportCalendars($this->user)->select('VEVENT'))->map(fn ($event) => (string) $event->SUMMARY)->all())->not->toContain('From the server');
+    });
 });

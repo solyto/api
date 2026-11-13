@@ -6,12 +6,13 @@ use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\CalendarImportDTO;
 use App\Dav\DTOs\EventDTO;
+use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\ImportException;
 use App\Dav\Helpers\ICalendarHelper;
+use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 class CalendarImport
@@ -22,8 +23,11 @@ class CalendarImport
     private Calendars $calendars;
     private ICalendarHelper $helper;
 
-    public function __construct(Calendars $calendars, private readonly UserCacheService $cache)
-    {
+    public function __construct(
+        Calendars $calendars,
+        private readonly UserCacheService $cache,
+        private readonly RemoteCalDavClient $remote,
+    ) {
         $this->calendars = $calendars;
         $this->helper = new ICalendarHelper();
     }
@@ -36,7 +40,8 @@ class CalendarImport
         $dto->stage = 'started';
         $dto->url = rtrim($url, '/') . '/';
         $dto->username = $username;
-        $dto->secret = $secret;
+        // The state sits in the cache for the queued import; never in plaintext.
+        $dto->secret = Crypt::encryptString($secret);
 
         $this->saveState($user->id, $dto);
         $this->getAvailableCalendars($user, $dto);
@@ -159,10 +164,16 @@ class CalendarImport
         }
     }
 
+    /**
+     * @throws ImportException
+     */
     public function getAvailableCalendars(User $user, CalendarImportDTO $dto): void
     {
-        $homeSet = $this->discoverCalendarHome($dto);
-        $calendars = $this->getCalendars($dto, $homeSet);
+        try {
+            $calendars = $this->remote->discover($dto->url, $dto->username, Crypt::decryptString($dto->secret));
+        } catch (BlockedUrlException) {
+            throw new ImportException();
+        }
 
         $dto->stage = 'select';
         $dto->calendars = $calendars;
@@ -174,60 +185,26 @@ class CalendarImport
         }
     }
 
-    private function discoverCalendarHome(CalendarImportDTO $dto): string
-    {
-        $response = $this->getBasicRequest($dto)->send(
-            'PROPFIND',
-            $dto->url . 'principals/users/' . $dto->username . '/',
-            ['body' => $this->helper->getCalendarHomeDiscoveryXml()]
-        );
-
-
-        if (!$response->successful()) {
-            throw new ImportException();
-        }
-
-        $homes = $this->helper->parseCalendarHomeFromXml($response->body(), $dto->url);
-        return $homes[0]['url'] ?? throw new ImportException();
-    }
-
-    private function getCalendars(CalendarImportDTO $dto, string $homeSet): array
-    {
-        $response = $this->getBasicRequest($dto)->send(
-            'PROPFIND',
-            $homeSet,
-            ['body' => ICalendarHelper::getCalendarsXml()]
-        );
-
-        if (!$response->successful()) {
-            return [];
-        }
-
-        return $this->helper->parseCalendarsFromXml($response->body(), $homeSet);
-    }
-
     private function getEvents(CalendarImportDTO $dto, string $calendarUrl, string $calendarName): array
     {
-        $response = $this->getBasicRequest($dto)->send(
-            'REPORT',
-            $calendarUrl,
-            ['body' => $this->helper->getEntriesXml()]
-        );
+        try {
+            $response = $this->remote->send(
+                $dto->username,
+                Crypt::decryptString($dto->secret),
+                'REPORT',
+                $calendarUrl,
+                ['Content-Type' => 'application/xml', 'Depth' => '1'],
+                $this->helper->getEntriesXml()
+            );
+        } catch (ExternalCalendarUnavailableException) {
+            return [];
+        }
 
         if (!$response->successful()) {
             return [];
         }
 
         return $this->helper->parseEntriesFromXml($response->body(), $calendarName);
-    }
-
-    private function getBasicRequest(CalendarImportDTO $dto): PendingRequest
-    {
-        return Http::withBasicAuth($dto->username, $dto->secret)
-                   ->withHeaders([
-                       'Content-Type' => 'application/xml',
-                       'Depth' => '1',
-                   ]);
     }
 
     private function saveState(string $userId, CalendarImportDTO $dto): void

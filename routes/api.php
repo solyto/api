@@ -3,6 +3,7 @@
 use App\Api\ApiResponse;
 use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\EventAttachmentController;
+use App\Api\Calendars\Controllers\ExternalCalendarController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\Clipboard\Controllers\ClipboardController;
@@ -188,6 +189,15 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::post('', [CalendarImportController::class, 'startImport']);
             Route::post('select', [CalendarImportController::class, 'selectCalendars']);
             Route::get('state', [CalendarImportController::class, 'getState']);
+        });
+
+        Route::prefix('external/accounts')->group(function () {
+            Route::get('', [ExternalCalendarController::class, 'listAccounts']);
+            Route::post('', [ExternalCalendarController::class, 'storeAccount']);
+            Route::put('{account}', [ExternalCalendarController::class, 'updateAccount']);
+            Route::delete('{account}', [ExternalCalendarController::class, 'destroyAccount']);
+            Route::get('{account}/available', [ExternalCalendarController::class, 'listAvailable']);
+            Route::post('{account}/calendars', [ExternalCalendarController::class, 'connectCalendars']);
         });
 
         Route::prefix('invites')->group(function () {

@@ -4,6 +4,7 @@ namespace App\Api\Export\Services;
 
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
+use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\DavService;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Reader;
@@ -30,7 +31,14 @@ class CalendarExportService
         $usedUids = [];
 
         foreach ($calendars as $calendar) {
-            foreach ($this->davService->calendars()->events()->list($calendar) as $event) {
+            // External calendars are read from their server; an unreachable one is left out.
+            try {
+                $events = $this->davService->calendars()->events()->list($calendar);
+            } catch (ExternalCalendarUnavailableException) {
+                continue;
+            }
+
+            foreach ($events as $event) {
                 $vcalendar = $this->readStored($event);
 
                 foreach ($vcalendar->select('VTIMEZONE') as $vtimezone) {

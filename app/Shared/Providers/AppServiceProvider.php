@@ -2,6 +2,7 @@
 
 namespace App\Shared\Providers;
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Users\Models\User;
 use App\Api\Users\Observers\UserObserver;
 use App\Api\Users\Policies\UserPolicy;
@@ -26,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('local') && class_exists(TelescopeServiceProvider::class)) {
             $this->app->register(TelescopeServiceProvider::class);
         }
+
+        // One instance per request or job, so callers can ask which external
+        // calendars the last event listing had to leave out.
+        $this->app->scoped(CalendarService::class);
 
         $this->app->singleton(ImageTransformationService::class, function () {
             $driver = config('services.image.driver', 'imgproxy') === 'intervention'

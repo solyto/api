@@ -22,6 +22,8 @@ class CalendarDTO
         public ?string $inviteStatus = null,
         public ?string $shareToken = null,
         public bool $solytoShared = false,
+        public bool $isExternal = false,
+        public bool $isUnavailable = false,
     ) {}
 
     public static function fromSabre(array $data): self
@@ -52,6 +54,7 @@ class CalendarDTO
             inviteStatus: $inviteStatus,
             shareToken: $data['share-href'] ?? null,
             solytoShared: $data['solyto-shared'] ?? false,
+            isExternal: !empty($data['is-external']),
         );
     }
 

@@ -107,6 +107,17 @@ class IntegrationGateway
     }
 
     /**
+     * Instance ids of the external calendars the last event listing in this
+     * request had to leave out.
+     *
+     * @return array<int, int>
+     */
+    public function unavailableCalendars(): array
+    {
+        return app(CalendarService::class)->unavailableCalendars();
+    }
+
+    /**
      * @throws IntegrationAuthException
      */
     public function completeTodo(Todo $todo): Todo

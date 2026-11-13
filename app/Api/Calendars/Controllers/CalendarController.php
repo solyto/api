@@ -192,7 +192,8 @@ class CalendarController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/EventListingMeta")
      *         )
      *     ),
      *
@@ -203,7 +204,8 @@ class CalendarController
     {
         return ApiResponse::success(
             EventResource::collection($this->calendarService->listEvents($request->user(), $yearMonth)),
-            'Calendar events retrieved successfully.'
+            'Calendar events retrieved successfully.',
+            meta: ['unavailable_calendars' => $this->calendarService->unavailableCalendars()]
         );
     }
 
@@ -221,7 +223,8 @@ class CalendarController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Event")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/EventListingMeta")
      *         )
      *     ),
      *
@@ -232,7 +235,8 @@ class CalendarController
     {
         return ApiResponse::success(
             EventResource::collection($this->calendarService->listWidgetEvents($request->user())),
-            'Calendar events retrieved successfully.'
+            'Calendar events retrieved successfully.',
+            meta: ['unavailable_calendars' => $this->calendarService->unavailableCalendars()]
         );
     }
 
@@ -672,7 +676,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=403, description="You can only list sharees for calendars you own", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="You can only list sharees for calendars you own; external calendars cannot be shared", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
@@ -725,7 +729,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=403, description="You can only share calendars you own", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="You can only share calendars you own; external calendars cannot be shared", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or User not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
@@ -787,7 +791,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=403, description="You can only manage shares for calendars you own", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="You can only manage shares for calendars you own; external calendars cannot be shared", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or User not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
