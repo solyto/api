@@ -37,7 +37,7 @@ class RefreshContactsCache implements ShouldQueue, ShouldBeUniqueUntilProcessing
 
         Log::info('Refreshing contacts cache for user ' . $user->id . ' after invalidation');
 
-        $service->listAddressBooks($user);
-        $service->listContacts($user);
+        $service->listAddressBooks($user, refresh: true);
+        $service->listContacts($user, refresh: true);
     }
 }

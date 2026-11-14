@@ -34,7 +34,7 @@ class RefreshCalendarCache implements ShouldQueue, ShouldBeUniqueUntilProcessing
     {
         $user = User::findOrFail($this->userId);
 
-        $service->list($user);
-        $service->listEvents($user, date('Y-m'));
+        $service->list($user, refresh: true);
+        $service->listEvents($user, date('Y-m'), refresh: true);
     }
 }

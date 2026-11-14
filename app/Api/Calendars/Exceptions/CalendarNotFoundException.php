@@ -8,6 +8,6 @@ class CalendarNotFoundException extends HttpException
 {
     public function __construct()
     {
-        parent::__construct(404, 'Calendar does not exist');
+        parent::__construct(404, 'Calendar does not exist.');
     }
 }

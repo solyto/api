@@ -829,8 +829,11 @@ tables and contact photos (`config/database.php`, DAV migration
 remap it to SQLite). App migrations are additive, one per change, never
 edited after deploy (`2026_05_20_000001_add_link_to_todos.php` is the
 shape). Nothing outside `app/Dav` writes to `pgsql` except the two Contacts
-repair commands (rule 5.5); changing the DAV schema, backends or routes is
-flagged before it is done.
+repair commands (rule 5.5) and the DAV data migrations, each flagged and in
+the `MigrationCompatibilityTest` allowlist
+(`2026_11_13_000001_add_solyto_shared_to_calendarinstances.php`,
+`2026_11_14_000002_recompute_event_occurrence_bounds.php`); changing the DAV
+schema, backends or routes is flagged before it is done.
 
 ### 12.7 Background work: Redis queue, jobs in the module, schedule in `routes/console.php`
 

@@ -4,6 +4,7 @@ use App\Dav\Exceptions\ImportException;
 use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -109,6 +110,25 @@ describe('Calendar import', function () {
         $state = $import->getState($user->id);
         expect($state->stage)->toBe('select')
             ->and(collect($state->calendars)->pluck('name')->all())->toBe(['Personal', 'Work']);
+    });
+
+    it('treats a session started before the secret was encrypted as expired', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', ['Personal' => []]);
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $state = $import->getState($user->id);
+        $state->secret = 'app-password';
+        Cache::set('calendar-import-'.$user->id, $state, now()->addMinutes(60));
+
+        expect($import->getState($user->id))->toBeNull()
+            ->and(Cache::has('calendar-import-'.$user->id))->toBeFalse();
+
+        Cache::set('calendar-import-'.$user->id, $state, now()->addMinutes(60));
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/import/select', ['calendars' => ['Personal']])
+            ->assertStatus(404)
+            ->assertJsonPath('message', 'Import state not found');
     });
 
     it('authenticates against the remote server with the given credentials', function () {

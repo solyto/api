@@ -11,6 +11,7 @@ use App\Dav\Exceptions\ImportException;
 use App\Dav\Helpers\ICalendarHelper;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -224,8 +225,26 @@ class CalendarImport
         Cache::set('calendar-import-' . $userId, $dto, now()->addMinutes(60));
     }
 
+    /**
+     * A session started before the secret was encrypted holds it in
+     * plaintext; it is dropped and reads as expired.
+     */
     public function getState(string $userId): ?CalendarImportDTO
     {
-        return Cache::get('calendar-import-' . $userId);
+        $dto = Cache::get('calendar-import-' . $userId);
+
+        if ($dto === null) {
+            return null;
+        }
+
+        try {
+            Crypt::decryptString($dto->secret);
+        } catch (DecryptException) {
+            Cache::forget('calendar-import-' . $userId);
+
+            return null;
+        }
+
+        return $dto;
     }
 }

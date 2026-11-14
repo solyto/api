@@ -37,7 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
               $middleware->appendToGroup('api', RecordClientVersion::class);
           })
           ->withCommands([
-              __DIR__.'/../app/Api/Calendars/Commands',
               __DIR__.'/../app/Api/Contacts/Commands',
               __DIR__.'/../app/Api/Export/Commands',
               __DIR__.'/../app/Api/Feeds/Commands',
