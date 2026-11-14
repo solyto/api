@@ -95,3 +95,67 @@ describe('All-day events at the window edges', function () {
             ->toBe(['First day', 'Last day']);
     })->with(['Pacific/Kiritimati', 'Etc/GMT+12']);
 });
+
+/**
+ * A weekly series from Monday 2030-01-07 with the 2030-01-14 occurrence
+ * moved by an hour, the override written before or after the master.
+ */
+function rangeSeriesWithOverride(bool $overrideFirst): string
+{
+    $master = [
+        'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'DTSTART:20300107T100000Z', 'DTEND:20300107T110000Z',
+        'RRULE:FREQ=WEEKLY', 'SUMMARY:Series', 'END:VEVENT',
+    ];
+    $override = [
+        'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'RECURRENCE-ID:20300114T100000Z',
+        'DTSTART:20300114T110000Z', 'DTEND:20300114T120000Z', 'SUMMARY:Series', 'END:VEVENT',
+    ];
+
+    return implode("\r\n", [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN',
+        ...($overrideFirst ? [...$override, ...$master] : [...$master, ...$override]),
+        'END:VCALENDAR',
+    ])."\r\n";
+}
+
+describe('Recurring series with an override', function () {
+    it('lists the series in a window far from the override', function (bool $overrideFirst) {
+        $user = davUser();
+        $calendar = rangeCalendar($user);
+        $start = new \DateTime('2030-10-14 00:00:00', new \DateTimeZone('UTC'));
+        $end = new \DateTime('2030-10-17 00:00:00', new \DateTimeZone('UTC'));
+
+        rangePut($user, 'series.ics', rangeSeriesWithOverride($overrideFirst));
+
+        $bounds = DB::connection('pgsql')->table('calendarobjects')->where('uri', 'series.ics')->first(['firstoccurence', 'lastoccurence', 'etag']);
+        $uris = collect((new AppCalendarsPDO(DB::connection('pgsql')->getPdo()))->getEventObjectsInRange($calendar, $start, $end))->pluck('uri')->all();
+
+        expect((int) $bounds->firstoccurence)->toBe((new \DateTime('2030-01-07 10:00:00', new \DateTimeZone('UTC')))->getTimestamp())
+            ->and((int) $bounds->lastoccurence)->toBe(2145916800)
+            ->and($bounds->etag)->toBe(md5(rangeSeriesWithOverride($overrideFirst)))
+            ->and($uris)->toBe(['series.ics'])
+            ->and(rangeTitles($calendar, $start, $end))->toBe(['Series']);
+    })->with(['override first' => true, 'master first' => false]);
+});
+
+describe('Series past sabre\'s 2038 cap', function () {
+    it('lists series that run into the window', function () {
+        $user = davUser();
+        $calendar = rangeCalendar($user);
+        $start = new \DateTime('2039-06-01 00:00:00', new \DateTimeZone('UTC'));
+        $end = new \DateTime('2039-06-04 00:00:00', new \DateTimeZone('UTC'));
+
+        rangePut($user, 'infinite.ics', davIcs('infinite', 'Infinite', '20300101T080000Z', '20300101T083000Z', ['RRULE:FREQ=DAILY']));
+        rangePut($user, 'until-2040.ics', davIcs('until-2040', 'Until 2040', '20300101T080000Z', '20300101T083000Z', ['RRULE:FREQ=DAILY;UNTIL=20400101T000000Z']));
+        rangePut($user, 'until-2031.ics', davIcs('until-2031', 'Until 2031', '20300101T080000Z', '20300101T083000Z', ['RRULE:FREQ=DAILY;UNTIL=20310101T000000Z']));
+
+        $uris = collect((new AppCalendarsPDO(DB::connection('pgsql')->getPdo()))->getEventObjectsInRange($calendar, $start, $end))
+            ->pluck('uri')
+            ->sort()
+            ->values()
+            ->all();
+
+        expect($uris)->toBe(['infinite.ics', 'until-2040.ics'])
+            ->and(rangeTitles($calendar, $start, $end))->toBe(['Infinite', 'Until 2040']);
+    });
+});
