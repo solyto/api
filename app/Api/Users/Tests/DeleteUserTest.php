@@ -129,6 +129,7 @@ describe('app:users:delete', function () {
         $cache->store(['todos', $user->id], 300, ['cached']);
         $cache->store(['books', $user->id], 300, ['cached']);
         $cache->store(['checkin', $user->id], 300, ['cached']);
+        $cache->store(['feed_import', $user->id], 300, ['cached']);
         $cache->store(['todos', $other->id], 300, ['cached']);
 
         // The release-notified sets live forever in the longterm store (the
@@ -182,6 +183,7 @@ describe('app:users:delete', function () {
         expect($cache->has(['todos', $user->id]))->toBeFalse()
             ->and($cache->has(['books', $user->id]))->toBeFalse()
             ->and($cache->has(['checkin', $user->id]))->toBeFalse()
+            ->and($cache->has(['feed_import', $user->id]))->toBeFalse()
             ->and($cache->has(['todos', $other->id]))->toBeTrue()
             ->and($longterm->has(['book_release_notified', $user->id]))->toBeFalse()
             ->and($longterm->has(['book_release_notified', $other->id]))->toBeTrue();

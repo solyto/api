@@ -4,6 +4,7 @@ use App\Api\Feeds\Jobs\ImportFeedSubscriptions;
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedSubscription;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 
 function feedImportOpml(int $count = 2): string
@@ -214,6 +215,39 @@ describe('Feed import select', function () {
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed2.example/rss']]), 409);
+    });
+
+    it('returns 409 while another select holds the lock', function () {
+        Queue::fake();
+        $user = makeUser();
+        feedImportUpload($this, $user, feedImportOpml());
+        $lock = Cache::lock('feed_import_select_'.$user->id, 10);
+        $lock->get();
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 409);
+        Queue::assertNotPushed(ImportFeedSubscriptions::class);
+
+        $lock->release();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
+            ->assertStatus(200);
+        Queue::assertPushed(ImportFeedSubscriptions::class, 1);
+    });
+
+    it('starts one job for a double submit', function () {
+        Queue::fake();
+        $user = makeUser();
+        feedImportUpload($this, $user, feedImportOpml());
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
+            ->assertStatus(200);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 409);
+
+        Queue::assertPushed(ImportFeedSubscriptions::class, 1);
     });
 });
 

@@ -203,24 +203,101 @@ describe('ImportFeedSubscriptions', function () {
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('parsed');
     });
 
-    it('finishes the import when the job fails part way through', function () {
+    it('marks a feed that throws unexpectedly as unreachable and finishes the rest', function () {
         Queue::fake();
         $user = makeUser();
         Feed::factory()->create(['url' => 'https://known.example/feed']);
         Http::fake(['*' => Http::response('<rss/>', 200)]);
         $this->mock(FeedReader::class)->shouldReceive('parseFeedData')->andThrow(new RuntimeException('boom'));
         runningFeedImport($user, ['https://known.example/feed', 'https://new.example/feed']);
-        $job = app(ImportFeedSubscriptions::class, ['userId' => $user->id]);
 
-        expect(fn () => $job->handle(app(OpmlImportService::class)))->toThrow(RuntimeException::class);
-        expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('running');
-
-        $job->failed(new RuntimeException('boom'));
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
 
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
         expect(feedImportStatuses($user))->toBe([
             'https://known.example/feed' => 'subscribed',
             'https://new.example/feed' => 'unreachable',
+        ]);
+    });
+
+    it('subscribes a feed with an overlong title and keeps importing the feeds after it', function () {
+        Queue::fake();
+        $user = makeUser();
+        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        Http::fake([
+            'https://long.example/*' => Http::response(str_replace('Fixture Feed', str_repeat('x', 300), $rss), 200),
+            '*' => Http::response($rss, 200),
+        ]);
+        runningFeedImport($user, ['https://before.example/feed', 'https://long.example/feed', 'https://after.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://before.example/feed' => 'subscribed',
+            'https://long.example/feed' => 'subscribed',
+            'https://after.example/feed' => 'subscribed',
+        ]);
+        expect(Feed::where('url', 'https://long.example/feed')->value('title'))->toBe(str_repeat('x', 255));
+        expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(3);
+    });
+
+    it('keeps importing when subscribing one feed throws an unexpected exception', function () {
+        Queue::fake();
+        $user = makeUser();
+        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        $real = app(FeedService::class);
+        $this->mock(FeedService::class, function ($mock) use ($real) {
+            $mock->shouldReceive('plainTitle')->andReturnUsing(fn (?string $value) => $real->plainTitle($value));
+            $mock->shouldReceive('createImportedSubscription')->andReturnUsing(
+                fn (User $user, string $title, string $url, array|false|null $feedData) => $url === 'https://bad.example/feed'
+                    ? throw new RuntimeException('boom')
+                    : $real->createImportedSubscription($user, $title, $url, $feedData)
+            );
+        });
+        runningFeedImport($user, ['https://before.example/feed', 'https://bad.example/feed', 'https://after.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
+        expect(feedImportStatuses($user))->toBe([
+            'https://before.example/feed' => 'subscribed',
+            'https://bad.example/feed' => 'unreachable',
+            'https://after.example/feed' => 'subscribed',
+        ]);
+    });
+
+    it('treats a feed body over the size cap as unreachable', function () {
+        Queue::fake();
+        $user = makeUser();
+        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        Http::fake([
+            'https://huge.example/*' => Http::response(str_replace('</channel>', str_repeat(' ', 5 * 1024 * 1024).'</channel>', $rss), 200),
+            'https://declared.example/*' => Http::response($rss, 200, ['Content-Length' => (string) (5 * 1024 * 1024 + 1)]),
+            '*' => Http::response($rss, 200),
+        ]);
+        runningFeedImport($user, ['https://huge.example/feed', 'https://declared.example/feed', 'https://ok.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://huge.example/feed' => 'unreachable',
+            'https://declared.example/feed' => 'unreachable',
+            'https://ok.example/feed' => 'subscribed',
+        ]);
+        expect(Feed::pluck('url')->all())->toBe(['https://ok.example/feed']);
+    });
+
+    it('finishes a running import when the job fails', function () {
+        Queue::fake();
+        $user = makeUser();
+        runningFeedImport($user, ['https://one.example/feed', 'https://two.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->failed(new RuntimeException('boom'));
+
+        expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
+        expect(feedImportStatuses($user))->toBe([
+            'https://one.example/feed' => 'unreachable',
+            'https://two.example/feed' => 'unreachable',
         ]);
     });
 });

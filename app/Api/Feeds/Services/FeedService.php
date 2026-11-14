@@ -25,6 +25,7 @@ class FeedService
     private const int MAX_ERROR_LENGTH = 500;
     private const int MAX_DESCRIPTION_LENGTH = 1000;
     private const int MAX_ITEM_ID_LENGTH = 255;
+    private const int MAX_TITLE_LENGTH = 255;
     private const int MAX_TITLE_DECODE_PASSES = 3;
 
     public function __construct(
@@ -117,7 +118,7 @@ class FeedService
             }
 
             $feed = Feed::create([
-                'title' => $this->plainTitle($feedData['title']) ?: $title,
+                'title' => mb_substr($this->plainTitle($feedData['title']) ?: $title, 0, self::MAX_TITLE_LENGTH),
                 'url' => $url,
                 'created_by' => $userId,
             ]);
