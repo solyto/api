@@ -108,11 +108,23 @@ class CalendarService
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
     }
 
+    /**
+     * Deleting the owner's instance removes every sharee instance with it, so
+     * the sharees are collected first. solytoShared is not a usable guard: it
+     * ignores pending invites, which still show in the sharee's list.
+     */
     public function destroy(User $user, CalendarDTO $calendar): void
     {
+        $shareeIds = ! $calendar->isShared && ! $calendar->isExternal
+            ? array_column($this->dav->calendars()->sharing()->listSharees($calendar), 'user_id')
+            : [];
+
         $this->dav->calendars()->delete($calendar);
-        $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+
+        foreach ([$user->id, ...$shareeIds] as $userId) {
+            $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
+            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar->calendarId]);
+        }
     }
 
     public function listEvents(User $user, string $yearMonth): array
