@@ -10,6 +10,8 @@ use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -111,7 +113,8 @@ class ExternalCalendarService
     /**
      * Connects collections the server listed: each becomes a native
      * calendar row (named like the import, made unique with " (n)") linked
-     * to the remote collection. Already connected ones are skipped.
+     * to the remote collection. Already connected ones are skipped. All or
+     * nothing: if one fails, the calendars this call created are removed.
      *
      * @param  array<int, string>  $urls
      * @return array<int, CalendarDTO>
@@ -127,31 +130,39 @@ class ExternalCalendarService
             throw ValidationException::withMessages(['urls' => 'Only calendars found on the server can be connected.']);
         }
 
-        $connected = [];
-        foreach ($urls as $url) {
-            $candidate = $available[$url];
-            if ($candidate['is_connected']) {
-                continue;
-            }
+        $candidates = array_filter(array_map(fn (string $url) => $available[$url], $urls), fn (array $candidate) => !$candidate['is_connected']);
+        $created = [];
 
-            $calendar = $this->calendars->create($user, [
-                'name' => $this->uniqueName($user, $candidate['name']),
-                'color' => $candidate['color'],
-            ]);
+        try {
+            DB::transaction(function () use ($user, $account, $candidates, &$created) {
+                foreach ($candidates as $candidate) {
+                    $calendar = $this->calendars->create($user, [
+                        'name' => $this->uniqueName($user, $candidate['name']),
+                        'color' => $candidate['color'],
+                    ]);
+                    $created[] = $calendar;
 
-            ExternalCalendar::create([
-                'external_calendar_account_id' => $account->id,
-                'user_id' => $user->id,
-                'remote_url' => $url,
-                'calendar_id' => $calendar->calendarId,
-                'instance_id' => $calendar->instanceId,
-            ]);
-            $this->calendars->markExternal($user, $calendar);
+                    ExternalCalendar::create([
+                        'external_calendar_account_id' => $account->id,
+                        'user_id' => $user->id,
+                        'remote_url' => $candidate['url'],
+                        'calendar_id' => $calendar->calendarId,
+                        'instance_id' => $calendar->instanceId,
+                    ]);
+                }
+            });
+        } catch (\Throwable $e) {
+            // Rethrown: the catch only undoes the DAV calendars, which live on the pgsql connection outside the transaction.
+            $this->removeCreated($user, $created);
 
-            $connected[] = $calendar->instanceId;
+            throw $e;
         }
 
-        return array_values(array_filter(array_map(fn (int $instanceId) => $this->calendars->get($user, $instanceId), $connected)));
+        foreach ($created as $calendar) {
+            $this->calendars->markExternal($user, $calendar);
+        }
+
+        return array_values(array_filter(array_map(fn (CalendarDTO $calendar) => $this->calendars->get($user, $calendar->instanceId), $created)));
     }
 
     /**
@@ -172,6 +183,27 @@ class ExternalCalendarService
         }
 
         return $found;
+    }
+
+    /**
+     * A cleanup failure is logged, not thrown, so it cannot hide the error
+     * that triggered the cleanup.
+     *
+     * @param  array<int, CalendarDTO>  $created
+     */
+    private function removeCreated(User $user, array $created): void
+    {
+        foreach ($created as $calendar) {
+            try {
+                $this->calendars->destroy($user, $calendar);
+            } catch (\Throwable $e) {
+                Log::error('Could not remove a calendar after a failed external connect', [
+                    'user_id' => $user->id,
+                    'instance_id' => $calendar->instanceId,
+                    'exception' => $e,
+                ]);
+            }
+        }
     }
 
     private function uniqueName(User $user, string $name): string

@@ -53,6 +53,24 @@ describe('Calendar CRUD', function () {
             ->assertJsonPath('message', 'Calendar already exists.');
     });
 
+    it('gives calendars whose names slug alike or to nothing distinct uris', function () {
+        $user = makeUser();
+        $names = ['Work', 'work!', 'Work?', '🎉', '🎈'];
+
+        foreach ($names as $name) {
+            $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => $name])->assertStatus(201);
+        }
+
+        $uris = DB::connection('pgsql')->table('calendarinstances')
+            ->where('principaluri', 'principals/'.$user->email)
+            ->whereIn('displayname', $names)
+            ->pluck('uri', 'displayname');
+
+        expect($uris->all())->toHaveCount(5)
+            ->and($uris->filter()->unique()->all())->toHaveCount(5)
+            ->and($uris->only(['Work', 'work!', 'Work?'])->values()->all())->toBe(['work', 'work-1', 'work-2']);
+    });
+
     it('renders a service failure through the central 500 handler', function () {
         $user = makeUser();
 

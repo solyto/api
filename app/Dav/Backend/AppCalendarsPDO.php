@@ -488,7 +488,30 @@ SQL
             'timezone' => $dto->timezone,
         ];
 
-        parent::createCalendar($principalUri, Str::slug($dto->displayName), $calendar);
+        parent::createCalendar($principalUri, $this->uniqueUri($principalUri, $dto->displayName), $calendar);
+    }
+
+    /**
+     * (principaluri, uri) is unique, but different display names can slug
+     * alike ("Work" and "work!") or to nothing (emoji-only names).
+     */
+    private function uniqueUri(string $principalUri, string $displayName): string
+    {
+        $base = Str::slug($displayName);
+        if ($base === '') {
+            return Str::uuid()->toString();
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND uri = ?'
+        );
+
+        $candidate = $base;
+        for ($i = 1; $stmt->execute([$principalUri, $candidate]) && $stmt->fetchColumn() !== false; $i++) {
+            $candidate = $base.'-'.$i;
+        }
+
+        return $candidate;
     }
 
     public function updateCalendarCustom(CalendarDTO $dto): void
