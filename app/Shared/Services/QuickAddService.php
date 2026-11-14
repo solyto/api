@@ -203,7 +203,7 @@ class QuickAddService
 
         return $service->create($user, [
             'title' => $dto->getTitle(),
-            'category' => $dto->getType() === 'series' ? 'series' : 'movie',
+            'category' => in_array($dto->getType(), ['tv', 'series'], true) ? 'series' : 'movie',
             'publication_year' => $dto->getReleaseYear(),
             'cover_path' => $dto->getCover(),
             'link' => $dto->getLink(),
