@@ -1,7 +1,7 @@
 # Report: Every library cover response sleeps for one second
 
 date: 2026-11-14
-read: false
+read: true
 branch: `main`, tree at `1176396`
 scope: Performance of `GET /libraries/covers/{type}/{fileName}`. Written for the maintainer. No application code, config or migrations were changed.
 
