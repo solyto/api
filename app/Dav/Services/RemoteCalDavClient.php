@@ -303,13 +303,14 @@ class RemoteCalDavClient
 
     /**
      * Sends a request with the given credentials to a URL that already went
-     * through discovery, e.g. the import's per-collection REPORT.
+     * through discovery, e.g. the import's per-collection REPORT, following
+     * redirects.
      *
      * @param  array<string, string>  $headers
      */
     public function send(string $username, string $password, string $method, string $url, array $headers = [], ?string $body = null): Response
     {
-        return $this->request([$username, $password], $method, $url, $headers, $body);
+        return $this->sendFollowing([$username, $password], $method, $url, $headers, $body)[0];
     }
 
     /**
@@ -336,6 +337,7 @@ class RemoteCalDavClient
 
         $timeout = (int) config('calendars.external.timeout');
         $maxBytes = (int) config('calendars.external.max_response_bytes');
+        $tooLarge = false;
 
         $pending = Http::withBasicAuth($credentials[0], $credentials[1])
             ->timeout($timeout)
@@ -344,22 +346,25 @@ class RemoteCalDavClient
             ->withHeaders($headers)
             ->withOptions([
                 'curl' => [CURLOPT_RESOLVE => [$pin]],
-                'on_headers' => function (ResponseInterface $response) use ($maxBytes) {
+                'on_headers' => function (ResponseInterface $response) use ($maxBytes, &$tooLarge) {
                     if ((int) $response->getHeaderLine('Content-Length') > $maxBytes) {
+                        $tooLarge = true;
                         throw new ExternalCalendarUnavailableException();
                     }
                 },
-                'progress' => function ($downloadTotal, $downloaded) use ($maxBytes) {
+                'progress' => function ($downloadTotal, $downloaded) use ($maxBytes, &$tooLarge) {
                     if ($downloaded > $maxBytes) {
+                        $tooLarge = true;
                         throw new ExternalCalendarUnavailableException();
                     }
                 },
             ]);
 
+        // Guzzle wraps an on_headers exception in a TransferException but lets one from progress through.
         try {
             $response = $pending->send($method, $url, $body !== null ? ['body' => $body] : []);
-        } catch (ConnectionException|TransferException) {
-            throw $this->unavailable($url, null, 'connection');
+        } catch (ConnectionException|TransferException|ExternalCalendarUnavailableException) {
+            throw $this->unavailable($url, null, $tooLarge ? 'too large' : 'connection');
         }
 
         if (strlen($response->body()) > $maxBytes) {
@@ -385,7 +390,14 @@ class RemoteCalDavClient
                 return [$response, $url];
             }
 
-            $url = $this->resolveUrl($response->header('Location'), $url);
+            $next = $this->resolveUrl($response->header('Location'), $url);
+
+            // Every hop carries the Basic auth credentials, so a downgrade would send them in plaintext.
+            if (strtolower((string) parse_url($url, PHP_URL_SCHEME)) === 'https' && strtolower((string) parse_url($next, PHP_URL_SCHEME)) !== 'https') {
+                throw $this->unavailable($url, $response->status(), 'insecure redirect');
+            }
+
+            $url = $next;
         }
 
         throw $this->unavailable($url, null, 'redirects');
@@ -574,9 +586,24 @@ class RemoteCalDavClient
         return str_starts_with($etag, '"') || str_starts_with($etag, 'W/') ? $etag : '"'.$etag.'"';
     }
 
+    /**
+     * If-Match uses strong comparison (RFC 9110 13.1.1), so a weak tag never
+     * matches. A server behind a compressing proxy (nginx gzip) weakens its
+     * strong ETags on GET, so the W/ prefix is dropped here only; the stored
+     * tag stays as the remote sent it.
+     */
     private function ifMatchHeader(string $etag): string
     {
-        return str_contains($etag, ',') ? $etag : (string) $this->normalizeEtag($etag);
+        if (str_contains($etag, ',')) {
+            return implode(', ', array_map(fn (string $tag) => $this->strongEtag(trim($tag)), explode(',', $etag)));
+        }
+
+        return (string) $this->normalizeEtag($this->strongEtag(trim($etag)));
+    }
+
+    private function strongEtag(string $etag): string
+    {
+        return str_starts_with($etag, 'W/') ? substr($etag, 2) : $etag;
     }
 
     private function isCollection(\DOMElement $resourceType): bool

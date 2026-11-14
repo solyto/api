@@ -29,7 +29,8 @@ directories for Pest's own discovery:
 | `Plugins` | `app/Plugins/Tests/`, `app/Plugins/*/Tests/` | the plugin framework and each plugin |
 
 Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
-`goodreads_book.html`) and `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`).
+`goodreads_book.html`), `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`) and
+`tests/Fixtures/http/` (the `php -S` router for `RemoteCalDavClientLiveTest`).
 
 Binding: `tests/Pest.php` is the only Pest bootstrap file Pest loads
 (nested `Pest.php` files are ignored). It binds `Tests\TestCase` to all five
@@ -88,7 +89,9 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
   `FeedReader`), recurrence, release filtering, quick-add detection —
   through `app(Service::class)` with factory data, no HTTP.
 - **External services** — through the HTTP seams with `Http::fake()` and
-  the fixtures; never a live call.
+  the fixtures; never a live call. A loopback listener started by the test
+  (`RemoteCalDavClientLiveTest`) is allowed when the transport itself is
+  under test; it never leaves the machine.
 - **Jobs and commands** — assert the effect (rows written, notification
   sent), not that the job was dispatched.
 - **Shared contracts** in `tests/Unit` with `covers()`: `ApiResponse`,
@@ -208,7 +211,11 @@ isolates DAV writes.
   `DavApiConsistencyTest` (API ↔ DAV, `CacheInvalidationPlugin`),
   `DavClientFixtureTest` (`tests/Fixtures/dav/`), `DavImportTest`
   (`Http::fake()` remote server), `EventOccurrenceServiceTest`,
-  `PrincipalsServiceTest`, `DavServiceTest`.
+  `PrincipalsServiceTest`, `DavServiceTest`, `RemoteCalDavClientTest` and
+  `ExternalCalendarProxyTest` (external calendars against
+  `tests/Support/FakeCalDavServer`), `RemoteCalDavClientLiveTest` (the
+  client against a real `php -S` listener on `127.0.0.1`, see
+  [Caveats](#caveats)).
 - A DAV-level isolation test belongs next to every new DAV-reachable
   resource or method.
 
@@ -252,6 +259,8 @@ Limits of the setup:
 | Real-client data (Apple, Google, Outlook, Thunderbird, DAVx5) | `DavClientFixtureTest` | `DavClientFixtureTest` | — |
 | Occurrence edits, expansion, DST | `EventOccurrenceServiceTest`, `DavClientFixtureTest` | — | — |
 | Import from a remote server | `DavImportTest` | `DavImportTest` | — |
+| Outbound client: redirects, weak ETags, credentials | `RemoteCalDavClientTest`, `ExternalCalendarProxyTest` | — | — |
+| Outbound client: `CURLOPT_RESOLVE` pinning, response size cap | `RemoteCalDavClientLiveTest` | — | — |
 | Service CRUD, sharing, deletion | `DavServiceTest` | `DavServiceTest` | `PrincipalsServiceTest` |
 
 ### Known gaps (skipped tests)
@@ -274,6 +283,11 @@ turns green once the gap is fixed (remove the `skip`).
   today) and resets it — never a hard-coded date that is only true once.
 - External HTTP is faked (`Http::fake()`, 8 files) and side effects are
   caught with `Notification::fake()`/`Queue::fake()`/`Bus::fake()` (8 files).
+- `Http::fake()` replaces the transport, so curl options are never applied
+  there. `RemoteCalDavClientLiveTest` covers them instead: it starts
+  `php -S` on a free loopback port per test (stopped in `afterEach`) and
+  binds an `OutboundUrlGuard` that pins the unresolvable `dav.test` to
+  `127.0.0.1`, so a successful request proves the pinning.
 - The DAV SQLite file is shared by all tests in a process; the transaction
   wrapper handles isolation, but a test that commits through SabreDAV
   directly must clean up. `davRequest()` stays inside the transaction.

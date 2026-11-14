@@ -27,6 +27,9 @@ class FakeCalDavServer
 
     public bool $supportsSync = true;
 
+    /** Sends GET ETags as W/"…" while If-Match stays a strong comparison, like sabre behind nginx gzip. */
+    public bool $weakEtags = false;
+
     /** @var array<int, string> hrefs added to every multistatus listing */
     public array $extraHrefs = [];
 
@@ -102,7 +105,7 @@ class FakeCalDavServer
         }
 
         return match ($request->method()) {
-            'GET' => $object ? Http::response($object['data'], 200, ['ETag' => $object['etag'], 'Content-Type' => 'text/calendar']) : Http::response('', 404),
+            'GET' => $object ? Http::response($object['data'], 200, ['ETag' => ($this->weakEtags ? 'W/' : '').$object['etag'], 'Content-Type' => 'text/calendar']) : Http::response('', 404),
             'PUT' => $this->handlePut($request, $name, $object),
             'DELETE' => $object ? $this->handleDelete($name) : Http::response('', 404),
             default => Http::response('', 405),

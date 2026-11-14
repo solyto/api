@@ -163,6 +163,47 @@ describe('Calendar import', function () {
         expect($import->getState($user->id)->calendarsDone)->toBe(0);
     });
 
+    it('follows a redirect from a calendar collection', function () {
+        $user = davUser();
+        Http::fake(fn (Request $request) => $request->method() === 'REPORT' && str_starts_with($request->url(), 'https://remote.example.com/')
+            ? Http::response('', 301, ['Location' => 'https://moved.example.com/remote.php/dav/calendars/alice/personal/'])
+            : null);
+        fakeRemoteDav('calendars', ['Personal' => ['a.ics' => davIcs('a', 'Dentist')]]);
+        $import = app(DavService::class)->import()->calendars();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
+        $import->importCalendars($user, $import->getState($user->id));
+        $import->importEvents($user, $import->getState($user->id));
+
+        expect($import->getState($user->id)->eventsDone)->toBe(1);
+        Http::assertSent(fn (Request $request) => $request->method() === 'REPORT' && str_starts_with($request->url(), 'https://moved.example.com/'));
+    });
+
+    it('logs a calendar it cannot read and imports the others', function () {
+        $user = davUser();
+        Http::fake(fn (Request $request) => $request->method() === 'REPORT' && str_ends_with($request->url(), '/personal/')
+            ? Http::response('', 500)
+            : null);
+        fakeRemoteDav('calendars', ['Personal' => ['a.ics' => davIcs('a')], 'Work' => ['b.ics' => davIcs('b', 'Review')]]);
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal', 'Work']);
+        $import->importCalendars($user, $import->getState($user->id));
+
+        Log::shouldReceive('channel')->with('dav')->andReturnSelf();
+        Log::shouldReceive('warning')->once()->with('Calendar import could not read a calendar', Mockery::on(
+            fn (array $context) => $context === ['host' => 'remote.example.com', 'status' => 500]
+        ));
+
+        $import->importEvents($user, $import->getState($user->id));
+
+        $work = app(DavService::class)->calendars()->getByName($user, 'Work');
+        expect($import->getState($user->id)->stage)->toBe('finished')
+            ->and(collect(app(DavService::class)->calendars()->events()->list($work))->pluck('title')->all())->toBe(['Review'])
+            ->and(app(DavService::class)->calendars()->events()->list(app(DavService::class)->calendars()->getByName($user, 'Personal')))->toBeEmpty();
+    });
+
     it('imports events with escaped text without losing them', function () {
         $user = davUser();
         fakeRemoteDav('calendars', ['Personal' => [
