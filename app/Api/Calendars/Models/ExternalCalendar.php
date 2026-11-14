@@ -22,6 +22,7 @@ class ExternalCalendar extends Model
         'external_calendar_account_id',
         'user_id',
         'remote_url',
+        'remote_url_hash',
         'calendar_id',
         'instance_id',
     ];

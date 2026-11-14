@@ -194,11 +194,11 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
 
         Route::prefix('external/accounts')->group(function () {
             Route::get('', [ExternalCalendarController::class, 'listAccounts']);
-            Route::post('', [ExternalCalendarController::class, 'storeAccount']);
-            Route::put('{account}', [ExternalCalendarController::class, 'updateAccount']);
+            Route::middleware('throttle:external-calendars')->post('', [ExternalCalendarController::class, 'storeAccount']);
+            Route::middleware('throttle:external-calendars')->put('{account}', [ExternalCalendarController::class, 'updateAccount']);
             Route::delete('{account}', [ExternalCalendarController::class, 'destroyAccount']);
-            Route::get('{account}/available', [ExternalCalendarController::class, 'listAvailable']);
-            Route::post('{account}/calendars', [ExternalCalendarController::class, 'connectCalendars']);
+            Route::middleware('throttle:external-calendars')->get('{account}/available', [ExternalCalendarController::class, 'listAvailable']);
+            Route::middleware('throttle:external-calendars')->post('{account}/calendars', [ExternalCalendarController::class, 'connectCalendars']);
         });
 
         Route::prefix('invites')->group(function () {

@@ -83,7 +83,8 @@ class ExternalCalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error, URL not allowed or no calendars found", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error, URL not allowed, credentials rejected, server unreachable or no calendars found", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function storeAccount(StoreExternalCalendarAccountRequest $request): JsonResponse
@@ -128,7 +129,8 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error or no calendars found with these credentials", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error, credentials rejected, server unreachable or no calendars found", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function updateAccount(UpdateExternalCalendarAccountRequest $request, ExternalCalendarAccount $account): JsonResponse
@@ -199,7 +201,8 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="No calendars found on the server", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Credentials rejected, server unreachable or no calendars found on the server", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function listAvailable(Request $request, ExternalCalendarAccount $account): JsonResponse
@@ -246,7 +249,8 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error or a URL the server did not list", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error or a URL the server did not list", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function connectCalendars(ConnectExternalCalendarsRequest $request, ExternalCalendarAccount $account): JsonResponse

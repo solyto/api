@@ -86,6 +86,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perHour(20)->by($request->user()->id);
         });
 
+        // Each of these asks the user's own CalDAV server (discovery), up to a timeout per request.
+        RateLimiter::for('external-calendars', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+        });
+
         RateLimiter::for('widget-token', function (Request $request) {
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });

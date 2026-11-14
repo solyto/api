@@ -6,10 +6,13 @@ use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
+use App\Dav\Exceptions\ExternalCalendarCredentialsRejectedException;
+use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -142,13 +145,21 @@ class ExternalCalendarService
                     ]);
                     $created[] = $calendar;
 
-                    ExternalCalendar::create([
-                        'external_calendar_account_id' => $account->id,
-                        'user_id' => $user->id,
-                        'remote_url' => $candidate['url'],
-                        'calendar_id' => $calendar->calendarId,
-                        'instance_id' => $calendar->instanceId,
-                    ]);
+                    try {
+                        ExternalCalendar::create([
+                            'external_calendar_account_id' => $account->id,
+                            'user_id' => $user->id,
+                            'remote_url' => $candidate['url'],
+                            // The unique key is on the hash: the URL column is too long to index on older MariaDB.
+                            'remote_url_hash' => hash('sha256', $candidate['url']),
+                            'calendar_id' => $calendar->calendarId,
+                            'instance_id' => $calendar->instanceId,
+                        ]);
+                    } catch (UniqueConstraintViolationException) {
+                        // A concurrent connect linked this collection first: treated as already connected.
+                        array_pop($created);
+                        $this->removeCreated($user, [$calendar]);
+                    }
                 }
             });
         } catch (\Throwable $e) {
@@ -176,10 +187,14 @@ class ExternalCalendarService
             $found = $this->remote->discover($url, $username, $password);
         } catch (BlockedUrlException) {
             throw ValidationException::withMessages(['server_url' => 'The server URL is not allowed.']);
+        } catch (ExternalCalendarCredentialsRejectedException) {
+            throw ValidationException::withMessages(['password' => 'The server rejected the username or app password.']);
+        } catch (ExternalCalendarUnavailableException) {
+            throw ValidationException::withMessages(['server_url' => 'The server could not be reached or did not answer as a CalDAV server.']);
         }
 
         if ($found === []) {
-            throw ValidationException::withMessages(['server_url' => 'No calendars were found with these credentials.']);
+            throw ValidationException::withMessages(['server_url' => 'No calendars were found on the server.']);
         }
 
         return $found;

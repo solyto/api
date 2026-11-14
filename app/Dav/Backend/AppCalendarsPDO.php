@@ -7,6 +7,7 @@ use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Dav\Helpers\DavHelper;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Services\UserCacheService;
@@ -30,6 +31,8 @@ class AppCalendarsPDO extends SabreBackend
 {
     private const string SYNC_TOKEN_MARKER = 'ext-';
     private const string CACHE_KEY_STATE = 'external_calendar_state';
+    // Shared with CalendarService: a remote that failed is skipped by both for the unavailable TTL.
+    private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
     // Sabre's MAX_DATE (2038-01-01 UTC): series running past it are stored with lastoccurence capped here or just after.
     private const int LAST_OCCURRENCE_CAP = 2145916800;
 
@@ -1177,6 +1180,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
     /**
      * @return array{0: ?\Sabre\VObject\Component\VCalendar, 1: ?\Sabre\VObject\Component\VEvent, 2: ?string}
+     *
+     * @throws UnreadableCalendarObjectException
      */
     private function readRecurringObject(CalendarDTO $calendar, string $uri): array
     {
@@ -1194,12 +1199,23 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             return [null, null, null];
         }
 
-        $vCal = Reader::read($vCalData);
+        // Remote objects were never validated by sabre (see getExpandedEventsCustom).
+        try {
+            $vCal = Reader::read($vCalData);
 
-        foreach ($vCal->VEVENT ?? [] as $vevent) {
-            if (!isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->RRULE)) {
-                return [$vCal, $vevent, $obj['etag'] ?? null];
+            foreach ($vCal->VEVENT ?? [] as $vevent) {
+                if (!isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->RRULE)) {
+                    if (!isset($vevent->DTSTART)) {
+                        throw new \UnexpectedValueException('VEVENT without DTSTART');
+                    }
+
+                    return [$vCal, $vevent, $obj['etag'] ?? null];
+                }
             }
+        } catch (\Throwable $e) {
+            $this->logSkippedObject($calendar->calendarId, $uri, $e);
+
+            throw new UnreadableCalendarObjectException();
         }
 
         return [$vCal, null, $obj['etag'] ?? null];
@@ -1318,6 +1334,11 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             return $cached['state'];
         }
 
+        $unavailableKey = [self::CACHE_KEY_UNAVAILABLE, $link->user_id, $link->calendar_id];
+        if ($cache->get($unavailableKey)) {
+            return is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
+        }
+
         try {
             $state = $this->remote()->collectionState($link);
         } catch (ExternalCalendarUnavailableException) {
@@ -1325,6 +1346,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             // included: remember the failure so a dead remote is asked at
             // most once per TTL.
             $state = is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
+            $cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), time());
         }
 
         $cache->store($key, 0, ['fetched_at' => time(), 'state' => $state]);

@@ -5,6 +5,7 @@ use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Shared\Middleware\RecordClientVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -47,8 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
               __DIR__.'/../app/Plugins/Ai/Commands',
           ])
           ->withExceptions(function ($exceptions) {
-              // RemoteCalDavClient already logs the failing host; a user's server being down is not an app error.
-              $exceptions->dontReport([ExternalCalendarPreconditionFailedException::class, ExternalCalendarUnavailableException::class]);
+              // RemoteCalDavClient and AppCalendarsPDO already log these; a user's server being down or storing bad data is not an app error.
+              $exceptions->dontReport([ExternalCalendarPreconditionFailedException::class, ExternalCalendarUnavailableException::class, UnreadableCalendarObjectException::class]);
 
               $exceptions->render(function (Throwable $e, Request $request) {
                   $isApi = $request->is('api/*') || $request->expectsJson();
@@ -109,6 +110,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof ExternalCalendarPreconditionFailedException) {
                       return ApiResponse::error('The event was changed on its server.', 412);
+                  }
+
+                  if ($e instanceof UnreadableCalendarObjectException) {
+                      return ApiResponse::error('The event cannot be read, so it cannot be changed.', 422);
                   }
 
                   if ($e instanceof ExternalCalendarUnavailableException) {

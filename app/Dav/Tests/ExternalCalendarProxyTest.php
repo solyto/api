@@ -269,6 +269,33 @@ describe('External calendars over DAV', function () {
             ->and($second->evaluate('string(//d:response[contains(d:href, "/remote/")]//cs:getctag)'))->toBe('ctag-1');
     });
 
+    it('never sends a dot-segment object name to the remote', function (string $method, string $name) {
+        $this->remote->put('a.ics', davIcs('a'));
+
+        $response = $method === 'PUT'
+            ? remotePut($this->user, $name, davIcs('dot'))
+            : davRequest($this->user, $method, remotePath($this->user, $name));
+
+        expect($response->getStatus())->toBeGreaterThanOrEqual(400)
+            ->and($response->getStatus())->toBeLessThan(500)
+            ->and(collect($this->remote->requests)->reject(fn ($r) => $r->method() === 'PROPFIND'))->toBeEmpty()
+            ->and($this->remote->objects)->toHaveKey('a.ics');
+    })->with(['GET', 'DELETE', 'PUT'])->with(['%2E', '%2E%2E']);
+
+    it('shares a dead remote with the API listing', function () {
+        config(['calendars.external.unavailable_ttl' => 300]);
+        $this->remote->down = true;
+
+        davRequest($this->user, 'PROPFIND', 'calendars/'.$this->user->email.'/', davPropfindBody(['cs:getctag']), ['Depth' => '1']);
+        $asked = count($this->remote->requests);
+        $service = app(\App\Api\Calendars\Services\CalendarService::class);
+        $service->listWidgetEvents($this->user);
+
+        expect($asked)->toBe(1)
+            ->and($this->remote->requests)->toHaveCount(1)
+            ->and($service->unavailableCalendars())->toBe([$this->calendar->instanceId]);
+    });
+
     it('refuses to share an external calendar over DAV', function () {
         $friend = davUser();
         $body = '<?xml version="1.0" encoding="utf-8"?><d:share-resource xmlns:d="DAV:"><d:sharee><d:href>mailto:'.$friend->email.'</d:href><d:share-access><d:read/></d:share-access></d:sharee></d:share-resource>';

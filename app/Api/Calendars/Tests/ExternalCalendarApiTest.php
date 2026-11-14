@@ -134,6 +134,7 @@ describe('External calendars through the API', function () {
             ->and($calendars['Remote']['is_unavailable'])->toBeTrue();
 
         $this->remote->down = false;
+        $this->travel(301)->seconds();
         $recovered = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget');
 
         expect($recovered->json('meta.unavailable_calendars'))->toBe([])
@@ -162,6 +163,85 @@ describe('External calendars through the API', function () {
         $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendar->calendarId]);
         $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $native->calendarId]);
     });
+
+    it('does not ask a remote that just failed again for the unavailable TTL', function () {
+        config(['calendars.external.unavailable_ttl' => 300]);
+        $this->remote->down = true;
+        $listing = fn () => $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/'.now()->format('Y-m'));
+
+        $listing()->assertStatus(200);
+        $asked = count($this->remote->requests);
+        $again = $listing()->assertStatus(200);
+
+        expect($asked)->toBeGreaterThan(0)
+            ->and($this->remote->requests)->toHaveCount($asked)
+            ->and($again->json('meta.unavailable_calendars'))->toBe([$this->calendar->instanceId])
+            ->and(collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Remote')['is_unavailable'])->toBeTrue();
+
+        $this->travel(301)->seconds();
+        $listing();
+
+        expect(count($this->remote->requests))->toBeGreaterThan($asked);
+    });
+
+    it('still serves cached events of a remote flagged unavailable without asking it', function () {
+        $this->remote->put('a.ics', remoteEventIcs('a', 'Cached', remoteEventStart(), remoteEventEnd()));
+        $widget = fn () => $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200);
+        $widget();
+
+        $this->remote->down = true;
+        $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/'.now()->addYear()->format('Y-m'))->assertStatus(200);
+        $asked = count($this->remote->requests);
+        $again = $widget();
+
+        expect(collect($again->json('data'))->pluck('title')->all())->toBe(['Cached'])
+            ->and($again->json('meta.unavailable_calendars'))->toBe([$this->calendar->instanceId])
+            ->and($this->remote->requests)->toHaveCount($asked);
+    });
+
+    it('never sends a dot-segment event name to the remote', function (string $method, string $name) {
+        $this->remote->put('a.ics', remoteEventIcs('a', 'Remote', remoteEventStart(), remoteEventEnd()));
+        $url = '/api/v1/calendars/'.$this->calendar->instanceId.'/events/'.$name;
+
+        $response = $method === 'DELETE'
+            ? $this->actingAs($this->user, 'sanctum')->deleteJson($url)
+            : $this->actingAs($this->user, 'sanctum')->putJson($url, [
+                'title' => 'X',
+                'start_date' => now()->addDay()->setTime(10, 0)->format('Y-m-d H:i:s'),
+                'end_date' => now()->addDay()->setTime(11, 0)->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $this->calendar->instanceId,
+                'etag' => '"x"',
+            ]);
+
+        expectApiError($response, 404);
+        expect($this->remote->requests)->toBeEmpty()
+            ->and($this->remote->objects)->toHaveKey('a.ics');
+    })->with(['DELETE', 'PUT'])->with(['%2E', '%2E%2E', '.%2E']);
+
+    it('answers 422 for an occurrence of a remote series that cannot be parsed', function (string $method) {
+        $start = now('UTC')->addDay()->setTime(10, 0);
+        $this->remote->put('broken.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Remote//EN', 'BEGIN:VEVENT', 'UID:broken', 'DTSTAMP:20300101T000000Z',
+            'DTSTART:'.$start->format('Ymd\THis\Z'), 'DTEND:'.$start->copy()->addHour()->format('Ymd\THis\Z'),
+            'RRULE:FREQ=DAILY;COUNT=5', 'SUMMARY:Broken', 'not a content line', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n");
+        $url = '/api/v1/calendars/'.$this->calendar->instanceId.'/events/broken.ics/occurrence/'.$start->copy()->addDay()->format('Y-m-d H:i:s');
+
+        $response = $method === 'DELETE'
+            ? $this->actingAs($this->user, 'sanctum')->deleteJson($url)
+            : $this->actingAs($this->user, 'sanctum')->putJson($url, [
+                'title' => 'Changed',
+                'start_date' => $start->copy()->addDay()->setTime(12, 0)->format('Y-m-d H:i:s'),
+                'end_date' => $start->copy()->addDay()->setTime(13, 0)->format('Y-m-d H:i:s'),
+                'is_all_day' => false,
+                'calendar_id' => $this->calendar->instanceId,
+                'etag' => $this->remote->objects['broken.ics']['etag'],
+            ]);
+
+        expectApiError($response, 422);
+        expect(collect($this->remote->requests)->filter(fn ($r) => $r->method() === 'PUT'))->toBeEmpty();
+    })->with(['DELETE', 'PUT']);
 
     it('answers 503 for a single event of an unreachable calendar', function () {
         $this->remote->down = true;
@@ -387,6 +467,63 @@ describe('Connecting external calendars', function () {
         'private' => ['https://192.168.1.10', null],
         'wrong password' => [FakeCalDavServer::ORIGIN, ['alice', 'other']],
     ]);
+
+    it('tells rejected credentials, an unreachable server and a server without calendars apart', function (string $case, string $field, string $message) {
+        match ($case) {
+            'credentials' => $this->remote->credentials = ['alice', 'other'],
+            'unreachable' => $this->remote->down = true,
+            'empty' => null,
+        };
+
+        // Every discovery path below /nothing answers 404.
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
+            'server_url' => FakeCalDavServer::ORIGIN.($case === 'empty' ? '/nothing' : ''),
+            'username' => 'alice',
+            'password' => 'app-password',
+        ]);
+
+        expectApiError($response, 422);
+        expect($response->json('errors.'.$field.'.0'))->toBe($message);
+    })->with([
+        'credentials rejected' => ['credentials', 'password', 'The server rejected the username or app password.'],
+        'server unreachable' => ['unreachable', 'server_url', 'The server could not be reached or did not answer as a CalDAV server.'],
+        'no calendars' => ['empty', 'server_url', 'No calendars were found on the server.'],
+    ]);
+
+    it('throttles the routes that ask the server', function () {
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/calendars/external/accounts/{$account->id}/available")->assertStatus(200);
+        }
+
+        expectApiError($this->actingAs($this->user, 'sanctum')->getJson("/api/v1/calendars/external/accounts/{$account->id}/available"), 429);
+        $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/external/accounts')->assertStatus(200);
+    });
+
+    it('treats a concurrent connect of the same calendar as already connected', function () {
+        $user = makeUser();
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);
+        $instances = DB::connection('pgsql')->table('calendarinstances')->count();
+
+        \App\Api\Calendars\Models\ExternalCalendar::creating(function () use ($account, $user) {
+            DB::table('external_calendars')->insertOrIgnore([
+                'external_calendar_account_id' => $account->id,
+                'user_id' => $user->id,
+                'remote_url' => $this->remote->url(),
+                'remote_url_hash' => hash('sha256', $this->remote->url()),
+                'calendar_id' => 999999,
+                'instance_id' => 999999,
+            ]);
+        });
+
+        $connect = $this->actingAs($user, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", ['urls' => [$this->remote->url()]])
+            ->assertStatus(201);
+
+        expect($connect->json('data'))->toBe([])
+            ->and(\App\Api\Calendars\Models\ExternalCalendar::where('external_calendar_account_id', $account->id)->count())->toBe(1)
+            ->and(DB::connection('pgsql')->table('calendarinstances')->count())->toBe($instances);
+    });
 
     it('replaces the app password only after the server accepts it', function () {
         $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();

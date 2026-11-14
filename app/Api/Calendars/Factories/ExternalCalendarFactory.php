@@ -17,6 +17,7 @@ class ExternalCalendarFactory extends Factory
             'external_calendar_account_id' => ExternalCalendarAccount::factory(),
             'user_id' => fn (array $attributes) => ExternalCalendarAccount::find($attributes['external_calendar_account_id'])?->user_id,
             'remote_url' => 'https://dav.example.com/calendars/'.$this->faker->slug(2).'/',
+            'remote_url_hash' => fn (array $attributes) => hash('sha256', $attributes['remote_url']),
             'calendar_id' => $this->faker->unique()->numberBetween(1, 1_000_000),
             'instance_id' => $this->faker->unique()->numberBetween(1, 1_000_000),
         ];

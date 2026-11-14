@@ -93,6 +93,61 @@ describe('RemoteCalDavClient', function () {
         Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request->header('If-Match') === ['"one", "two"']);
     });
 
+    it('passes If-Match: * through verbatim', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+        $remote->put('a.ics', davIcs('a'));
+
+        // The fake compares If-Match literally, so it answers 412; only the header matters here.
+        expect(fn () => app(RemoteCalDavClient::class)->deleteObject(ExternalCalendar::first(), 'a.ics', '*'))
+            ->toThrow(ExternalCalendarPreconditionFailedException::class);
+        Http::assertSent(fn (Request $request) => $request->method() === 'DELETE' && $request->header('If-Match') === ['*']);
+    });
+
+    it('refuses dot-segment names before any request', function (string $name) {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+        $client = app(RemoteCalDavClient::class);
+
+        expect($client->getObject(ExternalCalendar::first(), $name))->toBeNull()
+            ->and($client->multiget(ExternalCalendar::first(), [$name]))->toBe([])
+            ->and($client->childName(ExternalCalendar::first(), $remote->path.rawurlencode($name)))->toBeNull()
+            ->and(fn () => $client->deleteObject(ExternalCalendar::first(), $name))->toThrow(\Sabre\DAV\Exception\BadRequest::class)
+            ->and(fn () => $client->putObject(ExternalCalendar::first(), $name, davIcs('a'), true))->toThrow(\Sabre\DAV\Exception\BadRequest::class)
+            ->and($remote->requests)->toBeEmpty();
+    })->with(['.', '..', '']);
+
+    it('keeps Basic auth on a redirect only within the same registrable domain', function (string $from, string $to, bool $keeps) {
+        Http::fake(fn (Request $request) => str_starts_with($request->url(), $from)
+            ? Http::response('', 301, ['Location' => $to])
+            : Http::response('', 404));
+
+        app(RemoteCalDavClient::class)->send('alice', 'app-password', 'PROPFIND', $from);
+
+        Http::assertSent(fn (Request $request) => $request->url() === $from && $request->hasHeader('Authorization'));
+        Http::assertSent(fn (Request $request) => $request->url() === $to && $request->hasHeader('Authorization') === $keeps);
+    })->with([
+        'same host' => ['https://dav.example.com/a/', 'https://dav.example.com/b/', true],
+        'iCloud shard' => ['https://caldav.icloud.com/', 'https://p42-caldav.icloud.com/alice/', true],
+        'other domain' => ['https://example.com/dav/', 'https://evil.com/dav/', false],
+        'private suffix' => ['https://a.github.io/dav/', 'https://b.github.io/dav/', false],
+        'IP literal' => ['https://93.184.216.34/dav/', 'https://93.184.216.35/dav/', false],
+        'underscore in the host' => ['https://dav.example.com/', 'https://dav_2.example.com/', true],
+        'host without a registrable domain' => ['https://dav.example.com/', 'https://'.str_repeat('a', 70).'.example.com/', false],
+    ]);
+
+    it('keeps Basic auth dropped for every later hop', function () {
+        Http::fake(fn (Request $request) => match ($request->url()) {
+            'https://example.com/dav/' => Http::response('', 301, ['Location' => 'https://other.net/dav/']),
+            'https://other.net/dav/' => Http::response('', 301, ['Location' => 'https://www.example.com/dav/']),
+            default => Http::response('', 404),
+        });
+
+        app(RemoteCalDavClient::class)->send('alice', 'app-password', 'PROPFIND', 'https://example.com/dav/');
+
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://www.example.com/dav/' && !$request->hasHeader('Authorization'));
+    });
+
     it('keeps credentials out of logs and caches', function () {
         $remote = (new FakeCalDavServer())->fake();
         $user = davUser();

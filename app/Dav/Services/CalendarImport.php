@@ -171,7 +171,7 @@ class CalendarImport
     {
         try {
             $calendars = $this->remote->discover($dto->url, $dto->username, Crypt::decryptString($dto->secret));
-        } catch (BlockedUrlException) {
+        } catch (BlockedUrlException|ExternalCalendarUnavailableException) {
             throw new ImportException();
         }
 

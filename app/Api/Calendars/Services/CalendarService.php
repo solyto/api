@@ -188,8 +188,10 @@ class CalendarService
     /**
      * Remote changes never invalidate the cache of an external calendar, so
      * its entries live for the short external TTL. An unreachable external
-     * calendar is left out and reported, and flagged in list() until a
-     * listing reaches it again; the failure itself is not cached.
+     * calendar is reported and flagged in list(); its server is not asked
+     * again for the unavailable TTL, whether the failure was seen here or by
+     * a DAV client (AppCalendarsPDO shares the key). Meanwhile its events
+     * are served from the cache when they are there, and left out otherwise.
      *
      * @param  array<int, string>  $keySuffix
      * @return array<int, EventDTO>
@@ -215,19 +217,28 @@ class CalendarService
 
             $eventsKey = [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix];
 
+            // Wrapped so an empty window is cached too: the cache treats
+            // a bare [] as a miss and would ask the remote every time.
+            $cached = $this->cache->get($eventsKey);
+            $isCached = is_array($cached) && array_key_exists('events', $cached);
+
+            if ($this->cache->get($unavailableKey)) {
+                $this->unavailable[] = $calendar->instanceId;
+                if ($isCached) {
+                    $events = array_merge($events, $cached['events']);
+                }
+                continue;
+            }
+
             try {
-                // Wrapped so an empty window is cached too: the cache treats
-                // a bare [] as a miss and would ask the remote every time.
-                $cached = $this->cache->get($eventsKey);
-                if (!is_array($cached) || !array_key_exists('events', $cached)) {
+                if (!$isCached) {
                     $cached = ['events' => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)];
                     $this->cache->store($eventsKey, $externalTtl, $cached);
                 }
                 $events = array_merge($events, $cached['events']);
-                $this->cache->forget($unavailableKey);
             } catch (ExternalCalendarUnavailableException) {
                 $this->unavailable[] = $calendar->instanceId;
-                $this->cache->store($unavailableKey, $externalTtl, time());
+                $this->cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), time());
             }
         }
 
