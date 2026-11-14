@@ -68,6 +68,29 @@ describe('FeedReader', function () {
         expect($reader->getFeedData('https://fixture.example/empty.rss'))->toBeFalse();
     });
 
+    it('parses already downloaded content into feed data', function () {
+        $data = (new FeedReader)->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
+
+        expect($data)->toBeArray();
+        expect($data['title'])->toBe('Fixture Feed');
+        expect($data['items'])->toHaveCount(2);
+    });
+
+    it('returns false for downloaded content that is not a feed', function () {
+        $reader = new FeedReader;
+
+        expect($reader->parseFeedData('<!DOCTYPE html><html><body><p>Hello</p></body></html>'))->toBeFalse();
+        expect($reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss')))->toBeFalse();
+    });
+
+    it('keeps parsed content out of later fetches', function () {
+        $reader = feedReaderWithFixture('feed.atom');
+
+        $reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
+
+        expect($reader->getFeedData('https://fixture.example/feed.atom')['items'][0]->get_title())->toBe('Atom Post');
+    });
+
     it('extracts a media thumbnail from an item', function () {
         $reader = feedReaderWithFixture('feed.rss');
         $items = $reader->getItems('https://fixture.example/feed.rss');
