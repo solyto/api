@@ -671,7 +671,7 @@ describe('CacheInvalidationPlugin', function () {
         davRequest($this->user, 'MKCALENDAR', 'calendars/'.$this->user->email.'/work/');
         davRequest($this->user, 'DELETE', 'calendars/'.$this->user->email.'/work/');
 
-        $this->cache->shouldHaveReceived('forget')->with(['calendars', $this->user->id])->twice();
+        $this->cache->shouldHaveReceived('forget')->with(['calendars_v2', $this->user->id])->twice();
     });
 
     it('drops the cached contacts and queues nothing on a DAV card write', function () {
@@ -731,7 +731,7 @@ describe('CacheInvalidationPlugin', function () {
         expect(davRequest($this->user, 'DELETE', $this->calendar)->getStatus())->toBe(204);
 
         foreach ($sharees as $sharee) {
-            $this->cache->shouldHaveReceived('forget')->with(['calendars', $sharee->id])->once();
+            $this->cache->shouldHaveReceived('forget')->with(['calendars_v2', $sharee->id])->once();
             $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $sharee->id, $this->calendarId])->once();
         }
     });
@@ -743,7 +743,7 @@ describe('CacheInvalidationPlugin', function () {
         expect(davRequest($accepted, 'DELETE', 'calendars/'.$accepted->email.'/'.$instance->uri.'/')->getStatus())->toBe(204);
 
         foreach ([$this->user, $pending] as $other) {
-            $this->cache->shouldNotHaveReceived('forget', [['calendars', $other->id]]);
+            $this->cache->shouldNotHaveReceived('forget', [['calendars_v2', $other->id]]);
         }
     });
 
@@ -753,7 +753,7 @@ describe('CacheInvalidationPlugin', function () {
         expect(davRequest(davUser(), 'DELETE', $this->calendar)->getStatus())->toBe(403);
 
         foreach ($sharees as $sharee) {
-            $this->cache->shouldNotHaveReceived('forget', [['calendars', $sharee->id]]);
+            $this->cache->shouldNotHaveReceived('forget', [['calendars_v2', $sharee->id]]);
             $this->cache->shouldNotHaveReceived('forgetByPrefix', [['calendar_events', $sharee->id, $this->calendarId]]);
         }
     });

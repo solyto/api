@@ -11,6 +11,7 @@ use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Exceptions\UnresolvableHostException;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -52,6 +53,9 @@ class FeedService
         return true;
     }
 
+    /**
+     * @throws ValidationException when the feed host does not resolve
+     */
     public function getTestFeedItems(string $url): array
     {
         $feed = Feed::where('url', $url)->first();
@@ -73,7 +77,13 @@ class FeedService
 
         try {
             $rssItems = $this->getFeedItemsFromRss($url);
+        } catch (UnresolvableHostException) {
+            throw ValidationException::withMessages(['url' => 'The feed URL could not be resolved.']);
         } catch (BlockedUrlException) {
+            return [];
+        }
+
+        if (!$rssItems) {
             return [];
         }
 
@@ -93,6 +103,8 @@ class FeedService
     {
         try {
             return $this->subscribe($user->id, $title, $url, fn () => $this->feedReader->getFeedData($url), $whitelist, $blacklist);
+        } catch (UnresolvableHostException) {
+            throw ValidationException::withMessages(['url' => 'The feed URL could not be resolved.']);
         } catch (BlockedUrlException) {
             throw ValidationException::withMessages(['url' => 'The feed URL is not allowed.']);
         } catch (FeedSubscriptionLimitException) {
@@ -456,6 +468,10 @@ class FeedService
 
         try {
             $items = $this->getFeedItemsFromRss($feed->url);
+        } catch (UnresolvableHostException) {
+            $this->recordSyncFailure($feedId, 'The feed URL could not be resolved.');
+
+            return false;
         } catch (BlockedUrlException) {
             $this->recordSyncFailure($feedId, 'The feed URL is not allowed.');
 

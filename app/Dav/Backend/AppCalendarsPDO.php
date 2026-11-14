@@ -36,6 +36,8 @@ class AppCalendarsPDO extends SabreBackend
     private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
     // Sabre's MAX_DATE (2038-01-01 UTC): series running past it are stored with lastoccurence capped here or just after.
     private const int LAST_OCCURRENCE_CAP = 2145916800;
+    // calendarinstances.uri is VARCHAR(200); the rest is for uniqueUri()'s "-n" suffix.
+    private const int MAX_URI_BASE_LENGTH = 190;
 
     /** @var array<int, ExternalCalendar|false> pgsql calendarid => link, false for native */
     private array $external = [];
@@ -498,10 +500,13 @@ SQL
     /**
      * (principaluri, uri) is unique, but different display names can slug
      * alike ("Work" and "work!") or to nothing (emoji-only names).
+     * Transliteration can make the slug longer than the name (one
+     * Cyrillic letter can become three), so it is cut to leave room for a
+     * "-n" suffix in uri's VARCHAR(200).
      */
     private function uniqueUri(string $principalUri, string $displayName): string
     {
-        $base = Str::slug($displayName);
+        $base = rtrim(substr(Str::slug($displayName), 0, self::MAX_URI_BASE_LENGTH), '-');
         if ($base === '') {
             return Str::uuid()->toString();
         }

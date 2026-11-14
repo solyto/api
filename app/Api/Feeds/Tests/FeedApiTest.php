@@ -94,6 +94,29 @@ describe('Feed subscriptions CRUD', function () {
         expect(FeedSubscription::count())->toBe(0);
     });
 
+    it('rejects a feed URL whose host does not resolve with 422 and says so', function () {
+        Http::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => []));
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'Typo', 'url' => 'https://nowhere.example/feed.xml'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.url.0', 'The feed URL could not be resolved.');
+
+        Http::assertNothingSent();
+        expect(Feed::count())->toBe(0);
+    });
+
+    it('rejects a feed that redirects to an unparseable Location with 422', function (string $location) {
+        Http::fake(['https://bad.example/*' => Http::response('', 302, ['Location' => $location])]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'Bad', 'url' => 'https://bad.example/feed.xml'])
+            ->assertStatus(422);
+
+        expect(Feed::count())->toBe(0);
+    })->with(['//', 'http://', 'http://:80/x']);
+
     it('rejects a subscription over the limit with 422, counting only the user\'s own', function () {
         Queue::fake();
         config(['feeds.max_subscriptions' => 1]);
@@ -191,6 +214,25 @@ describe('Feed items and discovery', function () {
             ->postJson('/api/v1/feeds/test', ['url' => 'https://example.com/feed.xml'])
             ->assertStatus(200)
             ->assertJsonPath('data.0.title', 'Latest Article');
+    });
+
+    it('answers 422 when testing a feed that redirects to an unparseable Location', function (string $location) {
+        Http::fake(['https://bad.example/*' => Http::response('', 302, ['Location' => $location])]);
+
+        expectApiError($this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/test', ['url' => 'https://bad.example/feed.xml']), 422);
+    })->with(['//', 'http://', 'http://:80/x']);
+
+    it('says when testing a feed whose host does not resolve', function () {
+        Http::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => []));
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/test', ['url' => 'https://nowhere.example/feed.xml'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.url.0', 'The feed URL could not be resolved.');
+
+        Http::assertNothingSent();
     });
 });
 

@@ -70,6 +70,41 @@ describe('FeedReader', function () {
         expect($reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss')))->toBeFalse();
     });
 
+    it('resolves an autodiscovered feed link against the URL after redirects', function () {
+        Http::fake([
+            'https://site.example/blog' => Http::response('', 301, ['Location' => '/blog/']),
+            'https://site.example/blog/' => Http::response(
+                '<!DOCTYPE html><html><head><link rel="alternate" type="application/rss+xml" href="feed.xml"></head><body></body></html>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+            'https://site.example/blog/feed.xml' => Http::response(
+                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                200,
+                ['Content-Type' => 'application/rss+xml']
+            ),
+            '*' => Http::response('Not found', 404),
+        ]);
+
+        $data = app(FeedReader::class)->getFeedData('https://site.example/blog');
+
+        expect($data['title'])->toBe('Fixture Feed');
+        Http::assertSent(fn ($request) => $request->url() === 'https://site.example/blog/feed.xml');
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://site.example/feed.xml');
+        Http::assertSentCount(3);
+    });
+
+    it('parses already downloaded content in the charset of its Content-Type', function () {
+        $rss = mb_convert_encoding(
+            '<?xml version="1.0"?><rss version="2.0"><channel><title>Café “News” €</title><link>https://cp1252.example/</link>'
+            .'<item><title>Eins</title><link>https://cp1252.example/1</link></item></channel></rss>',
+            'Windows-1252',
+            'UTF-8'
+        );
+
+        expect(app(FeedReader::class)->parseFeedData($rss, 'application/rss+xml; charset=windows-1252')['title'])->toBe('Café “News” €');
+    });
+
     it('keeps parsed content out of later fetches', function () {
         $reader = feedReaderWithFixture('feed.atom');
 

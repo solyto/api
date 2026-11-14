@@ -12,7 +12,7 @@ use Sabre\HTTP\RequestInterface;
 
 class CacheInvalidationPlugin extends ServerPlugin
 {
-    private const string CACHE_KEY_CALENDARS = 'calendars';
+    private const string CACHE_KEY_CALENDARS = 'calendars_v2';
     private const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
     private const string CACHE_KEY_CONTACTS = 'contacts';

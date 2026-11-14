@@ -2,6 +2,8 @@
 
 namespace App\Dav\Services;
 
+use App\Api\Calendars\Services\CalendarService;
+
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\CalendarImportDTO;
@@ -18,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 
 class CalendarImport
 {
-    private const string CACHE_KEY_CALENDARS = 'calendars';
+    private const string CACHE_KEY_CALENDARS = 'calendars_v2';
     private const string CACHE_KEY_EVENTS = 'calendar_events';
 
     private Calendars $calendars;
@@ -89,7 +91,8 @@ class CalendarImport
             $this->saveState($user->id, $dto);
 
                 unset($calendar['url']);
-                $calendar['name'] = urldecode($calendar['name']);
+                // calendarinstances.displayname is VARCHAR(100) on pgsql; a longer remote name would skip the calendar.
+                $calendar['name'] = mb_substr(urldecode($calendar['name']), 0, CalendarService::MAX_NAME_LENGTH);
 
             try {
                 $this->calendars->create($user, CalendarDTO::fromRequest($calendar));

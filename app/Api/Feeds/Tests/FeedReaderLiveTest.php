@@ -57,6 +57,22 @@ describe('FeedReader over a real connection', function () {
             ->and($data['items'])->toHaveCount(2);
     });
 
+    it('asks for a compressed body and inflates it', function () {
+        $response = app(FeedReader::class)->fetchMany(['http://feed.test:'.$this->port.'/feed-negotiated'], 5)[0];
+
+        expect($response?->header('X-Sent-Encoding'))->toBe('gzip')
+            ->and($response->body())->toContain('Fixture Feed');
+    });
+
+    it('fetches a body labelled as gzip that is not once more without decoding', function () {
+        $url = 'http://feed.test:'.$this->port.'/feed-mislabelled-gzip';
+        $response = app(FeedReader::class)->fetchMany([$url], 5)[0];
+
+        expect($response?->header('X-Accept-Encoding'))->toBe('identity')
+            ->and($response->body())->toContain('Fixture Feed')
+            ->and(app(FeedReader::class)->getFeedData($url)['items'])->toHaveCount(2);
+    });
+
     it('aborts a gzip bomb once it inflates past the cap', function () {
         $started = microtime(true);
 

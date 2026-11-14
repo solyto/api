@@ -24,6 +24,8 @@ return new class extends Migration
 
         $db->table('calendarobjects')
             ->where('componenttype', 'VEVENT')
+            // On Postgres only the overrides leave the database; SQLite (tests) relies on the check below.
+            ->when($db->getDriverName() === 'pgsql', fn ($query) => $query->whereRaw("position('RECURRENCE-ID'::bytea in calendardata) > 0"))
             ->select(['id', 'calendarid', 'uri', 'calendardata', 'firstoccurence', 'lastoccurence'])
             ->chunkById(50, function ($objects) use ($db, $backend, &$calendarIds) {
                 foreach ($objects as $object) {

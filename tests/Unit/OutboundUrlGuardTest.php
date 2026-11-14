@@ -1,6 +1,7 @@
 <?php
 
 use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Exceptions\UnresolvableHostException;
 use App\Shared\Services\OutboundUrlGuard;
 
 covers(OutboundUrlGuard::class);
@@ -26,6 +27,9 @@ describe('OutboundUrlGuard', function () {
         'ipv6 unique local' => 'http://[fd00::1]/',
         'ipv4-mapped loopback' => 'http://[::ffff:127.0.0.1]/',
         'local-use nat64' => 'http://[64:ff9b:1::a00:1]/',
+        'nat64 private' => 'http://[64:ff9b::a00:1]/',
+        'nat64 loopback' => 'http://[64:ff9b::7f00:1]/',
+        'nat64 link-local' => 'http://[64:ff9b::a9fe:a9fe]/',
         'siit ipv4-translated' => 'http://[::ffff:0:a00:1]/',
         '6to4' => 'http://[2002:a00:1::1]/',
         'site-local' => 'http://[fec0::1]/',
@@ -39,7 +43,17 @@ describe('OutboundUrlGuard', function () {
         (new OutboundUrlGuard(fn () => ['93.184.216.34', '10.0.0.1']))->check('https://rebind.example.com/');
     })->throws(BlockedUrlException::class);
 
-    it('refuses a host that does not resolve', function () {
+    it('refuses a host that does not resolve, as unresolvable rather than not allowed', function () {
         (new OutboundUrlGuard(fn () => []))->check('https://nowhere.example.com/');
+    })->throws(UnresolvableHostException::class);
+
+    it('allows a NAT64 address that embeds a public IPv4 address', function () {
+        $guard = new OutboundUrlGuard(fn () => ['64:ff9b::5db8:d822']);
+
+        expect($guard->check('https://ipv4-only.example.com/feed'))->toBe('ipv4-only.example.com:443:[64:ff9b::5db8:d822]');
+    });
+
+    it('refuses a host whose NAT64 address embeds an internal IPv4 address', function () {
+        (new OutboundUrlGuard(fn () => ['64:ff9b::5db8:d822', '64:ff9b::c0a8:1']))->check('https://rebind.example.com/');
     })->throws(BlockedUrlException::class);
 });

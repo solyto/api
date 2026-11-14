@@ -500,19 +500,21 @@ describe('Connecting external calendars', function () {
     it('fits long remote names and odd colours into the calendar columns', function () {
         $user = makeUser();
         $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);
-        $this->remote->displayName = str_repeat('ä', 150);
-        $this->remote->siblings = ['/remote.php/dav/calendars/alice/party/' => str_repeat('ä', 150)];
+        $this->remote->displayName = str_repeat('Щ', 150);
+        $this->remote->siblings = ['/remote.php/dav/calendars/alice/party/' => str_repeat('Щ', 150)];
         $this->remote->color = 'rgba(255, 0, 0, 1)';
 
         $connect = $this->actingAs($user, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", [
             'urls' => [$this->remote->url(), FakeCalDavServer::ORIGIN.'/remote.php/dav/calendars/alice/party/'],
         ])->assertStatus(201);
 
-        $rows = DB::connection('pgsql')->table('calendarinstances')->where('principaluri', 'principals/'.$user->email)->where('displayname', 'like', 'ää%')->get();
+        $rows = DB::connection('pgsql')->table('calendarinstances')->where('principaluri', 'principals/'.$user->email)->where('displayname', 'like', 'ЩЩ%')->get();
 
         expect($connect->json('data'))->toHaveCount(2)
-            ->and($rows->pluck('displayname')->sort()->values()->all())->toBe([str_repeat('ä', 96).' (1)', str_repeat('ä', 100)])
-            ->and($rows->pluck('calendarcolor')->unique()->all())->toBe(['#0088CC']);
+            ->and($rows->pluck('displayname')->sort()->values()->all())->toBe([str_repeat('Щ', 96).' (1)', str_repeat('Щ', 100)])
+            ->and($rows->pluck('calendarcolor')->unique()->all())->toBe(['#0088CC'])
+            ->and($rows->pluck('uri')->unique())->toHaveCount(2)
+            ->and($rows->map(fn ($row) => strlen($row->uri))->max())->toBeLessThanOrEqual(200);
     });
 
     it('keeps a short hex colour from the remote', function () {
@@ -575,6 +577,20 @@ describe('Connecting external calendars', function () {
         'private' => ['https://192.168.1.10', null, 'external_url_not_allowed'],
         'wrong password' => [FakeCalDavServer::ORIGIN, ['alice', 'other'], 'external_credentials_rejected'],
     ]);
+
+    it('reports a server whose host does not resolve as unreachable, not as not allowed', function () {
+        app()->instance(\App\Shared\Services\OutboundUrlGuard::class, new \App\Shared\Services\OutboundUrlGuard(fn () => []));
+
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
+            'server_url' => 'https://nowhere.example',
+            'username' => 'alice',
+            'password' => 'app-password',
+        ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('errors', ['external_server_unreachable']);
+        expect($this->remote->requests)->toBeEmpty();
+    });
 
     it('keeps a malformed server URL a field validation error', function () {
         $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [

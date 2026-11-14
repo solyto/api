@@ -11,6 +11,7 @@ use App\Dav\Exceptions\ExternalCalendarCredentialsRejectedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Exceptions\UnresolvableHostException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -27,8 +28,6 @@ class ExternalCalendarService
 {
     private const string CACHE_KEY_DISCOVERY = 'external_calendar_discovery';
     private const int CACHE_TTL_DISCOVERY = 600;
-    // calendarinstances.displayname is VARCHAR(100) on pgsql.
-    private const int MAX_NAME_LENGTH = 100;
 
     public function __construct(
         private readonly CalendarService $calendars,
@@ -193,6 +192,8 @@ class ExternalCalendarService
     {
         try {
             $found = $this->remote->discover($url, $username, $password);
+        } catch (UnresolvableHostException) {
+            throw new ExternalCalendarDiscoveryException('The server could not be reached or did not answer as a CalDAV server.', 'external_server_unreachable');
         } catch (BlockedUrlException) {
             throw new ExternalCalendarDiscoveryException('The server URL is not allowed.', 'external_url_not_allowed');
         } catch (ExternalCalendarCredentialsRejectedException) {
@@ -231,10 +232,10 @@ class ExternalCalendarService
 
     private function uniqueName(User $user, string $name): string
     {
-        $candidate = mb_substr($name, 0, self::MAX_NAME_LENGTH);
+        $candidate = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH);
         for ($i = 1; $this->calendars->getByName($user, $candidate) !== null; $i++) {
             $suffix = ' ('.$i.')';
-            $candidate = mb_substr($name, 0, self::MAX_NAME_LENGTH - mb_strlen($suffix)).$suffix;
+            $candidate = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH - mb_strlen($suffix)).$suffix;
         }
 
         return $candidate;

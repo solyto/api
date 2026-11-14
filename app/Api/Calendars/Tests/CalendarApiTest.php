@@ -24,6 +24,24 @@ describe('Calendar CRUD', function () {
             ->assertJsonPath('success', true);
     });
 
+    it('ignores a calendar list cached before CalendarDTO gained its external fields', function () {
+        $user = makeUser();
+        // What a 1.1.2 entry unserializes to: the DTO without the fields added since.
+        $serialized = preg_replace(
+            '/s:\d+:"(solytoShared|isExternal|isUnavailable|isCredentialsRejected)";b:0;/',
+            '',
+            serialize(new \App\Dav\DTOs\CalendarDTO(calendarId: 1, instanceId: 1, name: 'stale', displayName: 'Stale'))
+        );
+        $stale = unserialize(preg_replace('/^(O:\d+:"[^"]+":)\d+:/', '${1}14:', $serialized));
+        app(UserCacheService::class)->store(['calendars', $user->id], 86400, [$stale]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.name', 'My Calendar')
+            ->assertJsonCount(1, 'data');
+    });
+
     it('stores a new calendar', function () {
         $user = makeUser();
 
@@ -51,6 +69,38 @@ describe('Calendar CRUD', function () {
             ->assertStatus(409)
             ->assertJsonPath('success', false)
             ->assertJsonPath('message', 'Calendar already exists.');
+    });
+
+    // SQLite does not enforce VARCHAR lengths, so the lengths pgsql enforces are asserted.
+    it('accepts names up to the 100 characters of calendarinstances.displayname', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars', ['name' => str_repeat('a', 101)])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('name');
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars', ['name' => str_repeat('ä', 100)])
+            ->assertStatus(201);
+
+        expect(DB::connection('pgsql')->table('calendarinstances')->where('principaluri', 'principals/'.$user->email)->where('displayname', str_repeat('ä', 100))->exists())->toBeTrue();
+    });
+
+    it('keeps the uri of a name that transliterates long within 200 characters and unique', function () {
+        $user = makeUser();
+
+        foreach ([str_repeat('Щ', 100), str_repeat('щ', 100)] as $name) {
+            $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => $name])->assertStatus(201);
+        }
+
+        $uris = DB::connection('pgsql')->table('calendarinstances')
+            ->where('principaluri', 'principals/'.$user->email)
+            ->whereIn('displayname', [str_repeat('Щ', 100), str_repeat('щ', 100)])
+            ->pluck('uri');
+
+        expect($uris)->toHaveCount(2)
+            ->and($uris->unique())->toHaveCount(2)
+            ->and($uris->map(fn (string $uri) => strlen($uri))->max())->toBeLessThanOrEqual(200);
     });
 
     it('gives calendars whose names slug alike or to nothing distinct uris', function () {
@@ -796,8 +846,8 @@ describe('Shared calendar cache invalidation', function () {
 
         $this->actingAs($loner, 'sanctum')->deleteJson('/api/v1/calendars/'.$instance)->assertStatus(200);
 
-        expect($cache->has(['calendars', $loner->id]))->toBeFalse()
-            ->and($cache->has(['calendars', $this->owner->id]))->toBeTrue()
-            ->and($cache->has(['calendars', $this->sharee->id]))->toBeTrue();
+        expect($cache->has(['calendars_v2', $loner->id]))->toBeFalse()
+            ->and($cache->has(['calendars_v2', $this->owner->id]))->toBeTrue()
+            ->and($cache->has(['calendars_v2', $this->sharee->id]))->toBeTrue();
     });
 });

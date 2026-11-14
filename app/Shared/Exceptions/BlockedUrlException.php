@@ -6,8 +6,8 @@ use Exception;
 
 class BlockedUrlException extends Exception
 {
-    public function __construct()
+    public function __construct(string $message = 'The URL is not allowed.')
     {
-        parent::__construct('The URL is not allowed.');
+        parent::__construct($message);
     }
 }

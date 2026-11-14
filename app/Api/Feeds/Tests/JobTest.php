@@ -56,6 +56,19 @@ describe('SyncFeed on a private address', function () {
     });
 });
 
+describe('SyncFeed on a host that does not resolve', function () {
+    it('records that the URL could not be resolved, not that it is not allowed', function () {
+        Http::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => []));
+        $feed = Feed::factory()->create(['url' => 'https://gone.example/feed']);
+
+        app(SyncFeed::class, ['feedId' => $feed->id])->handle(app(FeedService::class));
+
+        Http::assertNothingSent();
+        expect($feed->fresh()->last_error)->toBe('The feed URL could not be resolved.');
+    });
+});
+
 describe('SyncFeeds', function () {
     it('dispatches a SyncFeed job for every subscribed feed', function () {
         Queue::fake();
@@ -330,6 +343,64 @@ describe('ImportFeedSubscriptions', function () {
         ]);
         Http::assertNotSent(fn (HttpRequest $request) => str_contains($request->url(), 'private.example'));
         Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://moved.example/new-feed');
+    });
+
+    it('marks a feed redirecting to an unparseable Location as unreachable and imports the rest', function () {
+        Queue::fake();
+        Http::fake([
+            'https://slashes.example/*' => Http::response('', 302, ['Location' => '//']),
+            'https://scheme.example/*' => Http::response('', 301, ['Location' => 'http://']),
+            'https://port.example/*' => Http::response('', 302, ['Location' => 'http://:80/x']),
+            '*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200),
+        ]);
+        $user = makeUser();
+        runningFeedImport($user, ['https://slashes.example/feed', 'https://ok.example/feed', 'https://scheme.example/feed', 'https://port.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://slashes.example/feed' => 'unreachable',
+            'https://ok.example/feed' => 'subscribed',
+            'https://scheme.example/feed' => 'unreachable',
+            'https://port.example/feed' => 'unreachable',
+        ]);
+        expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
+    });
+
+    it('marks a feed whose host does not resolve as unreachable', function () {
+        Queue::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(
+            fn (string $host) => $host === 'gone.example' ? [] : ['93.184.216.34']
+        ));
+        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        $user = makeUser();
+        runningFeedImport($user, ['https://gone.example/feed', 'https://ok.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://gone.example/feed' => 'unreachable',
+            'https://ok.example/feed' => 'subscribed',
+        ]);
+        Http::assertNotSent(fn (HttpRequest $request) => str_contains($request->url(), 'gone.example'));
+    });
+
+    it('decodes a feed title in the charset of the Content-Type header', function () {
+        Queue::fake();
+        $rss = mb_convert_encoding(
+            '<?xml version="1.0"?><rss version="2.0"><channel><title>Café “News” €</title><link>https://cp1252.example/</link>'
+            .'<item><title>Eins</title><link>https://cp1252.example/1</link><guid>1</guid></item></channel></rss>',
+            'Windows-1252',
+            'UTF-8'
+        );
+        Http::fake(['*' => Http::response($rss, 200, ['Content-Type' => 'application/rss+xml; charset=windows-1252'])]);
+        $user = makeUser();
+        runningFeedImport($user, ['https://cp1252.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe(['https://cp1252.example/feed' => 'subscribed'])
+            ->and(Feed::where('url', 'https://cp1252.example/feed')->value('title'))->toBe('Café “News” €');
     });
 
     it('marks feeds past the subscription limit as limit_reached, counting only the user\'s own', function () {

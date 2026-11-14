@@ -189,7 +189,7 @@ class OpmlImportService
                     $response = $responses[$index];
 
                     $state->feeds[$index]['status'] = $response?->successful()
-                        ? $this->subscribe($user, $feed, fn () => $this->feedReader->parseFeedData($response->body()))
+                        ? $this->subscribe($user, $feed, fn () => $this->feedReader->parseFeedData($response->body(), $response->header('Content-Type')))
                         : FeedImportStatus::Unreachable;
                 }
             } finally {

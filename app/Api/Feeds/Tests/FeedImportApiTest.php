@@ -266,7 +266,7 @@ describe('Feed import select', function () {
         Queue::assertPushed(ImportFeedSubscriptions::class, 1);
     });
 
-    it('starts one job for a double submit', function () {
+    it('starts no second job when the same selection is sent again after the import started', function () {
         Queue::fake();
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml());

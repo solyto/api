@@ -3,6 +3,7 @@
 namespace App\Shared\Services;
 
 use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Exceptions\UnresolvableHostException;
 
 /**
  * Refuses outbound requests to user-supplied URLs that point at private,
@@ -19,7 +20,6 @@ class OutboundUrlGuard
         '100.64.0.0/10',
         '192.0.0.0/24',
         '198.18.0.0/15',
-        '64:ff9b::/96',
         '64:ff9b:1::/48',
         '::ffff:0:0:0/96',
         '2001:db8::/32',
@@ -41,6 +41,7 @@ class OutboundUrlGuard
     /**
      * @return string the CURLOPT_RESOLVE entry ("host:port:address") the request must be pinned to
      *
+     * @throws UnresolvableHostException when the host has no address
      * @throws BlockedUrlException
      */
     public function check(string $url): string
@@ -57,7 +58,7 @@ class OutboundUrlGuard
         $addresses = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ($this->resolver)($host);
 
         if ($addresses === []) {
-            throw new BlockedUrlException();
+            throw new UnresolvableHostException();
         }
 
         foreach ($addresses as $address) {
@@ -80,8 +81,11 @@ class OutboundUrlGuard
 
         $binary = inet_pton($address);
 
-        // IPv4-mapped and IPv4-compatible IPv6 addresses reach the IPv4 host.
-        if (strlen($binary) === 16 && (str_starts_with($binary, str_repeat("\0", 10)."\xff\xff") || str_starts_with($binary, str_repeat("\0", 12)))) {
+        // IPv4-mapped, IPv4-compatible and NAT64 (64:ff9b::/96, what DNS64 hands an IPv6-only host
+        // for an IPv4-only name) addresses reach the IPv4 host.
+        if (strlen($binary) === 16 && (str_starts_with($binary, str_repeat("\0", 10)."\xff\xff")
+            || str_starts_with($binary, str_repeat("\0", 12))
+            || str_starts_with($binary, "\x00\x64\xff\x9b".str_repeat("\0", 8)))) {
             return $this->isPublic(inet_ntop(substr($binary, 12)));
         }
 

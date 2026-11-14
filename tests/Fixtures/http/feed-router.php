@@ -17,6 +17,25 @@ switch (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) {
         echo gzencode(file_get_contents(__DIR__.'/../feed.rss'));
         break;
 
+    case '/feed-negotiated':
+        // Compressed only when the client asks for it, like most servers.
+        $gzip = str_contains($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip');
+        header('Content-Type: application/rss+xml');
+        header('X-Sent-Encoding: '.($gzip ? 'gzip' : 'identity'));
+        if ($gzip) {
+            header('Content-Encoding: gzip');
+        }
+        echo $gzip ? gzencode(file_get_contents(__DIR__.'/../feed.rss')) : file_get_contents(__DIR__.'/../feed.rss');
+        break;
+
+    case '/feed-mislabelled-gzip':
+        // A broken server: the body is plain whatever was asked for, but labelled as gzip.
+        header('Content-Type: application/rss+xml');
+        header('Content-Encoding: gzip');
+        header('X-Accept-Encoding: '.($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''));
+        echo file_get_contents(__DIR__.'/../feed.rss');
+        break;
+
     case '/gzip-bomb':
         // Zeros compress about 1000:1, so the bytes on the wire stay far below the 5 MB cap while the
         // body inflates to gigabytes. Streamed until the client hangs up, which ends this script.

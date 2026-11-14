@@ -5,8 +5,10 @@ namespace App\Api\Feeds\Services;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\OutboundUrlGuard;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Psr7\Exception\MalformedUriException;
 use GuzzleHttp\Psr7\FnStream;
 use GuzzleHttp\Psr7\HttpFactory;
+use GuzzleHttp\Psr7\Response as PsrResponse;
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use GuzzleHttp\Psr7\Utils;
@@ -27,6 +29,8 @@ use SimplePie\SimplePie;
  * redirects are followed by hand, and a body is cut off once its
  * decompressed size passes MAX_FEED_BYTES. SimplePie fetches through the
  * same path (httpClient()), so its feed autodiscovery is guarded too.
+ * Bodies are requested compressed; a body that does not decode as its
+ * Content-Encoding says is fetched once more without decoding.
  */
 class FeedReader
 {
@@ -72,13 +76,20 @@ class FeedReader
 
     /**
      * A fresh SimplePie per call: raw data set on a shared instance would
-     * stay there and be served to every later call.
+     * stay there and be served to every later call. The charset of
+     * $contentType (the HTTP header) comes before the XML declaration, as it
+     * does when SimplePie fetches the feed itself.
      */
-    public function parseFeedData(string $content): array|false
+    public function parseFeedData(string $content, ?string $contentType = null): array|false
     {
         $pie = new SimplePie;
         $pie->enable_cache(false);
         $pie->set_raw_data($content);
+
+        if ($contentType !== null && preg_match('/;\x20?charset=([^;]*)/i', $contentType, $charset)) {
+            $pie->set_input_encoding(trim($charset[1], " \"'"));
+        }
+
         $pie->init();
 
         $items = $pie->get_items();
@@ -96,9 +107,10 @@ class FeedReader
     /**
      * Fetches all URLs concurrently, one pool per redirect hop. A URL comes
      * back as null when it or a hop it redirects to is blocked by the guard,
-     * the connection fails, the body is over MAX_FEED_BYTES, or it redirects
-     * more than MAX_REDIRECTS times; otherwise as the final response, whatever
-     * its status.
+     * the connection fails, the body is over MAX_FEED_BYTES, it redirects to
+     * a Location that cannot be parsed, or it redirects more than
+     * MAX_REDIRECTS times; otherwise as the final response, whatever its
+     * status. The final response's effectiveUri() is the URL after redirects.
      *
      * @param  array<array-key, string>  $urls
      * @param  array<string, string>  $headers
@@ -120,25 +132,22 @@ class FeedReader
                 }
             }
 
-            // Plain closures: an arrow function would capture $tooLarge by value.
             $tooLarge = [];
-            $responses = $pins === [] ? [] : Http::pool(function (Pool $pool) use ($pins, $pending, $headers, $timeout, &$tooLarge) {
-                foreach ($pins as $key => $pin) {
-                    $pool->as((string) $key)
-                        ->withUserAgent(Misc::get_default_useragent())
-                        ->withHeaders($headers)
-                        ->timeout($timeout)
-                        ->connectTimeout($timeout)
-                        ->withoutRedirecting()
-                        ->withOptions([
-                            'curl' => [CURLOPT_RESOLVE => [$pin]],
-                            'sink' => $this->cappedSink(function () use (&$tooLarge, $key) {
-                                $tooLarge[$key] = true;
-                            }),
-                        ])
-                        ->get($pending[$key]);
-                }
-            });
+            $responses = $pins === [] ? [] : $this->pool($pins, $pending, $timeout, $headers, true, $tooLarge);
+
+            // What curl did on CURLE_BAD_CONTENT_ENCODING for SimplePie's own File: ask again
+            // without decoding, for servers that label a plain body as gzip.
+            $undecodable = array_filter(
+                $pins,
+                fn ($pin, $key) => ! isset($tooLarge[$key])
+                    && ($responses[$key] ?? null) instanceof Response
+                    && $responses[$key]->transferStats?->getHandlerErrorData() === CURLE_BAD_CONTENT_ENCODING,
+                ARRAY_FILTER_USE_BOTH
+            );
+
+            if ($undecodable !== []) {
+                $responses = array_replace($responses, $this->pool($undecodable, $pending, $timeout, $headers, false, $tooLarge));
+            }
 
             $next = [];
 
@@ -151,7 +160,11 @@ class FeedReader
                 } elseif (! $response instanceof Response) {
                     $results[$key] = null;
                 } elseif ($response->redirect() && $response->header('Location') !== '') {
-                    $next[$key] = (string) UriResolver::resolve(new Uri($pending[$key]), new Uri($response->header('Location')));
+                    try {
+                        $next[$key] = (string) UriResolver::resolve(new Uri($pending[$key]), new Uri($response->header('Location')));
+                    } catch (MalformedUriException) {
+                        $results[$key] = null;
+                    }
                 } else {
                     $results[$key] = $response;
                 }
@@ -167,6 +180,39 @@ class FeedReader
         }
 
         return $ordered;
+    }
+
+    /**
+     * One request per pinned URL, all in one pool. Without $decode the body is
+     * kept as sent and identity is asked for instead of compression.
+     *
+     * @param  array<array-key, string>  $pins
+     * @param  array<array-key, string>  $urls
+     * @param  array<string, string>  $headers
+     * @param  array<array-key, true>  $tooLarge  set for every key whose body passed MAX_FEED_BYTES
+     * @return array<array-key, Response|\Throwable>
+     */
+    private function pool(array $pins, array $urls, int $timeout, array $headers, bool $decode, array &$tooLarge): array
+    {
+        // Plain closures: an arrow function would capture $tooLarge by value.
+        return Http::pool(function (Pool $pool) use ($pins, $urls, $timeout, $headers, $decode, &$tooLarge) {
+            foreach ($pins as $key => $pin) {
+                $pool->as((string) $key)
+                    ->withUserAgent(Misc::get_default_useragent())
+                    ->withHeaders(['Accept-Encoding' => $decode ? 'gzip, deflate' : 'identity', ...$headers])
+                    ->timeout($timeout)
+                    ->connectTimeout($timeout)
+                    ->withoutRedirecting()
+                    ->withOptions([
+                        'decode_content' => $decode,
+                        'curl' => [CURLOPT_RESOLVE => [$pin]],
+                        'sink' => $this->cappedSink(function () use (&$tooLarge, $key) {
+                            $tooLarge[$key] = true;
+                        }),
+                    ])
+                    ->get($urls[$key]);
+            }
+        });
     }
 
     /**
@@ -188,21 +234,44 @@ class FeedReader
     }
 
     /**
-     * SimplePie's own redirect handling never sees a redirect: fetchMany()
-     * has already followed it through the guard.
+     * fetchMany() follows redirects through the guard itself. SimplePie
+     * resolves relative links (autodiscovery, items) against the last URL it
+     * requested, so a redirected fetch is answered with one 307 to the final
+     * URL, and SimplePie's request for that URL with the response already
+     * fetched.
      */
     private function httpClient(): ClientInterface
     {
         return new class($this, self::FETCH_TIMEOUT) implements ClientInterface
         {
+            /** @var array<string, ResponseInterface> final URL => its response */
+            private array $redirected = [];
+
             public function __construct(private readonly FeedReader $reader, private readonly int $timeout) {}
 
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
-                $headers = $request->hasHeader('Accept') ? ['Accept' => $request->getHeaderLine('Accept')] : [];
-                $response = $this->reader->fetchMany([(string) $request->getUri()], $this->timeout, $headers)[0];
+                $url = (string) $request->getUri();
 
-                return $response?->toPsrResponse() ?? throw new TransferException('The feed could not be fetched.');
+                if (isset($this->redirected[$url])) {
+                    $response = $this->redirected[$url];
+                    unset($this->redirected[$url]);
+
+                    return $response;
+                }
+
+                $headers = $request->hasHeader('Accept') ? ['Accept' => $request->getHeaderLine('Accept')] : [];
+                $response = $this->reader->fetchMany([$url], $this->timeout, $headers)[0]
+                    ?? throw new TransferException('The feed could not be fetched.');
+                $finalUrl = (string) $response->effectiveUri();
+
+                if ($finalUrl === '' || $finalUrl === $url) {
+                    return $response->toPsrResponse();
+                }
+
+                $this->redirected[$finalUrl] = $response->toPsrResponse();
+
+                return new PsrResponse(307, ['Location' => $finalUrl]);
             }
         };
     }
