@@ -1,6 +1,7 @@
 # Report: Importing RSS feeds from an OPML file
 
 date: 2026-11-13
+read: true
 branch: `report/quickly_import-opml-rss-feeds`, tree at `8a8652c`
 scope: Whether and how users can import their feed subscriptions from an OPML file. Written for the maintainer. No application code, config, routes or migrations were changed. Two throwaway PHP probes (libxml behaviour) were run outside the repo and then deleted.
 
