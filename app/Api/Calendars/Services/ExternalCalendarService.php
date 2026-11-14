@@ -2,6 +2,7 @@
 
 namespace App\Api\Calendars\Services;
 
+use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\Users\Models\User;
@@ -42,7 +43,7 @@ class ExternalCalendarService
     }
 
     /**
-     * @throws ValidationException
+     * @throws ExternalCalendarDiscoveryException
      */
     public function createAccount(User $user, array $data): ExternalCalendarAccount
     {
@@ -64,7 +65,7 @@ class ExternalCalendarService
      * Checks the new credentials against the server before they replace the
      * old ones.
      *
-     * @throws ValidationException
+     * @throws ExternalCalendarDiscoveryException
      */
     public function updateAccount(ExternalCalendarAccount $account, array $data): ExternalCalendarAccount
     {
@@ -99,7 +100,7 @@ class ExternalCalendarService
      *
      * @return array<int, array{url: string, name: string, color: string, is_connected: bool}>
      *
-     * @throws ValidationException
+     * @throws ExternalCalendarDiscoveryException
      */
     public function listAvailable(ExternalCalendarAccount $account): array
     {
@@ -123,6 +124,7 @@ class ExternalCalendarService
      * @return array<int, CalendarDTO>
      *
      * @throws ValidationException
+     * @throws ExternalCalendarDiscoveryException
      */
     public function connect(User $user, ExternalCalendarAccount $account, array $urls): array
     {
@@ -179,22 +181,22 @@ class ExternalCalendarService
     /**
      * @return array<int, array{url: string, name: string, color: string}>
      *
-     * @throws ValidationException
+     * @throws ExternalCalendarDiscoveryException
      */
     private function discover(string $url, string $username, string $password): array
     {
         try {
             $found = $this->remote->discover($url, $username, $password);
         } catch (BlockedUrlException) {
-            throw ValidationException::withMessages(['server_url' => 'The server URL is not allowed.']);
+            throw new ExternalCalendarDiscoveryException('The server URL is not allowed.', 'external_url_not_allowed');
         } catch (ExternalCalendarCredentialsRejectedException) {
-            throw ValidationException::withMessages(['password' => 'The server rejected the username or app password.']);
+            throw new ExternalCalendarDiscoveryException('The server rejected the username or app password.', 'external_credentials_rejected');
         } catch (ExternalCalendarUnavailableException) {
-            throw ValidationException::withMessages(['server_url' => 'The server could not be reached or did not answer as a CalDAV server.']);
+            throw new ExternalCalendarDiscoveryException('The server could not be reached or did not answer as a CalDAV server.', 'external_server_unreachable');
         }
 
         if ($found === []) {
-            throw ValidationException::withMessages(['server_url' => 'No calendars were found on the server.']);
+            throw new ExternalCalendarDiscoveryException('No calendars were found on the server.', 'external_no_calendars');
         }
 
         return $found;

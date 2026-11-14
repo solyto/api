@@ -83,7 +83,12 @@ class ExternalCalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error, URL not allowed, credentials rejected, server unreachable or no calendars found", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error (ValidationErrorResponse), or the server refused the account (ErrorResponse, errors[0] is external_url_not_allowed, external_server_unreachable, external_no_calendars or external_credentials_rejected)",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     ),
      *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
@@ -129,7 +134,12 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error, credentials rejected, server unreachable or no calendars found", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error (ValidationErrorResponse), or the server refused the new credentials (ErrorResponse, errors[0] is external_url_not_allowed, external_server_unreachable, external_no_calendars or external_credentials_rejected)",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     ),
      *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
@@ -201,7 +211,7 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Credentials rejected, server unreachable or no calendars found on the server", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=422, description="The server refused the account; errors[0] is external_url_not_allowed, external_server_unreachable, external_no_calendars or external_credentials_rejected", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
@@ -249,7 +259,12 @@ class ExternalCalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Account not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error or a URL the server did not list", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error or a URL the server did not list (ValidationErrorResponse), or the server refused the account (ErrorResponse, errors[0] is external_url_not_allowed, external_server_unreachable, external_no_calendars or external_credentials_rejected)",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     ),
      *     @OA\Response(response=429, description="Too many requests - errors: [too_many_requests], meta.retry_after in seconds", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */

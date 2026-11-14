@@ -288,7 +288,8 @@ class CalendarController
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function storeEvent(StoreEventRequest $request, int $instanceId): JsonResponse
@@ -361,7 +362,14 @@ class CalendarController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=403, description="Unable to update event", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error (ValidationErrorResponse), or an event of an external calendar that cannot be read (ErrorResponse, errors: [external_event_unreadable])",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     ),
+     *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function updateEvent(UpdateEventRequest $request, int $instanceId, string $eventUri): JsonResponse
@@ -442,7 +450,9 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroyEvent(Request $request, int $instanceId, string $eventUri): JsonResponse
@@ -511,7 +521,10 @@ class CalendarController
      *
      *     @OA\Response(response=400, description="Event is not recurring", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="An event of an external calendar that cannot be read; errors: [external_event_unreadable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroyEventOccurrence(Request $request, int $instanceId, string $eventUri, string $occurrenceDate): JsonResponse
@@ -607,7 +620,14 @@ class CalendarController
      *     @OA\Response(response=400, description="Event is not recurring", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error (ValidationErrorResponse), or an event of an external calendar that cannot be read (ErrorResponse, errors: [external_event_unreadable])",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     ),
+     *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function updateEventOccurrence(UpdateEventRequest $request, int $instanceId, string $eventUri, string $occurrenceDate): JsonResponse

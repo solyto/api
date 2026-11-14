@@ -109,6 +109,7 @@ describe('External calendars through the API', function () {
         ]);
 
         expectApiError($response, 412);
+        $response->assertJsonPath('errors', ['external_event_changed']);
         expect($this->remote->objects['a.ics']['data'])->toContain('Changed elsewhere');
     });
 
@@ -240,13 +241,17 @@ describe('External calendars through the API', function () {
             ]);
 
         expectApiError($response, 422);
+        $response->assertJsonPath('errors', ['external_event_unreadable']);
         expect(collect($this->remote->requests)->filter(fn ($r) => $r->method() === 'PUT'))->toBeEmpty();
     })->with(['DELETE', 'PUT']);
 
     it('answers 503 for a single event of an unreachable calendar', function () {
         $this->remote->down = true;
 
-        expectApiError($this->actingAs($this->user, 'sanctum')->deleteJson('/api/v1/calendars/'.$this->calendar->instanceId.'/events/a.ics'), 503);
+        $response = $this->actingAs($this->user, 'sanctum')->deleteJson('/api/v1/calendars/'.$this->calendar->instanceId.'/events/a.ics');
+
+        expectApiError($response, 503);
+        $response->assertJsonPath('errors', ['external_server_unavailable']);
     });
 
     it('caches external events for the short TTL only', function () {
@@ -452,23 +457,37 @@ describe('Connecting external calendars', function () {
         expect(\App\Api\Calendars\Models\ExternalCalendar::where('external_calendar_account_id', $account->id)->count())->toBe(0);
     });
 
-    it('refuses servers on private addresses and accounts without calendars', function (string $url, ?array $credentials) {
+    it('refuses servers on private addresses and accounts without calendars', function (string $url, ?array $credentials, string $code) {
         $this->remote->credentials = $credentials;
 
-        expectApiError($this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
             'server_url' => $url,
             'username' => 'alice',
             'password' => 'app-password',
-        ]), 422);
+        ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('errors', [$code]);
         expect(\App\Api\Calendars\Models\ExternalCalendarAccount::count())->toBe(1);
     })->with([
-        'loopback' => ['http://127.0.0.1:8080', null],
-        'metadata' => ['http://169.254.169.254', null],
-        'private' => ['https://192.168.1.10', null],
-        'wrong password' => [FakeCalDavServer::ORIGIN, ['alice', 'other']],
+        'loopback' => ['http://127.0.0.1:8080', null, 'external_url_not_allowed'],
+        'metadata' => ['http://169.254.169.254', null, 'external_url_not_allowed'],
+        'private' => ['https://192.168.1.10', null, 'external_url_not_allowed'],
+        'wrong password' => [FakeCalDavServer::ORIGIN, ['alice', 'other'], 'external_credentials_rejected'],
     ]);
 
-    it('tells rejected credentials, an unreachable server and a server without calendars apart', function (string $case, string $field, string $message) {
+    it('keeps a malformed server URL a field validation error', function () {
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
+            'server_url' => 'not a url',
+            'username' => 'alice',
+        ]);
+
+        expectApiError($response, 422);
+        expect($response->json('errors'))->toHaveKeys(['server_url', 'password']);
+        expect($this->remote->requests)->toBeEmpty();
+    });
+
+    it('tells rejected credentials, an unreachable server and a server without calendars apart', function (string $case, string $code, string $message) {
         match ($case) {
             'credentials' => $this->remote->credentials = ['alice', 'other'],
             'unreachable' => $this->remote->down = true,
@@ -483,17 +502,27 @@ describe('Connecting external calendars', function () {
         ]);
 
         expectApiError($response, 422);
-        expect($response->json('errors.'.$field.'.0'))->toBe($message);
+        $response->assertJsonPath('errors', [$code])->assertJsonPath('message', $message);
     })->with([
-        'credentials rejected' => ['credentials', 'password', 'The server rejected the username or app password.'],
-        'server unreachable' => ['unreachable', 'server_url', 'The server could not be reached or did not answer as a CalDAV server.'],
-        'no calendars' => ['empty', 'server_url', 'No calendars were found on the server.'],
+        'credentials rejected' => ['credentials', 'external_credentials_rejected', 'The server rejected the username or app password.'],
+        'server unreachable' => ['unreachable', 'external_server_unreachable', 'The server could not be reached or did not answer as a CalDAV server.'],
+        'no calendars' => ['empty', 'external_no_calendars', 'No calendars were found on the server.'],
     ]);
+
+    it('reports a server that now rejects the app password when listing its calendars', function () {
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();
+        $this->remote->credentials = ['alice', 'changed-on-the-server'];
+
+        $response = $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/calendars/external/accounts/{$account->id}/available");
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('errors', ['external_credentials_rejected']);
+    });
 
     it('throttles the routes that ask the server', function () {
         $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();
 
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 20; $i++) {
             $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/calendars/external/accounts/{$account->id}/available")->assertStatus(200);
         }
 
@@ -529,7 +558,9 @@ describe('Connecting external calendars', function () {
         $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();
         $this->remote->credentials = ['alice', 'new-password'];
 
-        expectApiError($this->actingAs($this->user, 'sanctum')->putJson("/api/v1/calendars/external/accounts/{$account->id}", ['password' => 'wrong']), 422);
+        $this->actingAs($this->user, 'sanctum')->putJson("/api/v1/calendars/external/accounts/{$account->id}", ['password' => 'wrong'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors', ['external_credentials_rejected']);
         expect($account->fresh()->password)->toBe('app-password');
 
         $this->actingAs($this->user, 'sanctum')->putJson("/api/v1/calendars/external/accounts/{$account->id}", ['password' => 'new-password'])
