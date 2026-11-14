@@ -18,9 +18,12 @@ use App\Shared\Services\UserCacheService;
 use DOMDocument;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use SimplePie\Misc;
 use SimpleXMLElement;
+use Throwable;
 
 class OpmlImportService
 {
@@ -28,10 +31,13 @@ class OpmlImportService
 
     private const string CACHE_KEY = 'feed_import';
     private const int CACHE_TTL = 3600;
+    private const string SELECT_LOCK_KEY = 'feed_import_select';
+    private const int SELECT_LOCK_TTL = 10;
     private const int MAX_URL_LENGTH = 255;
     private const int MAX_TITLE_LENGTH = 255;
     private const int FETCH_CHUNK_SIZE = 25;
     private const int FETCH_TIMEOUT = 5;
+    private const int MAX_FEED_BYTES = 5 * 1024 * 1024;
 
     /** FreshRSS scraper types: their URL is a web page, not a feed. */
     private const array SCRAPER_TYPES = ['html+xpath', 'xml+xpath', 'json+dotnotation', 'jsonfeed'];
@@ -89,32 +95,43 @@ class OpmlImportService
      */
     public function select(User $user, array $urls): FeedImportStateDTO
     {
-        $state = $this->state($user);
+        // Without the lock, a double submit passes the Parsed check twice and dispatches two jobs.
+        $lock = Cache::lock(self::SELECT_LOCK_KEY.'_'.$user->id, self::SELECT_LOCK_TTL);
 
-        if ($state->stage !== FeedImportStage::Parsed) {
+        if (! $lock->get()) {
             throw new FeedImportConflictException('This feed import has already started.');
         }
 
-        $selected = array_flip($urls);
-        $feeds = array_values(array_filter(
-            $state->feeds,
-            fn (array $feed) => isset($selected[$feed['url']]) && ! $feed['already_subscribed']
-        ));
+        try {
+            $state = $this->state($user);
 
-        if ($feeds === []) {
-            throw new FeedImportException('None of the selected feeds can be imported.');
+            if ($state->stage !== FeedImportStage::Parsed) {
+                throw new FeedImportConflictException('This feed import has already started.');
+            }
+
+            $selected = array_flip($urls);
+            $feeds = array_values(array_filter(
+                $state->feeds,
+                fn (array $feed) => isset($selected[$feed['url']]) && ! $feed['already_subscribed']
+            ));
+
+            if ($feeds === []) {
+                throw new FeedImportException('None of the selected feeds can be imported.');
+            }
+
+            $state = new FeedImportStateDTO(FeedImportStage::Running, array_map(
+                fn (array $feed) => [...$feed, 'status' => FeedImportStatus::Pending],
+                $feeds
+            ));
+
+            $this->saveState($user->id, $state);
+
+            ImportFeedSubscriptions::dispatch($user->id);
+
+            return $state;
+        } finally {
+            $lock->release();
         }
-
-        $state = new FeedImportStateDTO(FeedImportStage::Running, array_map(
-            fn (array $feed) => [...$feed, 'status' => FeedImportStatus::Pending],
-            $feeds
-        ));
-
-        $this->saveState($user->id, $state);
-
-        ImportFeedSubscriptions::dispatch($user->id);
-
-        return $state;
     }
 
     /**
@@ -137,34 +154,46 @@ class OpmlImportService
         $known = Feed::whereIn('url', array_column($state->feeds, 'url'))->pluck('url')->flip();
         $toFetch = [];
 
-        foreach ($state->feeds as $index => $feed) {
-            if ($known->has($feed['url'])) {
-                $state->feeds[$index]['status'] = $this->subscribe($user, $feed, null);
-            } else {
-                $toFetch[$index] = $feed;
+        try {
+            foreach ($state->feeds as $index => $feed) {
+                if ($known->has($feed['url'])) {
+                    $state->feeds[$index]['status'] = $this->subscribe($user, $feed, fn () => null);
+                } else {
+                    $toFetch[$index] = $feed;
+                }
             }
+        } finally {
+            $this->saveState($userId, $state);
         }
 
-        $this->saveState($userId, $state);
-
         foreach (array_chunk($toFetch, self::FETCH_CHUNK_SIZE, true) as $chunk) {
-            $responses = Http::pool(fn (Pool $pool) => array_map(
-                fn (array $feed) => $pool->as($feed['url'])
-                    ->withUserAgent(Misc::get_default_useragent())
-                    ->timeout(self::FETCH_TIMEOUT)
-                    ->get($feed['url']),
-                $chunk
-            ));
+            try {
+                $responses = Http::pool(fn (Pool $pool) => array_map(
+                    fn (array $feed) => $pool->as($feed['url'])
+                        ->withUserAgent(Misc::get_default_useragent())
+                        ->timeout(self::FETCH_TIMEOUT)
+                        // Aborts just this transfer; a throwing Guzzle progress callback would reject the
+                        // whole chunk. An aborted transfer still comes back as a Response, see isFetchedFeed().
+                        ->withOptions(['curl' => [
+                            CURLOPT_NOPROGRESS => false,
+                            CURLOPT_XFERINFOFUNCTION => fn ($handle, int $downloadTotal, int $downloaded) => (int) (
+                                $downloadTotal > self::MAX_FEED_BYTES || $downloaded > self::MAX_FEED_BYTES
+                            ),
+                        ]])
+                        ->get($feed['url']),
+                    $chunk
+                ));
 
-            foreach ($chunk as $index => $feed) {
-                $response = $responses[$feed['url']] ?? null;
+                foreach ($chunk as $index => $feed) {
+                    $response = $responses[$feed['url']] ?? null;
 
-                $state->feeds[$index]['status'] = $response instanceof Response && $response->successful()
-                    ? $this->subscribe($user, $feed, $this->feedReader->parseFeedData($response->body()))
-                    : FeedImportStatus::Unreachable;
+                    $state->feeds[$index]['status'] = $this->isFetchedFeed($response)
+                        ? $this->subscribe($user, $feed, fn () => $this->feedReader->parseFeedData($response->body()))
+                        : FeedImportStatus::Unreachable;
+                }
+            } finally {
+                $this->saveState($userId, $state);
             }
-
-            $this->saveState($userId, $state);
         }
 
         $state->stage = FeedImportStage::Finished;
@@ -258,18 +287,40 @@ class OpmlImportService
 
     /**
      * @param  array{url: string, title: string}  $feed
+     * @param  \Closure(): (array|false|null)  $feedData
      */
-    private function subscribe(User $user, array $feed, array|false|null $feedData): FeedImportStatus
+    private function subscribe(User $user, array $feed, \Closure $feedData): FeedImportStatus
     {
         try {
-            $this->feedService->createImportedSubscription($user, $feed['title'], $feed['url'], $feedData);
+            $this->feedService->createImportedSubscription($user, $feed['title'], $feed['url'], $feedData());
 
             return FeedImportStatus::Subscribed;
         } catch (FeedAlreadySubscribedException) {
             return FeedImportStatus::AlreadySubscribed;
         } catch (FeedException) {
             return FeedImportStatus::NotAFeed;
+        } catch (Throwable $e) {
+            // One odd feed must not end the job ($tries = 1) and leave every later feed untried.
+            Log::warning('Feed import: subscribing a feed failed', [
+                'user_id' => $user->id,
+                'url' => $feed['url'],
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return FeedImportStatus::Unreachable;
         }
+    }
+
+    /**
+     * @phpstan-assert-if-true Response $response
+     */
+    private function isFetchedFeed(mixed $response): bool
+    {
+        return $response instanceof Response
+            && $response->successful()
+            && (int) $response->header('Content-Length') <= self::MAX_FEED_BYTES
+            && strlen($response->body()) <= self::MAX_FEED_BYTES;
     }
 
     private function getState(string $userId): ?FeedImportStateDTO

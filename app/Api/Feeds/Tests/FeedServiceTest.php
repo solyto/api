@@ -130,6 +130,21 @@ describe('FeedService', function () {
 
         expect(Feed::sole()->title)->toBe("Tom & Jerry's Blog");
     });
+
+    it('cuts an overlong remote feed title to the column length', function () {
+        Queue::fake();
+        $user = makeUser();
+
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getFeedData')->once()->andReturn([
+            'title' => str_repeat('ä', 300),
+            'items' => ['fake-item'],
+        ]);
+
+        app(FeedService::class)->createSubscription($user, 'My title', 'https://example.com/feed.xml', null, null);
+
+        expect(Feed::sole()->title)->toBe(str_repeat('ä', 255));
+    });
 });
 
 describe('FeedService sync cache invalidation', function () {
