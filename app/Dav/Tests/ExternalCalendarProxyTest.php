@@ -88,6 +88,24 @@ describe('External calendars over DAV', function () {
             ->and($this->remote->objects['a.ics']['data'])->toContain('Changed elsewhere');
     });
 
+    it('updates and deletes on a remote that sends weak ETags', function () {
+        $this->remote->weakEtags = true;
+        $this->remote->put('a.ics', davIcs('a', 'Old'));
+        $weak = davRequest($this->user, 'GET', remotePath($this->user, 'a.ics'))->getHeader('ETag');
+
+        $update = remotePut($this->user, 'a.ics', davIcs('a', 'Updated'), ['If-Match' => $weak]);
+
+        expect($weak)->toStartWith('W/"')
+            ->and($update->getStatus())->toBe(204)
+            ->and($this->remote->objects['a.ics']['data'])->toContain('SUMMARY:Updated');
+
+        $weak = davRequest($this->user, 'GET', remotePath($this->user, 'a.ics'))->getHeader('ETag');
+        $delete = davRequest($this->user, 'DELETE', remotePath($this->user, 'a.ics'), null, ['If-Match' => $weak]);
+
+        expect($delete->getStatus())->toBe(204)
+            ->and($this->remote->objects)->not->toHaveKey('a.ics');
+    });
+
     it('passes a remote 412 through when the object changes after the precondition check', function () {
         $etag = $this->remote->put('a.ics', davIcs('a', 'Old'));
         $remote = $this->remote;

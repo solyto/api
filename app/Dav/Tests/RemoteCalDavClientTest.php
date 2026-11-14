@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\Calendars\Models\ExternalCalendar;
+use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Dav\Services\DavService;
@@ -53,6 +54,43 @@ describe('RemoteCalDavClient', function () {
 
         expect($found)->toBe([]);
         Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '169.254.169.254'));
+    });
+
+    it('refuses a redirect from https to http', function () {
+        Http::fake(fn (Request $request) => str_contains($request->url(), '.well-known')
+            ? Http::response('', 301, ['Location' => 'http://cloud.example.com/remote.php/dav/'])
+            : Http::response('', 404));
+
+        $found = app(RemoteCalDavClient::class)->discover('https://cloud.example.com/', 'alice', 'app-password');
+
+        expect($found)->toBe([]);
+        Http::assertNotSent(fn (Request $request) => str_starts_with($request->url(), 'http://'));
+    });
+
+    it('still refuses a stale weak ETag', function (string $method) {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+        $stale = 'W/'.$remote->put('a.ics', davIcs('a', 'Old'));
+        $remote->put('a.ics', davIcs('a', 'Changed elsewhere'));
+        $client = app(RemoteCalDavClient::class);
+
+        try {
+            $method === 'PUT'
+                ? $client->putObject(ExternalCalendar::first(), 'a.ics', davIcs('a', 'Mine'), false, $stale)
+                : $client->deleteObject(ExternalCalendar::first(), 'a.ics', $stale);
+        } finally {
+            expect($remote->objects['a.ics']['data'])->toContain('Changed elsewhere');
+        }
+    })->with(['PUT', 'DELETE'])->throws(ExternalCalendarPreconditionFailedException::class);
+
+    it('sends every tag of an If-Match list as a strong tag', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+        $remote->put('a.ics', davIcs('a'));
+
+        expect(fn () => app(RemoteCalDavClient::class)->putObject(ExternalCalendar::first(), 'a.ics', davIcs('a'), false, 'W/"one", "two"'))
+            ->toThrow(ExternalCalendarPreconditionFailedException::class);
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT' && $request->header('If-Match') === ['"one", "two"']);
     });
 
     it('keeps credentials out of logs and caches', function () {

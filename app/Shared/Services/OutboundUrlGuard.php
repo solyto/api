@@ -20,7 +20,11 @@ class OutboundUrlGuard
         '192.0.0.0/24',
         '198.18.0.0/15',
         '64:ff9b::/96',
+        '64:ff9b:1::/48',
+        '::ffff:0:0:0/96',
         '2001:db8::/32',
+        '2002::/16',
+        'fec0::/10',
     ];
 
     /** @var \Closure(string): array<int, string> */

@@ -197,14 +197,26 @@ class CalendarImport
                 $this->helper->getEntriesXml()
             );
         } catch (ExternalCalendarUnavailableException) {
+            $this->logUnreadable($calendarUrl, null);
+
             return [];
         }
 
         if (!$response->successful()) {
+            $this->logUnreadable($calendarUrl, $response->status());
+
             return [];
         }
 
         return $this->helper->parseEntriesFromXml($response->body(), $calendarName);
+    }
+
+    private function logUnreadable(string $calendarUrl, ?int $status): void
+    {
+        Log::channel('dav')->warning('Calendar import could not read a calendar', [
+            'host'   => parse_url($calendarUrl, PHP_URL_HOST),
+            'status' => $status,
+        ]);
     }
 
     private function saveState(string $userId, CalendarImportDTO $dto): void
