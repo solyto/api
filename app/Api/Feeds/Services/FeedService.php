@@ -3,18 +3,21 @@
 namespace App\Api\Feeds\Services;
 
 use App\Api\Feeds\Exceptions\FeedException;
+use App\Api\Feeds\Exceptions\FeedSubscriptionLimitException;
 use App\Api\Feeds\Jobs\SyncFeed;
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
+use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class FeedService
 {
@@ -68,7 +71,11 @@ class FeedService
             }
         }
 
-        $rssItems = $this->getFeedItemsFromRss($url);
+        try {
+            $rssItems = $this->getFeedItemsFromRss($url);
+        } catch (BlockedUrlException) {
+            return [];
+        }
 
         return array_map(fn($item) => [
             'id'           => $item->get_id(),
@@ -80,10 +87,29 @@ class FeedService
 
     /**
      * @throws FeedException
+     * @throws ValidationException
      */
     public function createSubscription(User $user, string $title, string $url, ?string $whitelist, ?string $blacklist): FeedSubscription
     {
-        return $this->subscribe($user->id, $title, $url, fn () => $this->feedReader->getFeedData($url), $whitelist, $blacklist);
+        try {
+            return $this->subscribe($user->id, $title, $url, fn () => $this->feedReader->getFeedData($url), $whitelist, $blacklist);
+        } catch (BlockedUrlException) {
+            throw ValidationException::withMessages(['url' => 'The feed URL is not allowed.']);
+        } catch (FeedSubscriptionLimitException) {
+            throw ValidationException::withMessages([
+                'url' => sprintf('You can subscribe to at most %d feeds.', $this->maxSubscriptions()),
+            ]);
+        }
+    }
+
+    public function hasReachedSubscriptionLimit(string $userId): bool
+    {
+        return FeedSubscription::forUser($userId)->count() >= $this->maxSubscriptions();
+    }
+
+    private function maxSubscriptions(): int
+    {
+        return (int) config('feeds.max_subscriptions');
     }
 
     /**
@@ -101,6 +127,8 @@ class FeedService
      * @param  \Closure(): (array|false)  $fetchFeedData  only called when the Feed row does not exist yet
      *
      * @throws FeedException
+     * @throws FeedSubscriptionLimitException
+     * @throws BlockedUrlException from $fetchFeedData
      */
     private function subscribe(string $userId, string $title, string $url, \Closure $fetchFeedData, ?string $whitelist, ?string $blacklist): FeedSubscription
     {
@@ -108,6 +136,10 @@ class FeedService
 
         if ($feed && FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
             throw new \App\Api\Feeds\Exceptions\FeedAlreadySubscribedException('Already subscribed to this feed');
+        }
+
+        if ($this->hasReachedSubscriptionLimit($userId)) {
+            throw new FeedSubscriptionLimitException('Feed subscription limit reached');
         }
 
         if (!$feed) {
@@ -259,6 +291,9 @@ class FeedService
         );
     }
 
+    /**
+     * @throws BlockedUrlException
+     */
     public function getFeedItemsFromRss(string $url): array|false
     {
         return $this->feedReader->getItems($url);
@@ -419,7 +454,13 @@ class FeedService
             return false;
         }
 
-        $items = $this->getFeedItemsFromRss($feed->url);
+        try {
+            $items = $this->getFeedItemsFromRss($feed->url);
+        } catch (BlockedUrlException) {
+            $this->recordSyncFailure($feedId, 'The feed URL is not allowed.');
+
+            return false;
+        }
 
         if (!$items) {
             $this->recordSyncFailure($feedId, 'Feed returned no items');

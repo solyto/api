@@ -65,9 +65,9 @@ class LibraryCoverController
             default => 'image/jpeg'
         };
 
-        // File names are uniqid()-based and never reused, so the bytes behind a URL never change.
+        // Not immutable: the nightly ScaleCovers job resizes covers in place under the same file name.
         return response($cover)
             ->header('Content-Type', $mimeType)
-            ->header('Cache-Control', 'private, max-age=31536000, immutable');
+            ->header('Cache-Control', 'private, max-age=86400');
     }
 }

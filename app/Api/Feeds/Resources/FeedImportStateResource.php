@@ -22,7 +22,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *             @OA\Property(property="url", type="string", format="uri"),
  *             @OA\Property(property="title", type="string"),
  *             @OA\Property(property="already_subscribed", type="boolean"),
- *             @OA\Property(property="status", type="string", nullable=true, enum={"pending", "subscribed", "already_subscribed", "unreachable", "not_a_feed"})
+ *             @OA\Property(property="status", type="string", nullable=true, enum={"pending", "subscribed", "already_subscribed", "unreachable", "not_a_feed", "limit_reached"})
  *         )
  *     )
  * )

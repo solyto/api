@@ -7,6 +7,9 @@ use App\Api\Feeds\Enums\FeedImportStatus;
 
 class FeedImportStateDTO
 {
+    /** Unix time of the last save; null on states cached before it was recorded. */
+    public ?int $updatedAt = null;
+
     /**
      * @param  array<int, array{url: string, title: string, already_subscribed: bool, status: ?FeedImportStatus}>  $feeds
      */

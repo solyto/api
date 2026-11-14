@@ -5,6 +5,8 @@ use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Users\Models\Friend;
+use App\Shared\Services\OutboundUrlGuard;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 describe('Feed subscriptions CRUD', function () {
@@ -72,6 +74,47 @@ describe('Feed subscriptions CRUD', function () {
         expect(Feed::where('url', 'https://example.com/feed.xml')->exists())->toBeTrue();
 
         Queue::assertPushed(\App\Api\Feeds\Jobs\SyncFeed::class);
+    });
+
+    it('rejects a feed URL on a private address with 422 and fetches nothing', function () {
+        Http::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => ['10.0.0.1']));
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', [
+                'title' => 'Internal',
+                'url' => 'https://internal.example/feed.xml',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('url');
+
+        Http::assertNothingSent();
+        expect(Feed::count())->toBe(0);
+        expect(FeedSubscription::count())->toBe(0);
+    });
+
+    it('rejects a subscription over the limit with 422, counting only the user\'s own', function () {
+        Queue::fake();
+        config(['feeds.max_subscriptions' => 1]);
+        $user = makeUser();
+        $other = makeUser();
+        FeedSubscription::factory()->forUser($user)->create();
+        FeedSubscription::factory()->forUser(makeUser())->count(3)->create();
+        $this->mock(FeedReader::class)->shouldReceive('getFeedData')->once()->andReturn([
+            'title' => 'Example Feed',
+            'items' => ['fake-item'],
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'One more', 'url' => 'https://example.com/feed.xml'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('url');
+        expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(1);
+
+        $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'First', 'url' => 'https://example.com/feed.xml'])
+            ->assertStatus(201);
     });
 
     it('rejects subscribing to an existing feed twice', function () {

@@ -324,7 +324,7 @@ class FeedController
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=409, description="Already subscribed to this feed", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Feed URL doesn't seem valid", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=422, description="Feed URL doesn't seem valid, is not allowed, or the subscription limit is reached", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function storeSubscription(StoreFeedSubscriptionRequest $request): JsonResponse

@@ -2,25 +2,48 @@
 
 namespace App\Api\Feeds\Services;
 
+use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Services\OutboundUrlGuard;
+use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Psr7\FnStream;
+use GuzzleHttp\Psr7\HttpFactory;
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
+use GuzzleHttp\Psr7\Utils;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
+use SimplePie\Misc;
 use SimplePie\SimplePie;
 
+/**
+ * Every download goes through fetchMany(): each hop is checked by the
+ * OutboundUrlGuard and pinned to the address it checked (CURLOPT_RESOLVE),
+ * redirects are followed by hand, and a body is cut off once its
+ * decompressed size passes MAX_FEED_BYTES. SimplePie fetches through the
+ * same path (httpClient()), so its feed autodiscovery is guarded too.
+ */
 class FeedReader
 {
-    private SimplePie $pie;
+    private const int MAX_FEED_BYTES = 5 * 1024 * 1024;
+    private const int MAX_REDIRECTS = 5;
+    private const int FETCH_TIMEOUT = 10;
+    private const int OG_IMAGE_TIMEOUT = 5;
 
-    public function __construct(?SimplePie $pie = null)
+    public function __construct(private readonly OutboundUrlGuard $guard) {}
+
+    /**
+     * @throws BlockedUrlException when the feed URL itself points at a non-public address
+     */
+    public function getItems(string $url): array|false
     {
-        $this->pie = $pie ?? new SimplePie;
-        $this->pie->enable_cache(false);
-    }
-
-    public function getItems(string $url): array|bool
-    {
-        $this->pie->set_feed_url($url);
-        $this->pie->init();
-
-        $items = $this->pie->get_items();
+        $pie = $this->fetchFeed($url);
+        $items = $pie->get_items();
 
         if (empty($items)) {
             return false;
@@ -29,26 +52,27 @@ class FeedReader
         return $items;
     }
 
+    /**
+     * @throws BlockedUrlException when the feed URL itself points at a non-public address
+     */
     public function getFeedData(string $url): array|false
     {
-        $this->pie->set_feed_url($url);
-        $this->pie->init();
-
-        $items = $this->pie->get_items();
+        $pie = $this->fetchFeed($url);
+        $items = $pie->get_items();
 
         if (empty($items)) {
             return false;
         }
 
         return [
-            'title' => $this->pie->get_title() ?: null,
+            'title' => $pie->get_title() ?: null,
             'items' => $items,
         ];
     }
 
     /**
-     * A fresh SimplePie per call: raw data set on the shared instance would
-     * stay there and be served to every later getFeedData() call.
+     * A fresh SimplePie per call: raw data set on a shared instance would
+     * stay there and be served to every later call.
      */
     public function parseFeedData(string $content): array|false
     {
@@ -67,6 +91,152 @@ class FeedReader
             'title' => $pie->get_title() ?: null,
             'items' => $items,
         ];
+    }
+
+    /**
+     * Fetches all URLs concurrently, one pool per redirect hop. A URL comes
+     * back as null when it or a hop it redirects to is blocked by the guard,
+     * the connection fails, the body is over MAX_FEED_BYTES, or it redirects
+     * more than MAX_REDIRECTS times; otherwise as the final response, whatever
+     * its status.
+     *
+     * @param  array<array-key, string>  $urls
+     * @param  array<string, string>  $headers
+     * @return array<array-key, Response|null> keyed like $urls
+     */
+    public function fetchMany(array $urls, int $timeout, array $headers = []): array
+    {
+        $results = [];
+        $pending = $urls;
+
+        for ($hop = 0; $hop <= self::MAX_REDIRECTS && $pending !== []; $hop++) {
+            $pins = [];
+
+            foreach ($pending as $key => $url) {
+                try {
+                    $pins[$key] = $this->guard->check($url);
+                } catch (BlockedUrlException) {
+                    $results[$key] = null;
+                }
+            }
+
+            // Plain closures: an arrow function would capture $tooLarge by value.
+            $tooLarge = [];
+            $responses = $pins === [] ? [] : Http::pool(function (Pool $pool) use ($pins, $pending, $headers, $timeout, &$tooLarge) {
+                foreach ($pins as $key => $pin) {
+                    $pool->as((string) $key)
+                        ->withUserAgent(Misc::get_default_useragent())
+                        ->withHeaders($headers)
+                        ->timeout($timeout)
+                        ->connectTimeout($timeout)
+                        ->withoutRedirecting()
+                        ->withOptions([
+                            'curl' => [CURLOPT_RESOLVE => [$pin]],
+                            'sink' => $this->cappedSink(function () use (&$tooLarge, $key) {
+                                $tooLarge[$key] = true;
+                            }),
+                        ])
+                        ->get($pending[$key]);
+                }
+            });
+
+            $next = [];
+
+            foreach (array_keys($pins) as $key) {
+                $response = $responses[$key] ?? null;
+
+                if (isset($tooLarge[$key]) || ($response instanceof Response && $this->isTooLarge($response))) {
+                    Log::warning('Feed fetch: response over the size cap', ['host' => parse_url($pending[$key], PHP_URL_HOST)]);
+                    $results[$key] = null;
+                } elseif (! $response instanceof Response) {
+                    $results[$key] = null;
+                } elseif ($response->redirect() && $response->header('Location') !== '') {
+                    $next[$key] = (string) UriResolver::resolve(new Uri($pending[$key]), new Uri($response->header('Location')));
+                } else {
+                    $results[$key] = $response;
+                }
+            }
+
+            $pending = $next;
+        }
+
+        $ordered = [];
+
+        foreach (array_keys($urls) as $key) {
+            $ordered[$key] = $results[$key] ?? null;
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * @throws BlockedUrlException
+     */
+    private function fetchFeed(string $url): SimplePie
+    {
+        // Checked up front so callers can tell a forbidden URL from one that is just unreachable.
+        $this->guard->check($url);
+
+        $factory = new HttpFactory;
+        $pie = new SimplePie;
+        $pie->enable_cache(false);
+        $pie->set_http_client($this->httpClient(), $factory, $factory);
+        $pie->set_feed_url($url);
+        $pie->init();
+
+        return $pie;
+    }
+
+    /**
+     * SimplePie's own redirect handling never sees a redirect: fetchMany()
+     * has already followed it through the guard.
+     */
+    private function httpClient(): ClientInterface
+    {
+        return new class($this, self::FETCH_TIMEOUT) implements ClientInterface
+        {
+            public function __construct(private readonly FeedReader $reader, private readonly int $timeout) {}
+
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                $headers = $request->hasHeader('Accept') ? ['Accept' => $request->getHeaderLine('Accept')] : [];
+                $response = $this->reader->fetchMany([(string) $request->getUri()], $this->timeout, $headers)[0];
+
+                return $response?->toPsrResponse() ?? throw new TransferException('The feed could not be fetched.');
+            }
+        };
+    }
+
+    /**
+     * curl hands the sink decompressed bytes, so counting here caps what a
+     * gzip body inflates to; a progress callback only sees the compressed
+     * bytes on the wire. Accepting fewer bytes than offered makes curl abort
+     * just this transfer, where a throw would reject the whole pool.
+     */
+    private function cappedSink(\Closure $onTooLarge): StreamInterface
+    {
+        $stream = Utils::streamFor(Utils::tryFopen('php://temp', 'w+'));
+        $written = 0;
+
+        return FnStream::decorate($stream, [
+            'write' => function (string $data) use ($stream, &$written, $onTooLarge): int {
+                $written += strlen($data);
+
+                if ($written > self::MAX_FEED_BYTES) {
+                    $onTooLarge();
+
+                    return 0;
+                }
+
+                return $stream->write($data);
+            },
+        ]);
+    }
+
+    private function isTooLarge(Response $response): bool
+    {
+        return (int) $response->header('Content-Length') > self::MAX_FEED_BYTES
+            || strlen($response->body()) > self::MAX_FEED_BYTES;
     }
 
     /**
@@ -184,11 +354,11 @@ class FeedReader
         }
 
         try {
-            $response = Http::timeout(5)->withHeaders([
+            $response = $this->fetchMany([$url], self::OG_IMAGE_TIMEOUT, [
                 'User-Agent' => 'Mozilla/5.0 (compatible; FeedBot/1.0)',
-            ])->get($url);
+            ])[0];
 
-            if (! $response->successful()) {
+            if (! $response?->successful()) {
                 return null;
             }
 

@@ -131,6 +131,36 @@ describe('Feed import upload', function () {
         expectApiError(feedImportUpload($this, $user, feedImportOpml()), 409);
     });
 
+    it('returns 409 for an upload while a select holds the lock', function () {
+        $user = makeUser();
+        feedImportUpload($this, $user, feedImportOpml(2))->assertStatus(200);
+        $lock = Cache::lock('feed_import_select_'.$user->id, 10);
+        $lock->get();
+
+        expectApiError(feedImportUpload($this, $user, feedImportOpml(3)), 409);
+
+        $lock->release();
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/import/state')->assertJsonPath('data.total', 2);
+    });
+
+    it('accepts a new upload once a running import has not saved progress for 5 minutes', function () {
+        Queue::fake();
+        $user = makeUser();
+        feedImportUpload($this, $user, feedImportOpml(2))->assertStatus(200);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
+            ->assertStatus(200);
+
+        $this->travel(299)->seconds();
+        expectApiError(feedImportUpload($this, $user, feedImportOpml(3)), 409);
+
+        $this->travel(2)->seconds();
+        feedImportUpload($this, $user, feedImportOpml(3))
+            ->assertStatus(200)
+            ->assertJsonPath('data.stage', 'parsed')
+            ->assertJsonPath('data.total', 3);
+    });
+
     it('replaces a parsed import with a new upload', function () {
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml(2))->assertStatus(200);

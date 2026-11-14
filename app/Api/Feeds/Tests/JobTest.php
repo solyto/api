@@ -11,7 +11,9 @@ use App\Api\Feeds\Services\FeedReader;
 use App\Api\Feeds\Services\FeedService;
 use App\Api\Feeds\Services\OpmlImportService;
 use App\Api\Users\Models\User;
+use App\Shared\Services\OutboundUrlGuard;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use SimplePie\Misc;
@@ -38,6 +40,19 @@ describe('SyncFeed', function () {
         } catch (\Exception $e) {
             expect($e->getMessage())->toBe('boom');
         }
+    });
+});
+
+describe('SyncFeed on a private address', function () {
+    it('records the blocked URL as the sync error without throwing or fetching', function () {
+        Http::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => ['10.0.0.1']));
+        $feed = Feed::factory()->create(['url' => 'https://rebound.example/feed']);
+
+        app(SyncFeed::class, ['feedId' => $feed->id])->handle(app(FeedService::class));
+
+        Http::assertNothingSent();
+        expect($feed->fresh()->last_error)->toBe('The feed URL is not allowed.');
     });
 });
 
@@ -203,12 +218,14 @@ describe('ImportFeedSubscriptions', function () {
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('parsed');
     });
 
-    it('marks a feed that throws unexpectedly as unreachable and finishes the rest', function () {
+    it('marks a feed whose content cannot be parsed as not a feed and finishes the rest', function () {
         Queue::fake();
         $user = makeUser();
         Feed::factory()->create(['url' => 'https://known.example/feed']);
         Http::fake(['*' => Http::response('<rss/>', 200)]);
-        $this->mock(FeedReader::class)->shouldReceive('parseFeedData')->andThrow(new RuntimeException('boom'));
+        $reader = Mockery::mock(FeedReader::class, [app(OutboundUrlGuard::class)])->makePartial();
+        $reader->shouldReceive('parseFeedData')->andThrow(new RuntimeException('boom'));
+        $this->instance(FeedReader::class, $reader);
         runningFeedImport($user, ['https://known.example/feed', 'https://new.example/feed']);
 
         app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
@@ -216,7 +233,7 @@ describe('ImportFeedSubscriptions', function () {
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
         expect(feedImportStatuses($user))->toBe([
             'https://known.example/feed' => 'subscribed',
-            'https://new.example/feed' => 'unreachable',
+            'https://new.example/feed' => 'not_a_feed',
         ]);
     });
 
@@ -241,13 +258,15 @@ describe('ImportFeedSubscriptions', function () {
         expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(3);
     });
 
-    it('keeps importing when subscribing one feed throws an unexpected exception', function () {
+    it('reports an unexpected exception while subscribing and keeps importing', function () {
         Queue::fake();
+        Exceptions::fake();
         $user = makeUser();
         Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
         $real = app(FeedService::class);
         $this->mock(FeedService::class, function ($mock) use ($real) {
             $mock->shouldReceive('plainTitle')->andReturnUsing(fn (?string $value) => $real->plainTitle($value));
+            $mock->shouldReceive('hasReachedSubscriptionLimit')->andReturnUsing(fn (string $userId) => $real->hasReachedSubscriptionLimit($userId));
             $mock->shouldReceive('createImportedSubscription')->andReturnUsing(
                 fn (User $user, string $title, string $url, array|false|null $feedData) => $url === 'https://bad.example/feed'
                     ? throw new RuntimeException('boom')
@@ -264,6 +283,7 @@ describe('ImportFeedSubscriptions', function () {
             'https://bad.example/feed' => 'unreachable',
             'https://after.example/feed' => 'subscribed',
         ]);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'boom');
     });
 
     it('treats a feed body over the size cap as unreachable', function () {
@@ -285,6 +305,69 @@ describe('ImportFeedSubscriptions', function () {
             'https://ok.example/feed' => 'subscribed',
         ]);
         expect(Feed::pluck('url')->all())->toBe(['https://ok.example/feed']);
+    });
+
+    it('marks a feed on a private address, or redirecting to one, as unreachable without fetching it', function () {
+        Queue::fake();
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(
+            fn (string $host) => str_starts_with($host, 'private.') ? ['10.0.0.1'] : ['93.184.216.34']
+        ));
+        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        Http::fake([
+            'https://redirect.example/*' => Http::response('', 302, ['Location' => 'http://private.example/feed']),
+            'https://moved.example/feed' => Http::response('', 301, ['Location' => '/new-feed']),
+            '*' => Http::response($rss, 200),
+        ]);
+        $user = makeUser();
+        runningFeedImport($user, ['https://private.example/feed', 'https://redirect.example/feed', 'https://moved.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://private.example/feed' => 'unreachable',
+            'https://redirect.example/feed' => 'unreachable',
+            'https://moved.example/feed' => 'subscribed',
+        ]);
+        Http::assertNotSent(fn (HttpRequest $request) => str_contains($request->url(), 'private.example'));
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://moved.example/new-feed');
+    });
+
+    it('marks feeds past the subscription limit as limit_reached, counting only the user\'s own', function () {
+        Queue::fake();
+        config(['feeds.max_subscriptions' => 3]);
+        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        $user = makeUser();
+        FeedSubscription::factory()->forUser($user)->create();
+        FeedSubscription::factory()->forUser(makeUser())->count(5)->create();
+        Feed::factory()->create(['url' => 'https://known.example/feed']);
+        runningFeedImport($user, ['https://known.example/feed', 'https://one.example/feed', 'https://two.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        expect(feedImportStatuses($user))->toBe([
+            'https://known.example/feed' => 'subscribed',
+            'https://one.example/feed' => 'subscribed',
+            'https://two.example/feed' => 'limit_reached',
+        ]);
+        expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(3);
+        expect(Feed::where('url', 'https://two.example/feed')->exists())->toBeFalse();
+    });
+
+    it('does not fetch feeds once the user is at the subscription limit', function () {
+        Queue::fake();
+        config(['feeds.max_subscriptions' => 1]);
+        Http::fake();
+        $user = makeUser();
+        FeedSubscription::factory()->forUser($user)->create();
+        runningFeedImport($user, ['https://one.example/feed', 'https://two.example/feed']);
+
+        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+
+        Http::assertNothingSent();
+        expect(feedImportStatuses($user))->toBe([
+            'https://one.example/feed' => 'limit_reached',
+            'https://two.example/feed' => 'limit_reached',
+        ]);
     });
 
     it('finishes a running import when the job fails', function () {

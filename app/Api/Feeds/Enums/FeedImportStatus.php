@@ -9,4 +9,5 @@ enum FeedImportStatus: string
     case AlreadySubscribed = 'already_subscribed';
     case Unreachable = 'unreachable';
     case NotAFeed = 'not_a_feed';
+    case LimitReached = 'limit_reached';
 }

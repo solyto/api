@@ -419,8 +419,8 @@ describe('Cover serving', function () {
 
         $headers = $response->baseResponse->headers;
         expect($headers->getCacheControlDirective('private'))->toBeTrue()
-            ->and($headers->getCacheControlDirective('max-age'))->toBe('31536000')
-            ->and($headers->getCacheControlDirective('immutable'))->toBeTrue()
+            ->and($headers->getCacheControlDirective('max-age'))->toBe('86400')
+            ->and($headers->hasCacheControlDirective('immutable'))->toBeFalse()
             ->and($headers->hasCacheControlDirective('public'))->toBeFalse();
     });
 

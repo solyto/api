@@ -1,32 +1,19 @@
 <?php
 
 use App\Api\Feeds\Services\FeedReader;
-use GuzzleHttp\Psr7\HttpFactory;
-use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Http;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\RequestInterface;
-use SimplePie\SimplePie;
 
 covers(FeedReader::class);
 
 function feedReaderWithFixture(string $fixture): FeedReader
 {
-    $client = Mockery::mock(ClientInterface::class);
-    $client->shouldReceive('sendRequest')->andReturnUsing(function (RequestInterface $request) use ($fixture) {
-        return new Response(
-            200,
-            ['Content-Type' => 'application/rss+xml'],
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/'.$fixture)
-        );
-    });
+    Http::fake(['fixture.example/*' => Http::response(
+        file_get_contents(__DIR__.'/../../../../tests/Fixtures/'.$fixture),
+        200,
+        ['Content-Type' => 'application/rss+xml']
+    )]);
 
-    $factory = new HttpFactory;
-    $pie = new SimplePie;
-    $pie->enable_cache(false);
-    $pie->set_http_client($client, $factory, $factory);
-
-    return new FeedReader($pie);
+    return app(FeedReader::class);
 }
 
 describe('FeedReader', function () {
@@ -69,7 +56,7 @@ describe('FeedReader', function () {
     });
 
     it('parses already downloaded content into feed data', function () {
-        $data = (new FeedReader)->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
+        $data = app(FeedReader::class)->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
 
         expect($data)->toBeArray();
         expect($data['title'])->toBe('Fixture Feed');
@@ -77,7 +64,7 @@ describe('FeedReader', function () {
     });
 
     it('returns false for downloaded content that is not a feed', function () {
-        $reader = new FeedReader;
+        $reader = app(FeedReader::class);
 
         expect($reader->parseFeedData('<!DOCTYPE html><html><body><p>Hello</p></body></html>'))->toBeFalse();
         expect($reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss')))->toBeFalse();

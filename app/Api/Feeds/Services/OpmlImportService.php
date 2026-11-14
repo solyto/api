@@ -10,18 +10,15 @@ use App\Api\Feeds\Exceptions\FeedException;
 use App\Api\Feeds\Exceptions\FeedImportConflictException;
 use App\Api\Feeds\Exceptions\FeedImportException;
 use App\Api\Feeds\Exceptions\FeedImportNotFoundException;
+use App\Api\Feeds\Exceptions\FeedSubscriptionLimitException;
 use App\Api\Feeds\Jobs\ImportFeedSubscriptions;
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use DOMDocument;
-use Illuminate\Http\Client\Pool;
-use Illuminate\Http\Client\Response;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use SimplePie\Misc;
 use SimpleXMLElement;
 use Throwable;
 
@@ -37,7 +34,10 @@ class OpmlImportService
     private const int MAX_TITLE_LENGTH = 255;
     private const int FETCH_CHUNK_SIZE = 25;
     private const int FETCH_TIMEOUT = 5;
-    private const int MAX_FEED_BYTES = 5 * 1024 * 1024;
+    // A running import with no save for this long has lost its worker. A live job saves after every
+    // chunk (worst case 25 feeds x 5 s fetched one after another = 125 s), and its $timeout of 300 s
+    // bounds any gap, so only a job still waiting in the queue can be mistaken for a dead one.
+    private const int STALE_AFTER = 300;
 
     /** FreshRSS scraper types: their URL is a web page, not a feed. */
     private const array SCRAPER_TYPES = ['html+xpath', 'xml+xpath', 'json+dotnotation', 'jsonfeed'];
@@ -54,10 +54,6 @@ class OpmlImportService
      */
     public function start(User $user, string $content): FeedImportStateDTO
     {
-        if ($this->getState($user->id)?->stage === FeedImportStage::Running) {
-            throw new FeedImportConflictException('A feed import is already running.');
-        }
-
         $feeds = $this->parse($content);
 
         if ($feeds === []) {
@@ -81,7 +77,19 @@ class OpmlImportService
             'status' => null,
         ], $feeds));
 
-        $this->saveState($user->id, $state);
+        // Same lock as select(): without it, a select between this check and the save would start a
+        // job whose Running state this upload then overwrites.
+        $lock = $this->lock($user->id, 'A feed import is already running.');
+
+        try {
+            if ($this->isRunning($this->getState($user->id))) {
+                throw new FeedImportConflictException('A feed import is already running.');
+            }
+
+            $this->saveState($user->id, $state);
+        } finally {
+            $lock->release();
+        }
 
         return $state;
     }
@@ -96,11 +104,7 @@ class OpmlImportService
     public function select(User $user, array $urls): FeedImportStateDTO
     {
         // Without the lock, a double submit passes the Parsed check twice and dispatches two jobs.
-        $lock = Cache::lock(self::SELECT_LOCK_KEY.'_'.$user->id, self::SELECT_LOCK_TTL);
-
-        if (! $lock->get()) {
-            throw new FeedImportConflictException('This feed import has already started.');
-        }
+        $lock = $this->lock($user->id, 'This feed import has already started.');
 
         try {
             $state = $this->state($user);
@@ -168,26 +172,23 @@ class OpmlImportService
 
         foreach (array_chunk($toFetch, self::FETCH_CHUNK_SIZE, true) as $chunk) {
             try {
-                $responses = Http::pool(fn (Pool $pool) => array_map(
-                    fn (array $feed) => $pool->as($feed['url'])
-                        ->withUserAgent(Misc::get_default_useragent())
-                        ->timeout(self::FETCH_TIMEOUT)
-                        // Aborts just this transfer; a throwing Guzzle progress callback would reject the
-                        // whole chunk. An aborted transfer still comes back as a Response, see isFetchedFeed().
-                        ->withOptions(['curl' => [
-                            CURLOPT_NOPROGRESS => false,
-                            CURLOPT_XFERINFOFUNCTION => fn ($handle, int $downloadTotal, int $downloaded) => (int) (
-                                $downloadTotal > self::MAX_FEED_BYTES || $downloaded > self::MAX_FEED_BYTES
-                            ),
-                        ]])
-                        ->get($feed['url']),
-                    $chunk
-                ));
+                if ($this->feedService->hasReachedSubscriptionLimit($userId)) {
+                    foreach (array_keys($chunk) as $index) {
+                        $state->feeds[$index]['status'] = FeedImportStatus::LimitReached;
+                    }
+
+                    continue;
+                }
+
+                $responses = $this->feedReader->fetchMany(
+                    array_map(fn (array $feed) => $feed['url'], $chunk),
+                    self::FETCH_TIMEOUT
+                );
 
                 foreach ($chunk as $index => $feed) {
-                    $response = $responses[$feed['url']] ?? null;
+                    $response = $responses[$index];
 
-                    $state->feeds[$index]['status'] = $this->isFetchedFeed($response)
+                    $state->feeds[$index]['status'] = $response?->successful()
                         ? $this->subscribe($user, $feed, fn () => $this->feedReader->parseFeedData($response->body()))
                         : FeedImportStatus::Unreachable;
                 }
@@ -291,36 +292,50 @@ class OpmlImportService
      */
     private function subscribe(User $user, array $feed, \Closure $feedData): FeedImportStatus
     {
+        // Content SimplePie chokes on is a feed problem, not a server one.
         try {
-            $this->feedService->createImportedSubscription($user, $feed['title'], $feed['url'], $feedData());
+            $data = $feedData();
+        } catch (Throwable) {
+            return FeedImportStatus::NotAFeed;
+        }
+
+        try {
+            $this->feedService->createImportedSubscription($user, $feed['title'], $feed['url'], $data);
 
             return FeedImportStatus::Subscribed;
         } catch (FeedAlreadySubscribedException) {
             return FeedImportStatus::AlreadySubscribed;
+        } catch (FeedSubscriptionLimitException) {
+            return FeedImportStatus::LimitReached;
         } catch (FeedException) {
             return FeedImportStatus::NotAFeed;
         } catch (Throwable $e) {
-            // One odd feed must not end the job ($tries = 1) and leave every later feed untried.
-            Log::warning('Feed import: subscribing a feed failed', [
-                'user_id' => $user->id,
-                'url' => $feed['url'],
-                'exception' => $e::class,
-                'message' => $e->getMessage(),
-            ]);
+            // One odd feed must not end the job ($tries = 1) and leave every later feed untried. Unreachable
+            // reads as "try again later", which is the right advice for a failure on our side.
+            report($e);
 
             return FeedImportStatus::Unreachable;
         }
     }
 
-    /**
-     * @phpstan-assert-if-true Response $response
-     */
-    private function isFetchedFeed(mixed $response): bool
+    private function isRunning(?FeedImportStateDTO $state): bool
     {
-        return $response instanceof Response
-            && $response->successful()
-            && (int) $response->header('Content-Length') <= self::MAX_FEED_BYTES
-            && strlen($response->body()) <= self::MAX_FEED_BYTES;
+        return $state?->stage === FeedImportStage::Running
+            && ($state->updatedAt === null || $state->updatedAt > now()->getTimestamp() - self::STALE_AFTER);
+    }
+
+    /**
+     * @throws FeedImportConflictException
+     */
+    private function lock(string $userId, string $conflictMessage): Lock
+    {
+        $lock = Cache::lock(self::SELECT_LOCK_KEY.'_'.$userId, self::SELECT_LOCK_TTL);
+
+        if (! $lock->get()) {
+            throw new FeedImportConflictException($conflictMessage);
+        }
+
+        return $lock;
     }
 
     private function getState(string $userId): ?FeedImportStateDTO
@@ -332,6 +347,7 @@ class OpmlImportService
 
     private function saveState(string $userId, FeedImportStateDTO $state): void
     {
+        $state->updatedAt = now()->getTimestamp();
         $this->cache->store([self::CACHE_KEY, $userId], self::CACHE_TTL, $state);
     }
 }
