@@ -43,6 +43,24 @@ function apiEdit(\Tests\TestCase $test, string $uri, array $fields): \Sabre\VObj
     return \Sabre\VObject\Reader::read(davRequest($test->user, 'GET', $path)->getBodyAsString());
 }
 
+/**
+ * Share the user's default calendar with one accepted and one pending sharee.
+ *
+ * @return array{0: \App\Api\Users\Models\User, 1: \App\Api\Users\Models\User}
+ */
+function shareDefaultCalendar(\App\Api\Users\Models\User $owner): array
+{
+    [$accepted, $pending] = [davUser(), davUser()];
+    $dav = app(\App\Dav\Services\DavService::class);
+    $sharing = $dav->calendars()->sharing();
+    $calendar = $dav->calendars()->list($owner)[0];
+    $sharing->inviteUser($calendar, $owner, $accepted);
+    $sharing->inviteUser($calendar, $owner, $pending);
+    $sharing->acceptInvite($accepted, 'mailto:'.$accepted->email);
+
+    return [$accepted, $pending];
+}
+
 function seriesWithMovedDate(): string
 {
     return implode("\r\n", [
@@ -561,6 +579,21 @@ describe('Calendars: DAV and API agree', function () {
         $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->assertJsonCount(1, 'data');
     });
 
+    it('drops a shared calendar the owner deleted over DAV from every sharee\'s API listing', function () {
+        $sharees = shareDefaultCalendar($this->user);
+        $sharedIn = fn (\App\Api\Users\Models\User $user) => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))
+            ->where('is_shared', true);
+        foreach ($sharees as $sharee) {
+            expect($sharedIn($sharee))->toHaveCount(1);
+        }
+
+        davRequest($this->user, 'DELETE', $this->calendar);
+
+        foreach ($sharees as $sharee) {
+            expect($sharedIn($sharee))->toBeEmpty();
+        }
+    });
+
     it('shows a color changed over DAV in the API', function () {
         $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars');
 
@@ -712,5 +745,40 @@ describe('CacheInvalidationPlugin', function () {
 
         $this->cache->shouldNotHaveReceived('forgetByPrefix');
         Queue::assertNothingPushed();
+    });
+
+    it('drops every sharee\'s cached list and events when the owner deletes a shared calendar over DAV', function () {
+        $sharees = shareDefaultCalendar($this->user);
+
+        expect(davRequest($this->user, 'DELETE', $this->calendar)->getStatus())->toBe(204);
+
+        foreach ($sharees as $sharee) {
+            $this->cache->shouldHaveReceived('forget')->with(['calendars', $sharee->id])->once();
+            $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $sharee->id, $this->calendarId])->once();
+            Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->userId === $sharee->id && $job->delay !== null);
+        }
+    });
+
+    it('leaves the owner and other sharees alone when a sharee deletes their instance over DAV', function () {
+        [$accepted, $pending] = shareDefaultCalendar($this->user);
+        $instance = collect(app(\App\Dav\Services\DavService::class)->calendars()->list($accepted))->firstWhere('isShared', true);
+
+        expect(davRequest($accepted, 'DELETE', 'calendars/'.$accepted->email.'/'.$instance->uri.'/')->getStatus())->toBe(204);
+
+        foreach ([$this->user, $pending] as $other) {
+            $this->cache->shouldNotHaveReceived('forget', [['calendars', $other->id]]);
+        }
+    });
+
+    it('clears no sharee caches for a rejected calendar delete', function () {
+        $sharees = shareDefaultCalendar($this->user);
+
+        expect(davRequest(davUser(), 'DELETE', $this->calendar)->getStatus())->toBe(403);
+
+        foreach ($sharees as $sharee) {
+            $this->cache->shouldNotHaveReceived('forget', [['calendars', $sharee->id]]);
+            $this->cache->shouldNotHaveReceived('forgetByPrefix', [['calendar_events', $sharee->id, $this->calendarId]]);
+        }
+        Queue::assertNotPushed(RefreshCalendarCache::class);
     });
 });

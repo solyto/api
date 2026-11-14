@@ -745,4 +745,41 @@ describe('Shared calendar cache invalidation', function () {
             ->assertStatus(200);
         expect($service->list($this->owner)[0]->solytoShared)->toBeFalse();
     });
+
+    it('drops a deleted shared calendar from every sharee\'s cached list and events', function () {
+        $pending = makeUser();
+        Friend::factory()->forUsers($this->owner, $pending)->create();
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$this->ownerInstance.'/share', ['friend_id' => $pending->id])
+            ->assertStatus(200);
+        ($this->accept)();
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'Doomed');
+        $sharedIn = fn (User $user) => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))
+            ->where('is_shared', true);
+        expect($sharedIn($this->sharee))->toHaveCount(1)
+            ->and($sharedIn($pending))->toHaveCount(1)
+            ->and(($this->monthTitles)($this->sharee))->toContain('Doomed');
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$this->ownerInstance)
+            ->assertStatus(200);
+
+        expect($sharedIn($this->sharee))->toBeEmpty()
+            ->and($sharedIn($pending))->toBeEmpty()
+            ->and(($this->monthTitles)($this->sharee))->not->toContain('Doomed');
+    });
+
+    it('leaves other users\' caches alone when an unshared calendar is deleted', function () {
+        $loner = makeUser();
+        $instance = $this->actingAs($loner, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->assertStatus(200);
+        $this->actingAs($this->sharee, 'sanctum')->getJson('/api/v1/calendars')->assertStatus(200);
+        $cache = app(UserCacheService::class);
+
+        $this->actingAs($loner, 'sanctum')->deleteJson('/api/v1/calendars/'.$instance)->assertStatus(200);
+
+        expect($cache->has(['calendars', $loner->id]))->toBeFalse()
+            ->and($cache->has(['calendars', $this->owner->id]))->toBeTrue()
+            ->and($cache->has(['calendars', $this->sharee->id]))->toBeTrue();
+    });
 });

@@ -19,12 +19,23 @@ class CacheInvalidationPlugin extends ServerPlugin
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
     private const string CACHE_KEY_CONTACTS = 'contacts';
 
+    /**
+     * Sharees of an owner's calendar that is about to be deleted, keyed by
+     * path. Sabre removes every sharee instance with the owner's, so they
+     * can't be looked up after the unbind.
+     *
+     * @var array<string, array{calendarId: int, userIds: array<int, string>}>
+     */
+    private array $pendingSharees = [];
+
     public function __construct(private readonly UserCacheService $cache) {}
 
     public function initialize(Server $server): void
     {
         $server->on('afterCreateFile',   [$this, 'onCalendarObjectWrite']);
         $server->on('afterWriteContent', [$this, 'onCalendarObjectWrite']);
+        // Default priority, so it runs after the ACL check (priority 20).
+        $server->on('beforeUnbind',      [$this, 'onBeforeUnbind']);
         $server->on('afterUnbind',       [$this, 'onAfterUnbind']);
         $server->on('afterBind',         [$this, 'onAfterBind']);
         $server->on('afterMethod:PROPPATCH', [$this, 'onAfterPropPatch']);
@@ -48,6 +59,15 @@ class CacheInvalidationPlugin extends ServerPlugin
         }
     }
 
+    public function onBeforeUnbind(string $path): void
+    {
+        $parts = $this->parsePath($path);
+
+        if (count($parts) === 3 && $parts[0] === 'calendars') {
+            $this->collectSharees($path, $parts[1], $parts[2]);
+        }
+    }
+
     public function onAfterUnbind(string $path): void
     {
         $parts = $this->parsePath($path);
@@ -62,6 +82,7 @@ class CacheInvalidationPlugin extends ServerPlugin
             } elseif (count($parts) === 3) {
                 $this->invalidateCalendarEvents($parts[1], $parts[2]);
                 $this->invalidateCalendarsForEmail($parts[1]);
+                $this->invalidateSharees($path);
             }
         }
 
@@ -137,6 +158,69 @@ class CacheInvalidationPlugin extends ServerPlugin
                 'email'       => $email,
                 'calendarUri' => $calendarUri,
                 'error'       => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function collectSharees(string $path, string $email, string $calendarUri): void
+    {
+        unset($this->pendingSharees[$path]);
+
+        try {
+            $calendarId = DB::connection('pgsql')
+                ->table('calendarinstances')
+                ->where('principaluri', 'principals/' . $email)
+                ->where('uri', $calendarUri)
+                ->where('access', 1)
+                ->value('calendarid');
+
+            if ($calendarId === null) {
+                return;
+            }
+
+            $emails = DB::connection('pgsql')
+                ->table('calendarinstances')
+                ->where('calendarid', $calendarId)
+                ->where('access', '>', 1)
+                ->pluck('principaluri')
+                ->map(fn (string $principalUri) => str_replace('principals/', '', $principalUri));
+
+            if ($emails->isEmpty()) {
+                return;
+            }
+
+            $this->pendingSharees[$path] = [
+                'calendarId' => (int) $calendarId,
+                'userIds'    => DB::table('users')->whereIn('email', $emails)->pluck('id')->all(),
+            ];
+        } catch (\Throwable $e) {
+            Log::channel('dav')->error('DAV cache invalidation failed to collect calendar sharees', [
+                'email'       => $email,
+                'calendarUri' => $calendarUri,
+                'error'       => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function invalidateSharees(string $path): void
+    {
+        $pending = $this->pendingSharees[$path] ?? null;
+        unset($this->pendingSharees[$path]);
+
+        if ($pending === null) {
+            return;
+        }
+
+        try {
+            foreach ($pending['userIds'] as $userId) {
+                $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
+                $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $pending['calendarId']]);
+                RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
+            }
+        } catch (\Throwable $e) {
+            Log::channel('dav')->error('DAV cache invalidation failed for calendar sharees', [
+                'path'  => $path,
+                'error' => $e->getMessage(),
             ]);
         }
     }
