@@ -30,6 +30,8 @@ class AppCalendarsPDO extends SabreBackend
 {
     private const string SYNC_TOKEN_MARKER = 'ext-';
     private const string CACHE_KEY_STATE = 'external_calendar_state';
+    // Sabre's MAX_DATE (2038-01-01 UTC): series running past it are stored with lastoccurence capped here or just after.
+    private const int LAST_OCCURRENCE_CAP = 2145916800;
 
     /** @var array<int, ExternalCalendar|false> pgsql calendarid => link, false for native */
     private array $external = [];
@@ -167,6 +169,55 @@ class AppCalendarsPDO extends SabreBackend
         }
 
         return $this->putRemote($link, $objectUri, $calendarData, false, $this->ifMatch);
+    }
+
+    /**
+     * Sabre takes the occurrence bounds from the first VEVENT, so a client
+     * that writes an override before its master would hide the series from
+     * time-range queries.
+     */
+    protected function getDenormalizedData($calendarData)
+    {
+        return array_merge(parent::getDenormalizedData($calendarData), $this->masterOccurrenceBounds($calendarData) ?? []);
+    }
+
+    /**
+     * The bounds sabre would store with the master first, or null unless the
+     * object's first component is an override written before its master.
+     *
+     * @return array{firstOccurence: int, lastOccurence: int}|null
+     */
+    public function masterOccurrenceBounds(string $calendarData): ?array
+    {
+        $vCal = Reader::read($calendarData);
+
+        try {
+            $components = array_values(array_filter($vCal->getComponents(), fn ($c) => $c->name !== 'VTIMEZONE'));
+            $first = $components[0] ?? null;
+            if (!$first || $first->name !== 'VEVENT' || !isset($first->{'RECURRENCE-ID'})) {
+                return null;
+            }
+
+            $events = $vCal->select('VEVENT');
+            $master = collect($events)->first(fn ($e) => !isset($e->{'RECURRENCE-ID'}) && (string) $e->UID === (string) $first->UID);
+            if (!$master) {
+                return null;
+            }
+
+            $vCal->remove('VEVENT');
+            $vCal->add($master);
+            foreach ($events as $event) {
+                if ($event !== $master) {
+                    $vCal->add($event);
+                }
+            }
+
+            $data = parent::getDenormalizedData($vCal->serialize());
+
+            return ['firstOccurence' => (int) $data['firstOccurence'], 'lastOccurence' => (int) $data['lastOccurence']];
+        } finally {
+            $vCal->destroy();
+        }
     }
 
     public function deleteCalendarObject($calendarId, $objectUri)
@@ -529,8 +580,8 @@ SQL
             ], $objects);
         }
 
-        $stmt = $this->pdo->prepare('SELECT id, uri, etag, calendardata FROM '.$this->calendarObjectTableName." WHERE calendarid = ? AND componenttype = 'VEVENT' AND lastoccurence > ? AND firstoccurence < ?");
-        $stmt->execute([$calendar->calendarId, $start->getTimestamp() - 86400, $end->getTimestamp() + 86400]);
+        $stmt = $this->pdo->prepare('SELECT id, uri, etag, calendardata FROM '.$this->calendarObjectTableName." WHERE calendarid = ? AND componenttype = 'VEVENT' AND (lastoccurence > ? OR lastoccurence >= ?) AND firstoccurence < ?");
+        $stmt->execute([$calendar->calendarId, $start->getTimestamp() - 86400, self::LAST_OCCURRENCE_CAP, $end->getTimestamp() + 86400]);
 
         // Quoted like Sabre's getCalendarObject(), which this read replaced.
         return array_map(fn (array $row) => [
