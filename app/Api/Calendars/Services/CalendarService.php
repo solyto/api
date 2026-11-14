@@ -15,6 +15,7 @@ use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class CalendarService
 {
@@ -200,12 +201,17 @@ class CalendarService
             $externalTtl = (int) config('calendars.external.cache_ttl');
             $unavailableKey = [self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId];
 
+            $eventsKey = [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix];
+
             try {
-                $events = array_merge($events, $this->cache->remember(
-                    [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix],
-                    $externalTtl,
-                    fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)
-                ));
+                // Wrapped so an empty window is cached too: the cache treats
+                // a bare [] as a miss and would ask the remote every time.
+                $cached = $this->cache->get($eventsKey);
+                if (!is_array($cached) || !array_key_exists('events', $cached)) {
+                    $cached = ['events' => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)];
+                    $this->cache->store($eventsKey, $externalTtl, $cached);
+                }
+                $events = array_merge($events, $cached['events']);
                 $this->cache->forget($unavailableKey);
             } catch (ExternalCalendarUnavailableException) {
                 $this->unavailable[] = $calendar->instanceId;
@@ -237,12 +243,40 @@ class CalendarService
         if ($newEvent === null) {
             return null;
         }
-        $this->dav->calendars()->events()->delete($from, $event);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $from->calendarId]);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $to->calendarId]);
-        $this->invalidateSharedCalendar($from);
-        $this->invalidateSharedCalendar($to);
+
+        // Create first so a failed create loses nothing; when the source
+        // (an external remote) refuses the delete, the copy is taken back so
+        // a retry does not leave a duplicate.
+        try {
+            $this->dav->calendars()->events()->delete($from, $event);
+        } catch (\Throwable $e) {
+            $this->removeMovedCopy($to, $newEvent);
+            throw $e;
+        } finally {
+            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $from->calendarId]);
+            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $to->calendarId]);
+            $this->invalidateSharedCalendar($from);
+            $this->invalidateSharedCalendar($to);
+        }
+
         return $newEvent;
+    }
+
+    /**
+     * A failure here is only logged: the caller rethrows the delete's error,
+     * which is the one the user needs to see.
+     */
+    private function removeMovedCopy(CalendarDTO $to, EventDTO $copy): void
+    {
+        try {
+            $this->dav->calendars()->events()->delete($to, $copy);
+        } catch (\Throwable $e) {
+            Log::channel('dav')->warning('Moved event copy could not be removed after the source delete failed', [
+                'calendar_id' => $to->calendarId,
+                'uri' => $copy->uri,
+                'error' => $e::class,
+            ]);
+        }
     }
 
     public function updateEvent(User $user, CalendarDTO $calendar, EventDTO $event): ?EventDTO

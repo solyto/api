@@ -141,6 +141,22 @@ describe('External calendars over DAV', function () {
             ->and($xpath->evaluate('string(//cal:calendar-data)'))->toContain('SUMMARY:In');
     });
 
+    it('leaves remote objects that cannot be parsed out of a calendar-query', function () {
+        $this->remote->put('good.ics', davIcs('good', 'Good'));
+        $this->remote->put('garbage.ics', 'garbage');
+
+        $body = '<?xml version="1.0" encoding="utf-8"?><cal:calendar-query xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">'
+            .'<d:prop><d:getetag/><cal:calendar-data/></d:prop><cal:filter><cal:comp-filter name="VCALENDAR">'
+            .'<cal:comp-filter name="VEVENT"><cal:time-range start="20301001T000000Z" end="20301031T000000Z"/></cal:comp-filter>'
+            .'</cal:comp-filter></cal:filter></cal:calendar-query>';
+        $response = davRequest($this->user, 'REPORT', remotePath($this->user), $body, ['Depth' => '1']);
+        $xpath = davXpath($response);
+
+        expect($response->getStatus())->toBe(207)
+            ->and($xpath->evaluate('count(//d:response)'))->toBe(1.0)
+            ->and($xpath->evaluate('string(//d:href)'))->toContain('good.ics');
+    });
+
     it('answers calendar-multiget from the remote', function () {
         $this->remote->put('a.ics', davIcs('a', 'First'));
         $this->remote->put('b.ics', davIcs('b', 'Second'));
@@ -235,6 +251,22 @@ describe('External calendars over DAV', function () {
             ->and($collection->getStatus())->toBe(503)
             ->and($object->getStatus())->toBe(503)
             ->and($native->getStatus())->toBe(207);
+    });
+
+    it('asks a dead remote for its state at most once per TTL', function () {
+        $home = 'calendars/'.$this->user->email.'/';
+        davRequest($this->user, 'PROPFIND', $home, davPropfindBody(['cs:getctag']), ['Depth' => '1']);
+        $key = ['external_calendar_state', $this->user->id, $this->calendar->calendarId];
+        $cache = app(\App\Shared\Services\UserCacheService::class);
+        $cache->store($key, 0, ['fetched_at' => time() - 1000, 'state' => $cache->get($key)['state']]);
+        $this->remote->down = true;
+        $this->remote->requests = [];
+
+        davRequest($this->user, 'PROPFIND', $home, davPropfindBody(['cs:getctag']), ['Depth' => '1']);
+        $second = davXpath(davRequest($this->user, 'PROPFIND', $home, davPropfindBody(['cs:getctag']), ['Depth' => '1']));
+
+        expect($this->remote->requests)->toHaveCount(1)
+            ->and($second->evaluate('string(//d:response[contains(d:href, "/remote/")]//cs:getctag)'))->toBe('ctag-1');
     });
 
     it('refuses to share an external calendar over DAV', function () {
