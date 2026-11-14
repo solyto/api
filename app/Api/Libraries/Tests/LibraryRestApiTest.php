@@ -412,9 +412,16 @@ describe('Cover serving', function () {
 
         Storage::disk('user_data')->put($user->id.'/books/test.jpg', 'fake-image-bytes');
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->get('/api/v1/libraries/covers/books/test.jpg')
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'image/jpeg');
+
+        $headers = $response->baseResponse->headers;
+        expect($headers->getCacheControlDirective('private'))->toBeTrue()
+            ->and($headers->getCacheControlDirective('max-age'))->toBe('31536000')
+            ->and($headers->getCacheControlDirective('immutable'))->toBeTrue()
+            ->and($headers->hasCacheControlDirective('public'))->toBeFalse();
     });
 
     it('returns 404 for missing covers', function () {

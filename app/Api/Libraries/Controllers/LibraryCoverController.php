@@ -65,8 +65,9 @@ class LibraryCoverController
             default => 'image/jpeg'
         };
 
-        sleep(1);
-
-        return response($cover)->header('Content-Type', $mimeType);
+        // File names are uniqid()-based and never reused, so the bytes behind a URL never change.
+        return response($cover)
+            ->header('Content-Type', $mimeType)
+            ->header('Cache-Control', 'private, max-age=31536000, immutable');
     }
 }
