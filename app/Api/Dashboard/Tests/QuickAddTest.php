@@ -2,6 +2,7 @@
 
 use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Api\Libraries\Models\LibraryGame;
+use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
@@ -190,6 +191,66 @@ describe('QuickAddService::commit', function () {
         expect($game->platform)->toBe('boardgame');
         expect($game->developer)->toBe('Isaac Childres');
         expect($game->publication_year)->toBe(2017);
+    });
+
+    it('commits an imdb series url as a series', function () {
+        $user = makeUser();
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.themoviedb.org/3/find/tt0944947*' => Http::response([
+                'movie_results' => [],
+                'tv_results' => [['id' => 1399]],
+            ]),
+            'https://api.themoviedb.org/3/tv/1399*' => Http::response([
+                'id' => 1399,
+                'name' => 'Game of Thrones',
+                'first_air_date' => '2011-04-17',
+                'genres' => [],
+            ]),
+        ]);
+
+        $movie = app(QuickAddService::class)->commit(
+            $user,
+            'https://www.imdb.com/title/tt0944947/',
+            QuickAddContentType::Movies,
+            []
+        );
+
+        expect($movie)->toBeInstanceOf(LibraryMovie::class);
+        expect($movie->title)->toBe('Game of Thrones');
+        expect($movie->category)->toBe('series');
+        expect($movie->publication_year)->toBe(2011);
+    });
+
+    it('commits an imdb movie url as a movie', function () {
+        $user = makeUser();
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.themoviedb.org/3/find/tt1160419*' => Http::response([
+                'movie_results' => [['id' => 438631]],
+                'tv_results' => [],
+            ]),
+            'https://api.themoviedb.org/3/movie/438631*' => Http::response([
+                'id' => 438631,
+                'title' => 'Dune',
+                'release_date' => '2021-09-15',
+                'genres' => [],
+            ]),
+        ]);
+
+        $movie = app(QuickAddService::class)->commit(
+            $user,
+            'https://www.imdb.com/title/tt1160419/',
+            QuickAddContentType::Movies,
+            []
+        );
+
+        expect($movie)->toBeInstanceOf(LibraryMovie::class);
+        expect($movie->title)->toBe('Dune');
+        expect($movie->category)->toBe('movie');
+        expect($movie->publication_year)->toBe(2021);
     });
 });
 
