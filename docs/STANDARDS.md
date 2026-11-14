@@ -479,8 +479,7 @@ Check: `grep -rn 'catch (\\Exception\|catch (\\Throwable' app/Api/*/Services app
 Logging in services is for failures the code cannot raise
 (`UserCacheService.php:39,50,84,104` warn with the key, never the payload).
 `NoteImportService.php:59,63,81,89,95` logs every path it walks at `info`
-level; `RefreshCalendarCache.php:26` announces that it is running. Delete
-those; the queue and `pail` already show the job.
+level. Delete those; the queue and `pail` already show the job.
 
 Check: `grep -rn 'Log::info' app` → 11 today, target 0 outside commands.
 
@@ -656,9 +655,9 @@ cached).
 
 `SyncFeed(string $feedId)`, `ProcessExport(string $userId, int $jobId)`,
 `ScaleProfileImage(string $path)` re-read state in `handle()`. The four
-jobs that took `public User $user` (`RefreshCalendarCache`,
-`ImportCalendars`, `RefreshContactsCache`, `ImportContacts`) take
-`string $userId` since `ca1627b`. No job uses `SerializesModels`, so a
+jobs that took `public User $user` (`ImportCalendars`, `ImportContacts`,
+and the cache refresh jobs removed on 2026-11-14) take `string $userId`
+since `ca1627b`. No job uses `SerializesModels`, so a
 model in a job payload would be serialised whole and used stale.
 
 Check: `grep -rln 'User \$user' app/Api/*/Jobs` → 0, or every such file has `SerializesModels`.

@@ -43,15 +43,10 @@ class CalendarService
         private readonly UserCacheService $cache
     ) {}
 
-    /**
-     * $refresh rebuilds and overwrites the entry instead of reading it, for
-     * the refresh job: an entry stored by an earlier run that read DAV before
-     * a write would otherwise be kept.
-     */
-    public function list(User $user, bool $refresh = false): array
+    public function list(User $user): array
     {
-        $calendars = $this->cached([self::CACHE_KEY_CALENDARS, $user->id], self::CACHE_TTL,
-            fn() => $this->dav->calendars()->list($user), $refresh);
+        $calendars = $this->cache->remember([self::CACHE_KEY_CALENDARS, $user->id], self::CACHE_TTL,
+            fn() => $this->dav->calendars()->list($user));
 
         return array_map(function (CalendarDTO $calendar) use ($user) {
             $reason = $calendar->isExternal ? $this->cache->get([self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId]) : null;
@@ -142,10 +137,7 @@ class CalendarService
         }
     }
 
-    /**
-     * $refresh: as in list(), for the events of non-external calendars.
-     */
-    public function listEvents(User $user, string $yearMonth, bool $refresh = false): array
+    public function listEvents(User $user, string $yearMonth): array
     {
         $now = date('Y-m');
         $ttl = match(true) {
@@ -159,8 +151,7 @@ class CalendarService
             [$yearMonth],
             $ttl,
             new \DateTime($yearMonth . '-01 00:00:00')->modify('- 3 months'),
-            new \DateTime($yearMonth . '-01 23:59:59')->modify('last day of this month')->modify('+ 3 months'),
-            $refresh
+            new \DateTime($yearMonth . '-01 23:59:59')->modify('last day of this month')->modify('+ 3 months')
         );
     }
 
@@ -240,7 +231,7 @@ class CalendarService
      * @param  array<int, string>  $keySuffix
      * @return array<int, EventDTO>
      */
-    private function collectEvents(User $user, array $keySuffix, int $ttl, \DateTime $start, \DateTime $end, bool $refresh = false): array
+    private function collectEvents(User $user, array $keySuffix, int $ttl, \DateTime $start, \DateTime $end): array
     {
         $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $this->unavailable = [];
@@ -249,11 +240,10 @@ class CalendarService
 
         foreach ($calendars as $calendar) {
             if (!$calendar->isExternal) {
-                $events = array_merge($events, $this->cached(
+                $events = array_merge($events, $this->cache->remember(
                     [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix],
                     $ttl,
-                    fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end),
-                    $refresh
+                    fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)
                 ));
                 continue;
             }
@@ -504,18 +494,6 @@ class CalendarService
         }
 
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
-    }
-
-    private function cached(array $identifiers, int $ttl, callable $callback, bool $refresh): mixed
-    {
-        if (! $refresh) {
-            return $this->cache->remember($identifiers, $ttl, $callback);
-        }
-
-        $data = $callback();
-        $this->cache->replace($identifiers, $ttl, $data);
-
-        return $data;
     }
 
     private function invalidateSharedCalendar(CalendarDTO $calendar): void

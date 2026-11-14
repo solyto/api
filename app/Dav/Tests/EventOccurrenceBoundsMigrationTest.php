@@ -1,12 +1,10 @@
 <?php
 
-use App\Api\Calendars\Jobs\RefreshCalendarCache;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -65,7 +63,6 @@ describe('recompute_event_occurrence_bounds migration', function () {
 
         $this->cache = Mockery::spy(UserCacheService::class);
         $this->app->instance(UserCacheService::class, $this->cache);
-        Queue::fake([RefreshCalendarCache::class]);
         $this->log = Mockery::spy();
         Log::shouldReceive('channel')->with('dav')->andReturn($this->log);
 
@@ -103,10 +100,8 @@ describe('recompute_event_occurrence_bounds migration', function () {
     it('forgets the event caches of the owner and sharees of changed calendars only', function () {
         foreach ([$this->owner, $this->sharee] as $member) {
             $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $member->id, $this->calendar->calendarId])->once();
-            Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->userId === $member->id);
         }
 
         $this->cache->shouldHaveReceived('forgetByPrefix')->twice();
-        Queue::assertPushed(RefreshCalendarCache::class, 2);
     });
 });

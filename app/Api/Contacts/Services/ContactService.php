@@ -26,15 +26,10 @@ class ContactService
         private readonly ImageTransformationService $imageTransformation
     ) {}
 
-    /**
-     * $refresh rebuilds and overwrites the entry instead of reading it, for
-     * the refresh job: an entry stored by an earlier run that read DAV before
-     * a write would otherwise be kept.
-     */
-    public function listAddressBooks(User $user, bool $refresh = false): array
+    public function listAddressBooks(User $user): array
     {
-        return $this->cached([self::CACHE_KEY_ADDRESS_BOOKS, $user->id], self::CACHE_TTL,
-            fn() => $this->dav->addressBooks()->list($user), $refresh);
+        return $this->cache->remember([self::CACHE_KEY_ADDRESS_BOOKS, $user->id], self::CACHE_TTL,
+            fn() => $this->dav->addressBooks()->list($user));
     }
 
     public function getAddressBook(User $user, int $id): ?AddressBookDTO
@@ -82,19 +77,15 @@ class ContactService
         $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
     }
 
-    /**
-     * $refresh: as in listAddressBooks(), for each address book's contacts.
-     */
-    public function listContacts(User $user, bool $refresh = false): array
+    public function listContacts(User $user): array
     {
         $addressBooks = $this->listAddressBooks($user);
         $contacts = [];
         foreach ($addressBooks as $addressBook) {
-            $addressBookContacts = $this->cached(
+            $addressBookContacts = $this->cache->remember(
                 [self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id],
                 self::CACHE_TTL,
-                fn() => $this->dav->addressBooks()->contacts()->list($addressBook),
-                $refresh
+                fn() => $this->dav->addressBooks()->contacts()->list($addressBook)
             );
             $contacts = array_merge($contacts, $addressBookContacts);
             unset($addressBookContacts);
@@ -178,18 +169,6 @@ class ContactService
             $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
         }
         return $updated;
-    }
-
-    private function cached(array $identifiers, int $ttl, callable $callback, bool $refresh): mixed
-    {
-        if (! $refresh) {
-            return $this->cache->remember($identifiers, $ttl, $callback);
-        }
-
-        $data = $callback();
-        $this->cache->replace($identifiers, $ttl, $data);
-
-        return $data;
     }
 
     private function convertPhotoString(?string $photo): ?string

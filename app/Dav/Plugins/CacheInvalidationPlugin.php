@@ -3,8 +3,6 @@
 namespace App\Dav\Plugins;
 
 use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
-use App\Api\Calendars\Jobs\RefreshCalendarCache;
-use App\Api\Contacts\Jobs\RefreshContactsCache;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -148,7 +146,6 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar]);
-            RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
 
             if ((int) $instance->access > 1 || (bool) $instance->solyto_shared) {
                 InvalidateSharedCalendarCache::dispatch($calendar)->delay(now()->addSeconds(10));
@@ -215,7 +212,6 @@ class CacheInvalidationPlugin extends ServerPlugin
             foreach ($pending['userIds'] as $userId) {
                 $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
                 $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $pending['calendarId']]);
-                RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
             }
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendar sharees', [
@@ -237,7 +233,6 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
-            RefreshCalendarCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendars', [
                 'email' => $email,
@@ -270,7 +265,6 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_CONTACTS, $userId, $addressBookId]);
-            RefreshContactsCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for contacts', [
                 'email'          => $email,
@@ -292,7 +286,6 @@ class CacheInvalidationPlugin extends ServerPlugin
             }
 
             $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $userId]);
-            RefreshContactsCache::dispatch($userId)->delay(now()->addSeconds(10));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for address books', [
                 'email' => $email,

@@ -1,8 +1,6 @@
 <?php
 
 use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
-use App\Api\Calendars\Jobs\RefreshCalendarCache;
-use App\Api\Contacts\Jobs\RefreshContactsCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
@@ -659,25 +657,15 @@ describe('CacheInvalidationPlugin', function () {
         Queue::fake();
     });
 
-    it('drops the cached events and queues a refresh on a DAV event write and delete', function (string $method) {
+    it('drops the cached events and queues nothing on a DAV event write and delete', function (string $method) {
         davRequest($this->user, 'PUT', $this->calendar.'a.ics', davIcs('a'), ['Content-Type' => 'text/calendar']);
         if ($method === 'DELETE') {
             davRequest($this->user, 'DELETE', $this->calendar.'a.ics');
         }
 
         $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendarId])->atLeast()->once();
-        Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->userId === $this->user->id);
+        Queue::assertNothingPushed();
     })->with(['PUT', 'DELETE']);
-
-    it('queues one delayed calendar refresh for a burst of DAV event writes', function () {
-        foreach (['a', 'b', 'c'] as $uid) {
-            davRequest($this->user, 'PUT', $this->calendar.$uid.'.ics', davIcs($uid), ['Content-Type' => 'text/calendar']);
-        }
-
-        $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendarId])->times(3);
-        Queue::assertPushed(RefreshCalendarCache::class, 1);
-        Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->delay !== null);
-    });
 
     it('drops the cached calendar list when a calendar is created or deleted over DAV', function () {
         davRequest($this->user, 'MKCALENDAR', 'calendars/'.$this->user->email.'/work/');
@@ -686,21 +674,11 @@ describe('CacheInvalidationPlugin', function () {
         $this->cache->shouldHaveReceived('forget')->with(['calendars', $this->user->id])->twice();
     });
 
-    it('drops the cached contacts and queues a refresh on a DAV card write', function () {
+    it('drops the cached contacts and queues nothing on a DAV card write', function () {
         davRequest($this->user, 'PUT', $this->addressBook.'a.vcf', davVcard('a'), ['Content-Type' => 'text/vcard']);
 
         $this->cache->shouldHaveReceived('forget')->with(['contacts', $this->user->id, $this->addressBookId])->once();
-        Queue::assertPushed(RefreshContactsCache::class, fn (RefreshContactsCache $job) => $job->userId === $this->user->id);
-    });
-
-    it('queues one delayed contacts refresh for a burst of DAV card writes', function () {
-        foreach (['a', 'b', 'c'] as $uid) {
-            davRequest($this->user, 'PUT', $this->addressBook.$uid.'.vcf', davVcard($uid), ['Content-Type' => 'text/vcard']);
-        }
-
-        $this->cache->shouldHaveReceived('forget')->with(['contacts', $this->user->id, $this->addressBookId])->times(3);
-        Queue::assertPushed(RefreshContactsCache::class, 1);
-        Queue::assertPushed(RefreshContactsCache::class, fn (RefreshContactsCache $job) => $job->delay !== null);
+        Queue::assertNothingPushed();
     });
 
     it('drops the cached address book list when an address book is created over DAV', function () {
@@ -755,7 +733,6 @@ describe('CacheInvalidationPlugin', function () {
         foreach ($sharees as $sharee) {
             $this->cache->shouldHaveReceived('forget')->with(['calendars', $sharee->id])->once();
             $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $sharee->id, $this->calendarId])->once();
-            Queue::assertPushed(RefreshCalendarCache::class, fn (RefreshCalendarCache $job) => $job->userId === $sharee->id && $job->delay !== null);
         }
     });
 
@@ -779,6 +756,5 @@ describe('CacheInvalidationPlugin', function () {
             $this->cache->shouldNotHaveReceived('forget', [['calendars', $sharee->id]]);
             $this->cache->shouldNotHaveReceived('forgetByPrefix', [['calendar_events', $sharee->id, $this->calendarId]]);
         }
-        Queue::assertNotPushed(RefreshCalendarCache::class);
     });
 });
