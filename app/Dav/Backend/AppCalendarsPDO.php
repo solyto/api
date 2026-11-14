@@ -10,6 +10,7 @@ use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Helpers\DavHelper;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Sabre\CalDAV\Backend\PDO as SabreBackend;
 use Sabre\CalDAV\Plugin;
@@ -204,7 +205,15 @@ class AppCalendarsPDO extends SabreBackend
         $uris = [];
         foreach ($this->remote()->query($link, $component, $start, $end) as $object) {
             $row = $this->objectRow($link, $object);
-            if ($this->validateFilterForObject($row, $filters)) {
+
+            try {
+                $matches = $this->validateFilterForObject($row, $filters);
+            } catch (\Throwable $e) {
+                $this->logSkippedObject($link->calendar_id, $row['uri'], $e);
+                continue;
+            }
+
+            if ($matches) {
                 $uris[] = $row['uri'];
                 $this->prefetched[$link->calendar_id][$row['uri']] = $row;
             }
@@ -539,118 +548,138 @@ SQL
         $events = [];
 
         foreach ($this->getEventObjectsInRange($calendar, $start, $end) as $obj) {
-            $vCalData = $obj['calendardata'];
-
-            if (!$vCalData) {
+            if (!$obj['calendardata']) {
                 continue;
             }
 
-            $vObj = \Sabre\VObject\Reader::read($vCalData);
+            // Remote objects were never validated by sabre: one that cannot
+            // be read or expanded is skipped, not allowed to fail the listing.
+            try {
+                array_push($events, ...$this->expandObject($obj, $calendar, $start, $end));
+            } catch (\Throwable $e) {
+                $this->logSkippedObject($calendar->calendarId, $obj['uri'], $e);
+            }
+        }
 
-            // Calendars also accept VTODOs from DAV clients; they have no VEVENT.
-            foreach ($vObj->VEVENT ?? [] as $vevent) {
-                $startOrig = $vevent->DTSTART->getDateTime();
-                $endOrig   = isset($vevent->DTEND) ? $vevent->DTEND->getDateTime() : $startOrig;
-                $isAllDay = $vevent->DTSTART->getValueType() === 'DATE';
+        return $events;
+    }
 
-                // All-day events are stored as floating DATE values (the user's
-                // local dates), which VObject parses as UTC. Rebase their
-                // boundaries onto the query window's wall clock so midnight
-                // boundaries line up for users outside UTC. Per RFC 5545 an
-                // all-day event without DTEND spans exactly one day.
+    /**
+     * @param  array<string, mixed>  $obj
+     * @return array<int, EventDTO>
+     */
+    private function expandObject(array $obj, CalendarDTO $calendar, \DateTimeInterface $start, \DateTimeInterface $end): array
+    {
+        $vObj = Reader::read($obj['calendardata']);
+        $events = [];
+
+        // Calendars also accept VTODOs from DAV clients; they have no VEVENT.
+        foreach ($vObj->VEVENT ?? [] as $vevent) {
+            if (!isset($vevent->DTSTART)) {
+                throw new \UnexpectedValueException('VEVENT without DTSTART');
+            }
+
+            $startOrig = $vevent->DTSTART->getDateTime();
+            $endOrig   = isset($vevent->DTEND) ? $vevent->DTEND->getDateTime() : $startOrig;
+            $isAllDay = $vevent->DTSTART->getValueType() === 'DATE';
+
+            // All-day events are stored as floating DATE values (the user's
+            // local dates), which VObject parses as UTC. Rebase their
+            // boundaries onto the query window's wall clock so midnight
+            // boundaries line up for users outside UTC. Per RFC 5545 an
+            // all-day event without DTEND spans exactly one day.
+            if ($isAllDay) {
+                $queryTz = $start->getTimezone();
+                if (!isset($vevent->DTEND)) {
+                    $endOrig = $endOrig->modify('+1 day');
+                }
+                $startOrig = new \DateTimeImmutable($startOrig->format('Y-m-d H:i:s'), $queryTz);
+                $endOrig = new \DateTimeImmutable($endOrig->format('Y-m-d H:i:s'), $queryTz);
+            }
+
+            if (isset($vevent->RRULE)) {
+                $rrule = (string) $vevent->RRULE;
+                $rruleEnd = isset($vevent->RRULE['UNTIL']) ? $vevent->RRULE['UNTIL']->getDateTime() : null;
+
+                // Compare wall-clock to wall-clock on both sides of the
+                // window for all-day events: their floating DATE values
+                // are parsed as UTC by VObject, while the window bounds
+                // live in the query timezone. Rebase the bounds onto the
+                // UTC wall clock so the boundary behavior is identical
+                // for users east and west of UTC: an occurrence ending
+                // exactly at the window start is skipped, and one
+                // starting exactly at the window end is not emitted.
+                $windowStart = $start;
+                $windowEnd = $end;
                 if ($isAllDay) {
-                    $queryTz = $start->getTimezone();
-                    if (!isset($vevent->DTEND)) {
-                        $endOrig = $endOrig->modify('+1 day');
-                    }
-                    $startOrig = new \DateTimeImmutable($startOrig->format('Y-m-d H:i:s'), $queryTz);
-                    $endOrig = new \DateTimeImmutable($endOrig->format('Y-m-d H:i:s'), $queryTz);
+                    $utc = new \DateTimeZone('UTC');
+                    $windowStart = new \DateTimeImmutable($start->format('Y-m-d H:i:s'), $utc);
+                    $windowEnd = new \DateTimeImmutable($end->format('Y-m-d H:i:s'), $utc);
                 }
 
-                if (isset($vevent->RRULE)) {
-                    $rrule = (string) $vevent->RRULE;
-                    $rruleEnd = isset($vevent->RRULE['UNTIL']) ? $vevent->RRULE['UNTIL']->getDateTime() : null;
+                $iterator = new \Sabre\VObject\Recur\EventIterator($vObj, (string)$vevent->UID);
+                $iterator->fastForward($windowStart);
 
-                    // Compare wall-clock to wall-clock on both sides of the
-                    // window for all-day events: their floating DATE values
-                    // are parsed as UTC by VObject, while the window bounds
-                    // live in the query timezone. Rebase the bounds onto the
-                    // UTC wall clock so the boundary behavior is identical
-                    // for users east and west of UTC: an occurrence ending
-                    // exactly at the window start is skipped, and one
-                    // starting exactly at the window end is not emitted.
-                    $windowStart = $start;
-                    $windowEnd = $end;
+                while ($iterator->valid() && $iterator->getDtStart() < $windowEnd) {
+                    $occStart = clone $iterator->getDtStart();
+                    $occEnd = $iterator->getDtEnd() ? clone $iterator->getDtEnd() : null;
                     if ($isAllDay) {
-                        $utc = new \DateTimeZone('UTC');
-                        $windowStart = new \DateTimeImmutable($start->format('Y-m-d H:i:s'), $utc);
-                        $windowEnd = new \DateTimeImmutable($end->format('Y-m-d H:i:s'), $utc);
+                        $occStart = new \DateTimeImmutable($occStart->format('Y-m-d H:i:s'), $queryTz);
+                        if ($occEnd) {
+                            $occEnd = new \DateTimeImmutable($occEnd->format('Y-m-d H:i:s'), $queryTz);
+                        }
                     }
 
-                    $iterator = new \Sabre\VObject\Recur\EventIterator($vObj, (string)$vevent->UID);
-                    $iterator->fastForward($windowStart);
-
-                    while ($iterator->valid() && $iterator->getDtStart() < $windowEnd) {
-                        $occStart = clone $iterator->getDtStart();
-                        $occEnd = $iterator->getDtEnd() ? clone $iterator->getDtEnd() : null;
-                        if ($isAllDay) {
-                            $occStart = new \DateTimeImmutable($occStart->format('Y-m-d H:i:s'), $queryTz);
-                            if ($occEnd) {
-                                $occEnd = new \DateTimeImmutable($occEnd->format('Y-m-d H:i:s'), $queryTz);
-                            }
-                        }
-
-                        // Skip occurrences outside requested range
-                        if ($occEnd && $occEnd <= $start) {
-                            $iterator->next();
-                            continue;
-                        }
-                        if ($occStart > $end) {
-                            break;
-                        }
-
-                        $occurrence = $iterator->getEventObject();
-
-                        // The occurrence's original slot, which differs from its
-                        // start once it was moved; clients address it by this.
-                        $originalStart = isset($occurrence->{'RECURRENCE-ID'})
-                            ? $occurrence->{'RECURRENCE-ID'}->getDateTime()
-                            : $occStart;
-                        if ($isAllDay) {
-                            $originalStart = new \DateTimeImmutable($originalStart->format('Y-m-d H:i:s'), $queryTz);
-                        }
-
-                        $eventDto = EventDTO::fromSabre([
-                            'id' => $obj['id'],
-                            'uri' => $obj['uri'],
-                            'etag' => $obj['etag'],
-                            'calendardata' => $occurrence->serialize(),
-                        ], $calendar);
-
-                        $eventDto->originalStartDate = \DateTime::createFromInterface($originalStart);
-                        $eventDto->recurrenceRule = $rrule;
-                        $eventDto->recurrenceEnd = $rruleEnd;
-
-                        $events[] = $eventDto;
-
+                    // Skip occurrences outside requested range
+                    if ($occEnd && $occEnd <= $start) {
                         $iterator->next();
-                    }
-                } else if (!isset($vevent->{'RECURRENCE-ID'})) {
-                    // Skip single-instance events outside the requested range.
-                    // An event ending exactly at the window start, or starting
-                    // exactly at the window end, does not overlap it
-                    // (exclusive end, RFC 4791/5545).
-                    if ($endOrig <= $start || $startOrig >= $end) {
                         continue;
                     }
+                    if ($occStart > $end) {
+                        break;
+                    }
 
-                    $events[] = EventDTO::fromSabre([
+                    $occurrence = $iterator->getEventObject();
+
+                    // The occurrence's original slot, which differs from its
+                    // start once it was moved; clients address it by this.
+                    $originalStart = isset($occurrence->{'RECURRENCE-ID'})
+                        ? $occurrence->{'RECURRENCE-ID'}->getDateTime()
+                        : $occStart;
+                    if ($isAllDay) {
+                        $originalStart = new \DateTimeImmutable($originalStart->format('Y-m-d H:i:s'), $queryTz);
+                    }
+
+                    $eventDto = EventDTO::fromSabre([
                         'id' => $obj['id'],
                         'uri' => $obj['uri'],
                         'etag' => $obj['etag'],
-                        'calendardata' => $vevent->serialize(),
+                        'calendardata' => $occurrence->serialize(),
                     ], $calendar);
+
+                    $eventDto->originalStartDate = \DateTime::createFromInterface($originalStart);
+                    $eventDto->recurrenceRule = $rrule;
+                    $eventDto->recurrenceEnd = $rruleEnd;
+
+                    $events[] = $eventDto;
+
+                    $iterator->next();
                 }
+            } else if (!isset($vevent->{'RECURRENCE-ID'})) {
+                // Skip single-instance events outside the requested range.
+                // An event ending exactly at the window start, or starting
+                // exactly at the window end, does not overlap it
+                // (exclusive end, RFC 4791/5545).
+                if ($endOrig <= $start || $startOrig >= $end) {
+                    continue;
+                }
+
+                $events[] = EventDTO::fromSabre([
+                    'id' => $obj['id'],
+                    'uri' => $obj['uri'],
+                    'etag' => $obj['etag'],
+                    'calendardata' => $vevent->serialize(),
+                ], $calendar);
             }
         }
 
@@ -1169,9 +1198,10 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     /**
      * ctag and sync token of an external calendar come from the remote, not
      * from the local row. The remote answer is kept for the external cache
-     * TTL; when the remote is down the last known values are served, so the
-     * calendar never drops out of the home listing (a client would delete
-     * its copy). Requests into the collection then get a 503.
+     * TTL; when the remote is down the last known values are served (and
+     * kept for another TTL), so the calendar never drops out of the home
+     * listing (a client would delete its copy). Requests into the collection
+     * then get a 503.
      *
      * @param  array<string, mixed>  $calendar
      * @return array<string, mixed>
@@ -1217,12 +1247,28 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         try {
             $state = $this->remote()->collectionState($link);
         } catch (ExternalCalendarUnavailableException) {
-            return is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
+            // Sabre resolves the home on every request, native calendars
+            // included: remember the failure so a dead remote is asked at
+            // most once per TTL.
+            $state = is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
         }
 
         $cache->store($key, 0, ['fetched_at' => time(), 'state' => $state]);
 
         return $state;
+    }
+
+    /**
+     * Throwable, since odd remote property types surface as \Error. Only the
+     * class is logged: parser messages can quote calendar data.
+     */
+    private function logSkippedObject(int $calendarId, string $uri, \Throwable $e): void
+    {
+        Log::channel('dav')->warning('Calendar object skipped: cannot be parsed', [
+            'calendar_id' => $calendarId,
+            'uri' => $uri,
+            'error' => $e::class,
+        ]);
     }
 
     private function markStateStale(ExternalCalendar $link): void

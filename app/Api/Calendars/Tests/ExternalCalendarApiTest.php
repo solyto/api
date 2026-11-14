@@ -140,6 +140,29 @@ describe('External calendars through the API', function () {
             ->and(collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Remote')['is_unavailable'])->toBeFalse();
     });
 
+    it('takes the copy back when moving out of an external calendar fails on the remote delete', function () {
+        $etag = $this->remote->put('a.ics', remoteEventIcs('a', 'Remote', remoteEventStart(), remoteEventEnd()));
+        $this->remote->failDelete = true;
+        $native = app(\App\Dav\Services\DavService::class)->calendars()->getByName($this->user, 'My Calendar');
+        $cache = Mockery::mock(new \App\Shared\Services\UserCacheService());
+        $this->instance(\App\Shared\Services\UserCacheService::class, $cache);
+
+        $response = $this->actingAs($this->user, 'sanctum')->putJson('/api/v1/calendars/'.$this->calendar->instanceId.'/events/a.ics', [
+            'title' => 'Moved',
+            'start_date' => now()->addDay()->setTime(10, 0)->format('Y-m-d H:i:s'),
+            'end_date' => now()->addDay()->setTime(11, 0)->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+            'calendar_id' => $native->instanceId,
+            'etag' => $etag,
+        ]);
+
+        expectApiError($response, 503);
+        expect(DB::connection('pgsql')->table('calendarobjects')->where('calendarid', $native->calendarId)->count())->toBe(0)
+            ->and($this->remote->objects)->toHaveKey('a.ics');
+        $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendar->calendarId]);
+        $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $native->calendarId]);
+    });
+
     it('answers 503 for a single event of an unreachable calendar', function () {
         $this->remote->down = true;
 
@@ -160,6 +183,27 @@ describe('External calendars through the API', function () {
         $this->travel(301)->seconds();
 
         expect($titles())->toBe(['After']);
+    });
+
+    it('caches an empty external window', function () {
+        $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200);
+        $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200);
+
+        expect(collect($this->remote->requests)->filter(fn ($r) => $r->method() === 'REPORT'))->toHaveCount(1);
+    });
+
+    it('skips remote objects that cannot be read instead of failing the listing', function () {
+        $this->remote->put('good.ics', remoteEventIcs('good', 'Good', remoteEventStart(), remoteEventEnd()));
+        $this->remote->put('garbage.ics', 'garbage');
+        $this->remote->put('nostart.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Remote//EN', 'BEGIN:VEVENT',
+            'UID:nostart', 'DTSTAMP:20300101T000000Z', 'SUMMARY:No start', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n");
+
+        $response = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200);
+
+        expect(collect($response->json('data'))->pluck('title')->all())->toBe(['Good'])
+            ->and($response->json('meta.unavailable_calendars'))->toBe([]);
     });
 
     it('attaches a todo to an external event and removes it with the event', function () {

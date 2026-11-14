@@ -25,6 +25,9 @@ class FakeCalDavServer
 
     public bool $down = false;
 
+    /** Answers DELETE with a 503 while every other method keeps working. */
+    public bool $failDelete = false;
+
     public bool $supportsSync = true;
 
     /** Sends GET ETags as W/"…" while If-Match stays a strong comparison, like sabre behind nginx gzip. */
@@ -128,6 +131,10 @@ class FakeCalDavServer
 
     private function handleDelete(string $name): mixed
     {
+        if ($this->failDelete) {
+            return Http::response('', 503);
+        }
+
         $this->remove($name);
 
         return Http::response('', 204);
