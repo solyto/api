@@ -60,7 +60,8 @@ namespace App\OpenApi;
  * @OA\Schema(
  *     schema="EventListingMeta",
  *
- *     @OA\Property(property="unavailable_calendars", type="array", description="Ids of external calendars whose server could not be reached; their events are missing from data", @OA\Items(type="integer"))
+ *     @OA\Property(property="unavailable_calendars", type="array", description="Ids of external calendars whose server could not be reached; their events are missing from data", @OA\Items(type="integer")),
+ *     @OA\Property(property="credentials_rejected_calendars", type="array", description="The ids from unavailable_calendars whose server rejected the account's username or app password (change the app password rather than wait)", @OA\Items(type="integer"))
  * )
  *
  * @OA\Schema(

@@ -41,10 +41,13 @@ class FakeCalDavServer
 
     public string $displayName = 'Work';
 
+    /** calendar-color discovery lists for every collection */
+    public string $color = '#FF0000';
+
     /** @var array<string, string> further collections discovery lists, path => display name; they answer nothing else */
     public array $siblings = [];
 
-    /** @var array{0: string, 1: string}|null username and password discovery accepts; any when null */
+    /** @var array{0: string, 1: string}|null username and password the server accepts; any when null */
     public ?array $credentials = null;
 
     public function __construct(public string $path = '/remote.php/dav/calendars/alice/work/') {}
@@ -82,6 +85,10 @@ class FakeCalDavServer
 
         if ($this->down) {
             return Http::response('', 503);
+        }
+
+        if ($this->credentials !== null && !$request->hasHeader('Authorization', 'Basic '.base64_encode(implode(':', $this->credentials)))) {
+            return Http::response('', 401);
         }
 
         $path = rawurldecode((string) parse_url($request->url(), PHP_URL_PATH));
@@ -156,17 +163,13 @@ class FakeCalDavServer
             return null;
         }
 
-        if ($this->credentials !== null && !$request->hasHeader('Authorization', 'Basic '.base64_encode(implode(':', $this->credentials)))) {
-            return Http::response('', 401);
-        }
-
         return match ($path) {
             '/', '/remote.php/dav/' => $this->multistatus($this->response($path, '<d:current-user-principal><d:href>'.$principal.'</d:href></d:current-user-principal>')),
             $principal => $this->multistatus($this->response($principal, '<c:calendar-home-set><d:href>'.$home.'</d:href></c:calendar-home-set>')),
             default => $this->multistatus(
                 $this->response($home, '<d:resourcetype><d:collection/></d:resourcetype>')
                 .implode('', array_map(
-                    fn (string $path, string $name) => $this->response($path, '<d:displayname>'.htmlspecialchars($name, ENT_XML1).'</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><x:calendar-color xmlns:x="http://apple.com/ns/ical/">#FF0000</x:calendar-color>'),
+                    fn (string $path, string $name) => $this->response($path, '<d:displayname>'.htmlspecialchars($name, ENT_XML1).'</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><x:calendar-color xmlns:x="http://apple.com/ns/ical/">'.htmlspecialchars($this->color, ENT_XML1).'</x:calendar-color>'),
                     [$this->path, ...array_keys($this->siblings)],
                     [$this->displayName, ...array_values($this->siblings)],
                 ))

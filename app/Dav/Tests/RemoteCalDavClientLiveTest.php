@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 /*
  * Runs the client against a real loopback listener instead of Http::fake(),
  * so the curl options it builds (CURLOPT_RESOLVE pinning, the size-cap
- * callbacks) are exercised by an actual transfer.
+ * sink) are exercised by an actual transfer.
  */
 
 beforeEach(function () {
@@ -74,6 +74,23 @@ describe('RemoteCalDavClient over a real connection', function () {
         config(['calendars.external.max_response_bytes' => 1024]);
 
         expect(fn () => liveSend($this->port, '/streamed'))->toThrow(ExternalCalendarUnavailableException::class)
+            ->and($this->failures)->toBe([['status' => null, 'reason' => 'too large']]);
+    });
+
+    it('advertises gzip and decodes a compressed answer under the cap', function () {
+        config(['calendars.external.max_response_bytes' => 1024]);
+
+        $response = liveSend($this->port, '/gzip?size=1000');
+
+        expect($response->status())->toBe(200)
+            ->and($response->body())->toBe(str_repeat('x', 1000));
+    });
+
+    it('aborts a gzip body once it inflates over the cap', function () {
+        // 16 MiB of one byte compresses to about 16 KiB, well under the cap on the wire.
+        config(['calendars.external.max_response_bytes' => 64 * 1024]);
+
+        expect(fn () => liveSend($this->port, '/gzip?size='.(16 * 1024 * 1024)))->toThrow(ExternalCalendarUnavailableException::class)
             ->and($this->failures)->toBe([['status' => null, 'reason' => 'too large']]);
     });
 });

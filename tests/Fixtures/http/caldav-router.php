@@ -24,6 +24,19 @@ switch (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) {
         echo "0\r\n\r\n";
         break;
 
+    // Gzips only for a client that advertises it, like a real server; ?size= is the decompressed size.
+    case '/gzip':
+        if (!str_contains($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip')) {
+            http_response_code(406);
+            break;
+        }
+
+        $body = gzencode(str_repeat('x', (int) ($_GET['size'] ?? $size)), 9);
+        header('Content-Encoding: gzip');
+        header('Content-Length: '.strlen($body));
+        echo $body;
+        break;
+
     default:
         http_response_code(404);
 }

@@ -82,6 +82,14 @@ class WidgetService
         return $this->gateway->unavailableCalendars();
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function credentialsRejectedCalendars(): array
+    {
+        return $this->gateway->credentialsRejectedCalendars();
+    }
+
     public function completeTodo(User $user, Todo $todo): void
     {
         $this->gateway->setUser($user);

@@ -9,7 +9,9 @@ use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
+use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
@@ -22,6 +24,9 @@ class CalendarService
     private const string CACHE_KEY_CALENDARS = 'calendars';
     public const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
+    // Owned by AppCalendarsPDO (the remote's ctag and sync token); forgotten here with the flag.
+    private const string CACHE_KEY_STATE = 'external_calendar_state';
+    private const string REASON_CREDENTIALS_REJECTED = 'credentials_rejected';
     private const int CACHE_TTL = 86400;
     private const int CACHE_TTL_EVENTS_PAST = 604800;
     private const int CACHE_TTL_EVENTS_CURRENT = 900;
@@ -29,6 +34,9 @@ class CalendarService
 
     /** @var array<int, int> */
     private array $unavailable = [];
+
+    /** @var array<int, int> */
+    private array $credentialsRejected = [];
 
     public function __construct(
         private readonly DavService $dav,
@@ -46,12 +54,14 @@ class CalendarService
             fn() => $this->dav->calendars()->list($user), $refresh);
 
         return array_map(function (CalendarDTO $calendar) use ($user) {
-            if (!$calendar->isExternal || !$this->cache->get([self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId])) {
+            $reason = $calendar->isExternal ? $this->cache->get([self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId]) : null;
+            if (!$reason) {
                 return $calendar;
             }
 
             $calendar = clone $calendar;
             $calendar->isUnavailable = true;
+            $calendar->isCredentialsRejected = $reason === self::REASON_CREDENTIALS_REJECTED;
 
             return $calendar;
         }, $calendars);
@@ -195,6 +205,31 @@ class CalendarService
     }
 
     /**
+     * The part of unavailableCalendars() whose server refused the account's
+     * username or app password.
+     *
+     * @return array<int, int>
+     */
+    public function credentialsRejectedCalendars(): array
+    {
+        return $this->credentialsRejected;
+    }
+
+    /**
+     * Drops what is remembered about an external calendar's remote (the
+     * unavailable flag, its state and its events, and the link with its
+     * account that a long-lived process holds), e.g. once its account has
+     * working credentials again.
+     */
+    public function forgetRemoteState(string $userId, int $calendarId): void
+    {
+        $this->dav->calendars()->forgetExternal($calendarId);
+        $this->cache->forget([self::CACHE_KEY_UNAVAILABLE, $userId, $calendarId]);
+        $this->cache->forget([self::CACHE_KEY_STATE, $userId, $calendarId]);
+        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendarId]);
+    }
+
+    /**
      * Remote changes never invalidate the cache of an external calendar, so
      * its entries live for the short external TTL. An unreachable external
      * calendar is reported and flagged in list(); its server is not asked
@@ -209,6 +244,7 @@ class CalendarService
     {
         $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
         $this->unavailable = [];
+        $this->credentialsRejected = [];
         $events = [];
 
         foreach ($calendars as $calendar) {
@@ -232,8 +268,9 @@ class CalendarService
             $cached = $this->cache->get($eventsKey);
             $isCached = is_array($cached) && array_key_exists('events', $cached);
 
-            if ($this->cache->get($unavailableKey)) {
-                $this->unavailable[] = $calendar->instanceId;
+            $reason = $this->cache->get($unavailableKey);
+            if ($reason) {
+                $this->flagUnavailable($calendar, $reason);
                 if ($isCached) {
                     $events = array_merge($events, $cached['events']);
                 }
@@ -246,13 +283,25 @@ class CalendarService
                     $this->cache->store($eventsKey, $externalTtl, $cached);
                 }
                 $events = array_merge($events, $cached['events']);
-            } catch (ExternalCalendarUnavailableException) {
-                $this->unavailable[] = $calendar->instanceId;
-                $this->cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), time());
+            } catch (ExternalCalendarUnavailableException $e) {
+                $this->flagUnavailable($calendar, $e->reason());
+                $this->cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
             }
         }
 
         return $events;
+    }
+
+    /**
+     * $reason is what the flag stores; a flag stored before reasons were
+     * (a timestamp) reads as unreachable.
+     */
+    private function flagUnavailable(CalendarDTO $calendar, mixed $reason): void
+    {
+        $this->unavailable[] = $calendar->instanceId;
+        if ($reason === self::REASON_CREDENTIALS_REJECTED) {
+            $this->credentialsRejected[] = $calendar->instanceId;
+        }
     }
 
     public function getEvent(CalendarDTO $calendar, string $eventUri): ?EventDTO
@@ -314,7 +363,7 @@ class CalendarService
 
     public function updateEvent(User $user, CalendarDTO $calendar, EventDTO $event): ?EventDTO
     {
-        $updated = $this->dav->calendars()->events()->update($calendar, $event);
+        $updated = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->update($calendar, $event));
         if ($updated !== null) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
             $this->invalidateSharedCalendar($calendar);
@@ -324,7 +373,7 @@ class CalendarService
 
     public function destroyEvent(User $user, CalendarDTO $calendar, EventDTO $event): bool
     {
-        $success = $this->dav->calendars()->events()->delete($calendar, $event);
+        $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->delete($calendar, $event));
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
             $this->invalidateSharedCalendar($calendar);
@@ -334,7 +383,7 @@ class CalendarService
 
     public function destroyEventOccurrence(User $user, CalendarDTO $calendar, string $eventUri, \DateTime $date): bool
     {
-        $success = $this->dav->calendars()->events()->deleteOccurrence($calendar, $eventUri, $date);
+        $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->deleteOccurrence($calendar, $eventUri, $date));
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
             $this->invalidateSharedCalendar($calendar);
@@ -344,12 +393,33 @@ class CalendarService
 
     public function updateEventOccurrence(User $user, CalendarDTO $calendar, string $eventUri, \DateTime $date, EventDTO $dto): bool
     {
-        $success = $this->dav->calendars()->events()->updateOccurrence($calendar, $eventUri, $date, $dto);
+        $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->updateOccurrence($calendar, $eventUri, $date, $dto));
         if ($success) {
             $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
             $this->invalidateSharedCalendar($calendar);
         }
         return $success;
+    }
+
+    /**
+     * A 412 or an unreadable object means the cached copy of the calendar is
+     * stale (an external remote changed it), so it is dropped before the
+     * error reaches the client: the reload then shows the remote's version.
+     *
+     * @template T
+     *
+     * @param  \Closure(): T  $write
+     * @return T
+     */
+    private function forgettingStaleEvents(User $user, CalendarDTO $calendar, \Closure $write): mixed
+    {
+        try {
+            return $write();
+        } catch (ExternalCalendarPreconditionFailedException|UnreadableCalendarObjectException $e) {
+            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+
+            throw $e;
+        }
     }
 
     /**

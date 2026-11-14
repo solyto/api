@@ -118,6 +118,17 @@ class IntegrationGateway
     }
 
     /**
+     * The part of unavailableCalendars() whose server rejected the
+     * account's credentials.
+     *
+     * @return array<int, int>
+     */
+    public function credentialsRejectedCalendars(): array
+    {
+        return app(CalendarService::class)->credentialsRejectedCalendars();
+    }
+
+    /**
      * @throws IntegrationAuthException
      */
     public function completeTodo(Todo $todo): Todo

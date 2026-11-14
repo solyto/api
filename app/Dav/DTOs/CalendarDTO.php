@@ -24,6 +24,7 @@ class CalendarDTO
         public bool $solytoShared = false,
         public bool $isExternal = false,
         public bool $isUnavailable = false,
+        public bool $isCredentialsRejected = false,
     ) {}
 
     public static function fromSabre(array $data): self

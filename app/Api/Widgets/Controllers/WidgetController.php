@@ -51,7 +51,10 @@ class WidgetController
         return ApiResponse::success(
             new YourDayResource($this->widgetService->yourDay($request->user())),
             'Widget data retrieved successfully.',
-            meta: ['unavailable_calendars' => $this->widgetService->unavailableCalendars()]
+            meta: [
+                'unavailable_calendars' => $this->widgetService->unavailableCalendars(),
+                'credentials_rejected_calendars' => $this->widgetService->credentialsRejectedCalendars(),
+            ]
         );
     }
 

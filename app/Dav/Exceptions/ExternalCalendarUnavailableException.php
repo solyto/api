@@ -16,4 +16,13 @@ class ExternalCalendarUnavailableException extends ServiceUnavailable
     {
         parent::__construct('The external calendar is unavailable.');
     }
+
+    /**
+     * Stored with the unavailable flag, so the API and DAV paths report the
+     * same cause.
+     */
+    public function reason(): string
+    {
+        return 'unreachable';
+    }
 }

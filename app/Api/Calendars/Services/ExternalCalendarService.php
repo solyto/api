@@ -27,6 +27,8 @@ class ExternalCalendarService
 {
     private const string CACHE_KEY_DISCOVERY = 'external_calendar_discovery';
     private const int CACHE_TTL_DISCOVERY = 600;
+    // calendarinstances.displayname is VARCHAR(100) on pgsql.
+    private const int MAX_NAME_LENGTH = 100;
 
     public function __construct(
         private readonly CalendarService $calendars,
@@ -63,7 +65,8 @@ class ExternalCalendarService
 
     /**
      * Checks the new credentials against the server before they replace the
-     * old ones.
+     * old ones. Its calendars are then asked again right away instead of
+     * staying flagged unavailable for the rest of the TTL.
      *
      * @throws ExternalCalendarDiscoveryException
      */
@@ -74,6 +77,10 @@ class ExternalCalendarService
 
         $account->update(['username' => $username, 'password' => $data['password']]);
         $this->cache->store([self::CACHE_KEY_DISCOVERY, $account->user_id, $account->id], self::CACHE_TTL_DISCOVERY, $found);
+
+        foreach ($account->calendars as $link) {
+            $this->calendars->forgetRemoteState($account->user_id, $link->calendar_id);
+        }
 
         return $account->load('calendars');
     }
@@ -143,8 +150,7 @@ class ExternalCalendarService
                 foreach ($candidates as $candidate) {
                     $calendar = $this->calendars->create($user, [
                         'name' => $this->uniqueName($user, $candidate['name']),
-                        'color' => $candidate['color'],
-                    ]);
+                    ] + ($this->isStorableColor($candidate['color']) ? ['color' => $candidate['color']] : []));
                     $created[] = $calendar;
 
                     try {
@@ -225,11 +231,21 @@ class ExternalCalendarService
 
     private function uniqueName(User $user, string $name): string
     {
-        $candidate = $name;
+        $candidate = mb_substr($name, 0, self::MAX_NAME_LENGTH);
         for ($i = 1; $this->calendars->getByName($user, $candidate) !== null; $i++) {
-            $candidate = $name.' ('.$i.')';
+            $suffix = ' ('.$i.')';
+            $candidate = mb_substr($name, 0, self::MAX_NAME_LENGTH - mb_strlen($suffix)).$suffix;
         }
 
         return $candidate;
+    }
+
+    /**
+     * calendarinstances.calendarcolor is VARCHAR(10) on pgsql; anything else
+     * the remote sends gets the default colour.
+     */
+    private function isStorableColor(string $color): bool
+    {
+        return preg_match('/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i', $color) === 1;
     }
 }

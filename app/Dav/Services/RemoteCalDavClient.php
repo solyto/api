@@ -9,6 +9,8 @@ use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\OutboundUrlGuard;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Psr7\FnStream;
+use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 use Pdp\CannotProcessHost;
 use Pdp\Rules;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use Sabre\DAV\Exception\BadRequest;
 
 /**
@@ -259,6 +262,11 @@ class RemoteCalDavClient
      * calendar collections. Without a principal it falls back to the
      * Nextcloud path principals/users/<username>/.
      *
+     * Only hosts of the URL's registrable domain get the credentials, at
+     * every step and every redirect hop (caldav.icloud.com hands out
+     * p42-caldav.icloud.com). An href to another domain is treated as not
+     * found, and calendars on another domain are not offered.
+     *
      * @return array<int, array{url: string, name: string, color: string}> empty when the server answered but lists no calendars
      *
      * @throws BlockedUrlException
@@ -275,11 +283,11 @@ class RemoteCalDavClient
 
         // The well-known probe is optional on most servers, so its failure says nothing about the account.
         $failures = [];
-        $principal = $this->findHref($credentials, $origin.'.well-known/caldav', '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal')
-            ?? $this->findHref($credentials, $base, '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal', $failures)
+        $principal = $this->findHref($credentials, $base, $origin.'.well-known/caldav', '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal')
+            ?? $this->findHref($credentials, $base, $base, '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal', $failures)
             ?? $base.'principals/users/'.rawurlencode($username).'/';
 
-        $home = $this->findHref($credentials, $principal, '<c:calendar-home-set/>', self::NS_CALDAV, 'calendar-home-set', $failures);
+        $home = $this->findHref($credentials, $base, $principal, '<c:calendar-home-set/>', self::NS_CALDAV, 'calendar-home-set', $failures);
         if ($home === null) {
             $this->throwDiscoveryFailure($failures);
 
@@ -289,7 +297,7 @@ class RemoteCalDavClient
         $body = $this->xml('<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:ical="http://apple.com/ns/ical/"><d:prop><d:displayname/><d:resourcetype/><c:supported-calendar-component-set/><ical:calendar-color/></d:prop></d:propfind>');
 
         try {
-            [$response, $home] = $this->sendFollowing($credentials, 'PROPFIND', $home, ['Depth' => '1', 'Content-Type' => 'application/xml; charset=utf-8'], $body);
+            [$response, $home] = $this->sendFollowing($credentials, 'PROPFIND', $home, ['Depth' => '1', 'Content-Type' => 'application/xml; charset=utf-8'], $body, $base);
             $responses = $this->parseMultistatusResponse($home, $response)['responses'];
         } catch (ExternalCalendarUnavailableException $e) {
             $this->throwDiscoveryFailure([$e]);
@@ -305,7 +313,7 @@ class RemoteCalDavClient
             }
 
             $collection = $this->resolveUrl($entry['href'], $home);
-            if (!$this->sameOrigin($collection, $home)) {
+            if (!$this->sameOrigin($collection, $home) || !$this->mayShareCredentials($base, $collection)) {
                 $this->logSkipped($home);
                 continue;
             }
@@ -333,11 +341,18 @@ class RemoteCalDavClient
     }
 
     /**
+     * A link stored before discovery kept to the account's domain may point
+     * elsewhere; it is refused rather than sent the app password.
+     *
      * @param  array<string, string>  $headers
      */
     private function sendFor(ExternalCalendar $calendar, string $method, string $url, array $headers = [], ?string $body = null): Response
     {
         $account = $calendar->account;
+
+        if (!$this->mayShareCredentials($account->server_url, $url)) {
+            throw $this->unavailable($url, null, 'outside the account domain');
+        }
 
         return $this->request([$account->username, $account->password], $method, $url, $headers, $body);
     }
@@ -361,7 +376,7 @@ class RemoteCalDavClient
         $pending = Http::timeout($timeout)
             ->connectTimeout($timeout)
             ->withoutRedirecting()
-            ->withHeaders($headers)
+            ->withHeaders($headers + ['Accept-Encoding' => 'gzip, deflate'])
             ->withOptions([
                 'curl' => [CURLOPT_RESOLVE => [$pin]],
                 'on_headers' => function (ResponseInterface $response) use ($maxBytes, &$tooLarge) {
@@ -370,22 +385,19 @@ class RemoteCalDavClient
                         throw new ExternalCalendarUnavailableException();
                     }
                 },
-                'progress' => function ($downloadTotal, $downloaded) use ($maxBytes, &$tooLarge) {
-                    if ($downloaded > $maxBytes) {
-                        $tooLarge = true;
-                        throw new ExternalCalendarUnavailableException();
-                    }
-                },
+                'sink' => $this->cappedSink($maxBytes, function () use (&$tooLarge) {
+                    $tooLarge = true;
+                }),
             ]);
 
         if ($credentials !== null) {
             $pending = $pending->withBasicAuth($credentials[0], $credentials[1]);
         }
 
-        // Guzzle wraps an on_headers exception in a TransferException but lets one from progress through.
+        // Guzzle wraps an on_headers exception and a sink that stops accepting bytes in a TransferException.
         try {
             $response = $pending->send($method, $url, $body !== null ? ['body' => $body] : []);
-        } catch (ConnectionException|TransferException|ExternalCalendarUnavailableException) {
+        } catch (ConnectionException|TransferException) {
             throw $this->unavailable($url, null, $tooLarge ? 'too large' : 'connection');
         }
 
@@ -397,21 +409,59 @@ class RemoteCalDavClient
     }
 
     /**
+     * Mirrors FeedReader::cappedSink(): curl hands the sink decompressed
+     * bytes, so counting here caps what a gzip body inflates to (the
+     * Content-Length check above only sees the compressed size). Accepting
+     * fewer bytes than offered makes curl abort the transfer.
+     */
+    private function cappedSink(int $maxBytes, \Closure $onTooLarge): StreamInterface
+    {
+        $stream = Utils::streamFor(Utils::tryFopen('php://temp', 'w+'));
+        $written = 0;
+
+        return FnStream::decorate($stream, [
+            'write' => function (string $data) use ($stream, &$written, $maxBytes, $onTooLarge): int {
+                $written += strlen($data);
+
+                if ($written > $maxBytes) {
+                    $onTooLarge();
+
+                    return 0;
+                }
+
+                return $stream->write($data);
+            },
+        ]);
+    }
+
+    /**
      * Follows redirects by hand so every hop goes through the URL guard.
-     * The credentials stay on the first host and on hosts of the same
-     * registrable domain (caldav.icloud.com → p42-caldav.icloud.com); any
-     * other host gets this and every later hop without them.
+     * The credentials stay on the trusted host ($trusted, the first URL when
+     * null) and on hosts of its registrable domain (caldav.icloud.com →
+     * p42-caldav.icloud.com); any other host gets this and every later hop
+     * without them. A 401/403 from a host that got no credentials says
+     * nothing about them, so it is reported as unreachable.
      *
      * @param  array{0: string, 1: string}|null  $credentials
      * @param  array<string, string>  $headers
      * @return array{0: Response, 1: string} the response and the URL that gave it
      */
-    private function sendFollowing(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null): array
+    private function sendFollowing(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?string $trusted = null): array
     {
-        $origin = $url;
+        $trusted ??= $url;
+        $withheld = false;
 
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
+            if ($credentials !== null && !$this->mayShareCredentials($trusted, $url)) {
+                $credentials = null;
+                $withheld = true;
+            }
+
             $response = $this->request($credentials, $method, $url, $headers, $body);
+
+            if ($withheld && in_array($response->status(), [401, 403], true)) {
+                throw $this->unavailable($url, null, 'credentials withheld');
+            }
 
             if (!$response->redirect() || !$response->header('Location')) {
                 return [$response, $url];
@@ -424,10 +474,6 @@ class RemoteCalDavClient
                 throw $this->unavailable($url, $response->status(), 'insecure redirect');
             }
 
-            if ($credentials !== null && !$this->mayShareCredentials($origin, $next)) {
-                $credentials = null;
-            }
-
             $url = $next;
         }
 
@@ -436,18 +482,19 @@ class RemoteCalDavClient
 
     /**
      * The first href inside the given property of a Depth 0 PROPFIND, as an
-     * absolute URL, or null when the request or the property is missing.
-     * A failed request is added to $failures.
+     * absolute URL, or null when the request or the property is missing or
+     * the href leaves the domain of $trusted. A failed request is added to
+     * $failures.
      *
      * @param  array{0: string, 1: string}  $credentials
      * @param  array<int, ExternalCalendarUnavailableException>  $failures
      */
-    private function findHref(array $credentials, string $url, string $prop, string $namespace, string $name, array &$failures = []): ?string
+    private function findHref(array $credentials, string $trusted, string $url, string $prop, string $namespace, string $name, array &$failures = []): ?string
     {
         $body = $this->xml('<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>'.$prop.'</d:prop></d:propfind>');
 
         try {
-            [$response, $url] = $this->sendFollowing($credentials, 'PROPFIND', $url, ['Depth' => '0', 'Content-Type' => 'application/xml; charset=utf-8'], $body);
+            [$response, $url] = $this->sendFollowing($credentials, 'PROPFIND', $url, ['Depth' => '0', 'Content-Type' => 'application/xml; charset=utf-8'], $body, $trusted);
             $responses = $this->parseMultistatusResponse($url, $response)['responses'];
         } catch (ExternalCalendarUnavailableException $e) {
             $failures[] = $e;
@@ -460,7 +507,17 @@ class RemoteCalDavClient
             $href = $element?->getElementsByTagNameNS(self::NS_DAV, 'href')->item(0);
 
             if ($href && trim($href->textContent) !== '') {
-                return $this->resolveUrl(trim($href->textContent), $url);
+                $found = $this->resolveUrl(trim($href->textContent), $url);
+
+                if (!$this->mayShareCredentials($trusted, $found)) {
+                    Log::channel('dav')->warning('External calendar discovery href skipped: outside the server domain', [
+                        'host' => parse_url($found, PHP_URL_HOST),
+                    ]);
+
+                    return null;
+                }
+
+                return $found;
             }
         }
 
@@ -480,8 +537,8 @@ class RemoteCalDavClient
     private function throwDiscoveryFailure(array $failures): void
     {
         foreach ($failures as $failure) {
-            if (in_array($failure->remoteStatus, [401, 403], true)) {
-                throw new ExternalCalendarCredentialsRejectedException();
+            if ($failure instanceof ExternalCalendarCredentialsRejectedException) {
+                throw $failure;
             }
         }
 
@@ -792,6 +849,8 @@ class RemoteCalDavClient
             'reason' => $reason,
         ]);
 
-        return new ExternalCalendarUnavailableException($status);
+        return in_array($status, [401, 403], true)
+            ? new ExternalCalendarCredentialsRejectedException($status)
+            : new ExternalCalendarUnavailableException($status);
     }
 }

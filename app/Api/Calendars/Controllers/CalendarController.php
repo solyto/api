@@ -205,7 +205,10 @@ class CalendarController
         return ApiResponse::success(
             EventResource::collection($this->calendarService->listEvents($request->user(), $yearMonth)),
             'Calendar events retrieved successfully.',
-            meta: ['unavailable_calendars' => $this->calendarService->unavailableCalendars()]
+            meta: [
+                'unavailable_calendars' => $this->calendarService->unavailableCalendars(),
+                'credentials_rejected_calendars' => $this->calendarService->credentialsRejectedCalendars(),
+            ]
         );
     }
 
@@ -236,7 +239,10 @@ class CalendarController
         return ApiResponse::success(
             EventResource::collection($this->calendarService->listWidgetEvents($request->user())),
             'Calendar events retrieved successfully.',
-            meta: ['unavailable_calendars' => $this->calendarService->unavailableCalendars()]
+            meta: [
+                'unavailable_calendars' => $this->calendarService->unavailableCalendars(),
+                'credentials_rejected_calendars' => $this->calendarService->credentialsRejectedCalendars(),
+            ]
         );
     }
 

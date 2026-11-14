@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\Calendars\Models\ExternalCalendar;
+use App\Dav\Exceptions\ExternalCalendarCredentialsRejectedException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Services\RemoteCalDavClient;
@@ -146,6 +147,77 @@ describe('RemoteCalDavClient', function () {
         app(RemoteCalDavClient::class)->send('alice', 'app-password', 'PROPFIND', 'https://example.com/dav/');
 
         Http::assertSent(fn (Request $request) => $request->url() === 'https://www.example.com/dav/' && !$request->hasHeader('Authorization'));
+    });
+
+    it('never sends the credentials outside the domain of the server URL during discovery', function (string $step) {
+        $multistatus = fn (string $href, string $props) => Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>'.$href.'</d:href><d:propstat><d:prop>'.$props.'</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207);
+        $calendar = '<d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Work</d:displayname>';
+
+        Http::fake(fn (Request $request) => match (true) {
+            str_starts_with($request->url(), 'https://evil.net/') => $multistatus('/home/work/', $calendar),
+            $request->url() === 'https://cloud.example.com/' => $multistatus('/', '<d:current-user-principal><d:href>'.($step === 'principal' ? 'https://evil.net/principal/' : '/principal/').'</d:href></d:current-user-principal>'),
+            $request->url() === 'https://cloud.example.com/principal/' => $multistatus('/principal/', '<c:calendar-home-set><d:href>'.($step === 'home-set' ? 'https://evil.net/home/' : '/home/').'</d:href></c:calendar-home-set>'),
+            $request->url() === 'https://cloud.example.com/home/' => $step === 'redirect'
+                ? Http::response('', 301, ['Location' => 'https://evil.net/home/'])
+                : $multistatus('/home/work/', $calendar),
+            default => Http::response('', 404),
+        });
+
+        $found = app(RemoteCalDavClient::class)->discover('https://cloud.example.com/', 'alice', 'app-password');
+
+        expect($found)->toBe([]);
+        Http::assertNotSent(fn (Request $request) => str_starts_with($request->url(), 'https://evil.net/') && $request->hasHeader('Authorization'));
+    })->with(['principal', 'home-set', 'redirect']);
+
+    it('reports a foreign host that wants credentials as unreachable, not as rejected credentials', function () {
+        Http::fake(fn (Request $request) => match ($request->url()) {
+            // One answer for both steps: the root names itself as principal, which names /home/.
+            'https://cloud.example.com/' => Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>/</d:href><d:propstat><d:prop><d:current-user-principal><d:href>/</d:href></d:current-user-principal><c:calendar-home-set><d:href>/home/</d:href></c:calendar-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207),
+            'https://cloud.example.com/home/' => Http::response('', 301, ['Location' => 'https://evil.net/home/']),
+            'https://evil.net/home/' => Http::response('', 401),
+            default => Http::response('', 404),
+        });
+
+        expect(fn () => app(RemoteCalDavClient::class)->discover('https://cloud.example.com/', 'alice', 'app-password'))
+            ->toThrow(fn (ExternalCalendarUnavailableException $e) => expect($e)->not->toBeInstanceOf(ExternalCalendarCredentialsRejectedException::class));
+        Http::assertNotSent(fn (Request $request) => str_starts_with($request->url(), 'https://evil.net/') && $request->hasHeader('Authorization'));
+    });
+
+    it('follows an iCloud-style shard of the same domain through discovery', function () {
+        $multistatus = fn (string $href, string $props) => Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>'.$href.'</d:href><d:propstat><d:prop>'.$props.'</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207);
+
+        Http::fake(fn (Request $request) => match ($request->url()) {
+            'https://caldav.icloud.com/' => $multistatus('/', '<d:current-user-principal><d:href>https://p42-caldav.icloud.com/123/principal/</d:href></d:current-user-principal>'),
+            'https://p42-caldav.icloud.com/123/principal/' => $multistatus('/123/principal/', '<c:calendar-home-set><d:href>https://p42-caldav.icloud.com/123/calendars/</d:href></c:calendar-home-set>'),
+            'https://p42-caldav.icloud.com/123/calendars/' => $multistatus('/123/calendars/work/', '<d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Work</d:displayname>'),
+            default => Http::response('', 404),
+        });
+
+        $found = app(RemoteCalDavClient::class)->discover('https://caldav.icloud.com/', 'alice', 'app-password');
+
+        expect($found)->toBe([['url' => 'https://p42-caldav.icloud.com/123/calendars/work/', 'name' => 'Work', 'color' => '#e5e7eb']]);
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://p42-caldav.icloud.com/123/calendars/' && $request->hasHeader('Authorization'));
+    });
+
+    it('refuses a stored calendar outside the domain of its account', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+        ExternalCalendar::query()->update(['remote_url' => 'https://evil.net/remote.php/dav/calendars/alice/work/']);
+
+        try {
+            app(RemoteCalDavClient::class)->listObjects(ExternalCalendar::first());
+        } finally {
+            expect($remote->requests)->toBeEmpty();
+        }
+    })->throws(ExternalCalendarUnavailableException::class);
+
+    it('advertises gzip and deflate', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        externalCalendar(davUser(), $remote);
+
+        app(RemoteCalDavClient::class)->listObjects(ExternalCalendar::first());
+
+        Http::assertSent(fn (Request $request) => $request->header('Accept-Encoding') === ['gzip, deflate']);
     });
 
     it('keeps credentials out of logs and caches', function () {

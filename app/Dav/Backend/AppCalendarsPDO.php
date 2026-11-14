@@ -30,6 +30,7 @@ use Sabre\VObject\Reader;
 class AppCalendarsPDO extends SabreBackend
 {
     private const string SYNC_TOKEN_MARKER = 'ext-';
+    // Also forgotten by CalendarService::forgetRemoteState().
     private const string CACHE_KEY_STATE = 'external_calendar_state';
     // Shared with CalendarService: a remote that failed is skipped by both for the unavailable TTL.
     private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
@@ -1341,12 +1342,12 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
         try {
             $state = $this->remote()->collectionState($link);
-        } catch (ExternalCalendarUnavailableException) {
+        } catch (ExternalCalendarUnavailableException $e) {
             // Sabre resolves the home on every request, native calendars
             // included: remember the failure so a dead remote is asked at
             // most once per TTL.
             $state = is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
-            $cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), time());
+            $cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
         }
 
         $cache->store($key, 0, ['fetched_at' => time(), 'state' => $state]);

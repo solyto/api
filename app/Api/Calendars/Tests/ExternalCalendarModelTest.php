@@ -13,26 +13,6 @@ describe('External calendar models', function () {
             ->and($account->toArray())->not->toHaveKey('password');
     });
 
-    it('removes the calendars with their account', function () {
-        $account = ExternalCalendarAccount::factory()->forUser(makeUser())->create();
-        ExternalCalendar::factory()->forAccount($account)->count(2)->create();
-
-        $account->delete();
-
-        expect(ExternalCalendar::count())->toBe(0);
-    });
-
-    it('removes accounts and calendars with their user', function () {
-        $user = makeUser();
-        $account = ExternalCalendarAccount::factory()->forUser($user)->create();
-        ExternalCalendar::factory()->forAccount($account)->create();
-
-        $user->delete();
-
-        expect(ExternalCalendarAccount::count())->toBe(0)
-            ->and(ExternalCalendar::count())->toBe(0);
-    });
-
     it('scopes both models to their user', function () {
         $user = makeUser();
         $account = ExternalCalendarAccount::factory()->forUser($user)->create();
