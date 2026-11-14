@@ -309,6 +309,59 @@ describe('Connecting external calendars', function () {
             ->and(\App\Api\Calendars\Models\ExternalCalendar::where('external_calendar_account_id', $account->id)->count())->toBe(1);
     });
 
+    it('connects a calendar whose name slugs like a local one', function () {
+        $user = makeUser();
+        app(\App\Dav\Services\DavService::class)->calendars()->create($user, \App\Dav\DTOs\CalendarDTO::fromRequest(['name' => 'Work']));
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);
+        $this->remote->displayName = 'work';
+
+        $connect = $this->actingAs($user, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", ['urls' => [$this->remote->url()]])
+            ->assertStatus(201);
+
+        $uris = DB::connection('pgsql')->table('calendarinstances')->where('principaluri', 'principals/'.$user->email)->whereIn('displayname', ['Work', 'work'])->pluck('uri');
+
+        expect($connect->json('data.0.name'))->toBe('work')
+            ->and($uris->all())->toHaveCount(2)
+            ->and($uris->unique()->all())->toHaveCount(2);
+    });
+
+    it('connects two calendars with emoji-only names', function () {
+        $user = makeUser();
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);
+        $this->remote->displayName = '🎉';
+        $this->remote->siblings = ['/remote.php/dav/calendars/alice/party/' => '🎈'];
+
+        $connect = $this->actingAs($user, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", [
+            'urls' => [$this->remote->url(), FakeCalDavServer::ORIGIN.'/remote.php/dav/calendars/alice/party/'],
+        ])->assertStatus(201);
+
+        $uris = DB::connection('pgsql')->table('calendarinstances')->whereIn('displayname', ['🎉', '🎈'])->pluck('uri');
+
+        expect($connect->json('data'))->toHaveCount(2)
+            ->and($uris->filter()->unique()->all())->toHaveCount(2);
+    });
+
+    it('leaves nothing connected when a later calendar fails', function () {
+        $user = makeUser();
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);
+        $this->remote->siblings = ['/remote.php/dav/calendars/alice/home/' => 'Home'];
+        $instances = DB::connection('pgsql')->table('calendarinstances')->count();
+
+        $created = 0;
+        \App\Api\Calendars\Models\ExternalCalendar::creating(function () use (&$created) {
+            if (++$created === 2) {
+                throw new \RuntimeException('Second link fails');
+            }
+        });
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", [
+            'urls' => [$this->remote->url(), FakeCalDavServer::ORIGIN.'/remote.php/dav/calendars/alice/home/'],
+        ])->assertStatus(500);
+
+        expect(\App\Api\Calendars\Models\ExternalCalendar::where('external_calendar_account_id', $account->id)->count())->toBe(0)
+            ->and(DB::connection('pgsql')->table('calendarinstances')->count())->toBe($instances);
+    });
+
     it('refuses URLs the server did not list', function () {
         $user = makeUser();
         $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create(['server_url' => FakeCalDavServer::ORIGIN]);

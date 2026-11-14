@@ -4,6 +4,7 @@ use App\Dav\Exceptions\ImportException;
 use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -151,7 +152,8 @@ describe('Calendar import', function () {
         $import = app(DavService::class)->import()->calendars();
         $import->start($user, REMOTE, 'alice', 'app-password');
         $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
-        app(DavService::class)->calendars()->create($user, \App\Dav\DTOs\CalendarDTO::fromRequest(['name' => 'Personal']));
+        DB::connection('pgsql')->statement("CREATE TRIGGER fail_personal BEFORE INSERT ON calendarinstances WHEN NEW.displayname = 'Personal' BEGIN SELECT RAISE(ABORT, 'insert failed'); END");
+        $this->beforeApplicationDestroyed(fn () => DB::connection('pgsql')->statement('DROP TRIGGER IF EXISTS fail_personal'));
 
         Log::shouldReceive('channel')->with('dav')->andReturnSelf();
         Log::shouldReceive('warning')->once()->with('Calendar import skipped a calendar', Mockery::on(

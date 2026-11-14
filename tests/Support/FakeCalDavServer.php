@@ -41,6 +41,9 @@ class FakeCalDavServer
 
     public string $displayName = 'Work';
 
+    /** @var array<string, string> further collections discovery lists, path => display name; they answer nothing else */
+    public array $siblings = [];
+
     /** @var array{0: string, 1: string}|null username and password discovery accepts; any when null */
     public ?array $credentials = null;
 
@@ -162,7 +165,11 @@ class FakeCalDavServer
             $principal => $this->multistatus($this->response($principal, '<c:calendar-home-set><d:href>'.$home.'</d:href></c:calendar-home-set>')),
             default => $this->multistatus(
                 $this->response($home, '<d:resourcetype><d:collection/></d:resourcetype>')
-                .$this->response($this->path, '<d:displayname>'.htmlspecialchars($this->displayName, ENT_XML1).'</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><x:calendar-color xmlns:x="http://apple.com/ns/ical/">#FF0000</x:calendar-color>')
+                .implode('', array_map(
+                    fn (string $path, string $name) => $this->response($path, '<d:displayname>'.htmlspecialchars($name, ENT_XML1).'</d:displayname><d:resourcetype><d:collection/><c:calendar/></d:resourcetype><x:calendar-color xmlns:x="http://apple.com/ns/ical/">#FF0000</x:calendar-color>'),
+                    [$this->path, ...array_keys($this->siblings)],
+                    [$this->displayName, ...array_values($this->siblings)],
+                ))
             ),
         };
     }
