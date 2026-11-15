@@ -27,7 +27,7 @@ class ContactImport
         $this->helper = new VCardHelper();
     }
 
-    public function start(User $user, string $url, string $username, string $secret): void
+    public function start(User $user, string $url, string $username, #[\SensitiveParameter] string $secret): void
     {
         $dto = new AddressBookImportDTO();
         $dto->jobId = uniqid();
