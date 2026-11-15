@@ -188,7 +188,7 @@ class ExternalCalendarService
      *
      * @throws ExternalCalendarDiscoveryException
      */
-    private function discover(string $url, string $username, string $password): array
+    private function discover(string $url, string $username, #[\SensitiveParameter] string $password): array
     {
         try {
             $found = $this->remote->discover($url, $username, $password);

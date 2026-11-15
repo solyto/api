@@ -273,7 +273,7 @@ class RemoteCalDavClient
      * @throws ExternalCalendarCredentialsRejectedException
      * @throws ExternalCalendarUnavailableException when the server cannot be reached or gives no usable answer
      */
-    public function discover(string $url, string $username, string $password): array
+    public function discover(string $url, string $username, #[\SensitiveParameter] string $password): array
     {
         $this->guard->check($url);
 
@@ -336,7 +336,7 @@ class RemoteCalDavClient
      *
      * @param  array<string, string>  $headers
      */
-    public function send(string $username, string $password, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
+    public function send(string $username, #[\SensitiveParameter] string $password, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
     {
         return $this->sendFollowing([$username, $password], $method, $url, $headers, $body, null, $timeout, $maxBytes)[0];
     }

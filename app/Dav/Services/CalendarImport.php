@@ -40,7 +40,7 @@ class CalendarImport
         $this->helper = new ICalendarHelper();
     }
 
-    public function start(User $user, string $url, string $username, string $secret): void
+    public function start(User $user, string $url, string $username, #[\SensitiveParameter] string $secret): void
     {
         $dto = new CalendarImportDTO();
         $dto->jobId = uniqid();
