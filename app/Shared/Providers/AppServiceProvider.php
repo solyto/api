@@ -48,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
 
         User::observe(UserObserver::class);
         Gate::policy(User::class, UserPolicy::class);
+        Gate::define('viewPulse', fn (User $user): bool => $user->isSuperAdmin());
 
         // The only place restricted (non-`*`) tokens are scoped: they work on `widgets.*` routes and nowhere else.
         Sanctum::authenticateAccessTokensUsing(

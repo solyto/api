@@ -122,6 +122,8 @@ return [
 
     'middleware' => [
         'web',
+        'auth.basic',
+        'throttle:5,1',
         Authorize::class,
     ],
 

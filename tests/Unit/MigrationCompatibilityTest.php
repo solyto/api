@@ -45,6 +45,7 @@ const MIGRATION_COMPATIBILITY_ALLOWLIST = [
     '2026_11_13_000001_add_solyto_shared_to_calendarinstances.php' => 'job `extend`: additive DAV-only column plus index; the backfill touches only the new column, which no resource exposes (owner, 2026-11-13)',
     '2026_11_14_000001_add_indexes_to_external_calendars_table.php' => 'external calendars review: additive remote_url_hash column plus indexes; the backfill and ->change() touch only the new column, which no resource exposes, and no released build knows external calendars',
     '2026_11_14_000002_recompute_event_occurrence_bounds.php' => 'replaces the `app:calendars:recompute-event-bounds` command (owner, 2026-11-14): touches only the derived firstoccurence/lastoccurence columns of DAV rows whose stored bounds are wrong; no client-visible data, etag or sync token changes. InvalidateSharedCalendarCache::dispatchSync only drops the event caches of those calendars',
+    '2026_11_15_000001_add_waiting_for_deployment_status_to_dev_requests.php' => 'only widens the dev_requests.status enum; existing rows are untouched, and clients below 1.1.3 get the new value as in-progress (DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE, owner, 2026-11-15)',
 ];
 
 const MIGRATION_COMPATIBILITY_BASELINE = 'tests/Fixtures/client-contract/1.0.15-migrations.txt';

@@ -3,7 +3,9 @@
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\DevRequests\Models\DevRequestVote;
+use App\Api\DevRequests\Requests\UpdateDevRequestRequest;
 use App\Api\Users\Models\User;
+use Illuminate\Support\Facades\Validator;
 
 describe('DevRequest Factory', function () {
     it('creates a valid dev request', function () {
@@ -13,8 +15,18 @@ describe('DevRequest Factory', function () {
         expect($request->status)->toBeString();
         expect($request->title)->toBeString();
         expect($request->description)->toBeString();
-        expect($request->priority)->toBeString();
+        expect($request->priority)->toBeInt();
         expect($request->created_by_user_id)->not()->toBeNull();
+    });
+
+    it('only produces values the update rules accept', function () {
+        $rules = array_intersect_key((new UpdateDevRequestRequest)->rules(), array_flip(['type', 'status', 'priority']));
+
+        foreach (DevRequest::factory()->count(20)->make() as $request) {
+            $validator = Validator::make($request->only(['type', 'status', 'priority']), $rules);
+
+            expect($validator->errors()->all())->toBe([]);
+        }
     });
 
     it('creates a feature request', function () {
@@ -29,22 +41,22 @@ describe('DevRequest Factory', function () {
         expect($request->type)->toBe('bug');
     });
 
-    it('creates an improvement request', function () {
-        $request = DevRequest::factory()->improvement()->create();
+    it('creates a pending request', function () {
+        $request = DevRequest::factory()->pending()->create();
 
-        expect($request->type)->toBe('improvement');
-    });
-
-    it('creates an open request', function () {
-        $request = DevRequest::factory()->open()->create();
-
-        expect($request->status)->toBe('open');
+        expect($request->status)->toBe('pending');
     });
 
     it('creates an in progress request', function () {
         $request = DevRequest::factory()->inProgress()->create();
 
-        expect($request->status)->toBe('in_progress');
+        expect($request->status)->toBe('in-progress');
+    });
+
+    it('creates a request waiting for deployment', function () {
+        $request = DevRequest::factory()->waitingForDeployment()->create();
+
+        expect($request->status)->toBe('waiting-for-deployment');
     });
 
     it('creates a completed request', function () {
@@ -53,16 +65,16 @@ describe('DevRequest Factory', function () {
         expect($request->status)->toBe('completed');
     });
 
-    it('creates a rejected request', function () {
-        $request = DevRequest::factory()->rejected()->create();
+    it('creates a cancelled request', function () {
+        $request = DevRequest::factory()->cancelled()->create();
 
-        expect($request->status)->toBe('rejected');
+        expect($request->status)->toBe('cancelled');
     });
 
     it('creates a high priority request', function () {
         $request = DevRequest::factory()->highPriority()->create();
 
-        expect($request->priority)->toBe('high');
+        expect($request->priority)->toBe(5);
     });
 
     it('creates a request with url', function () {
