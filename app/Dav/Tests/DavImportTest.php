@@ -100,6 +100,26 @@ describe('Calendar import', function () {
             ->and(app(DavService::class)->calendars()->getByName($user, 'Work'))->toBeNull();
     });
 
+    it('loads events with its own limits, not the tighter external calendar ones', function () {
+        // Small enough to refuse the REPORT below, large enough for the discovery responses.
+        config(['calendars.external.max_response_bytes' => 2000]);
+        $user = davUser();
+        fakeRemoteDav('calendars', [
+            'Personal' => ['a.ics' => davIcs('a', str_repeat('Long history ', 400))],
+        ]);
+        $import = app(DavService::class)->import()->calendars();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
+        $import->importCalendars($user, $import->getState($user->id));
+        $import->importEvents($user, $import->getState($user->id));
+
+        $calendar = app(DavService::class)->calendars()->getByName($user, 'Personal');
+
+        expect($import->getState($user->id)->eventsDone)->toBe(1)
+            ->and(app(DavService::class)->calendars()->events()->list($calendar))->toHaveCount(1);
+    });
+
     it('lists the remote calendars for selection', function () {
         $user = davUser();
         fakeRemoteDav('calendars', ['Personal' => [], 'Work' => []]);

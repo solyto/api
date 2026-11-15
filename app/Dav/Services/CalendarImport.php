@@ -23,6 +23,11 @@ class CalendarImport
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
     private const string CACHE_KEY_EVENTS = 'calendar_events';
 
+    // A whole calendar comes in one REPORT, so the external calendar limits (5 s, 10 MB) are too tight.
+    // 30 s matches the import before 1.1.3; the cap keeps a response within the queue worker's memory.
+    private const int EVENTS_TIMEOUT = 30;
+    private const int EVENTS_MAX_BYTES = 50 * 1024 * 1024;
+
     private Calendars $calendars;
     private ICalendarHelper $helper;
 
@@ -198,7 +203,9 @@ class CalendarImport
                 'REPORT',
                 $calendarUrl,
                 ['Content-Type' => 'application/xml', 'Depth' => '1'],
-                $this->helper->getEntriesXml()
+                $this->helper->getEntriesXml(),
+                self::EVENTS_TIMEOUT,
+                self::EVENTS_MAX_BYTES
             );
         } catch (ExternalCalendarUnavailableException) {
             $this->logUnreadable($calendarUrl, null);

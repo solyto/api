@@ -331,13 +331,14 @@ class RemoteCalDavClient
     /**
      * Sends a request with the given credentials to a URL that already went
      * through discovery, e.g. the import's per-collection REPORT, following
-     * redirects.
+     * redirects. $timeout (seconds) and $maxBytes override the external
+     * calendar limits from config/calendars.php for this request only.
      *
      * @param  array<string, string>  $headers
      */
-    public function send(string $username, string $password, string $method, string $url, array $headers = [], ?string $body = null): Response
+    public function send(string $username, string $password, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
     {
-        return $this->sendFollowing([$username, $password], $method, $url, $headers, $body)[0];
+        return $this->sendFollowing([$username, $password], $method, $url, $headers, $body, null, $timeout, $maxBytes)[0];
     }
 
     /**
@@ -361,7 +362,7 @@ class RemoteCalDavClient
      * @param  array{0: string, 1: string}|null  $credentials  null sends no Authorization header
      * @param  array<string, string>  $headers
      */
-    private function request(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null): Response
+    private function request(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
     {
         try {
             $pin = $this->guard->check($url);
@@ -369,8 +370,8 @@ class RemoteCalDavClient
             throw $this->unavailable($url, null, 'blocked');
         }
 
-        $timeout = (int) config('calendars.external.timeout');
-        $maxBytes = (int) config('calendars.external.max_response_bytes');
+        $timeout ??= (int) config('calendars.external.timeout');
+        $maxBytes ??= (int) config('calendars.external.max_response_bytes');
         $tooLarge = false;
 
         $pending = Http::timeout($timeout)
@@ -446,7 +447,7 @@ class RemoteCalDavClient
      * @param  array<string, string>  $headers
      * @return array{0: Response, 1: string} the response and the URL that gave it
      */
-    private function sendFollowing(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?string $trusted = null): array
+    private function sendFollowing(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?string $trusted = null, ?int $timeout = null, ?int $maxBytes = null): array
     {
         $trusted ??= $url;
         $withheld = false;
@@ -457,7 +458,7 @@ class RemoteCalDavClient
                 $withheld = true;
             }
 
-            $response = $this->request($credentials, $method, $url, $headers, $body);
+            $response = $this->request($credentials, $method, $url, $headers, $body, $timeout, $maxBytes);
 
             if ($withheld && in_array($response->status(), [401, 403], true)) {
                 throw $this->unavailable($url, null, 'credentials withheld');
