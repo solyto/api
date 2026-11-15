@@ -18,13 +18,15 @@ describe('DeleteOldDevRequests', function () {
     it('deletes completed or cancelled requests older than 30 days', function () {
         $old = DevRequest::factory()->completed()->create(['created_at' => now()->subDays(31)]);
         $recent = DevRequest::factory()->completed()->create(['created_at' => now()->subDay()]);
-        $open = DevRequest::factory()->open()->create(['created_at' => now()->subDays(60)]);
+        $open = DevRequest::factory()->pending()->create(['created_at' => now()->subDays(60)]);
+        $waiting = DevRequest::factory()->waitingForDeployment()->create(['created_at' => now()->subDays(60)]);
 
         app(DeleteOldDevRequests::class)->handle();
 
         expect(DevRequest::find($old->id))->toBeNull();
         expect(DevRequest::find($recent->id))->not->toBeNull();
         expect(DevRequest::find($open->id))->not->toBeNull();
+        expect(DevRequest::find($waiting->id))->not->toBeNull();
     });
 });
 

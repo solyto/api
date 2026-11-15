@@ -14,13 +14,13 @@ class DevRequestFactory extends Factory
     public function definition(): array
     {
         return [
-            'type' => $this->faker->randomElement(['feature', 'bug', 'improvement', 'other']),
-            'status' => $this->faker->randomElement(['open', 'in_progress', 'completed', 'rejected']),
+            'type' => $this->faker->randomElement(['feature', 'bug']),
+            'status' => $this->faker->randomElement(['backlog', 'pending', 'in-progress', 'waiting-for-deployment', 'completed', 'cancelled']),
             'title' => $this->faker->sentence(6),
             'description' => $this->faker->paragraph(),
             'screenshot' => null,
             'url' => $this->faker->optional(0.3)->url(),
-            'priority' => $this->faker->randomElement(['low', 'medium', 'high', 'critical']),
+            'priority' => $this->faker->numberBetween(1, 5),
             'created_by_user_id' => User::factory(),
         ];
     }
@@ -39,31 +39,31 @@ class DevRequestFactory extends Factory
         ]);
     }
 
-    public function improvement(): static
+    public function cancelled(): static
     {
         return $this->state(fn (array $attributes) => [
-            'type' => 'improvement',
+            'status' => 'cancelled',
         ]);
     }
 
-    public function rejected(): static
+    public function pending(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'rejected',
-        ]);
-    }
-
-    public function open(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'open',
+            'status' => 'pending',
         ]);
     }
 
     public function inProgress(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'in_progress',
+            'status' => 'in-progress',
+        ]);
+    }
+
+    public function waitingForDeployment(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'waiting-for-deployment',
         ]);
     }
 
@@ -77,7 +77,7 @@ class DevRequestFactory extends Factory
     public function highPriority(): static
     {
         return $this->state(fn (array $attributes) => [
-            'priority' => 'high',
+            'priority' => 5,
         ]);
     }
 

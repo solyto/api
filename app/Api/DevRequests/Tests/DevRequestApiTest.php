@@ -89,6 +89,67 @@ describe('DevRequest fixed_in_version', function () {
     })->with(['v1.2', '1.2-beta', '1..2', '1.2.', '123456789.123456789.1']);
 });
 
+describe('DevRequest waiting-for-deployment status', function () {
+    it('lets an admin set the status to waiting-for-deployment', function () {
+        $admin = makeUser(['role' => 'admin']);
+        $devRequest = DevRequest::factory()->inProgress()->create();
+
+        $this->actingAs($admin, 'sanctum')
+            ->withHeaders(['X-Client-Version' => '1.1.3'])
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['status' => 'waiting-for-deployment'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'waiting-for-deployment');
+
+        expect($devRequest->fresh()->status)->toBe('waiting-for-deployment');
+    });
+
+    it('returns waiting-for-deployment to clients from 1.1.3 on', function (string $version) {
+        $user = makeUser();
+        DevRequest::factory()->waitingForDeployment()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeaders(['X-Client-Version' => $version])
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.status', 'waiting-for-deployment');
+    })->with(['1.1.3', '1.2.0']);
+
+    it('returns waiting-for-deployment as in-progress to older or unknown clients', function (?string $version) {
+        $user = makeUser();
+        $devRequest = DevRequest::factory()->waitingForDeployment()->create();
+        $headers = $version === null ? [] : ['X-Client-Version' => $version];
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeaders($headers)
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.status', 'in-progress');
+
+        expect($devRequest->fresh()->status)->toBe('waiting-for-deployment');
+    })->with(['1.1.2', '1.0.15', 'garbage', null]);
+
+    it('leaves other statuses alone for older clients', function () {
+        $user = makeUser();
+        DevRequest::factory()->completed()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->withHeaders(['X-Client-Version' => '1.0.15'])
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.status', 'completed');
+    });
+
+    it('forbids a non-admin from setting the status to waiting-for-deployment', function () {
+        $user = makeUser();
+        $devRequest = DevRequest::factory()->inProgress()->create();
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['status' => 'waiting-for-deployment']), 403);
+
+        expect($devRequest->fresh()->status)->toBe('in-progress');
+    });
+});
+
 describe('DevRequest voting', function () {
     it('allows a user to vote once', function () {
         $user = makeUser();
@@ -200,13 +261,13 @@ describe('DevRequest tenant isolation', function () {
         $other = makeUser();
         $devRequest = DevRequest::factory()->create([
             'created_by_user_id' => $other->id,
-            'status' => 'open',
+            'status' => 'pending',
         ]);
 
         expectApiError($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['status' => 'in-progress']), 403);
 
-        expect($devRequest->fresh()->status)->toBe('open');
+        expect($devRequest->fresh()->status)->toBe('pending');
     });
 
     it('does not change another user\'s vote when voting', function () {
