@@ -23,7 +23,8 @@ return new class extends Migration
         Schema::table('external_calendars', function (Blueprint $table) {
             $table->char('remote_url_hash', 64)->nullable(false)->change();
             // A collection is connected once per account, even when two connects race.
-            $table->unique(['external_calendar_account_id', 'remote_url_hash']);
+            // Named explicitly: the generated name is longer than MariaDB's 64-character limit.
+            $table->unique(['external_calendar_account_id', 'remote_url_hash'], 'external_calendars_account_remote_url_unique');
         });
     }
 
@@ -32,7 +33,7 @@ return new class extends Migration
         Schema::table('external_calendars', function (Blueprint $table) {
             // MariaDB may have dropped the foreign key's own index in favour of the unique one; keep the key covered.
             $table->index('external_calendar_account_id');
-            $table->dropUnique(['external_calendar_account_id', 'remote_url_hash']);
+            $table->dropUnique('external_calendars_account_remote_url_unique');
             $table->dropIndex(['calendar_id']);
         });
 
