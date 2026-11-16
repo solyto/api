@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
@@ -600,5 +601,21 @@ describe('Client contract', function () {
             ->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.value', 321);
+    });
+    // Since 1.0.0 (confirmed by the frontend in room pdf-clipboards, 2026-11-16): any entry that is not an image with a
+    // file_path is rendered as text and truncates content, which crashes the whole history if content is null.
+    it('keeps file_path on images and leaves file entries out of the plain clipboard list', function () {
+        $user = makeUser();
+        $image = Clipboard::factory()->forUser($user)->create(['type' => 'image', 'content' => '', 'file_path' => $user->id.'/clipboard/a.png']);
+        Clipboard::factory()->forUser($user)->create(['type' => 'file', 'content' => '', 'file_path' => $user->id.'/clipboard/b.pdf']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/clipboard')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $image->id)
+            ->assertJsonPath('data.0.type', 'image')
+            ->assertJsonPath('data.0.file_path', $user->id.'/clipboard/a.png')
+            ->assertJsonStructure(['data' => [['id', 'content', 'type', 'file_path', 'created_at', 'updated_at']]]);
     });
 });

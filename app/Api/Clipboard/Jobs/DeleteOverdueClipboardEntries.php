@@ -3,7 +3,7 @@
 namespace App\Api\Clipboard\Jobs;
 
 use App\Api\Clipboard\Models\Clipboard;
-use App\Api\Clipboard\Services\ClipboardImageService;
+use App\Api\Clipboard\Services\ClipboardFileService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,13 +18,13 @@ class DeleteOverdueClipboardEntries implements ShouldQueue
         //
     }
 
-    public function handle(ClipboardImageService $service): void
+    public function handle(ClipboardFileService $fileService): void
     {
         $overdueEntries = Clipboard::where('created_at', '<', now()->subDay())->get();
 
         foreach ($overdueEntries as $entry) {
-            if ($entry->type === 'image' && $entry->file_path) {
-                $service->delete($entry->file_path);
+            if ($entry->file_path) {
+                $fileService->delete($entry->file_path);
             }
         }
 

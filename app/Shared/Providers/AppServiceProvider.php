@@ -96,6 +96,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('clipboard-files', function (Request $request) {
+            return Limit::perDay(config('clipboard.max_files_per_day'))->by($request->user()->id);
+        });
+
         RateLimiter::for('widgets', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
 

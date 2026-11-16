@@ -12,8 +12,8 @@ class ClipboardImageService
     {
         $directory = $userId . '/clipboard';
 
-        if (!Storage::disk('user_data')->exists($directory)) {
-            if (!Storage::disk('user_data')->makeDirectory($directory)) {
+        if (!Storage::disk('private_user_data')->exists($directory)) {
+            if (!Storage::disk('private_user_data')->makeDirectory($directory)) {
                 return false;
             }
         }
@@ -25,16 +25,9 @@ class ClipboardImageService
         $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
         $extension = $mimeToExt[$file->getMimeType()] ?? 'png';
         $sanitizedName = bin2hex(random_bytes(16)) . '.' . $extension;
-        $store = Storage::disk('user_data')->putFileAs($directory, $file, $sanitizedName);
+        $store = Storage::disk('private_user_data')->putFileAs($directory, $file, $sanitizedName);
 
         return $store ? $directory . '/' . $sanitizedName : false;
-    }
-
-    public function delete(string $filePath): void
-    {
-        if (Storage::disk('user_data')->exists($filePath)) {
-            Storage::disk('user_data')->delete($filePath);
-        }
     }
 
     private function validateImage(UploadedFile $file): bool

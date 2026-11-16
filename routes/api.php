@@ -445,6 +445,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::post('', [ClipboardController::class, 'store']);
         Route::post('image', [ClipboardController::class, 'storeImage']);
         Route::get('{clipboard}/image', [ClipboardController::class, 'getImage']);
+        Route::middleware('throttle:clipboard-files')->post('file', [ClipboardController::class, 'storeFile']);
+        Route::get('{clipboard}/file', [ClipboardController::class, 'getFile']);
         Route::delete('{clipboard}', [ClipboardController::class, 'destroy']);
     });
 

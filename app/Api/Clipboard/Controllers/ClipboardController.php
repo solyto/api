@@ -4,6 +4,7 @@ namespace App\Api\Clipboard\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\Clipboard\Models\Clipboard;
+use App\Api\Clipboard\Requests\StoreClipboardFileRequest;
 use App\Api\Clipboard\Requests\StoreClipboardImageRequest;
 use App\Api\Clipboard\Requests\StoreClipboardRequest;
 use App\Api\Clipboard\Resources\ClipboardResource;
@@ -26,6 +27,15 @@ class ClipboardController
      *     tags={"Clipboard"},
      *     security={{"sanctum":{}}},
      *
+     *     @OA\Parameter(
+     *         name="include_files",
+     *         in="query",
+     *         required=false,
+     *         description="Include entries of type file; older clients do not know the type.",
+     *
+     *         @OA\Schema(type="boolean")
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Clipboards retrieved successfully",
@@ -41,7 +51,7 @@ class ClipboardController
     public function list(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            ClipboardResource::collection($this->clipboardService->list($request->user())),
+            ClipboardResource::collection($this->clipboardService->list($request->user(), $request->boolean('include_files'))),
             'Clipboards retrieved successfully.'
         );
     }
@@ -174,13 +184,98 @@ class ClipboardController
     {
         abort_unless($this->isResourceOwner($request, $clipboard), 403);
 
-        if ($clipboard->type !== 'image' || ! $clipboard->file_path) {
+        $path = $this->clipboardService->getImagePath($request->user()->id, $clipboard);
+
+        if (! $path) {
             return ApiResponse::error('No image found.', 404);
         }
 
-        $path = $this->clipboardService->getImagePath($request->user()->id, $clipboard);
+        return response()->file($path, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+        ]);
+    }
 
-        return response()->file($path);
+    /**
+     * @OA\Post(
+     *     path="/clipboard/file",
+     *     operationId="clipboardStoreFile",
+     *     tags={"Clipboard"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *
+     *             @OA\Schema(
+     *                 required={"file"},
+     *
+     *                 @OA\Property(property="file", type="string", format="binary", description="pdf, txt, md, csv, doc, docx, ppt, pptx, xls or xlsx")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Clipboard file saved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", ref="#/components/schemas/Clipboard")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=413, description="File too large", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=429, description="Daily file limit reached", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function storeFile(StoreClipboardFileRequest $request): JsonResponse
+    {
+        return ApiResponse::success(
+            new ClipboardResource($this->clipboardService->storeFile($request->user(), $request->file('file'))),
+            'Clipboard file saved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/clipboard/{clipboard}/file",
+     *     operationId="clipboardGetFile",
+     *     tags={"Clipboard"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="clipboard",
+     *         in="path",
+     *         required=true,
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(response=200, description="File returned as attachment"),
+     *     @OA\Response(response=403, description="Unauthorized"),
+     *     @OA\Response(response=404, description="No file found")
+     * )
+     */
+    public function getFile(Request $request, Clipboard $clipboard): BinaryFileResponse|JsonResponse
+    {
+        abort_unless($this->isResourceOwner($request, $clipboard), 403);
+
+        $path = $this->clipboardService->getFilePath($clipboard);
+
+        if (! $path) {
+            return ApiResponse::error('No file found.', 404);
+        }
+
+        return response()->download($path, $clipboard->file_name, [
+            'Content-Type' => $clipboard->mime_type,
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+        ]);
     }
 
     /**

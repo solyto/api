@@ -32,8 +32,8 @@ describe('DeleteOldDevRequests', function () {
 
 describe('DeleteOverdueClipboardEntries', function () {
     it('deletes entries older than a day and removes image files', function () {
-        Storage::fake('user_data');
-        Storage::disk('user_data')->put('clipboard/image.png', 'bytes');
+        Storage::fake('private_user_data');
+        Storage::disk('private_user_data')->put('clipboard/image.png', 'bytes');
 
         $old = Clipboard::factory()->create([
             'type' => 'image',
@@ -42,11 +42,30 @@ describe('DeleteOverdueClipboardEntries', function () {
         ]);
         $recent = Clipboard::factory()->create(['created_at' => now()]);
 
-        app(DeleteOverdueClipboardEntries::class)->handle(app(\App\Api\Clipboard\Services\ClipboardImageService::class));
+        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
 
         expect(Clipboard::find($old->id))->toBeNull();
         expect(Clipboard::find($recent->id))->not->toBeNull();
-        Storage::disk('user_data')->assertMissing('clipboard/image.png');
+        Storage::disk('private_user_data')->assertMissing('clipboard/image.png');
+    });
+
+    it('removes stored files of overdue file entries', function () {
+        Storage::fake('private_user_data');
+        Storage::disk('private_user_data')->put('u/clipboard/doc.pdf', 'bytes');
+        Storage::disk('private_user_data')->put('u/clipboard/new.pdf', 'bytes');
+
+        $old = Clipboard::factory()->create([
+            'type' => 'file',
+            'file_path' => 'u/clipboard/doc.pdf',
+            'created_at' => now()->subDays(2),
+        ]);
+        Clipboard::factory()->create(['type' => 'file', 'file_path' => 'u/clipboard/new.pdf']);
+
+        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+
+        expect(Clipboard::find($old->id))->toBeNull();
+        Storage::disk('private_user_data')->assertMissing('u/clipboard/doc.pdf');
+        Storage::disk('private_user_data')->assertExists('u/clipboard/new.pdf');
     });
 });
 

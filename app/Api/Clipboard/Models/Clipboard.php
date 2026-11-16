@@ -23,9 +23,13 @@ class Clipboard extends Model
         'user_id',
         'type',
         'file_path',
+        'file_name',
+        'file_size',
+        'mime_type',
     ];
 
     protected $casts = [
+        'file_size' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
