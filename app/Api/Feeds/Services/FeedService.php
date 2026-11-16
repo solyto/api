@@ -184,7 +184,7 @@ class FeedService
         return $subscription;
     }
 
-    public function getAggregatedItems(string $userId, int $offset = 0, ?int $limit = 50): array
+    public function getAggregatedItems(string $userId, int $offset = 0, ?int $limit = 50, ?string $feedId = null): array
     {
         $subscriptions = $this->getUserFeeds($userId);
 
@@ -204,6 +204,10 @@ class FeedService
 
         $counts = $items->countBy('feed_id')->all();
         $sorted = $items->sortByDesc('published_at');
+
+        if ($feedId !== null) {
+            $sorted = $sorted->where('feed_id', $feedId);
+        }
 
         $page = $limit === null
             ? $sorted

@@ -5,6 +5,7 @@ namespace App\Api\Feeds\Controllers;
 use App\Api\ApiResponse;
 use App\Api\Feeds\Exceptions\FeedException;
 use App\Api\Feeds\Models\FeedSubscription;
+use App\Api\Feeds\Requests\ListFeedItemsRequest;
 use App\Api\Feeds\Requests\StoreFeedSubscriptionRequest;
 use App\Api\Feeds\Requests\UpdateFeedSubscriptionRequest;
 use App\Api\Feeds\Resources\FeedItemResource;
@@ -59,6 +60,10 @@ class FeedController
      *     tags={"Feeds"},
      *     security={{"sanctum": {}}},
      *
+     *     @OA\Parameter(name="offset", in="query", required=false, @OA\Schema(type="integer", default=0)),
+     *     @OA\Parameter(name="limit", in="query", required=false, description="Page size or `all`", @OA\Schema(type="string", default="50")),
+     *     @OA\Parameter(name="feed_id", in="query", required=false, description="Only items of this feed; meta.feed_counts still covers all feeds", @OA\Schema(type="string", format="uuid")),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Feed items retrieved successfully",
@@ -73,13 +78,13 @@ class FeedController
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function listItems(Request $request): JsonResponse
+    public function listItems(ListFeedItemsRequest $request): JsonResponse
     {
         $offset = (int) $request->query('offset', 0);
         $limitParam = $request->query('limit', '50');
         $limit = $limitParam === 'all' ? null : (int) $limitParam;
 
-        ['items' => $items, 'counts' => $counts] = $this->feedService->getAggregatedItems($request->user()->id, $offset, $limit);
+        ['items' => $items, 'counts' => $counts] = $this->feedService->getAggregatedItems($request->user()->id, $offset, $limit, $request->validated('feed_id'));
 
         return ApiResponse::success(
             FeedItemResource::collection($items),
