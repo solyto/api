@@ -31,16 +31,17 @@ class SendDailyDayRemindersCommand extends Command
                 continue;
             }
 
-            $timezone = $user->settings->timezone ?? 'UTC';
-            $now = Carbon::now($timezone);
-
-            if ($now->hour !== 7) {
-                continue;
-            }
-
-            // One user's failure (unreadable calendar data, a mail or Telegram
-            // outage) must not cost everyone after them their reminder.
+            // One user's failure (an unknown stored timezone, unreadable
+            // calendar data, a mail or Telegram outage) must not cost everyone
+            // after them their reminder.
             try {
+                $timezone = $user->settings->timezone ?? 'UTC';
+                $now = Carbon::now($timezone);
+
+                if ($now->hour !== 7) {
+                    continue;
+                }
+
                 $todos = Todo::forUser($user->id)
                     ->where('is_completed', false)
                     ->where('due_at', '<=', today($timezone))

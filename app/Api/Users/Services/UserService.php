@@ -33,7 +33,8 @@ class UserService
         'address_books', 'book_recommendations', 'book_releases', 'books', 'budgets',
         'calendars', 'calendars_v2', 'checkin', 'clipboard', 'feed_import', 'games', 'links', 'movie_releases', 'movies',
         'music', 'music_recommendations', 'music_releases', 'note_categories',
-        'note_categories_hidden', 'notes', 'notes_hidden', 'notes_newest', 'plants', 'quotes',
+        'note_categories_hidden', 'notes', 'notes_hidden', 'notes_hidden_v2', 'notes_newest',
+        'notes_newest_v2', 'notes_recent', 'notes_v2', 'plants', 'quotes',
         'recipes', 'shortcuts', 'tags', 'todo_categories', 'todo_workspaces', 'todos',
         'todos_due', 'tt_categories', 'tt_entries', 'tt_projects', 'tt_projects_v2', 'user_feeds', 'wealth_fields',
     ];

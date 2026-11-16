@@ -6,6 +6,7 @@ use App\Api\Users\Notifications\DailyCheckInReminderNotification;
 use App\Api\Users\Notifications\DailyDayReminderNotification;
 use App\Dav\Models\Principal;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidTimeZoneException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Artisan;
@@ -231,6 +232,29 @@ describe('Daily reminder commands', function () {
         expect($user->notifications()->where('type', 'daily_check_in_reminder')->count())->toBe(1);
         Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'Mail server down');
     });
+
+    it('keeps sending reminders past a user with an unknown timezone', function (string $command, string $utcNow, string $notification) {
+        Notification::fake();
+        Exceptions::fake();
+        Carbon::setTestNow($utcNow);
+
+        $broken = makeUser();
+        $broken->settings()->update(['timezone' => 'Not/AZone']);
+        UserNotificationSettings::factory()->forUser($broken)->create();
+
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        UserNotificationSettings::factory()->forUser($user)->create();
+
+        $this->artisan($command)->assertSuccessful();
+
+        Notification::assertNotSentTo($broken, $notification);
+        Notification::assertSentTo($user, $notification);
+        Exceptions::assertReported(InvalidTimeZoneException::class);
+    })->with([
+        'day' => ['app:send-daily-day-reminders', '2026-08-14 07:00:00', DailyDayReminderNotification::class],
+        'check-in' => ['app:send-daily-check-in-reminders', '2026-08-14 20:00:00', DailyCheckInReminderNotification::class],
+    ]);
 
     it('does not send check-in reminders outside 20:00', function () {
         Notification::fake();

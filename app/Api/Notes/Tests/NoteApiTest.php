@@ -5,6 +5,7 @@ use App\Api\Notes\Models\NoteCategory;
 use App\Api\Notes\Services\NoteImportService;
 use App\Api\Notes\Services\NoteService;
 use App\Api\Tags\Models\Tag;
+use App\Shared\Services\UserCacheService;
 use Illuminate\Http\UploadedFile;
 
 describe('Note CRUD', function () {
@@ -47,6 +48,49 @@ describe('Note CRUD', function () {
             ->getJson('/api/v1/notes/newest')
             ->assertStatus(200)
             ->assertJsonCount(5, 'data');
+    });
+
+    it('returns the five most recently changed notes, edited before created', function () {
+        $user = makeUser();
+        $edited = Note::factory()->forUser($user)->create(['created_at' => now()->subDays(10), 'updated_at' => now()->subMinute()]);
+        Note::factory()->forUser($user)->count(6)->sequence(fn ($sequence) => [
+            'created_at' => now()->subDays($sequence->index + 1),
+            'updated_at' => now()->subDays($sequence->index + 1),
+        ])->create();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/recent')
+            ->assertStatus(200)
+            ->assertJsonCount(5, 'data');
+
+        expect($response->json('data.0.id'))->toBe($edited->id);
+    });
+
+    it('moves a note to the top of recent once it is edited', function () {
+        $user = makeUser();
+        $older = Note::factory()->forUser($user)->create(['created_at' => now()->subDays(2), 'updated_at' => now()->subDays(2)]);
+        Note::factory()->forUser($user)->create(['created_at' => now()->subDay(), 'updated_at' => now()->subDay()]);
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/recent')->assertJsonPath('data.1.id', $older->id);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/'.$older->id, ['content' => 'Edited'])
+            ->assertStatus(200);
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/recent')->assertJsonPath('data.0.id', $older->id);
+    });
+
+    it('returns the same list from the cache as from the database', function () {
+        $user = makeUser();
+        $note = Note::factory()->forUser($user)->create();
+        $note->tags()->attach(Tag::factory()->forUser($user)->create());
+
+        $fresh = $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertStatus(200)->json('data');
+        $cached = $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertStatus(200)->json('data');
+
+        expect($cached)->toBe($fresh)
+            ->and($fresh[0]['tags'])->toHaveCount(1)
+            ->and(app(UserCacheService::class)->get(['notes_v2', $user->id]))->toBe($fresh);
     });
 
     it('scopes notes to the authenticated user', function () {
@@ -286,6 +330,21 @@ describe('Note category visibility', function () {
             ->assertStatus(200)
             ->assertJsonCount(2, 'data');
     });
+
+    it('excludes notes in hidden folders from recent but keeps uncategorized notes', function () {
+        $user = makeUser();
+        $hidden = NoteCategory::factory()->forUser($user)->hidden()->create();
+        $visible = NoteCategory::factory()->forUser($user)->create();
+
+        Note::factory()->forUser($user)->forCategory($hidden)->create();
+        Note::factory()->forUser($user)->forCategory($visible)->create();
+        Note::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/recent')
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+    });
 });
 
 describe('Hidden notes and categories', function () {
@@ -374,6 +433,7 @@ describe('Hidden notes and categories', function () {
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertJsonCount(1, 'data');
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/hidden')->assertJsonCount(0, 'data');
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/newest')->assertJsonCount(1, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/recent')->assertJsonCount(1, 'data');
 
         $this->actingAs($user, 'sanctum')
             ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true])
@@ -384,6 +444,7 @@ describe('Hidden notes and categories', function () {
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertJsonCount(0, 'data');
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/hidden')->assertJsonCount(1, 'data');
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/newest')->assertJsonCount(0, 'data');
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/recent')->assertJsonCount(0, 'data');
     });
 });
 

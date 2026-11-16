@@ -170,6 +170,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('categories/hidden', [NoteCategoryController::class, 'hidden']);
         Route::apiResource('categories', NoteCategoryController::class);
         Route::get('newest', [NoteController::class, 'newest']);
+        Route::get('recent', [NoteController::class, 'recent']);
         Route::get('hidden', [NoteController::class, 'hidden']);
         Route::get('journal/marks', [NoteController::class, 'journalMarks']);
 

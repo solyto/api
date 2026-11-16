@@ -29,16 +29,16 @@ class SendDailyCheckInRemindersCommand extends Command
                 continue;
             }
 
-            $timezone = $user->settings->timezone ?? 'UTC';
-            $now = Carbon::now($timezone);
-
-            if ($now->hour !== 20) {
-                continue;
-            }
-
-            // One user's failure (a mail or Telegram outage) must not cost
-            // everyone after them their reminder.
+            // One user's failure (an unknown stored timezone, a mail or
+            // Telegram outage) must not cost everyone after them their reminder.
             try {
+                $timezone = $user->settings->timezone ?? 'UTC';
+                $now = Carbon::now($timezone);
+
+                if ($now->hour !== 20) {
+                    continue;
+                }
+
                 $user->notify(new DailyCheckInReminderNotification(
                     date: $now->toDateString()
                 ));
