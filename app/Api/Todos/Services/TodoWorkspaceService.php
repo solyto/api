@@ -68,7 +68,8 @@ class TodoWorkspaceService
 
     public function attachCategories(TodoWorkspace $workspace, array $categoryIds): TodoWorkspace
     {
-        $workspace->categories()->attach($categoryIds);
+        // Already attached categories are skipped; attach() would hit the unique (category_id, workspace_id) key.
+        $workspace->categories()->syncWithoutDetaching($categoryIds);
         $workspace->load('categories');
 
         $this->cache->forget([self::CACHE_KEY, $workspace->user_id]);

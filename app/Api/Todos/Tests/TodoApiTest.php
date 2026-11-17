@@ -83,6 +83,21 @@ describe('Todo workspaces CRUD', function () {
         expect(TodoWorkspace::count())->toBe(0);
     });
 
+    it('ignores a category that is already attached to the workspace', function () {
+        $user = makeUser();
+        $workspace = TodoWorkspace::factory()->forUser($user)->create();
+        $category = TodoCategory::factory()->forUser($user)->create();
+        $workspace->categories()->attach($category->id);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos/workspaces/'.$workspace->id.'/categories/attach', [
+                'categories' => [$category->id],
+            ])
+            ->assertStatus(200);
+
+        expect($workspace->fresh()->categories->pluck('id')->all())->toBe([$category->id]);
+    });
+
     it('attaches and detaches categories to a workspace', function () {
         $user = makeUser();
         $workspace = TodoWorkspace::factory()->forUser($user)->create();
