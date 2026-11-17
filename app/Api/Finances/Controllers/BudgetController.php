@@ -108,6 +108,7 @@ class BudgetController
      *
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="type", type="string", enum={"income","expense"}),
+     *             @OA\Property(property="interval", type="string", enum={"monthly","quarterly","yearly"}, default="monthly"),
      *             @OA\Property(property="value", type="number")
      *         )
      *     ),
@@ -143,7 +144,7 @@ class BudgetController
      *     path="/finances/budget/{budget}",
      *     operationId="updateBudget",
      *     tags={"Finances"},
-     *     description="Updates title and type. A given value is recorded as the item's value for today in its value history (replacing an existing value for today), and the item's current value is updated from that history.",
+     *     description="Updates title, type and interval. A given value is recorded as the item's value for today in its value history (replacing an existing value for today), and the item's current value is updated from that history.",
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
@@ -161,6 +162,7 @@ class BudgetController
      *         @OA\JsonContent(
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="type", type="string", enum={"income","expense"}),
+     *             @OA\Property(property="interval", type="string", enum={"monthly","quarterly","yearly"}),
      *             @OA\Property(property="value", type="number")
      *         )
      *     ),

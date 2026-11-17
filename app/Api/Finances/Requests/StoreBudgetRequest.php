@@ -11,6 +11,7 @@ class StoreBudgetRequest extends FormRequest
         return [
             'title' => 'required|string|max:255',
             'type' => 'required|string|in:income,expense',
+            'interval' => 'sometimes|string|in:monthly,quarterly,yearly',
             'value' => 'required|numeric',
         ];
     }

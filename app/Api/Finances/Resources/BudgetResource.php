@@ -13,6 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="type", type="string", enum={"income","expense"}),
+ *     @OA\Property(property="interval", type="string", enum={"monthly","quarterly","yearly"}, description="Interval the amounts refer to: value and every history value are amounts per interval. Changing the interval reinterprets the whole history."),
  *     @OA\Property(property="value", type="number", description="Current value: the value of the history entry with the latest date"),
  *     @OA\Property(property="values", type="array", @OA\Items(ref="#/components/schemas/BudgetValue"), description="Value history ordered by date, only when loaded"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
@@ -29,6 +30,7 @@ class BudgetResource extends JsonResource
             'id' => $this->id,
             'title' => $this->title,
             'type' => $this->type,
+            'interval' => $this->interval,
             'value' => $this->value,
             'values' => $this->whenLoaded('values', fn () => BudgetValueResource::collection($this->values->sortBy('date')->values())
             ),

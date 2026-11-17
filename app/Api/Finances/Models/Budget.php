@@ -25,8 +25,13 @@ class Budget extends Model
     protected $fillable = [
         'title',
         'type',
+        'interval',
         'value',
         'user_id',
+    ];
+
+    protected $attributes = [
+        'interval' => 'monthly',
     ];
 
     protected $casts = [

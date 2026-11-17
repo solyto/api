@@ -65,6 +65,90 @@ describe('Budget CRUD', function () {
     });
 });
 
+describe('Budget interval', function () {
+    it('defaults the interval to monthly when none is given', function () {
+        $user = makeUser();
+
+        $budgetId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/finances/budget', ['title' => 'Rent', 'type' => 'expense', 'value' => 800])
+            ->assertStatus(201)
+            ->assertJsonPath('data.interval', 'monthly')
+            ->json('data.id');
+
+        expect(Budget::find($budgetId)->interval)->toBe('monthly');
+    });
+
+    it('stores a quarterly or yearly interval', function (string $interval) {
+        $user = makeUser();
+
+        $budgetId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/finances/budget', [
+                'title' => 'Insurance',
+                'type' => 'expense',
+                'interval' => $interval,
+                'value' => 300,
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.interval', $interval)
+            ->json('data.id');
+
+        expect(Budget::find($budgetId)->interval)->toBe($interval);
+    })->with(['quarterly', 'yearly']);
+
+    it('updates the interval without touching the value', function () {
+        $user = makeUser();
+        $budget = Budget::factory()->forUser($user)->withValue(1200)->create();
+        BudgetValue::factory()->forBudget($budget)->withValue(1200)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['interval' => 'yearly'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.interval', 'yearly');
+
+        $budget->refresh();
+        expect($budget->interval)->toBe('yearly');
+        expect($budget->value)->toBe(1200.0);
+        expect(BudgetValue::where('budget_id', $budget->id)->count())->toBe(1);
+    });
+
+    it('rejects an unknown interval', function () {
+        $user = makeUser();
+        $budget = Budget::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/finances/budget', [
+                'title' => 'Groceries',
+                'type' => 'expense',
+                'interval' => 'weekly',
+                'value' => 50,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['interval']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['interval' => 'weekly'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['interval']);
+
+        expect($budget->fresh()->interval)->toBe('monthly');
+    });
+
+    it('includes the interval when listing and showing budgets', function () {
+        $user = makeUser();
+        $budget = Budget::factory()->forUser($user)->create(['interval' => 'quarterly']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.interval', 'quarterly');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget/'.$budget->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.interval', 'quarterly');
+    });
+});
+
 describe('Wealth fields', function () {
     it('lists, stores, updates and deletes fields', function () {
         $user = makeUser();

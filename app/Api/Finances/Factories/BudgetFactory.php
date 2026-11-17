@@ -16,6 +16,7 @@ class BudgetFactory extends Factory
         return [
             'title' => $this->faker->randomElement(['Monthly Groceries', 'Entertainment', 'Savings', 'Transport']),
             'type' => $this->faker->randomElement(['income', 'expense']),
+            'interval' => 'monthly',
             'value' => $this->faker->randomFloat(2, 10, 5000),
             'user_id' => User::factory(),
         ];

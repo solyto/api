@@ -11,6 +11,7 @@ class UpdateBudgetRequest extends FormRequest
         return [
             'title' => 'sometimes|string|max:255',
             'type' => 'sometimes|string|in:income,expense',
+            'interval' => 'sometimes|string|in:monthly,quarterly,yearly',
             'value' => 'sometimes|numeric',
         ];
     }
