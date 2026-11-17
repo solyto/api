@@ -83,7 +83,7 @@ class TimeTrackingEntryFactory extends Factory
     public function short(): static
     {
         return $this->state(fn (array $attributes) => [
-            'duration_minutes' => $this->faker->numberBetween(15, 60),
+            'duration_minutes' => $this->faker->numberBetween(15, 59),
         ]);
     }
 
