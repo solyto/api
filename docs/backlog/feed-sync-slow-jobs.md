@@ -69,6 +69,10 @@ not attributed to a specific feed.
 4. **Measure first.** Log the duration and number of og:image lookups per
    `SyncFeed` run (`queue` log channel), to confirm the cause and find the
    feeds behind the slow runs before changing anything.
+   A custom Pulse recorder per feed would show the same in the dashboard
+   (option B in `monitoring-improvements.md`). Grouping Pulse's slow outgoing
+   requests by host was considered and rejected: it loses the exact feed URL
+   and still misses lookups under 1 s.
 
 The options can be combined (e.g. 4 first, then 1 or 2; 3 independently).
 
