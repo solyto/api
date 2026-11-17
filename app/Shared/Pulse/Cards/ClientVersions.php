@@ -25,6 +25,7 @@ class ClientVersions extends MetricCard
                 ->where('last_used_at', '>=', now()->subDays(self::ACTIVE_DAYS))
                 ->selectRaw('name, client_version, count(*) as tokens')
                 ->groupBy('name', 'client_version')
+                ->toBase()
                 ->get()
                 ->map(fn ($row) => [
                     'key' => $this->platform($row->name).' · '.($row->client_version ?? 'unknown'),

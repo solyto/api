@@ -37,7 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
                   'webhooks/*',
               ]);
               $middleware->appendToGroup('api', RecordClientVersion::class);
-              $middleware->appendToGroup('api', RecordRateLimitedRequests::class);
+              // Global, not in the api group: the router sorts ThrottleRequests ahead of group middleware, which would then never see the 429.
+              $middleware->append(RecordRateLimitedRequests::class);
           })
           ->withCommands([
               __DIR__.'/../app/Api/Contacts/Commands',

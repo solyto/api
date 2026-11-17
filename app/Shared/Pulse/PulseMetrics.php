@@ -55,6 +55,27 @@ final class PulseMetrics
         'Windows' => 'Windows',
     ];
 
+    /**
+     * og:image page fetches in this process so far (FeedReader counts them).
+     * FeedService records the difference per sync, so a long-running queue
+     * worker doesn't need a reset.
+     */
+    private static int $ogImageLookups = 0;
+
+    private static int $ogImageLookupMs = 0;
+
+    public static function countOgImageLookup(int $ms): void
+    {
+        self::$ogImageLookups++;
+        self::$ogImageLookupMs += $ms;
+    }
+
+    /** @return array{0: int, 1: int} og:image page fetches so far and their total duration in ms */
+    public static function ogImageLookupStats(): array
+    {
+        return [self::$ogImageLookups, self::$ogImageLookupMs];
+    }
+
     public static function startTimer(): int
     {
         return hrtime(true);

@@ -473,7 +473,7 @@ class FeedService
 
         // Measured per feed for the Pulse feed sync card; a sync that returns false or throws counts as failed.
         $startedAt = PulseMetrics::startTimer();
-        [$ogLookupsBefore, $ogLookupMsBefore] = $this->feedReader->ogImageLookupStats();
+        [$ogLookupsBefore, $ogLookupMsBefore] = PulseMetrics::ogImageLookupStats();
         $synced = false;
 
         try {
@@ -481,7 +481,7 @@ class FeedService
 
             return $synced;
         } finally {
-            [$ogLookups, $ogLookupMs] = $this->feedReader->ogImageLookupStats();
+            [$ogLookups, $ogLookupMs] = PulseMetrics::ogImageLookupStats();
             PulseMetrics::feedSync(
                 $feed->url,
                 PulseMetrics::elapsedMs($startedAt),

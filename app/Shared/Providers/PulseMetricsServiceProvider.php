@@ -63,7 +63,7 @@ class PulseMetricsServiceProvider extends ServiceProvider
                 $availableAt = $payload[PulseMetrics::PAYLOAD_AVAILABLE_AT] ?? $payload['createdAt'] ?? null;
 
                 if (is_int($availableAt)) {
-                    PulseMetrics::queueWait($event->job->getQueue() ?? 'default', $event->job->resolveName(), time() - $availableAt);
+                    PulseMetrics::queueWait($event->job->getQueue(), $event->job->resolveName(), time() - $availableAt);
                 }
             });
         });

@@ -19,7 +19,7 @@ abstract class MetricCard extends Card
      * which keys exist; the others fill in 0 when a key has no entries.
      *
      * @param  array<string, array{0: string, 1: 'count'|'min'|'max'|'sum'|'avg'}>  $columns  field => [type, aggregate]
-     * @return Collection<int, array<string, int|float|string>>
+     * @return Collection<int, non-empty-array<string, mixed>>  'key' plus one value per field
      */
     protected function merged(array $columns, string $orderBy): Collection
     {
@@ -29,20 +29,16 @@ abstract class MetricCard extends Card
                 ->mapWithKeys(fn ($row) => [$row->key => $row->{$aggregate}]);
         }
 
-        $primary = array_key_first($columns);
+        $rows = [];
+        foreach ($values[array_key_first($columns)]->keys() as $key) {
+            $row = ['key' => (string) $key];
+            foreach ($values as $field => $byKey) {
+                $row[$field] = $byKey->get($key, 0);
+            }
+            $rows[] = $row;
+        }
 
-        return $values[$primary]->keys()
-            ->map(function (string $key) use ($values) {
-                $row = ['key' => $key];
-                foreach ($values as $field => $byKey) {
-                    $row[$field] = $byKey->get($key) ?? 0;
-                }
-
-                return $row;
-            })
-            ->sortByDesc($orderBy)
-            ->values()
-            ->take(100);
+        return collect($rows)->sortByDesc($orderBy)->values()->take(100);
     }
 
     /**
