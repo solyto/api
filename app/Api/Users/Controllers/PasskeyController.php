@@ -26,8 +26,9 @@ class PasskeyController
     {
         try {
             $platform = AuthPlatformEnum::tryFrom($request->input('platform') ?? '') ?? AuthPlatformEnum::WEB;
+            // The service takes the WebAuthn credential itself (id, rawId, response.*), not the request body.
             $result = $this->passkeyService->authenticate(
-                $request->validated(),
+                $request->validated('response'),
                 $request->ip(),
                 $platform
             );
@@ -53,7 +54,7 @@ class PasskeyController
         try {
             $passkey = $this->passkeyService->register(
                 $request->user(),
-                $request->validated(),
+                $request->validated('response'),
                 $request->validated('name') ?? 'Passkey'
             );
         } catch (\RuntimeException $e) {

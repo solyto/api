@@ -9,8 +9,13 @@ class PasskeyRegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'response' => 'required|array',
-            'name'     => 'sometimes|string|max:50',
+            // The RegistrationResponseJSON from @simplewebauthn/browser.
+            'response'                            => 'required|array',
+            'response.response'                   => 'required|array',
+            'response.response.clientDataJSON'    => 'required|string',
+            'response.response.attestationObject' => 'required|string',
+            'response.response.transports'        => 'sometimes|nullable|array',
+            'name'                                => 'sometimes|string|max:50',
         ];
     }
 }

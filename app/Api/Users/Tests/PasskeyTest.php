@@ -320,9 +320,17 @@ describe('Passkey endpoints', function () {
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/auth/passkeys/register', [
                 'name' => 'API Passkey',
+                // The body the app sends: { response: RegistrationResponseJSON, name }.
                 'response' => [
-                    'clientDataJSON' => b64uEncode($clientDataJson),
-                    'attestationObject' => b64uEncode(attestationObject($authData)),
+                    'id' => b64uEncode($credentialId),
+                    'rawId' => b64uEncode($credentialId),
+                    'type' => 'public-key',
+                    'clientExtensionResults' => [],
+                    'response' => [
+                        'clientDataJSON' => b64uEncode($clientDataJson),
+                        'attestationObject' => b64uEncode(attestationObject($authData)),
+                        'transports' => ['internal'],
+                    ],
                 ],
             ])
             ->assertStatus(200)
@@ -377,5 +385,65 @@ describe('Passkey endpoints', function () {
         $this->actingAs($user, 'sanctum')
             ->deleteJson('/api/v1/auth/passkeys/'.$passkey->id)
             ->assertStatus(403);
+    });
+
+    it('rejects a registration without clientDataJSON with 422', function () {
+        $user = makeUser();
+        app(PasskeyService::class)->registrationOptions($user);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/auth/passkeys/register', [
+                'response' => ['id' => 'x', 'response' => ['attestationObject' => 'e30']],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['response.response.clientDataJSON']);
+    });
+
+    it('signs in with a passkey through the API', function () {
+        $user = makeUser();
+        $rpId = config('webauthn.relying_party_id');
+
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        $details = openssl_pkey_get_details($key);
+        $credentialId = random_bytes(16);
+
+        Passkey::create([
+            'user_id' => $user->id,
+            'credential_id' => base64_encode($credentialId),
+            'public_key' => base64_encode(coseEc2PublicKey($details['ec']['x'], $details['ec']['y'])),
+            'sign_count' => 0,
+            'name' => 'Test Passkey',
+        ]);
+
+        $options = app(PasskeyService::class)->authenticationOptions('127.0.0.1');
+        $clientDataJson = json_encode(clientData('webauthn.get', $options['challenge'], config('webauthn.origin')));
+        $authData = hash('sha256', $rpId, true)."\x01".pack('N', 1);
+        openssl_sign($authData.hash('sha256', $clientDataJson, true), $signature, $key, OPENSSL_ALGO_SHA256);
+
+        // The body the app sends: { response: AuthenticationResponseJSON, platform }.
+        $this->postJson('/api/v1/auth/passkey/authenticate', [
+            'platform' => 'web',
+            'response' => [
+                'id' => b64uEncode($credentialId),
+                'rawId' => b64uEncode($credentialId),
+                'type' => 'public-key',
+                'clientExtensionResults' => [],
+                'response' => [
+                    'clientDataJSON' => b64uEncode($clientDataJson),
+                    'authenticatorData' => b64uEncode($authData),
+                    'signature' => b64uEncode($signature),
+                ],
+            ],
+        ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.user.id', $user->id);
+    });
+
+    it('rejects a passkey sign-in without signature with 422', function () {
+        $this->postJson('/api/v1/auth/passkey/authenticate', [
+            'response' => ['id' => 'x', 'response' => ['clientDataJSON' => 'e30', 'authenticatorData' => 'e30']],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['response.response.signature']);
     });
 });

@@ -67,7 +67,7 @@ class PasskeyService
         }
 
         $decodedStored   = base64_decode(strtr($storedChallenge, '-_', '+/'));
-        $decodedReceived = base64_decode(strtr($clientData['challenge'], '-_', '+/'));
+        $decodedReceived = base64_decode(strtr($clientData['challenge'] ?? '', '-_', '+/'));
         if (!hash_equals($decodedStored, $decodedReceived)) {
             throw new \RuntimeException('Challenge mismatch.');
         }
@@ -154,7 +154,7 @@ class PasskeyService
         }
 
         $decodedStored   = base64_decode(strtr($storedChallenge, '-_', '+/'));
-        $decodedReceived = base64_decode(strtr($clientData['challenge'], '-_', '+/'));
+        $decodedReceived = base64_decode(strtr($clientData['challenge'] ?? '', '-_', '+/'));
         if (!hash_equals($decodedStored, $decodedReceived)) {
             throw new \RuntimeException('Challenge mismatch.');
         }
