@@ -144,6 +144,7 @@ return [
             'sample_rate' => env('PULSE_CACHE_INTERACTIONS_SAMPLE_RATE', 1),
             'ignore' => [
                 ...Pulse::defaultVendorCacheKeys(),
+                '/^[0-9a-f]{32}(:timer)?$/', // Rate limiter counters (ThrottleRequests hashes limiter + key with md5)...
             ],
             'groups' => [
                 '/^job-exceptions:.*/' => 'job-exceptions:*',
@@ -219,7 +220,8 @@ return [
         ],
 
         Recorders\UserJobs::class => [
-            'enabled' => env('PULSE_USER_JOBS_ENABLED', true),
+            // Off: the Usage card ranks users by name, which we don't want to track.
+            'enabled' => env('PULSE_USER_JOBS_ENABLED', false),
             'sample_rate' => env('PULSE_USER_JOBS_SAMPLE_RATE', 1),
             'ignore' => [
                 // '/^Package\\\\Jobs\\\\/',
@@ -227,7 +229,8 @@ return [
         ],
 
         Recorders\UserRequests::class => [
-            'enabled' => env('PULSE_USER_REQUESTS_ENABLED', true),
+            // Off: see UserJobs.
+            'enabled' => env('PULSE_USER_REQUESTS_ENABLED', false),
             'sample_rate' => env('PULSE_USER_REQUESTS_SAMPLE_RATE', 1),
             'ignore' => [
                 '#^/'.env('PULSE_PATH', 'pulse').'$#', // Pulse dashboard...

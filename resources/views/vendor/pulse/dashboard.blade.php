@@ -1,11 +1,9 @@
 <x-pulse>
     <livewire:pulse.servers cols="full" />
 
-    <livewire:pulse.usage cols="4" rows="2" />
+    <livewire:pulse.queues cols="6" />
 
-    <livewire:pulse.queues cols="4" />
-
-    <livewire:pulse.cache cols="4" />
+    <livewire:pulse.cache cols="6" />
 
     <livewire:pulse.slow-queries cols="8" />
 
