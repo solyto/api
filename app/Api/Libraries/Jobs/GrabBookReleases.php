@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Jobs;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\Libraries\Notifications\BookReleaseNotification;
 use App\Api\Libraries\Services\LibraryReleases;
 use App\Api\Users\Models\User;
@@ -37,7 +38,7 @@ class GrabBookReleases implements ShouldQueue
         $users = User::all();
 
         foreach ($users as $user) {
-            $releases = $libraryReleases->getBookReleases($user);
+            $releases = PulseMetrics::timedReleaseLookup('books', 'job', fn () => $libraryReleases->getBookReleases($user));
             $cache->store([self::CACHE_KEY_RELEASES, $user->id], self::CACHE_TTL_RELEASES, $releases);
 
             $notified = $notifiedCache->get([self::CACHE_KEY_NOTIFIED, $user->id]) ?? [];

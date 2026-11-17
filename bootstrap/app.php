@@ -8,6 +8,7 @@ use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Shared\Middleware\RecordClientVersion;
+use App\Shared\Middleware\RecordRateLimitedRequests;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
                   'webhooks/*',
               ]);
               $middleware->appendToGroup('api', RecordClientVersion::class);
+              $middleware->appendToGroup('api', RecordRateLimitedRequests::class);
           })
           ->withCommands([
               __DIR__.'/../app/Api/Contacts/Commands',

@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\Libraries\DTOs\MusicReleaseDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
@@ -143,7 +144,7 @@ class LibraryMusicService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            fn () => $this->libraryReleases->getMusicReleases($user)
+            fn () => PulseMetrics::timedReleaseLookup('music', 'request', fn () => $this->libraryReleases->getMusicReleases($user))
         );
     }
 

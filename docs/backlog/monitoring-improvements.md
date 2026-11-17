@@ -64,7 +64,21 @@ detail):
   ingest (`PULSE_INGEST_DRIVER=redis` plus a `php artisan pulse:work`
   process).
 
-### B. Custom Pulse recorders and cards (small, closes the concrete gaps)
+### B. Custom Pulse recorders and cards (done, 2026-11-17)
+
+Built in `App\Shared\Pulse`: `PulseMetrics` records, `Cards\*` display,
+`PulseMetricsServiceProvider` wires the listeners. Cards: feed sync per feed
+(with og:image lookups), external calendars per host, DAV requests per method
+and client, notifications per channel, client versions (from the tokens, plus
+426 count), rate limits (429 per limiter and route), release lookups, and
+queue load (queue length per minute from the scheduler, wait time per job).
+The dashboard is grouped into sections (`components/pulse-section.blade.php`).
+Production ingests through Redis (`PULSE_INGEST_DRIVER=redis` in the `.env`,
+`pulse` service running `pulse:work` in `deployment`); local stays on direct
+database writes. Tests for the recorders and cards are still to do.
+
+Original notes:
+
 
 `Pulse::record($type, $key, $value)->max()->count()` plus a small Blade card:
 
@@ -143,8 +157,8 @@ that needs its own resources.
 
 ## Decisions
 
-- A: decided and done (see above).
-- B–F: undecided. The leaning from the discussion: **B next** (small, no data
+- A and B: done (see above).
+- C–F: undecided. The leaning from the discussion was **B first** (small, no data
   leaves the server, closes today's blind spots), **D (OpenTelemetry →
   SigNoz)** if traces are needed later, **C** only temporarily for a specific
   debugging session. **F** conflicts with the privacy focus and self-hosting.

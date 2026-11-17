@@ -2,6 +2,7 @@
 
 namespace App\Dav\Services;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Dav\Exceptions\ExternalCalendarCredentialsRejectedException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
@@ -363,6 +364,37 @@ class RemoteCalDavClient
      * @param  array<string, string>  $headers
      */
     private function request(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
+    {
+        // Measured per remote host for the Pulse external calendars card.
+        $startedAt = PulseMetrics::startTimer();
+        $failure = null;
+
+        try {
+            $response = $this->sendUnmeasured($credentials, $method, $url, $headers, $body, $timeout, $maxBytes);
+
+            if ($response->status() >= 400) {
+                $failure = 'http '.$response->status();
+            }
+
+            return $response;
+        } catch (ExternalCalendarUnavailableException $e) {
+            $failure = match (true) {
+                $e instanceof ExternalCalendarCredentialsRejectedException => 'login rejected',
+                $e->remoteStatus === null => 'unreachable',
+                default => 'http '.$e->remoteStatus,
+            };
+
+            throw $e;
+        } finally {
+            PulseMetrics::externalCalendarCall($url, PulseMetrics::elapsedMs($startedAt), $failure);
+        }
+    }
+
+    /**
+     * @param  array{0: string, 1: string}|null  $credentials  null sends no Authorization header
+     * @param  array<string, string>  $headers
+     */
+    private function sendUnmeasured(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
     {
         try {
             $pin = $this->guard->check($url);

@@ -2,6 +2,7 @@
 
 namespace App\Api\Libraries\Services;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
@@ -140,7 +141,7 @@ class LibraryBookService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            fn () => $this->libraryReleases->getBookReleases($user)
+            fn () => PulseMetrics::timedReleaseLookup('books', 'request', fn () => $this->libraryReleases->getBookReleases($user))
         );
     }
 

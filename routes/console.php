@@ -45,3 +45,13 @@ Schedule::command(\App\Api\Users\Commands\SendDailyCheckInRemindersCommand::clas
  * Export
  */
 Schedule::job(\App\Api\Export\Jobs\DeleteExpiredExports::class)->dailyAt(3);
+
+/*
+ * Pulse: queue length for the Queue Load card (App\Shared\Pulse)
+ */
+Schedule::call(function () {
+    $connection = config('queue.default');
+    $queue = config("queue.connections.{$connection}.queue", 'default');
+
+    \App\Shared\Pulse\PulseMetrics::queueSize($queue, \Illuminate\Support\Facades\Queue::connection($connection)->size($queue));
+})->everyMinute()->name('pulse-queue-size')->withoutOverlapping();

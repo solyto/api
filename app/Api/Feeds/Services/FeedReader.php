@@ -2,6 +2,7 @@
 
 namespace App\Api\Feeds\Services;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\OutboundUrlGuard;
 use GuzzleHttp\Exception\TransferException;
@@ -39,7 +40,20 @@ class FeedReader
     private const int FETCH_TIMEOUT = 10;
     private const int OG_IMAGE_TIMEOUT = 5;
 
+    // og:image page fetches done by this instance, read by FeedService for Pulse.
+    private int $ogImageLookups = 0;
+
+    private int $ogImageLookupMs = 0;
+
     public function __construct(private readonly OutboundUrlGuard $guard) {}
+
+    /**
+     * @return array{0: int, 1: int} og:image page fetches so far and their total duration in ms
+     */
+    public function ogImageLookupStats(): array
+    {
+        return [$this->ogImageLookups, $this->ogImageLookupMs];
+    }
 
     /**
      * @throws BlockedUrlException when the feed URL itself points at a non-public address
@@ -422,6 +436,9 @@ class FeedReader
             return null;
         }
 
+        $startedAt = PulseMetrics::startTimer();
+        $this->ogImageLookups++;
+
         try {
             $response = $this->fetchMany([$url], self::OG_IMAGE_TIMEOUT, [
                 'User-Agent' => 'Mozilla/5.0 (compatible; FeedBot/1.0)',
@@ -442,6 +459,8 @@ class FeedReader
             }
         } catch (\Throwable) {
             return null;
+        } finally {
+            $this->ogImageLookupMs += PulseMetrics::elapsedMs($startedAt);
         }
 
         return null;

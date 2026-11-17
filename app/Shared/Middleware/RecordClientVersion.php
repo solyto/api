@@ -2,6 +2,7 @@
 
 namespace App\Shared\Middleware;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\ApiResponse;
 use App\Shared\Helpers\ClientVersionHelper;
 use Closure;
@@ -16,6 +17,8 @@ class RecordClientVersion
     public function handle(Request $request, Closure $next): Response
     {
         if ($this->isBelowMinimum($request)) {
+            PulseMetrics::clientRejected(ClientVersionHelper::fromRequest($request));
+
             return ApiResponse::error('Please update the app.', 426, meta: ['min_client_version' => config('app.min_client_version')]);
         }
 

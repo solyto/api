@@ -2,6 +2,7 @@
 
 namespace App\Api\Feeds\Services;
 
+use App\Shared\Pulse\PulseMetrics;
 use App\Api\Feeds\Exceptions\FeedException;
 use App\Api\Feeds\Exceptions\FeedSubscriptionLimitException;
 use App\Api\Feeds\Jobs\SyncFeed;
@@ -470,6 +471,29 @@ class FeedService
             return false;
         }
 
+        // Measured per feed for the Pulse feed sync card; a sync that returns false or throws counts as failed.
+        $startedAt = PulseMetrics::startTimer();
+        [$ogLookupsBefore, $ogLookupMsBefore] = $this->feedReader->ogImageLookupStats();
+        $synced = false;
+
+        try {
+            $synced = $this->syncFoundFeed($feed, $feedId, $backfillImages);
+
+            return $synced;
+        } finally {
+            [$ogLookups, $ogLookupMs] = $this->feedReader->ogImageLookupStats();
+            PulseMetrics::feedSync(
+                $feed->url,
+                PulseMetrics::elapsedMs($startedAt),
+                $ogLookups - $ogLookupsBefore,
+                $ogLookupMs - $ogLookupMsBefore,
+                !$synced,
+            );
+        }
+    }
+
+    private function syncFoundFeed(Feed $feed, string $feedId, bool $backfillImages): bool
+    {
         try {
             $items = $this->getFeedItemsFromRss($feed->url);
         } catch (UnresolvableHostException) {
