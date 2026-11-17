@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 class ContactImport
 {
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
-    private const string CACHE_KEY_CONTACTS = 'contacts';
+    private const string CACHE_KEY_CONTACTS = 'contacts_v2';
 
     private AddressBooks $addressBooks;
     private VCardHelper $helper;

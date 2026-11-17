@@ -30,7 +30,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="state", type="string", nullable=true),
  *     @OA\Property(property="postal_code", type="string", nullable=true),
  *     @OA\Property(property="country", type="string", nullable=true),
- *     @OA\Property(property="etag", type="string")
+ *     @OA\Property(property="etag", type="string"),
+ *     @OA\Property(property="has_photo", type="boolean")
  * )
  *
  * @mixin ContactDTO
@@ -61,6 +62,7 @@ class ContactResource extends JsonResource
             'postal_code' => $this->postalCode,
             'country' => $this->country,
             'etag' => $this->etag,
+            'has_photo' => $this->hasPhoto,
         ];
     }
 

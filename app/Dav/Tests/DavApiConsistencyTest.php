@@ -677,7 +677,7 @@ describe('CacheInvalidationPlugin', function () {
     it('drops the cached contacts and queues nothing on a DAV card write', function () {
         davRequest($this->user, 'PUT', $this->addressBook.'a.vcf', davVcard('a'), ['Content-Type' => 'text/vcard']);
 
-        $this->cache->shouldHaveReceived('forget')->with(['contacts', $this->user->id, $this->addressBookId])->once();
+        $this->cache->shouldHaveReceived('forget')->with(['contacts_v2', $this->user->id, $this->addressBookId])->once();
         Queue::assertNothingPushed();
     });
 

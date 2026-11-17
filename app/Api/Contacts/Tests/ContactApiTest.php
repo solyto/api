@@ -85,6 +85,57 @@ describe('Address books (DAV-backed)', function () {
 });
 
 describe('Contact photos', function () {
+    it('flags contacts with a photo in the list and still serves the photo', function () {
+        $user = makeUser();
+
+        $addressBookId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Family'])
+            ->json('data.id');
+
+        $createContact = fn (string $firstName) => $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
+                'address_book_id' => $addressBookId,
+                'first_name' => $firstName,
+                'last_name' => 'Roe',
+            ])
+            ->json('data.uri');
+        $withPhoto = $createContact('Jane');
+        $withoutPhoto = $createContact('John');
+
+        $listHasPhoto = fn () => collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/address-books/contacts')
+            ->assertStatus(200)
+            ->json('data'))->pluck('has_photo', 'uri')->all();
+
+        expect($listHasPhoto())->toBe([$withPhoto => false, $withoutPhoto => false]);
+
+        $this->actingAs($user, 'sanctum')
+            ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$withPhoto.'/photo', [
+                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+            ])
+            ->assertStatus(200);
+
+        expect($listHasPhoto())->toBe([$withPhoto => true, $withoutPhoto => false]);
+
+        $photos = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books/contacts/photos', [
+                'contacts' => [
+                    ['address_book_id' => $addressBookId, 'uri' => $withPhoto],
+                    ['address_book_id' => $addressBookId, 'uri' => $withoutPhoto],
+                ],
+            ])
+            ->assertStatus(200)
+            ->json('data');
+        expect(array_keys($photos))->toBe([$withPhoto])
+            ->and($photos[$withPhoto])->not->toBeEmpty();
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$withPhoto.'/photo')
+            ->assertStatus(200);
+
+        expect($listHasPhoto())->toBe([$withPhoto => false, $withoutPhoto => false]);
+    });
+
     it('adds and removes a contact photo', function () {
         $user = makeUser();
 

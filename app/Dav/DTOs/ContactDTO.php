@@ -9,6 +9,10 @@ use Illuminate\Support\Str;
 
 class ContactDTO
 {
+    // A whole PHOTO property (plain, grouped, any case) with its folded lines,
+    // on LF-normalized input. Possessive so a 200 KB photo does not backtrack.
+    private const string PHOTO_PROPERTY_PATTERN = '/^(?:[A-Za-z0-9-]+\\.)?PHOTO[;:][^\\n]*+(?:\\n[ \\t][^\\n]*+)*+\\n?/mi';
+
     public function __construct(
         public ?string $uid,
         public string $firstName,
@@ -32,6 +36,7 @@ class ContactDTO
         public ?string $etag,
         public ?int    $addressBookId,
         public ?string $addressBookColor = null,
+        public bool    $hasPhoto = false,
     ) {}
 
     public static function fromSabre(array $row, AddressBookDTO $addressBook, bool $includePhoto = true): self
@@ -65,7 +70,8 @@ class ContactDTO
             uri: $row['uri'] ?? null,
             etag: $row['etag'] ?? null,
             addressBookId: $addressBook->id,
-            addressBookColor: $addressBook->color
+            addressBookColor: $addressBook->color,
+            hasPhoto: $parsed['has_photo'],
         );
     }
 
@@ -275,11 +281,24 @@ class ContactDTO
 
     public static function parseVCard(string $vcard, bool $includePhoto = true): array
     {
+        $vcard = str_replace(["\r\n", "\r"], "\n", $vcard);
+        $hasPhoto = false;
+
+        // The list never shows photos, and they are most of a card's bytes:
+        // drop them in one pass instead of walking thousands of folded lines.
+        if (!$includePhoto) {
+            $stripped = preg_replace(self::PHOTO_PROPERTY_PATTERN, '', $vcard, -1, $count);
+            if ($stripped !== null) {
+                $vcard = $stripped;
+                $hasPhoto = $count > 0;
+            }
+        }
+
         // Unfold continuation lines (RFC 6350 3.2). PHOTO keeps its folded
         // lines, which the photo handling below collects as they are.
         $lines = [];
         $photoOpen = false;
-        foreach (explode("\n", str_replace(["\r\n","\r"], "\n", $vcard)) as $rawLine) {
+        foreach (explode("\n", $vcard) as $rawLine) {
             $isContinuation = $lines !== [] && (str_starts_with($rawLine, ' ') || str_starts_with($rawLine, "\t"));
 
             if ($isContinuation && !$photoOpen) {
@@ -333,6 +352,7 @@ class ContactDTO
 
             if (str_starts_with($line, 'PHOTO')) {
                 $isPhoto = true;
+                $hasPhoto = true;
                 if ($includePhoto) {
                     $photoLines[] = $line;
                 }
@@ -402,9 +422,11 @@ class ContactDTO
         }
 
         // Catch photo if it's the last field
-        if ($isPhoto) {
+        if ($isPhoto && $includePhoto) {
             $result['photo'] = implode("\r\n", $photoLines);
         }
+
+        $result['has_photo'] = $hasPhoto;
 
         $result['phone'] = !empty($result['phone']) ? json_encode($result['phone']) : null;
         $result['email'] = !empty($result['email']) ? json_encode($result['email']) : null;

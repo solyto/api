@@ -15,7 +15,7 @@ class CacheInvalidationPlugin extends ServerPlugin
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
     private const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
-    private const string CACHE_KEY_CONTACTS = 'contacts';
+    private const string CACHE_KEY_CONTACTS = 'contacts_v2';
 
     /**
      * Sharees of an owner's calendar that is about to be deleted, keyed by

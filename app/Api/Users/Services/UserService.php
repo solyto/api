@@ -54,7 +54,7 @@ class UserService
      * by prefix, one key per resource the user owned.
      */
     private const array USER_CACHE_PREFIX_KEYS = [
-        'calendar_events', 'contacts', 'event_attachment_notes', 'event_attachment_todos',
+        'calendar_events', 'contacts_v2', 'event_attachment_notes', 'event_attachment_todos',
     ];
 
     private const string DELETION_BROKER = 'account_deletions';

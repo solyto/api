@@ -16,7 +16,8 @@ use Illuminate\Http\UploadedFile;
 class ContactService
 {
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
-    private const string CACHE_KEY_CONTACTS = 'contacts';
+    // Versioned: cached ContactDTOs from before hasPhoto would unserialize without it.
+    private const string CACHE_KEY_CONTACTS = 'contacts_v2';
     private const int CACHE_TTL = 86400;
     public const int PHOTO_MAX_BYTES = 200 * 1024;
 

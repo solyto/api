@@ -375,7 +375,7 @@ describe('Client contract', function () {
             ->assertJsonStructure(['data' => [[
                 'uid', 'uri', 'full_name', 'first_name', 'last_name', 'middle_name', 'prefix',
                 'suffix', 'groups', 'organization', 'note', 'street', 'city', 'state',
-                'postal_code', 'country', 'etag', 'address_book_id', 'address_book_color',
+                'postal_code', 'country', 'etag', 'address_book_id', 'address_book_color', 'has_photo',
                 'email' => [['value', 'type']],
                 'phone' => [['value', 'type']],
             ]]]);
