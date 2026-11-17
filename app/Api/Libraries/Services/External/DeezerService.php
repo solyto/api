@@ -7,6 +7,8 @@ use App\Api\Libraries\DTOs\MusicSearchResultDTO;
 use App\Api\Libraries\Enums\MusicServiceEnum;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class DeezerService
@@ -15,6 +17,7 @@ class DeezerService
     private const string SEARCH_ALBUM_URL = 'https://api.deezer.com/search/album?q=%s';
     private const string GET_ALBUMS_URL = 'https://api.deezer.com/artist/%d/albums';
     private const string GET_ALBUM_URL = 'https://api.deezer.com/album/%d';
+    private const int POOL_SIZE = 5;
 
     public function importFromUrl(string $url): ?MusicReleaseDTO
     {
@@ -42,16 +45,19 @@ class DeezerService
     public function searchArtists(string $artist): ?array
     {
         try {
-            $response = Http::get(sprintf(self::SEARCH_ARTIST_URL, $artist));
-
-            if (!$response->successful()) {
-                return null;
-            }
-
-            return $response->json()['data'] ?? null;
+            return $this->parseData(Http::get(sprintf(self::SEARCH_ARTIST_URL, $artist)));
         } catch (ConnectionException $e) {
             return null;
         }
+    }
+
+    /**
+     * @param  array<array-key, string>  $artists
+     * @return array<array-key, ?array>
+     */
+    public function searchManyArtists(array $artists): array
+    {
+        return $this->getManyData(array_map(fn(string $artist) => sprintf(self::SEARCH_ARTIST_URL, $artist), $artists));
     }
 
     public function searchAlbum(string $query): ?array
@@ -85,8 +91,35 @@ class DeezerService
 
     public function getNewReleases(int $artistId): ?array
     {
-        $albums = $this->getAlbums($artistId);
+        return $this->filterNewReleases($this->getAlbums($artistId));
+    }
 
+    /**
+     * @param  array<array-key, int>  $artistIds
+     * @return array<int, ?array>
+     */
+    public function getNewReleasesForArtists(array $artistIds): array
+    {
+        $urls = [];
+
+        foreach (array_unique($artistIds) as $artistId) {
+            $urls[$artistId] = sprintf(self::GET_ALBUMS_URL, $artistId);
+        }
+
+        return array_map(fn(?array $albums) => $this->filterNewReleases($albums), $this->getManyData($urls));
+    }
+
+    public function getAlbums(int $artistId): ?array
+    {
+        try {
+            return $this->parseData(Http::get(sprintf(self::GET_ALBUMS_URL, $artistId)));
+        } catch (ConnectionException $e) {
+            return null;
+        }
+    }
+
+    private function filterNewReleases(?array $albums): ?array
+    {
         if (!$albums) {
             return null;
         }
@@ -105,19 +138,35 @@ class DeezerService
         return $newAlbums;
     }
 
-    public function getAlbums(int $artistId): ?array
+    /**
+     * @param  array<array-key, string>  $urls
+     * @return array<array-key, ?array>
+     */
+    private function getManyData(array $urls): array
     {
-        try {
-            $response = Http::get(sprintf(self::GET_ALBUMS_URL, $artistId));
-
-            if (!$response->successful()) {
-                return null;
+        $responses = Http::pool(function (Pool $pool) use ($urls) {
+            foreach ($urls as $key => $url) {
+                $pool->as((string) $key)->get($url);
             }
+        }, self::POOL_SIZE);
 
-            return $response->json()['data'] ?? null;
-        } catch (ConnectionException $e) {
+        $data = [];
+
+        foreach ($urls as $key => $url) {
+            $response = $responses[$key] ?? null;
+            $data[$key] = $response instanceof Response ? $this->parseData($response) : null;
+        }
+
+        return $data;
+    }
+
+    private function parseData(Response $response): ?array
+    {
+        if (!$response->successful()) {
             return null;
         }
+
+        return $response->json()['data'] ?? null;
     }
 
     private function getAlbum(int $albumId): ?array

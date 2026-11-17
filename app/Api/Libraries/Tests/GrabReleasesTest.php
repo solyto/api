@@ -22,14 +22,14 @@ describe('GrabMusicReleases', function () {
         LibraryMusic::factory()->forUser($this->user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
         $deezer = $this->mock(DeezerService::class);
-        $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
-        $deezer->shouldReceive('getNewReleases')->with(6)->andReturn([[
+        $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
             'id' => 10,
             'title' => 'Fresh Album',
             'link' => 'https://deezer.com/album/10',
             'cover_big' => 'https://cover.example/10.jpg',
             'release_date' => now()->toDateString(),
-        ]]);
+        ]]]);
     });
 
     it('notifies a new release and remembers it in the long-term cache', function () {
@@ -72,14 +72,14 @@ describe('GrabMusicReleases', function () {
         // MusicReleaseDTO::id to int|string). The job's strict in_array dedup
         // must store and compare it as a string.
         $deezer = $this->mock(DeezerService::class);
-        $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
-        $deezer->shouldReceive('getNewReleases')->with(6)->andReturn([[
+        $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
             'id' => '4aawyAB9vmqN3uQ7FjRGTy',
             'title' => 'Fresh Album',
             'link' => 'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy',
             'cover_big' => null,
             'release_date' => now()->toDateString(),
-        ]]);
+        ]]]);
 
         app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
 
@@ -104,7 +104,7 @@ describe('GrabBookReleases', function () {
         LibraryBook::factory()->forUser($this->user)->create(['rating' => 5, 'author' => 'Frank Herbert']);
 
         $hardcover = $this->mock(HardcoverService::class);
-        $hardcover->shouldReceive('getNewReleases')->with('Frank Herbert')->andReturn([[
+        $hardcover->shouldReceive('getNewReleasesForAuthors')->with(['Frank Herbert'])->andReturn([[[
             'id' => 20,
             'slug' => 'children-of-dune',
             'title' => 'Children of Dune',
@@ -113,7 +113,7 @@ describe('GrabBookReleases', function () {
             'pages' => 444,
             'image' => ['url' => 'https://cover.example/cod.jpg'],
             'contributions' => [['author' => ['id' => 1, 'name' => 'Frank Herbert']]],
-        ]]);
+        ]]]);
     });
 
     it('notifies a new release and remembers it in the long-term cache', function () {

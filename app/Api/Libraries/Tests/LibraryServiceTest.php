@@ -3,9 +3,11 @@
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMusic;
+use App\Api\Libraries\Services\LibraryBookService;
 use App\Api\Libraries\Services\LibraryRecommender;
 use App\Api\Libraries\Services\LibraryReleases;
 use App\Plugins\Ai\Services\AiService;
+use Illuminate\Support\Facades\Cache;
 
 describe('LibraryRecommender', function () {
     it('throws for types without a recommender', function () {
@@ -103,14 +105,14 @@ describe('LibraryReleases', function () {
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
         $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
-        $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
-        $deezer->shouldReceive('getNewReleases')->with(6)->andReturn([[
+        $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
             'id' => 1,
             'title' => 'New Album',
             'link' => 'https://deezer.com/album/1',
             'cover_big' => 'https://cover.example/1.jpg',
             'release_date' => now()->toDateString(),
-        ]]);
+        ]]]);
 
         $service = app(LibraryReleases::class);
 
@@ -126,12 +128,44 @@ describe('LibraryReleases', function () {
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
         $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
-        $deezer->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => 6]]);
-        $deezer->shouldReceive('getNewReleases')->with(6)->andReturn(null);
+        $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => null]);
 
         $service = app(LibraryReleases::class);
 
         expect($service->getMusicReleases($user))->toBe([]);
+    });
+
+    it('gives every artist its releases when two artists resolve to the same deezer id', function () {
+        $user = makeUser();
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead, Thom Yorke']);
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Thom Yorke']);
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 4, 'artist' => 'Radiohead']);
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Nobody']);
+        LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Portishead']);
+
+        $album = fn (int $id, string $releaseDate) => [
+            'id' => $id,
+            'title' => 'Album '.$id,
+            'link' => 'https://deezer.com/album/'.$id,
+            'cover_big' => null,
+            'release_date' => $releaseDate,
+        ];
+
+        $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
+        $deezer->shouldReceive('searchManyArtists')
+            ->once()
+            ->with(['Radiohead', 'Thom Yorke', 'Nobody', 'Portishead'])
+            ->andReturn([[['id' => 6]], [['id' => 6]], [], [['id' => 7]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')
+            ->once()
+            ->with([0 => 6, 1 => 6, 3 => 7])
+            ->andReturn([6 => [$album(1, now()->subDays(3)->toDateString())], 7 => [$album(2, now()->toDateString())]]);
+
+        $releases = app(LibraryReleases::class)->getMusicReleases($user);
+
+        expect(array_map(fn ($release) => [$release->getId(), $release->getArtist(), $release->getArtistId()], $releases))
+            ->toBe([[2, 'Portishead', 7], [1, 'Radiohead', 6], [1, 'Thom Yorke', 6]]);
     });
 
     it('collects spotify music releases for favorite artists', function () {
@@ -178,7 +212,7 @@ describe('LibraryReleases', function () {
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert']);
 
         $hardcover = $this->mock(\App\Api\Libraries\Services\External\HardcoverService::class);
-        $hardcover->shouldReceive('getNewReleases')->with('Frank Herbert')->andReturn([[
+        $hardcover->shouldReceive('getNewReleasesForAuthors')->with(['Frank Herbert'])->andReturn([[[
             'id' => 1,
             'slug' => 'children-of-dune',
             'title' => 'Children of Dune',
@@ -187,7 +221,7 @@ describe('LibraryReleases', function () {
             'pages' => 444,
             'image' => ['url' => 'https://cover.example/cod.jpg'],
             'contributions' => [['author' => ['id' => 1, 'name' => 'Frank Herbert']]],
-        ]]);
+        ]]]);
 
         $service = app(LibraryReleases::class);
 
@@ -196,5 +230,56 @@ describe('LibraryReleases', function () {
         expect($releases)->toHaveCount(1);
         expect($releases[0]->getTitle())->toBe('Children of Dune');
         expect($releases[0]->getAuthor())->toBe('Frank Herbert');
+    });
+
+    it('looks up each distinct first author once, in one batch, and sorts by release date', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert, Brian Herbert']);
+        LibraryBook::factory()->forUser($user)->create(['rating' => 4, 'author' => 'Ursula K. Le Guin']);
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert']);
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Nobody']);
+        LibraryBook::factory()->forUser($user)->create(['rating' => 3, 'author' => 'Not A Favorite']);
+
+        $book = fn (int $id, string $releaseDate) => [
+            'id' => $id,
+            'slug' => 'book-'.$id,
+            'title' => 'Book '.$id,
+            'release_date' => $releaseDate,
+            'description' => null,
+            'pages' => 100,
+            'image' => null,
+            'contributions' => [],
+        ];
+
+        $hardcover = $this->mock(\App\Api\Libraries\Services\External\HardcoverService::class);
+        $hardcover->shouldReceive('getNewReleasesForAuthors')
+            ->once()
+            ->with(['Frank Herbert', 'Ursula K. Le Guin', 'Nobody'])
+            ->andReturn([
+                [$book(1, now()->subMonths(2)->toDateString())],
+                [$book(2, now()->subMonth()->toDateString())],
+                null,
+            ]);
+
+        $releases = app(LibraryReleases::class)->getBookReleases($user);
+
+        expect(array_map(fn ($release) => [$release->getId(), $release->getAuthor()], $releases))
+            ->toBe([[2, 'Ursula K. Le Guin'], [1, 'Frank Herbert']]);
+    });
+});
+
+describe('LibraryBookService', function () {
+    it('keeps releases fetched on a cache miss for seven days', function () {
+        $user = makeUser();
+
+        $this->mock(LibraryReleases::class)->shouldReceive('getBookReleases')->once()->andReturn(['release']);
+
+        app(LibraryBookService::class)->releases($user);
+
+        $this->travel(604799)->seconds();
+        expect(Cache::store('user_data')->get('book_releases_'.$user->id))->toBe(['release']);
+
+        $this->travel(2)->seconds();
+        expect(Cache::store('user_data')->get('book_releases_'.$user->id))->toBeNull();
     });
 });

@@ -21,7 +21,7 @@ class LibraryBookService
     private const string CACHE_KEY_RELEASES        = 'book_releases';
     private const string CACHE_KEY_RECOMMENDATIONS = 'book_recommendations';
     private const int CACHE_TTL                    = 86400;
-    private const int CACHE_TTL_RELEASES           = 86400;
+    private const int CACHE_TTL_RELEASES           = 604800;
 
     public function __construct(
         private readonly LibraryCoverService $coverService,

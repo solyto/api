@@ -39,25 +39,28 @@ class LibraryReleases
     private function getDeezerMusicReleases(User $user): array
     {
         $favorites = LibraryMusic::forUser($user->id)->where('rating', '>=', 4)->get();
-        $processedArtists = [];
+        $artists = [];
+        $artistIds = [];
         $releases = [];
 
         foreach ($favorites as $favorite) {
             $artist = Str::contains($favorite->artist, ',') ? explode(',', $favorite->artist)[0] : $favorite->artist;
 
-            if (in_array($artist, $processedArtists)) {
-                continue;
+            if (! in_array($artist, $artists)) {
+                $artists[] = $artist;
             }
+        }
 
-            $processedArtists[] = $artist;
-            $search = $this->deezerService->searchArtists($artist);
-
-            if (! $search) {
-                continue;
+        foreach ($this->deezerService->searchManyArtists($artists) as $key => $search) {
+            if ($search) {
+                $artistIds[$key] = $search[0]['id'];
             }
+        }
 
-            $artistId = $search[0]['id'];
-            $artistReleases = $this->deezerService->getNewReleases($artistId);
+        $releasesByArtistId = $this->deezerService->getNewReleasesForArtists($artistIds);
+
+        foreach ($artistIds as $key => $artistId) {
+            $artistReleases = $releasesByArtistId[$artistId];
 
             if (! $artistReleases) {
                 continue;
@@ -66,7 +69,7 @@ class LibraryReleases
             foreach ($artistReleases as $release) {
                 $releases[] = new MusicReleaseDTO(
                     id: $release['id'],
-                    artist: $artist,
+                    artist: $artists[$key],
                     artistId: $artistId,
                     title: $release['title'],
                     url: $release['link'],
@@ -137,18 +140,21 @@ class LibraryReleases
     public function getBookReleases(User $user): array
     {
         $favorites = LibraryBook::forUser($user->id)->where('rating', '>=', 4)->get();
-        $processedAuthors = [];
+        $authors = [];
         $releases = [];
 
         foreach ($favorites as $favorite) {
             $author = Str::contains($favorite->author, ',') ? explode(',', $favorite->author)[0] : $favorite->author;
 
-            if (in_array($author, $processedAuthors)) {
-                continue;
+            if (! in_array($author, $authors)) {
+                $authors[] = $author;
             }
+        }
 
-            $processedAuthors[] = $author;
-            $authorReleases = $this->hardcoverService->getNewReleases($author);
+        $releasesByAuthor = $this->hardcoverService->getNewReleasesForAuthors($authors);
+
+        foreach ($authors as $key => $author) {
+            $authorReleases = $releasesByAuthor[$key];
 
             if (! $authorReleases) {
                 continue;

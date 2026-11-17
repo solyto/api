@@ -6,12 +6,45 @@ use App\Api\Libraries\DTOs\BookReleaseDTO;
 use App\Api\Libraries\DTOs\BookSearchResultDTO;
 use App\Api\Libraries\Enums\BookServiceEnum;
 use Carbon\Carbon;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class HardcoverService
 {
     private const string API_URL = 'https://api.hardcover.app/v1/graphql';
     private const string BOOK_URL = 'https://hardcover.app/books/%s';
+    private const int POOL_SIZE = 5;
+    private const string NEW_RELEASES_QUERY = '
+            query SearchBooks($authorName: String!) {
+                books(
+                    where: {
+                        contributions: {
+                            author: { name: { _eq: $authorName } }
+                        }
+                        release_date: { _is_null: false }
+                    }
+                    order_by: { release_date: desc }
+                    limit: 5
+                ) {
+                    id
+                    slug
+                    title
+                    release_date
+                    description
+                    pages
+                    image {
+                        url
+                    }
+                    contributions {
+                        author {
+                            id
+                            name
+                        }
+                    }
+                }
+            }
+        ';
 
     private string $apiKey;
 
@@ -85,37 +118,39 @@ class HardcoverService
 
     public function getNewReleases(string $author): ?array
     {
-        $response = $this->post('
-            query SearchBooks($authorName: String!) {
-                books(
-                    where: {
-                        contributions: {
-                            author: { name: { _eq: $authorName } }
-                        }
-                        release_date: { _is_null: false }
-                    }
-                    order_by: { release_date: desc }
-                    limit: 5
-                ) {
-                    id
-                    slug
-                    title
-                    release_date
-                    description
-                    pages
-                    image {
-                        url
-                    }
-                    contributions {
-                        author {
-                            id
-                            name
-                        }
-                    }
-                }
-            }
-        ', ['authorName' => $author]);
+        $response = $this->post(self::NEW_RELEASES_QUERY, ['authorName' => $author]);
 
+        return $this->parseNewReleases($response);
+    }
+
+    /**
+     * @param  array<array-key, string>  $authors
+     * @return array<array-key, ?array>
+     */
+    public function getNewReleasesForAuthors(array $authors): array
+    {
+        $responses = Http::pool(function (Pool $pool) use ($authors) {
+            foreach ($authors as $key => $author) {
+                $pool->as((string) $key)
+                    ->withHeaders($this->headers())
+                    ->post(self::API_URL, ['query' => self::NEW_RELEASES_QUERY, 'variables' => ['authorName' => $author]]);
+            }
+        }, self::POOL_SIZE);
+
+        $releases = [];
+
+        foreach ($authors as $key => $author) {
+            $response = $responses[$key] ?? null;
+            $releases[$key] = $response instanceof Response && $response->successful()
+                ? $this->parseNewReleases($response->json())
+                : null;
+        }
+
+        return $releases;
+    }
+
+    private function parseNewReleases(?array $response): ?array
+    {
         $books = $response['data']['books'] ?? null;
 
         if (!$books) {
@@ -180,16 +215,24 @@ class HardcoverService
 
     private function post(string $query, array $variables): ?array
     {
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $this->apiKey,
-        ])->post(self::API_URL, ['query' => $query, 'variables' => $variables]);
+        $response = Http::withHeaders($this->headers())->post(self::API_URL, ['query' => $query, 'variables' => $variables]);
 
         if (!$response->successful()) {
             return null;
         }
 
         return $response->json();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function headers(): array
+    {
+        return [
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->apiKey,
+        ];
     }
 
     private function getSlugFromUrl(string $url): string
