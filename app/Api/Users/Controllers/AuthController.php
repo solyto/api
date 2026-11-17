@@ -292,7 +292,11 @@ class AuthController
         try {
             $result = $this->authService->verify($request->validated());
         } catch (\RuntimeException $e) {
-            report($e);
+            // The known outcomes are part of the flow (e.g. a link opened twice); only report anything else.
+            if (!in_array($e->getMessage(), ['already_verified', 'token_mismatch', 'token_expired'], true)) {
+                report($e);
+            }
+
             return match ($e->getMessage()) {
                 'already_verified' => ApiResponse::error('Account already verified', 401, ['already_verified']),
                 'token_mismatch' => ApiResponse::error('No such verification token', 401, ['token_mismatch']),

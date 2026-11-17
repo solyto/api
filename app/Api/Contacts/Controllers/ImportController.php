@@ -12,6 +12,7 @@ use App\Dav\Exceptions\ImportException;
 use App\Dav\Services\DavService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ImportController
 {
@@ -65,7 +66,10 @@ class ImportController
             $validatedData = $request->validated();
             $this->dav->import()->addressBooks()->start($request->user(), $validatedData['url'], $validatedData['username'], $validatedData['secret']);
         } catch (ImportException $e) {
-            report($e);
+            // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.
+            Log::channel('dav')->warning('Contact import could not reach the server', [
+                'host' => parse_url((string) $request->validated('url'), PHP_URL_HOST),
+            ]);
             return ApiResponse::error('Could not grab address books', 404);
         }
 
