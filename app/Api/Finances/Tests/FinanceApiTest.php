@@ -5,6 +5,8 @@ use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use App\Api\Finances\Services\WealthService;
+use App\Api\Tags\Models\Tag;
+use Illuminate\Support\Facades\DB;
 
 describe('Budget CRUD', function () {
     it('lists, stores, shows, updates and deletes budgets', function () {
@@ -146,6 +148,137 @@ describe('Budget interval', function () {
             ->getJson('/api/v1/finances/budget/'.$budget->id)
             ->assertStatus(200)
             ->assertJsonPath('data.interval', 'quarterly');
+    });
+});
+
+describe('Budget tags', function () {
+    it('stores a budget with the user\'s tags and returns them', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/finances/budget', [
+                'title' => 'Donations',
+                'type' => 'income',
+                'value' => 50,
+                'tags' => [$tag->id],
+            ])
+            ->assertStatus(201)
+            ->assertJsonCount(1, 'data.tags')
+            ->assertJsonPath('data.tags.0.id', $tag->id);
+    });
+
+    it('replaces the tags on update', function () {
+        $user = makeUser();
+        $old = Tag::factory()->forUser($user)->create();
+        $new = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($old);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['tags' => [$new->id]])
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data.tags')
+            ->assertJsonPath('data.tags.0.id', $new->id);
+
+        expect($budget->tags()->pluck('tags.id')->all())->toBe([$new->id]);
+    });
+
+    it('removes all tags when updated with an empty list', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($tag);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['tags' => []])
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data.tags');
+
+        expect($budget->tags()->count())->toBe(0);
+    });
+
+    it('keeps the tags when an update does not send them', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($tag);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['title' => 'Renamed'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.tags.0.id', $tag->id);
+
+        expect($budget->tags()->count())->toBe(1);
+    });
+
+    it('rejects another user\'s tag on store and update', function () {
+        $user = makeUser();
+        $foreignTag = Tag::factory()->forUser(makeUser())->create();
+        $budget = Budget::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/finances/budget', [
+                'title' => 'Donations',
+                'type' => 'income',
+                'value' => 50,
+                'tags' => [$foreignTag->id],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['tags' => [$foreignTag->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tags.0');
+
+        expect(Budget::count())->toBe(1)
+            ->and($budget->tags()->count())->toBe(0);
+    });
+
+    it('removes a deleted tag from the budget', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($tag);
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/tags/'.$tag->id)
+            ->assertStatus(200);
+
+        expect($budget->tags()->count())->toBe(0)
+            ->and(DB::table('tag_budget')->count())->toBe(0);
+    });
+
+    it('removes the pivot rows when the budget is deleted', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($tag);
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/budget/'.$budget->id)
+            ->assertStatus(200);
+
+        expect(DB::table('tag_budget')->count())->toBe(0)
+            ->and(Tag::count())->toBe(1);
+    });
+
+    it('returns the tags in the index and show', function () {
+        $user = makeUser();
+        $tag = Tag::factory()->forUser($user)->create();
+        $budget = Budget::factory()->forUser($user)->create();
+        $budget->tags()->attach($tag);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.tags.0.id', $tag->id);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget/'.$budget->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.tags.0.id', $tag->id);
     });
 });
 

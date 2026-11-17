@@ -3,10 +3,12 @@
 namespace App\Api\Finances\Models;
 
 
+use App\Api\Tags\Models\Tag;
 use App\Api\Users\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 
@@ -54,5 +56,11 @@ class Budget extends Model
     public function values(): HasMany
     {
         return $this->hasMany(BudgetValue::class);
+    }
+
+    /** @return BelongsToMany<Tag, $this> */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'tag_budget', 'budget_id', 'tag_id')->withTimestamps();
     }
 }

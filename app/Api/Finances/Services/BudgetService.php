@@ -23,8 +23,15 @@ class BudgetService
         return $this->cache->remember(
             [self::CACHE_KEY, $user->id],
             self::CACHE_TTL,
-            fn() => Budget::forUser($user->id)->orderByDesc('value')->get()
+            fn() => Budget::forUser($user->id)->with('tags')->orderByDesc('value')->get()
         );
+    }
+
+    public function find(Budget $budget): Budget
+    {
+        $budget->load('tags');
+
+        return $budget;
     }
 
     public function create(User $user, array $data): Budget
@@ -32,15 +39,19 @@ class BudgetService
         $data['user_id'] = $user->id;
 
         $budget = DB::transaction(function () use ($data) {
-            $budget = Budget::create($data);
+            $budget = Budget::create(collect($data)->except('tags')->all());
             $budget->values()->create([
                 'date' => Carbon::today()->toDateString(),
                 'value' => $data['value'],
             ]);
 
+            if (!empty($data['tags'])) {
+                $budget->tags()->attach($data['tags']);
+            }
+
             return $budget;
         });
-        $budget->load(['user']);
+        $budget->load(['user', 'tags']);
 
         $this->cache->forget([self::CACHE_KEY, $user->id]);
 
@@ -52,7 +63,11 @@ class BudgetService
         $userId = $budget->user_id;
 
         DB::transaction(function () use ($budget, $data) {
-            $budget->update(collect($data)->except('value')->all());
+            $budget->update(collect($data)->except(['value', 'tags'])->all());
+
+            if (array_key_exists('tags', $data)) {
+                $budget->tags()->sync($data['tags'] ?? []);
+            }
 
             if (array_key_exists('value', $data)) {
                 $this->writeValue($budget, Carbon::today()->toDateString(), $data['value']);
@@ -62,7 +77,7 @@ class BudgetService
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
 
-        return $budget->fresh(['user']);
+        return $budget->fresh(['user', 'tags']);
     }
 
     public function destroy(Budget $budget): void

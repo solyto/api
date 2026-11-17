@@ -3,6 +3,7 @@
 namespace App\Api\Finances\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreBudgetRequest extends FormRequest
 {
@@ -13,6 +14,8 @@ class StoreBudgetRequest extends FormRequest
             'type' => 'required|string|in:income,expense',
             'interval' => 'sometimes|string|in:monthly,quarterly,yearly',
             'value' => 'required|numeric',
+            'tags' => 'nullable|array',
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
         ];
     }
 }
