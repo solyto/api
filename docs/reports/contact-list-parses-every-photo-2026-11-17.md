@@ -1,7 +1,7 @@
 # Report: Contact list spends most of its time on photos it then discards
 
 date: 2026-11-17
-read: false
+read: true
 branch: `main`, tree at `073bfdc`
 scope: Performance of `GET /address-books/contacts` (`ContactService::listContacts`) when the cache is empty or has just been cleared. Written for the maintainer. No application code, config, migrations, or DAV wiring/schema were changed. Throwaway probe scripts were run and deleted.
 
