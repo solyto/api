@@ -4,6 +4,7 @@ namespace App\Api\Notes\Services;
 
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
+use App\Api\Notes\Resources\NoteResource;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
@@ -12,21 +13,24 @@ use Illuminate\Support\Collection;
 
 class NoteService
 {
-    private const string CACHE_KEY = 'notes';
+    // _v2: lists cached before they were stored as arrays instead of models
+    private const string CACHE_KEY = 'notes_v2';
 
-    private const string CACHE_KEY_HIDDEN = 'notes_hidden';
+    private const string CACHE_KEY_HIDDEN = 'notes_hidden_v2';
 
-    private const string CACHE_KEY_NEWEST = 'notes_newest';
+    private const string CACHE_KEY_NEWEST = 'notes_newest_v2';
+
+    private const string CACHE_KEY_RECENT = 'notes_recent';
 
     private const int CACHE_TTL = 86400;
 
     public function __construct(private readonly UserCacheService $cache) {}
 
-    public function list(User $user): Collection
+    public function list(User $user): array
     {
-        return $this->cache->remember(
-            [self::CACHE_KEY, $user->id],
-            self::CACHE_TTL,
+        return $this->rememberList(
+            self::CACHE_KEY,
+            $user->id,
             fn () => Note::forUser($user->id)
                 ->where(fn ($query) => $this->whereVisible($query, $user->id))
                 ->with(['tags'])
@@ -39,11 +43,11 @@ class NoteService
      * The notes the plain list leaves out: those in a hidden or system
      * category, or in a descendant of one.
      */
-    public function listHidden(User $user): Collection
+    public function listHidden(User $user): array
     {
-        return $this->cache->remember(
-            [self::CACHE_KEY_HIDDEN, $user->id],
-            self::CACHE_TTL,
+        return $this->rememberList(
+            self::CACHE_KEY_HIDDEN,
+            $user->id,
             fn () => Note::forUser($user->id)
                 ->whereIn('category_id', $this->hiddenCategoryIds($user->id))
                 ->with(['tags'])
@@ -52,14 +56,31 @@ class NoteService
         );
     }
 
-    public function newest(User $user): Collection
+    public function newest(User $user): array
     {
-        return $this->cache->remember(
-            [self::CACHE_KEY_NEWEST, $user->id],
-            self::CACHE_TTL,
+        return $this->rememberList(
+            self::CACHE_KEY_NEWEST,
+            $user->id,
             fn () => Note::forUser($user->id)
                 ->where(fn ($query) => $this->whereVisible($query, $user->id))
                 ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get()
+        );
+    }
+
+    /**
+     * The most recently created or edited notes; creating a note sets
+     * updated_at too.
+     */
+    public function recent(User $user): array
+    {
+        return $this->rememberList(
+            self::CACHE_KEY_RECENT,
+            $user->id,
+            fn () => Note::forUser($user->id)
+                ->where(fn ($query) => $this->whereVisible($query, $user->id))
+                ->orderBy('updated_at', 'desc')
                 ->limit(5)
                 ->get()
         );
@@ -180,6 +201,21 @@ class NoteService
         $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_HIDDEN, $userId]);
         $this->cache->forget([self::CACHE_KEY_NEWEST, $userId]);
+        $this->cache->forget([self::CACHE_KEY_RECENT, $userId]);
+    }
+
+    /**
+     * Lists are cached as the response arrays, not as models: a serialised
+     * model holds its attributes twice (attributes and original), and with
+     * the full note content that doubles the cached size.
+     */
+    private function rememberList(string $key, string $userId, callable $query): array
+    {
+        return $this->cache->remember(
+            [$key, $userId],
+            self::CACHE_TTL,
+            fn () => json_decode(json_encode(NoteResource::collection($query()), JSON_THROW_ON_ERROR), true)
+        );
     }
 
     /**

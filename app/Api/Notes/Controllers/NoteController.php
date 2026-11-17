@@ -43,7 +43,7 @@ class NoteController
     public function index(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            NoteResource::collection($this->noteService->list($request->user())),
+            $this->noteService->list($request->user()),
             'Notes retrieved successfully.'
         );
     }
@@ -72,7 +72,7 @@ class NoteController
     public function hidden(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            NoteResource::collection($this->noteService->listHidden($request->user())),
+            $this->noteService->listHidden($request->user()),
             'Hidden notes retrieved successfully.'
         );
     }
@@ -100,7 +100,35 @@ class NoteController
     public function newest(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            NoteResource::collection($this->noteService->newest($request->user())),
+            $this->noteService->newest($request->user()),
+            'Notes retrieved successfully.'
+        );
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/notes/recent",
+     *     operationId="noteRecent",
+     *     summary="List recently changed notes",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Notes retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Note"))
+     *         )
+     *     )
+     * )
+     */
+    public function recent(Request $request): JsonResponse
+    {
+        return ApiResponse::success(
+            $this->noteService->recent($request->user()),
             'Notes retrieved successfully.'
         );
     }

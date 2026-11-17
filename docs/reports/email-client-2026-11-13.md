@@ -3,7 +3,7 @@
 date: 2026-11-13
 branch: `report/initiative_email-functionality` (job `initiative`), tree at `ff7ca99`
 scope: A user asked for email in solyto, meaning an email client. This report looks at what exists today, the protocols and providers involved, the PHP libraries that could do it, and five ways to build it (or something smaller). It covers security, privacy and the fit with the rest of solyto. It's written for the maintainer, who makes the product decisions. No application code, config, migrations, routes, lang files or `composer.json` were changed. Every new package named here is a candidate that needs approval.
-read: false
+read: true
 
 ## Summary
 

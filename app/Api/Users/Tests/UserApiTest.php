@@ -260,6 +260,31 @@ describe('User settings endpoints', function () {
         expect($user->fresh()->settings->timezone)->toBe('Europe/Berlin');
     });
 
+    it('accepts timezones only in the backward-compatible list', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/timezone', ['timezone' => 'Etc/GMT+1'])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->timezone)->toBe('Etc/GMT+1');
+    });
+
+    it('rejects an unknown timezone', function (mixed $timezone) {
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'Europe/Berlin']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/timezone', ['timezone' => $timezone])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('timezone');
+
+        expect($user->fresh()->settings->timezone)->toBe('Europe/Berlin');
+    })->with([
+        'unknown name' => ['Not/AZone'],
+        'array' => [['Europe/Berlin']],
+    ]);
+
     it('updates date format', function () {
         $user = makeUser();
 

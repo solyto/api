@@ -174,6 +174,37 @@ describe('Feed items list', function () {
         expect(array_column($last->json('data'), 'id'))->toBe([$items[4]->id]);
     });
 
+    it('filters to one feed with paging while feed_counts stay global', function () {
+        $user = makeUser();
+        $feedA = Feed::factory()->create();
+        $feedB = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feedA)->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feedB)->create();
+
+        feedItemAt($feedA, '2026-11-08 12:00:00');
+        $b1 = feedItemAt($feedB, '2026-11-08 11:00:00');
+        $b2 = feedItemAt($feedB, '2026-11-08 10:00:00');
+        feedItemAt($feedA, '2026-11-08 09:00:00');
+
+        $first = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/feeds/items?feed_id={$feedB->id}&limit=1")
+            ->assertStatus(200)
+            ->assertJsonPath('meta.has_more', true)
+            ->assertJsonPath('meta.feed_counts', [$feedA->id => 2, $feedB->id => 2]);
+        expect(array_column($first->json('data'), 'id'))->toBe([$b1->id]);
+
+        $second = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/feeds/items?feed_id={$feedB->id}&offset=1&limit=1")
+            ->assertStatus(200);
+        expect(array_column($second->json('data'), 'id'))->toBe([$b2->id]);
+    });
+
+    it('rejects a non-uuid feed_id', function () {
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/feeds/items?feed_id=abc')
+            ->assertStatus(422);
+    });
+
     it('returns every item for limit=all with has_more false', function () {
         $user = makeUser();
         $feed = Feed::factory()->create();
