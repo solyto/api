@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class BudgetService
 {
-    private const string CACHE_KEY = 'budgets';
+    // _v2: lists cached before interval and tags lack both, and the app then hides the tag UI.
+    private const string CACHE_KEY = 'budgets_v2';
     private const int CACHE_TTL = 86400;
 
     public function __construct(private readonly UserCacheService $cache) {}

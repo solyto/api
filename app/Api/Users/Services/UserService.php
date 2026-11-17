@@ -30,7 +30,7 @@ class UserService
      * USER_LONGTERM_CACHE_KEYS).
      */
     private const array USER_CACHE_KEYS = [
-        'address_books', 'book_recommendations', 'book_releases', 'books', 'budgets',
+        'address_books', 'book_recommendations', 'book_releases', 'books', 'budgets', 'budgets_v2',
         'calendars', 'calendars_v2', 'checkin', 'clipboard', 'feed_import', 'games', 'links', 'movie_releases', 'movies',
         'music', 'music_recommendations', 'music_releases', 'note_categories',
         'note_categories_hidden', 'notes', 'notes_hidden', 'notes_hidden_v2', 'notes_newest',
