@@ -149,6 +149,7 @@ class TodoWorkspaceController
      *
      *         @OA\JsonContent(
      *
+     *             @OA\Property(property="title", type="string", maxLength=50),
      *             @OA\Property(property="is_hideable", type="boolean")
      *         )
      *     ),
