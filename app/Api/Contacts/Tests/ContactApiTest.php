@@ -105,9 +105,9 @@ describe('Contact photos', function () {
         $listHasPhoto = fn () => collect($this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/address-books/contacts')
             ->assertStatus(200)
-            ->json('data'))->pluck('has_photo', 'uri')->all();
+            ->json('data'))->pluck('has_photo', 'uri')->sortKeys()->all(); // the list order isn't fixed
 
-        expect($listHasPhoto())->toBe([$withPhoto => false, $withoutPhoto => false]);
+        expect($listHasPhoto())->toBe(collect([$withPhoto => false, $withoutPhoto => false])->sortKeys()->all());
 
         $this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$withPhoto.'/photo', [
@@ -115,7 +115,7 @@ describe('Contact photos', function () {
             ])
             ->assertStatus(200);
 
-        expect($listHasPhoto())->toBe([$withPhoto => true, $withoutPhoto => false]);
+        expect($listHasPhoto())->toBe(collect([$withPhoto => true, $withoutPhoto => false])->sortKeys()->all());
 
         $photos = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/address-books/contacts/photos', [
@@ -133,7 +133,7 @@ describe('Contact photos', function () {
             ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$withPhoto.'/photo')
             ->assertStatus(200);
 
-        expect($listHasPhoto())->toBe([$withPhoto => false, $withoutPhoto => false]);
+        expect($listHasPhoto())->toBe(collect([$withPhoto => false, $withoutPhoto => false])->sortKeys()->all());
     });
 
     it('adds and removes a contact photo', function () {
