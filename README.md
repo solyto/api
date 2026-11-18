@@ -34,6 +34,12 @@ php artisan key:generate
 php artisan migrate
 ```
 
+### Local test data
+
+Don't develop with your real account. `php artisan db:seed` creates `test@solyto.local` with fake data in every module, plus `friend@solyto.local` (a friend with a shared calendar) and `pending@solyto.local` (an open friend request). All three use the password `password`. Every run deletes and recreates these accounts, including their DAV data, so you can run it again at any time. It needs the local MariaDB and PostgreSQL, and it refuses to run when `APP_ENV=production`.
+
+The feeds are real public RSS feeds. The external calendar account, the Telegram connection and the AI plugin key are fake, so their syncs and deliveries fail.
+
 ## 
 
 ## Development
