@@ -32,7 +32,7 @@ describe('MCP endpoint access', function () {
         $response = mcpRequest($this, mcpToken(User::factory()->admin()->create()))->assertOk();
 
         expect(collect($response->json('result.tools'))->pluck('name')->all())->toEqualCanonicalizing([
-            'list-todos', 'search-notes', 'get-note', 'list-upcoming-events', 'search-contacts', 'list-dev-requests', 'get-dev-request',
+            'list-todos', 'update-todo', 'search-notes', 'get-note', 'list-upcoming-events', 'search-contacts', 'list-dev-requests', 'get-dev-request',
         ]);
     });
 

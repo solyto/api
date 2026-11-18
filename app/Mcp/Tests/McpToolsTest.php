@@ -4,7 +4,9 @@ use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
+use App\Api\Tags\Models\Tag;
 use App\Api\Todos\Models\Todo;
+use App\Api\Todos\Models\TodoCategory;
 use App\Api\Users\Models\User;
 use App\Mcp\SolytoServer;
 use App\Mcp\Tools\GetDevRequest;
@@ -14,6 +16,7 @@ use App\Mcp\Tools\ListTodos;
 use App\Mcp\Tools\ListUpcomingEvents;
 use App\Mcp\Tools\SearchContacts;
 use App\Mcp\Tools\SearchNotes;
+use App\Mcp\Tools\UpdateTodo;
 
 beforeEach(fn () => enableMcp());
 
@@ -39,6 +42,65 @@ describe('list-todos', function () {
         SolytoServer::actingAs($admin)->tool(ListTodos::class, ['query' => 'MILK'])
             ->assertSee('Buy milk')
             ->assertDontSee('Call mum');
+    });
+});
+
+describe('update-todo', function () {
+    it('updates only the given fields', function () {
+        $admin = User::factory()->admin()->create();
+        $todo = Todo::factory()->forUser($admin)->create(['title' => 'Old title', 'priority' => 'low', 'description' => 'Keep me']);
+
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'title' => 'New title', 'priority' => 'high'])
+            ->assertOk()
+            ->assertSee('New title');
+
+        $todo->refresh();
+        expect($todo->title)->toBe('New title')
+            ->and($todo->priority)->toBe('high')
+            ->and($todo->description)->toBe('Keep me');
+    });
+
+    it('sets the category and replaces the tags', function () {
+        $admin = User::factory()->admin()->create();
+        $category = TodoCategory::factory()->forUser($admin)->create();
+        $tag = Tag::factory()->forUser($admin)->create();
+        $todo = Todo::factory()->forUser($admin)->create();
+        $todo->tags()->attach(Tag::factory()->forUser($admin)->create());
+
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'category_id' => $category->id, 'tags' => [$tag->id]])
+            ->assertOk();
+
+        $todo->refresh();
+        expect($todo->category_id)->toBe($category->id)
+            ->and($todo->tags->pluck('id')->all())->toBe([$tag->id]);
+    });
+
+    it('rejects other users\' categories and tags', function () {
+        $admin = User::factory()->admin()->create();
+        $todo = Todo::factory()->forUser($admin)->create();
+
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'category_id' => TodoCategory::factory()->forUser(makeUser())->create()->id])
+            ->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'tags' => [Tag::factory()->forUser(makeUser())->create()->id]])
+            ->assertHasErrors();
+    });
+
+    it('does not update other users\' todos', function () {
+        $admin = User::factory()->admin()->create();
+        $todo = Todo::factory()->forUser(makeUser())->create(['title' => 'Not yours']);
+
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'title' => 'Hijacked'])
+            ->assertHasErrors(['Todo not found.']);
+
+        expect($todo->refresh()->title)->toBe('Not yours');
+    });
+
+    it('rejects invalid values', function () {
+        $admin = User::factory()->admin()->create();
+        $todo = Todo::factory()->forUser($admin)->create();
+
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'status' => 'whatever'])->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['title' => 'No id'])->assertHasErrors();
     });
 });
 
