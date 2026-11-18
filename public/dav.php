@@ -34,5 +34,13 @@ try {
     ]);
 }
 
+// Pulse writes its buffered entries when a kernel terminates, which this entry
+// point never does, so without this the DAV request metrics are lost.
+try {
+    $app->make(\Laravel\Pulse\Pulse::class)->ingest();
+} catch (\Throwable $e) {
+    Log::warning('Pulse recording failed', ['error' => $e->getMessage()]);
+}
+
 // Send raw SabreDAV response
 //$response->send();
