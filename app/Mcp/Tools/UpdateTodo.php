@@ -12,7 +12,7 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 
-#[Description('Update one of the user\'s todos by its id (from list-todos). Only the fields you pass are changed; pass null to clear a nullable field. Category and tag ids come from the category and tags of todos returned by list-todos.')]
+#[Description('Update one of the user\'s todos by its id (from list-todos). Only the fields you pass are changed; pass null to clear a nullable field. Category and tag ids come from list-todo-tags-and-categories.')]
 class UpdateTodo extends SolytoTool
 {
     public function __construct(private readonly TodoService $todos) {}

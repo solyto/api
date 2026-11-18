@@ -9,14 +9,18 @@ use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Models\TodoCategory;
 use App\Api\Users\Models\User;
 use App\Mcp\SolytoServer;
+use App\Mcp\Tools\CreateDevRequest;
+use App\Mcp\Tools\CreateTodo;
 use App\Mcp\Tools\GetDevRequest;
 use App\Mcp\Tools\GetNote;
 use App\Mcp\Tools\ListDevRequests;
 use App\Mcp\Tools\ListTodos;
+use App\Mcp\Tools\ListTodoTagsAndCategories;
 use App\Mcp\Tools\ListUpcomingEvents;
 use App\Mcp\Tools\SearchContacts;
 use App\Mcp\Tools\SearchNotes;
 use App\Mcp\Tools\UpdateTodo;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(fn () => enableMcp());
 
@@ -42,6 +46,84 @@ describe('list-todos', function () {
         SolytoServer::actingAs($admin)->tool(ListTodos::class, ['query' => 'MILK'])
             ->assertSee('Buy milk')
             ->assertDontSee('Call mum');
+    });
+});
+
+describe('list-todo-tags-and-categories', function () {
+    it('lists only the user\'s tags and categories', function () {
+        $admin = User::factory()->admin()->create();
+        Tag::factory()->forUser($admin)->create(['name' => 'errands']);
+        TodoCategory::factory()->forUser($admin)->create(['title' => 'Home']);
+        Tag::factory()->forUser(makeUser())->create(['name' => 'foreign-tag']);
+        TodoCategory::factory()->forUser(makeUser())->create(['title' => 'Foreign category']);
+
+        SolytoServer::actingAs($admin)->tool(ListTodoTagsAndCategories::class)
+            ->assertOk()
+            ->assertSee(['errands', 'Home'])
+            ->assertDontSee(['foreign-tag', 'Foreign category']);
+    });
+});
+
+describe('create-todo', function () {
+    it('creates a todo for the user', function () {
+        $admin = User::factory()->admin()->create();
+        $category = TodoCategory::factory()->forUser($admin)->create();
+        $tag = Tag::factory()->forUser($admin)->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, [
+            'title' => 'Buy milk',
+            'due_at' => '2026-12-01',
+            'category_id' => $category->id,
+            'tags' => [$tag->id],
+        ])->assertOk()->assertSee('Buy milk');
+
+        $todo = Todo::forUser($admin->id)->sole();
+        expect($todo->title)->toBe('Buy milk')
+            ->and($todo->priority)->toBe('medium')
+            ->and($todo->due_at->toDateString())->toBe('2026-12-01')
+            ->and($todo->category_id)->toBe($category->id)
+            ->and($todo->tags->pluck('id')->all())->toBe([$tag->id]);
+    });
+
+    it('does not create tags or categories from the title', function () {
+        $admin = User::factory()->admin()->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'Read #book /reading due:tomorrow'])->assertOk();
+
+        expect(Todo::forUser($admin->id)->sole()->title)->toBe('Read #book /reading due:tomorrow')
+            ->and(Tag::forUser($admin->id)->count())->toBe(0)
+            ->and(TodoCategory::forUser($admin->id)->count())->toBe(0);
+    });
+
+    it('rejects other users\' categories and tags', function () {
+        $admin = User::factory()->admin()->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'A', 'category_id' => TodoCategory::factory()->forUser(makeUser())->create()->id])
+            ->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'B', 'tags' => [Tag::factory()->forUser(makeUser())->create()->id]])
+            ->assertHasErrors();
+
+        expect(Todo::forUser($admin->id)->count())->toBe(0);
+    });
+
+    it('rejects invalid input', function () {
+        $admin = User::factory()->admin()->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, [])->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'A', 'due_at' => 'tomorrow'])->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'A', 'recurrence_frequency' => 'daily'])->assertHasErrors();
+
+        expect(Todo::forUser($admin->id)->count())->toBe(0);
+    });
+
+    it('ignores fields it does not accept', function () {
+        $admin = User::factory()->admin()->create();
+        $other = makeUser();
+
+        SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'Mine', 'user_id' => $other->id, 'is_completed' => true])->assertOk();
+
+        expect(Todo::forUser($admin->id)->sole()->is_completed)->toBeFalse()
+            ->and(Todo::forUser($other->id)->count())->toBe(0);
     });
 });
 
@@ -249,5 +331,52 @@ describe('list-dev-requests and get-dev-request', function () {
             ->assertSee(['Dark mode please', 'Yes, my eyes hurt']);
 
         SolytoServer::actingAs($admin)->tool(GetDevRequest::class, ['id' => $devRequest->id + 1])->assertHasErrors(['Dev request not found.']);
+    });
+});
+
+describe('create-dev-request', function () {
+    beforeEach(fn () => Notification::fake());
+
+    it('creates a dev request as the user', function () {
+        $admin = User::factory()->admin()->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, [
+            'type' => 'bug', 'title' => 'Crash on save', 'description' => 'Saving a note crashes', 'priority' => 4,
+        ])->assertOk()->assertSee('Crash on save');
+
+        $devRequest = DevRequest::sole();
+        expect($devRequest->created_by_user_id)->toBe($admin->id)
+            ->and($devRequest->type)->toBe('bug')
+            ->and($devRequest->priority)->toBe(4);
+    });
+
+    it('rejects invalid input and ignores fields it does not accept', function () {
+        $admin = User::factory()->admin()->create();
+
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, ['type' => 'bug', 'title' => 'No description'])->assertHasErrors();
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, ['type' => 'question', 'title' => 'A', 'description' => 'B'])->assertHasErrors();
+        expect(DevRequest::count())->toBe(0);
+
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, [
+            'type' => 'feature', 'title' => 'A', 'description' => 'B', 'status' => 'completed', 'created_by_user_id' => makeUser()->id,
+        ])->assertOk();
+
+        expect(DevRequest::sole()->created_by_user_id)->toBe($admin->id)
+            ->and(DevRequest::sole()->status)->not->toBe('completed');
+    });
+
+    it('shares the REST endpoint\'s hourly limit', function () {
+        $admin = User::factory()->admin()->create();
+        $payload = ['type' => 'feature', 'title' => 'Dark mode', 'description' => 'Add a dark theme'];
+
+        for ($i = 0; $i < 9; $i++) {
+            $this->actingAs($admin, 'sanctum')->postJson('/api/v1/dev-requests', $payload)->assertStatus(201);
+        }
+
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, $payload)->assertOk();
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, $payload)->assertHasErrors(['Too many dev requests, try again later.']);
+        expectApiError($this->actingAs($admin, 'sanctum')->postJson('/api/v1/dev-requests', $payload), 429);
+
+        expect(DevRequest::count())->toBe(10);
     });
 });
