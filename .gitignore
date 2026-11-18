@@ -44,3 +44,5 @@ app/Console/Commands/Dav/TestAddressBookImport.php
 app/Console/Commands/Dav/TestDav.php
 .manigot/
 /tmp/
+*.zip
+*.sql
