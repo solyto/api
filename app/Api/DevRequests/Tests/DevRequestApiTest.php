@@ -6,6 +6,8 @@ use App\Api\DevRequests\Models\DevRequestVote;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 describe('DevRequest CRUD', function () {
     it('lists, stores, updates and deletes dev requests', function () {
@@ -32,6 +34,19 @@ describe('DevRequest CRUD', function () {
             ->assertStatus(200);
 
         expect(DevRequest::find($requestId)->status)->toBe('in-progress');
+    });
+
+    it('limits how many dev requests a user can file per hour', function () {
+        Notification::fake();
+        $user = makeUser();
+        $payload = ['title' => 'Dark mode', 'description' => 'Add a dark theme', 'type' => 'feature'];
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->actingAs($user, 'sanctum')->postJson('/api/v1/dev-requests', $payload)->assertStatus(201);
+        }
+
+        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/dev-requests', $payload), 429);
+        expect(DevRequest::count())->toBe(10);
     });
 
     it('rejects invalid dev requests', function () {
@@ -186,6 +201,69 @@ describe('DevRequest voting', function () {
             ->json('data.*.id');
 
         expect($ids)->toBe([$top->id, $newer->id, $older->id, $bottom->id]);
+    });
+
+    it('rejects an unknown vote', function () {
+        $user = makeUser();
+        $devRequest = DevRequest::factory()->create();
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests/'.$devRequest->id.'/vote', ['vote' => 'sideways']), 422);
+
+        expect(DevRequestVote::count())->toBe(0);
+    });
+});
+
+describe('DevRequest screenshot', function () {
+    $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+    $store = fn ($test, array $screenshot) => $test->actingAs(makeUser(), 'sanctum')
+        ->postJson('/api/v1/dev-requests', [
+            'title' => 'Broken button',
+            'description' => 'It does nothing',
+            'type' => 'bug',
+            ...$screenshot,
+        ]);
+
+    beforeEach(function () {
+        Storage::fake('public');
+        Notification::fake();
+    });
+
+    it('rejects a screenshot that is not an image data URI', function (string $screenshot) use ($store) {
+        expectApiError($store($this, ['screenshot' => $screenshot, 'screenshot_name' => 'x.json']), 422);
+
+        expect(DevRequest::count())->toBe(0);
+        expect(Storage::disk('public')->allFiles())->toBe([]);
+    })->with([
+        'local path' => fn () => base_path('composer.json'),
+        'http url' => 'http://127.0.0.1/secret',
+        'data stream' => 'data://text/plain;base64,'.base64_encode('<?php echo 1;'),
+        'image prefix with non-image bytes' => 'data:image/png;base64,'.base64_encode('<?php echo 1;'),
+    ]);
+
+    it('stores the screenshot with the extension of the image, not of the client name', function () use ($store, $png) {
+        $id = $store($this, ['screenshot' => $png, 'screenshot_name' => 'x.php'])
+            ->assertStatus(201)
+            ->assertJsonPath('data.screenshot', fn (string $path) => str_ends_with($path, '/screenshot.png'))
+            ->json('data.id');
+
+        expect(Storage::disk('public')->allFiles())->toBe(['dev-requests/'.$id.'/screenshot.png']);
+        expect(DevRequest::find($id)->screenshot)->toBe('screenshot.png');
+    });
+
+    it('takes the extension from the image bytes, not from the declared type', function () use ($store, $png) {
+        $id = $store($this, ['screenshot' => str_replace('image/png', 'image/jpeg', $png)])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(Storage::disk('public')->allFiles())->toBe(['dev-requests/'.$id.'/screenshot.png']);
+    });
+
+    it('stores a screenshot sent without a name', function () use ($store, $png) {
+        $store($this, ['screenshot' => $png])->assertStatus(201);
+
+        expect(DevRequest::count())->toBe(1);
     });
 });
 

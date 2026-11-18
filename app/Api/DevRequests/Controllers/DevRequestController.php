@@ -7,6 +7,7 @@ use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Requests\StoreDevRequestCommentRequest;
 use App\Api\DevRequests\Requests\StoreDevRequestRequest;
 use App\Api\DevRequests\Requests\UpdateDevRequestRequest;
+use App\Api\DevRequests\Requests\VoteDevRequestRequest;
 use App\Api\DevRequests\Resources\DevRequestCommentResource;
 use App\Api\DevRequests\Resources\DevRequestResource;
 use App\Api\DevRequests\Services\DevRequestService;
@@ -62,9 +63,9 @@ class DevRequestController
      *
      *             @OA\Property(property="type", type="string", enum={"feature", "bug"}),
      *             @OA\Property(property="title", type="string", maxLength=255),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="screenshot", type="string", nullable=true),
-     *             @OA\Property(property="screenshot_name", type="string", maxLength=255, nullable=true),
+     *             @OA\Property(property="description", type="string", maxLength=65535),
+     *             @OA\Property(property="screenshot", type="string", maxLength=7000000, pattern="^data:image/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+=*$", nullable=true, description="PNG, JPEG, GIF or WebP image as a base64 data URI; the stored file extension follows the image content."),
+     *             @OA\Property(property="screenshot_name", type="string", maxLength=255, nullable=true, description="Ignored; kept for older clients."),
      *             @OA\Property(property="priority", type="integer", minimum=1, maximum=5, nullable=true),
      *             @OA\Property(property="url", type="string", maxLength=255, nullable=true)
      *         )
@@ -81,10 +82,7 @@ class DevRequestController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreDevRequestRequest $request): JsonResponse
@@ -180,7 +178,7 @@ class DevRequestController
      *         @OA\JsonContent(
      *             required={"vote"},
      *
-     *             @OA\Property(property="vote", type="integer")
+     *             @OA\Property(property="vote", type="string", enum={"up", "down"}, nullable=true, description="null removes the vote; the same value again toggles it off.")
      *         )
      *     ),
      *
@@ -195,17 +193,12 @@ class DevRequestController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function vote(Request $request, DevRequest $devRequest): JsonResponse
+    public function vote(VoteDevRequestRequest $request, DevRequest $devRequest): JsonResponse
     {
-        $devRequest->load(['votes', 'comments']);
-
-        $devRequest = $this->devRequestService->vote($devRequest, $request->user(), $request->input('vote'));
+        $devRequest = $this->devRequestService->vote($devRequest, $request->user(), $request->validated('vote'));
 
         return ApiResponse::success(new DevRequestResource($devRequest), 'Vote recorded successfully.');
     }

@@ -96,6 +96,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Every new dev request pushes an ntfy alert to the admins.
+        RateLimiter::for('dev-requests', function (Request $request) {
+            return Limit::perHour(10)->by($request->user()->id);
+        });
+
         RateLimiter::for('clipboard-files', function (Request $request) {
             return Limit::perDay(config('clipboard.max_files_per_day'))->by($request->user()->id);
         });

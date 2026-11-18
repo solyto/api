@@ -10,6 +10,7 @@ use App\Api\DevRequests\Notifications\DevRequestCreatedNotification;
 use App\Api\Users\Models\User;
 use App\Shared\Notifications\Channels\NtfyChannel;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 class DevRequestService
@@ -39,16 +40,23 @@ class DevRequestService
 
     public function create(User $user, array $data): DevRequest
     {
-        $screenshot = $data['screenshot'] ?? null;
-        $screenshotName = $data['screenshot_name'] ?? null;
+        $screenshot = empty($data['screenshot']) ? null : $this->screenshotService->decode($data['screenshot']);
         unset($data['screenshot'], $data['screenshot_name']);
 
-        $devRequest = DevRequest::create([...$data, 'created_by_user_id' => $user->id]);
+        $devRequest = DB::transaction(function () use ($user, $data, $screenshot) {
+            $devRequest = DevRequest::create([...$data, 'created_by_user_id' => $user->id]);
 
-        if (!empty($screenshot)) {
-            $this->screenshotService->save($devRequest->id, $screenshotName, $screenshot);
-            $devRequest->update(['screenshot' => $this->screenshotService->getFileName($screenshotName)]);
-        }
+            if ($screenshot !== null) {
+                $fileName = $this->screenshotService->save($devRequest->id, $screenshot['bytes'], $screenshot['extension']);
+                if ($fileName === false) {
+                    throw new \RuntimeException('Could not store the dev request screenshot.');
+                }
+
+                $devRequest->update(['screenshot' => $fileName]);
+            }
+
+            return $devRequest;
+        });
 
         Notification::route(NtfyChannel::class, config('services.ntfy.topics.dev_requests') ?: config('services.ntfy.topic'))->notify(new DevRequestCreatedNotification($devRequest->title));
 

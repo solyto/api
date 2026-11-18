@@ -3,16 +3,16 @@
 namespace App\Api\DevRequests\Services;
 
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class DevRequestScreenshotService
 {
-    public function getFileName(string $fileName): string | false
-    {
-        $split = explode('.', $fileName);
-        $extensiuon = end($split);
-
-        return 'screenshot.' . $extensiuon;
-    }
+    private const array EXTENSIONS = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+    ];
 
     public function load(int $devRequestId, string $fileName): string | false
     {
@@ -23,28 +23,39 @@ class DevRequestScreenshotService
         return Storage::disk('public')->get('dev-requests/' . $devRequestId . '/' . $fileName);
     }
 
-    public function save(int $devRequestId, string $fileName, string $file): string | false
+    /**
+     * @return array{bytes: string, extension: string}
+     *
+     * @throws ValidationException
+     */
+    public function decode(string $dataUri): array
     {
-        if (!$this->createDir('dev-requests/' . $devRequestId)) {
-            return false;
+        if (preg_match('/^data:image\/(png|jpeg|gif|webp);base64,/', $dataUri, $matches) !== 1) {
+            throw $this->invalid();
         }
 
-        $store = Storage::disk('public')->putFileAs('dev-requests/' . $devRequestId, $file, $this->getFileName($fileName));
+        // The extension comes from the decoded bytes, never from the client.
+        $bytes = base64_decode(substr($dataUri, strlen($matches[0])), true);
+        $info = $bytes === false ? false : @getimagesizefromstring($bytes);
 
-        return $store ?
-            'dev-requests/ ' . $devRequestId . '/' . $this->getFileName($fileName) :
-            false;
-    }
-
-    private function createDir(string $dir): bool
-    {
-        if (!Storage::disk('public')->exists($dir)) {
-            if (!Storage::disk('public')->makeDirectory($dir)) {
-                return false;
-            }
+        if ($info === false || !isset(self::EXTENSIONS[$info['mime']])) {
+            throw $this->invalid();
         }
 
-        return true;
+        return ['bytes' => $bytes, 'extension' => self::EXTENSIONS[$info['mime']]];
     }
 
+    public function save(int $devRequestId, string $bytes, string $extension): string | false
+    {
+        $fileName = 'screenshot.' . $extension;
+
+        return Storage::disk('public')->put('dev-requests/' . $devRequestId . '/' . $fileName, $bytes)
+            ? $fileName
+            : false;
+    }
+
+    private function invalid(): ValidationException
+    {
+        return ValidationException::withMessages(['screenshot' => 'The screenshot must be a PNG, JPEG, GIF or WebP image.']);
+    }
 }
