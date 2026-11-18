@@ -244,6 +244,21 @@ describe('Clipboard files', function () {
             ->assertStatus(200);
     });
 
+    it('does not count rejected uploads against the daily limit', function () {
+        config(['clipboard.max_files_per_day' => 1]);
+        $user = makeUser();
+
+        foreach (['a.exe', 'b.exe'] as $name) {
+            $this->actingAs($user, 'sanctum')
+                ->post('/api/v1/clipboard/file', ['file' => clipboardUpload($name, 'MZ')], ['Accept' => 'application/json'])
+                ->assertStatus(422);
+        }
+
+        $this->actingAs($user, 'sanctum')
+            ->post('/api/v1/clipboard/file', ['file' => clipboardUpload('a.txt', 'text')], ['Accept' => 'application/json'])
+            ->assertStatus(200);
+    });
+
     it('only lists file entries when asked for them', function () {
         $user = makeUser();
         Clipboard::factory()->forUser($user)->create();

@@ -102,7 +102,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('clipboard-files', function (Request $request) {
-            return Limit::perDay(config('clipboard.max_files_per_day'))->by($request->user()->id);
+            // Counts stored files only: a rejected upload (wrong type, too large) doesn't use up the quota.
+            return Limit::perDay(config('clipboard.max_files_per_day'))
+                ->by($request->user()->id)
+                ->after(fn ($response) => $response->isSuccessful());
         });
 
         RateLimiter::for('widgets', function (Request $request) {
