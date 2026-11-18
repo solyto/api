@@ -4,8 +4,8 @@ use App\Api\Users\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests', '../app/Plugins');
-uses(RefreshDatabase::class)->in('../app/Api', '../app/Plugins');
+uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests', '../app/Plugins', '../app/Mcp/Tests');
+uses(RefreshDatabase::class)->in('../app/Api', '../app/Plugins', '../app/Mcp/Tests');
 
 /*
 |--------------------------------------------------------------------------
@@ -211,4 +211,17 @@ function externalCalendar(User $user, \Tests\Support\FakeCalDavServer $server, s
     ]);
 
     return app(\App\Dav\Services\DavService::class)->calendars()->get($user, $calendar->instanceId);
+}
+
+/**
+ * Turn MCP on for the current test: load laravel/mcp (which registers
+ * routes/ai.php) the way App\Mcp\Providers\McpServiceProvider does when
+ * MCP_ENABLED is set.
+ */
+function enableMcp(): void
+{
+    config(['mcp.enabled' => true]);
+
+    app()->register(\Laravel\Mcp\Server\McpServiceProvider::class);
+    app('router')->getRoutes()->refreshNameLookups();
 }

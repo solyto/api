@@ -16,6 +16,9 @@
     <testsuite name="Bots">
       <directory>app/Bots/Tests</directory>
     </testsuite>
+    <testsuite name="Mcp">
+      <directory>app/Mcp/Tests</directory>
+    </testsuite>
     <testsuite name="Plugins">
       <directory>app/Plugins/Tests</directory>
       <directory>app/Plugins/*/Tests</directory>
