@@ -11,8 +11,8 @@ use Laravel\Pulse\Facades\Pulse;
  * break the request, job or notification it measures. Errors end up in the
  * log (see PulseMetricsServiceProvider).
  *
- * Keys hold feed URLs, server hosts, client names and versions, never user
- * names or credentials.
+ * Keys hold feed URLs (without credentials, query or fragment), server hosts,
+ * client names and versions, never user names or credentials.
  */
 final class PulseMetrics
 {
@@ -90,14 +90,33 @@ final class PulseMetrics
     public static function feedSync(string $feedUrl, int $ms, int $ogLookups, int $ogLookupMs, bool $failed): void
     {
         Pulse::rescue(function () use ($feedUrl, $ms, $ogLookups, $ogLookupMs, $failed) {
-            Pulse::record(self::FEED_SYNC, $feedUrl, $ms)->max()->avg()->count();
-            Pulse::record(self::FEED_OG_LOOKUPS, $feedUrl, $ogLookups)->sum();
-            Pulse::record(self::FEED_OG_LOOKUP_MS, $feedUrl, $ogLookupMs)->sum();
+            $key = self::feedKey($feedUrl);
+
+            Pulse::record(self::FEED_SYNC, $key, $ms)->max()->avg()->count();
+            Pulse::record(self::FEED_OG_LOOKUPS, $key, $ogLookups)->sum();
+            Pulse::record(self::FEED_OG_LOOKUP_MS, $key, $ogLookupMs)->sum();
 
             if ($failed) {
-                Pulse::record(self::FEED_SYNC_FAILED, $feedUrl)->count();
+                Pulse::record(self::FEED_SYNC_FAILED, $key)->count();
             }
         });
+    }
+
+    /**
+     * The feed URL without user info, query and fragment: private feeds often
+     * carry a token there, and Pulse keeps keys for days and shows them.
+     */
+    public static function feedKey(string $feedUrl): string
+    {
+        $parts = parse_url($feedUrl);
+
+        if ($parts === false || !isset($parts['host'])) {
+            return 'unknown';
+        }
+
+        return ($parts['scheme'] ?? 'https').'://'.$parts['host']
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .($parts['path'] ?? '');
     }
 
     /** B: one remote CalDAV request. $failure is null on success. */

@@ -126,6 +126,21 @@ describe('PulseMetrics', function () {
         [null, 'Unknown'],
     ]);
 
+    it('records feed URLs without credentials, query or fragment', function (string $url, string $key) {
+        expect(PulseMetrics::feedKey($url))->toBe($key);
+    })->with([
+        'plain' => ['https://example.com/feed.xml', 'https://example.com/feed.xml'],
+        'token in query' => ['https://example.com/feed.xml?token=secret#top', 'https://example.com/feed.xml'],
+        'user info and port' => ['https://user:pass@example.com:8443/rss', 'https://example.com:8443/rss'],
+        'not a URL' => ['not a url', 'unknown'],
+    ]);
+
+    it('records a private feed without its token', function () {
+        PulseMetrics::feedSync('https://user:pass@example.com/feed.xml?key=secret', 100, 0, 0, false);
+
+        expect(pulseEntries(PulseMetrics::FEED_SYNC)->pluck('key')->all())->toBe(['https://example.com/feed.xml']);
+    });
+
     it('records DAV requests per method and client', function () {
         PulseMetrics::davRequest('propfind', 'DAVx5/4.4.2', 12);
 
