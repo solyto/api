@@ -14,7 +14,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="type", type="string", enum={"feature","bug"}),
- *     @OA\Property(property="status", type="string", enum={"backlog","pending","in-progress","waiting-for-deployment","completed","cancelled"}, description="Clients below 1.1.3 (by X-Client-Version, none counts as below) get waiting-for-deployment as in-progress."),
+ *     @OA\Property(property="status", type="string", enum={"backlog","pending","in-progress","waiting-for-deployment","waiting-for-user","completed","cancelled"}, description="By X-Client-Version (none counts as below): clients below 1.1.3 get waiting-for-deployment as in-progress, clients below 1.1.5 get waiting-for-user as pending."),
  *     @OA\Property(property="priority", type="integer", minimum=1, maximum=5, nullable=true),
  *     @OA\Property(property="title", type="string"),
  *     @OA\Property(property="description", type="string"),
@@ -54,9 +54,11 @@ class DevRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'type' => $this->type,
-            'status' => $this->status === 'waiting-for-deployment' && ! ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE)
-                ? 'in-progress'
-                : $this->status,
+            'status' => match (true) {
+                $this->status === 'waiting-for-deployment' && ! ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE) => 'in-progress',
+                $this->status === 'waiting-for-user' && ! ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_USER_SINCE) => 'pending',
+                default => $this->status,
+            },
             'priority' => $this->priority,
             'title' => $this->title,
             'description' => $this->description,

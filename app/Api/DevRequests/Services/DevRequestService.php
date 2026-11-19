@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\Notification;
 
 class DevRequestService
 {
-    // Older clients don't know this status and get `in-progress` instead (STANDARDS 13.3).
+    // Older clients don't know these statuses and get `in-progress` / `pending` instead (STANDARDS 13.3).
     public const string WAITING_FOR_DEPLOYMENT_SINCE = '1.1.3';
+    public const string WAITING_FOR_USER_SINCE = '1.1.5';
 
     public function __construct(private readonly DevRequestScreenshotService $screenshotService) {}
 

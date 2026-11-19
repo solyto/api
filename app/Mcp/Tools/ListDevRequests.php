@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[Description('List solyto dev requests (feature requests and bug reports submitted by users, without who submitted them), highest voted first. Use get-dev-request for the comments on one.')]
 class ListDevRequests extends SolytoTool
 {
-    private const array STATUSES = ['backlog', 'pending', 'in-progress', 'waiting-for-deployment', 'completed', 'cancelled'];
+    private const array STATUSES = ['backlog', 'pending', 'in-progress', 'waiting-for-deployment', 'waiting-for-user', 'completed', 'cancelled'];
     private const array OMITTED_FIELDS = ['user_vote', 'created_by_user_id'];
     private const array TYPES = ['feature', 'bug'];
     private const int DEFAULT_LIMIT = 25;
@@ -48,7 +48,7 @@ class ListDevRequests extends SolytoTool
     }
 
     /**
-     * The resource downgrades `waiting-for-deployment` for clients that do not send a recent version header, which MCP clients never do.
+     * The resource downgrades `waiting-for-deployment` and `waiting-for-user` for clients that do not send a recent version header, which MCP clients never do.
      *
      * @return array<string, mixed>
      */
