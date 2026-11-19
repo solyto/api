@@ -1,6 +1,7 @@
 # Report: Time-tracking entries have no index for the way they are queried
 
 date: 2026-11-19
+read: true
 branch: `main`, tree at `695ffa4`
 scope: Performance of the `time_tracking_entries` queries (entry list, running timer, statistics, widget, project totals). Written for the maintainer. No application code, config, migrations, or DAV wiring/schema were changed. A throwaway SQLite query-plan probe was run and deleted.
 
