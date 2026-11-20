@@ -114,3 +114,22 @@ it('sends through the channels switched on for alerts', function () {
     $user->notificationSettings()->update(['alert_ui' => false, 'alert_email' => false]);
     expect($notification->via($user->fresh()))->not->toContain('database')->not->toContain('mail');
 });
+
+it('checks one user right away with --user, whatever their local time', function () {
+    $this->travelTo('2026-11-18 15:00:00');
+    $user = makeUser();
+    $user->settings()->update(['timezone' => 'Europe/Berlin']);
+    $other = makeUser();
+    $other->settings()->update(['timezone' => 'Europe/Berlin']);
+    sportsAlertFor($user);
+    sportsAlertFor($other);
+
+    $this->artisan('app:send-alerts', ['--user' => $user->email])->expectsOutput('Sent 1 alert(s)')->assertSuccessful();
+
+    Notification::assertSentTo($user, AlertNotification::class);
+    Notification::assertNotSentTo($other, AlertNotification::class);
+});
+
+it('fails for an unknown --user', function () {
+    $this->artisan('app:send-alerts', ['--user' => 'nobody@example.org'])->assertFailed();
+});

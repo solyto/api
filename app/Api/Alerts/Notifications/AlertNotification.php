@@ -86,7 +86,7 @@ class AlertNotification extends BaseNotification
 
     private function link(): string
     {
-        return $this->rule === AlertRule::GoalReached ? '/goals' : '/check-in/trends';
+        return $this->rule === AlertRule::GoalReached ? '/check-in/goals' : '/check-in/trends';
     }
 
     private function formatNumber(?float $number): string

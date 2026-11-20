@@ -4,6 +4,7 @@ namespace App\Api\Alerts\Services;
 
 use App\Api\Alerts\Models\Alert;
 use App\Api\Alerts\Notifications\AlertNotification;
+use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
@@ -28,10 +29,8 @@ class AlertDispatcher
             return 0;
         }
 
-        $sent = 0;
-        Alert::query()
-            ->where('enabled', true)
-            ->where(function (Builder $query) use ($timezones) {
+        return $this->send(
+            Alert::query()->where(function (Builder $query) use ($timezones) {
                 $query->whereIn('user_id', UserSettings::query()->select('user_id')->whereIn('timezone', $timezones));
 
                 // Users without settings or a timezone count as UTC, as everywhere else.
@@ -39,7 +38,22 @@ class AlertDispatcher
                     $query->orWhereIn('user_id', UserSettings::query()->select('user_id')->whereNull('timezone'))
                         ->orWhereNotIn('user_id', UserSettings::query()->select('user_id'));
                 }
-            })
+            }),
+            $now
+        );
+    }
+
+    // For testing: checks one user's alerts now, whatever their local time.
+    public function sendForUser(User $user, ?CarbonImmutable $now = null): int
+    {
+        return $this->send(Alert::forUser($user->id), $now ?? CarbonImmutable::now());
+    }
+
+    /** @param Builder<Alert> $query */
+    private function send(Builder $query, CarbonImmutable $now): int
+    {
+        $sent = 0;
+        $query->where('enabled', true)
             ->with(['user.settings', 'user.notificationSettings', 'checkInTracker', 'goal.checkInTracker'])
             ->chunkById(self::CHUNK, function (Collection $alerts) use ($now, &$sent) {
                 $sent += $this->dispatch($alerts, $now);
