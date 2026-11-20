@@ -25,6 +25,11 @@ return [
     'daily_check_in_reminder_title' => 'Пора пройти ежедневный опрос',
     'daily_check_in_reminder_body'  => 'Вы уже заполнили ежедневный опрос?',
 
+    // Check-in Alert
+    'check_in_alert_title'          => 'Напоминание об опросе',
+    'check_in_alert_missing'        => ':tracker: сегодня ещё нет данных.',
+    'check_in_alert_below'          => ':tracker: сегодня пока :current из :target.',
+
     // Daily Day Reminder
     'daily_day_reminder_title'      => 'Планы на день',
     'daily_day_reminder_tasks'      => 'Задачи (:count):',

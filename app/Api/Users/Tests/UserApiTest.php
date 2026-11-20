@@ -484,15 +484,18 @@ describe('UserSettingsService', function () {
         expect($settings->weather_longitude)->toBe(2.35);
     });
 
-    it('updateCheckInSettings uses updateOrCreate', function () {
+    it('updateCheckInSettings stores the sports and turns the built-in trackers on and off', function () {
         $user = makeUser();
 
         $settings = app(UserSettingsService::class)->updateCheckInSettings($user, [
             'enabled_trackers' => ['mood'],
-            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'],
+            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga'],
         ]);
 
-        expect($settings->user_id)->toBe($user->id);
-        expect($settings->check_in_settings['enabled_trackers'])->toBe(['mood']);
+        expect($settings)->toBe([
+            'enabled_trackers' => ['mood'],
+            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga'],
+        ]);
+        expect($user->fresh()->settings->check_in_settings['enabled_trackers'])->toBe(['mood']);
     });
 });

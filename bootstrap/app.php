@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
               $middleware->append(RecordRateLimitedRequests::class);
           })
           ->withCommands([
+              __DIR__.'/../app/Api/CheckIn/Commands',
               __DIR__.'/../app/Api/Contacts/Commands',
               __DIR__.'/../app/Api/Export/Commands',
               __DIR__.'/../app/Api/Feeds/Commands',

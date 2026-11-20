@@ -87,7 +87,11 @@ class NotificationSettingsController
      *             @OA\Property(property="dev_request_comment_ui", type="boolean"),
      *             @OA\Property(property="dev_request_comment_email", type="boolean"),
      *             @OA\Property(property="dev_request_comment_push", type="boolean"),
-     *             @OA\Property(property="dev_request_comment_telegram", type="boolean")
+     *             @OA\Property(property="dev_request_comment_telegram", type="boolean"),
+     *             @OA\Property(property="check_in_alert_ui", type="boolean"),
+     *             @OA\Property(property="check_in_alert_email", type="boolean"),
+     *             @OA\Property(property="check_in_alert_push", type="boolean"),
+     *             @OA\Property(property="check_in_alert_telegram", type="boolean")
      *         )
      *     ),
      *

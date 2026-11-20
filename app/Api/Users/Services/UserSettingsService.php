@@ -2,6 +2,8 @@
 
 namespace App\Api\Users\Services;
 
+use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
 
@@ -10,6 +12,8 @@ class UserSettingsService
     // Clients from this version on store navigation as {visible, desktop, mobile};
     // older ones read and write only a flat map of feature flags.
     public const string NESTED_NAVIGATION_SINCE = '1.1.0';
+
+    public function __construct(private readonly CheckInTrackerService $checkInTrackers) {}
 
     public function updateNavigation(User $user, array $navigation): void
     {
@@ -96,16 +100,35 @@ class UserSettingsService
         $user->settings()->update(['check_in_calendar_mark' => $enabled]);
     }
 
-    public function getCheckInSettings(User $user): UserSettings
+    /**
+     * The settings shape apps before the tracker tables read: on/off of the built-in trackers and the chosen sports.
+     *
+     * @return array{enabled_trackers: array<int, string>, selected_sports: array<int, string>}
+     */
+    public function getCheckInSettings(User $user): array
     {
-        return UserSettings::firstOrCreate(['user_id' => $user->id], []);
+        $settings = UserSettings::firstOrCreate(['user_id' => $user->id], []);
+
+        return [
+            'enabled_trackers' => $this->checkInTrackers->enabledBuiltInKeys($user),
+            'selected_sports' => $settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS,
+        ];
     }
 
-    public function updateCheckInSettings(User $user, array $data): UserSettings
+    /**
+     * @return array{enabled_trackers: array<int, string>, selected_sports: array<int, string>}
+     */
+    public function updateCheckInSettings(User $user, array $data): array
     {
-        return UserSettings::updateOrCreate(
-            ['user_id' => $user->id],
-            ['check_in_settings' => $data]
-        );
+        $settings = UserSettings::firstOrCreate(['user_id' => $user->id], []);
+        $settings->update(['check_in_settings' => [
+            ...($settings->check_in_settings ?? []),
+            'enabled_trackers' => $data['enabled_trackers'],
+            'selected_sports' => $data['selected_sports'],
+        ]]);
+
+        $this->checkInTrackers->setEnabledBuiltIns($user, $data['enabled_trackers']);
+
+        return $this->getCheckInSettings($user);
     }
 }

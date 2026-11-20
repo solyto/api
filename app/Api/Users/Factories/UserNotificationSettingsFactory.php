@@ -47,6 +47,10 @@ class UserNotificationSettingsFactory extends Factory
             'movie_release_email' => false,
             'movie_release_push' => true,
             'movie_release_telegram' => false,
+            'check_in_alert_ui' => true,
+            'check_in_alert_email' => false,
+            'check_in_alert_push' => true,
+            'check_in_alert_telegram' => false,
         ];
     }
 

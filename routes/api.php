@@ -6,6 +6,8 @@ use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ExternalCalendarController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
 use App\Api\CheckIn\Controllers\CheckInController;
+use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
+use App\Api\CheckIn\Controllers\CheckInTrackerController;
 use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
@@ -54,7 +56,6 @@ use App\Api\Users\Controllers\UserController;
 use App\Api\Users\Controllers\UserSettingsController;
 use App\Api\Weather\Controllers\WeatherController;
 use App\Api\Widgets\Controllers\WidgetController;
-use App\Api\Widgets\Services\WidgetService;
 use App\Plugins\Controllers\UserPluginController;
 use App\Shared\Middleware\TrackApiTraffic;
 use Illuminate\Support\Facades\Route;
@@ -181,6 +182,19 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('', [CheckInController::class, 'index']);
         Route::get('marks', [CheckInController::class, 'marks']);
         Route::post('', [CheckInController::class, 'store']);
+        Route::get('values', [CheckInController::class, 'values']);
+        Route::put('values', [CheckInController::class, 'setValue']);
+
+        Route::get('trackers', [CheckInTrackerController::class, 'index']);
+        Route::post('trackers', [CheckInTrackerController::class, 'store']);
+        Route::put('trackers/order', [CheckInTrackerController::class, 'reorder']);
+        Route::put('trackers/{tracker}', [CheckInTrackerController::class, 'update']);
+        Route::delete('trackers/{tracker}', [CheckInTrackerController::class, 'destroy']);
+        Route::put('trackers/{tracker}/goal', [CheckInTrackerController::class, 'setGoal']);
+        Route::delete('trackers/{tracker}/goal', [CheckInTrackerController::class, 'deleteGoal']);
+        Route::post('trackers/{tracker}/alerts', [CheckInTrackerController::class, 'storeAlert']);
+        Route::put('alerts/{alert}', [CheckInTrackerController::class, 'updateAlert']);
+        Route::delete('alerts/{alert}', [CheckInTrackerController::class, 'deleteAlert']);
     });
 
     Route::prefix('calendars')->group(function () {
@@ -275,7 +289,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::post('actions/time_tracking.stop/{entry}', [WidgetController::class, 'stopTimeTracking'])->name('actions.time-tracking-stop');
         Route::get('check-in', [WidgetController::class, 'checkIn'])->name('check-in');
         Route::post('actions/check_in.set/{tracker}', [WidgetController::class, 'setCheckIn'])
-            ->whereIn('tracker', WidgetService::CHECK_IN_TRACKERS)
+            ->whereIn('tracker', CheckInBuiltInTracker::keys())
             ->name('actions.check-in-set');
     });
 

@@ -1,0 +1,137 @@
+<?php
+
+use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\Users\Models\User;
+use Illuminate\Support\Facades\DB;
+
+// Users made by the factory already get trackers through the observer;
+// this turns one back into a user from before the tracker tables.
+function legacyCheckInUser(?array $checkInSettings = null): User
+{
+    $user = makeUser();
+    DB::table('check_in_trackers')->where('user_id', $user->id)->delete();
+    DB::table('user_settings')->where('user_id', $user->id)->update([
+        'check_in_settings' => $checkInSettings === null ? null : json_encode($checkInSettings),
+    ]);
+
+    return $user;
+}
+
+function legacyCheckInRow(User $user, string $date, array $values): void
+{
+    DB::table('check_in')->insert([
+        'user_id' => $user->id,
+        'date' => $date,
+        'created_at' => now(),
+        'updated_at' => now(),
+        ...$values,
+    ]);
+}
+
+function runCheckInMigration(): void
+{
+    (require database_path('migrations/2026_11_19_000005_migrate_check_in_to_trackers.php'))->up();
+}
+
+function migratedValues(User $user): array
+{
+    return CheckInValue::query()
+        ->join('check_in_trackers', 'check_in_trackers.id', '=', 'check_in_values.check_in_tracker_id')
+        ->where('check_in_trackers.user_id', $user->id)
+        ->orderBy('check_in_values.date')
+        ->orderBy('check_in_trackers.key')
+        ->get(['check_in_trackers.key', 'check_in_values.date', 'check_in_values.value'])
+        ->map(fn ($row) => [$row->key, substr((string) $row->date, 0, 10), (int) $row->value])
+        ->all();
+}
+
+describe('Check-in data migration', function () {
+    it('creates the twelve built-in trackers in the old order with the stored on/off state', function () {
+        $user = legacyCheckInUser(['enabled_trackers' => ['water', 'mood', 'social_life'], 'selected_sports' => ['yoga', 'bike', 'mountain', 'footprints', 'dumbbell']]);
+
+        runCheckInMigration();
+
+        $trackers = CheckInTracker::forUser($user->id)->orderBy('position')->get();
+        expect($trackers->pluck('key')->all())->toBe([
+            'mood', 'sleep', 'dreams', 'food_quality', 'food_amount', 'water',
+            'sports', 'work', 'menstruation', 'alcohol', 'smoking', 'social_life',
+        ])
+            ->and($trackers->where('enabled', true)->pluck('key')->values()->all())->toBe(['mood', 'water', 'social_life'])
+            ->and($trackers->firstWhere('key', 'sports')->type->value)->toBe('sport')
+            ->and($trackers->firstWhere('key', 'sports')->scored)->toBeFalse()
+            ->and($trackers->firstWhere('key', 'mood')->scored)->toBeTrue()
+            ->and($trackers->whereNotNull('name')->count())->toBe(0);
+    });
+
+    it('enables the old default trackers when the user never changed the settings', function () {
+        $user = legacyCheckInUser();
+
+        runCheckInMigration();
+
+        expect(CheckInTracker::forUser($user->id)->where('enabled', true)->orderBy('position')->pluck('key')->all())
+            ->toBe(['mood', 'sleep', 'dreams', 'food_quality', 'food_amount', 'water', 'sports', 'work']);
+    });
+
+    it('copies every stored value, including zeros and sports, and nothing else', function () {
+        $user = legacyCheckInUser();
+        legacyCheckInRow($user, '2026-10-01', ['mood' => 4, 'water' => 0, 'sports' => 6]);
+        legacyCheckInRow($user, '2026-10-02', ['social_life' => 2, 'menstruation' => 5, 'alcohol' => 1, 'smoking' => 5]);
+        legacyCheckInRow($user, '2026-10-03', []);
+
+        runCheckInMigration();
+
+        expect(migratedValues($user))->toBe([
+            ['mood', '2026-10-01', 4],
+            ['sports', '2026-10-01', 6],
+            ['water', '2026-10-01', 0],
+            ['alcohol', '2026-10-02', 1],
+            ['menstruation', '2026-10-02', 5],
+            ['smoking', '2026-10-02', 5],
+            ['social_life', '2026-10-02', 2],
+        ]);
+    });
+
+    it('keeps users apart', function () {
+        $first = legacyCheckInUser();
+        $second = legacyCheckInUser();
+        legacyCheckInRow($first, '2026-10-01', ['mood' => 1]);
+        legacyCheckInRow($second, '2026-10-01', ['mood' => 5]);
+
+        runCheckInMigration();
+
+        expect(migratedValues($first))->toBe([['mood', '2026-10-01', 1]])
+            ->and(migratedValues($second))->toBe([['mood', '2026-10-01', 5]]);
+    });
+
+    it('leaves the old table untouched', function () {
+        $user = legacyCheckInUser();
+        legacyCheckInRow($user, '2026-10-01', ['mood' => 4]);
+        $before = DB::table('check_in')->get()->toArray();
+
+        runCheckInMigration();
+
+        expect(DB::table('check_in')->get()->toArray())->toEqual($before);
+    });
+
+    it('skips users who already have trackers, so running it again changes nothing', function () {
+        $user = legacyCheckInUser();
+        legacyCheckInRow($user, '2026-10-01', ['mood' => 4]);
+
+        runCheckInMigration();
+        runCheckInMigration();
+
+        expect(CheckInTracker::forUser($user->id)->count())->toBe(12)
+            ->and(migratedValues($user))->toBe([['mood', '2026-10-01', 4]]);
+    });
+
+    it('migrates every user who has no trackers yet', function () {
+        $users = collect(range(1, 3))->map(fn () => legacyCheckInUser());
+        DB::table('check_in_trackers')->delete();
+
+        runCheckInMigration();
+
+        expect(CheckInTracker::count())->toBe(User::count() * 12);
+        $users->each(fn (User $user) => expect(CheckInTracker::forUser($user->id)->count())->toBe(12));
+    });
+});

@@ -5,7 +5,8 @@ namespace Database\Seeders;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\Calendars\Services\CalendarService;
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Services\CheckInService;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Contacts\Services\ContactService;
 use App\Api\DevRequests\Models\DevRequest;
@@ -282,11 +283,34 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
+    private function seedCheckIn(User $user): void
+    {
+        $checkIns = app(CheckInService::class);
+        $trackers = app(CheckInTrackerService::class);
+
+        $meditated = $trackers->create($user, ['name' => 'Meditated', 'type' => 'yes_no', 'icon' => 'flower-2']);
+        $glasses = $trackers->create($user, ['name' => 'Glasses of water', 'type' => 'count', 'icon' => 'glass-water']);
+        $trackers->setGoal($meditated, ['period' => 'week', 'comparison' => 'at_least', 'target' => 5]);
+        $trackers->addAlert($glasses, ['time' => '18:00', 'target' => 5]);
+
+        foreach (range(29, 0) as $daysAgo) {
+            $date = now()->subDays($daysAgo)->toDateString();
+
+            $checkIns->saveDay($user, $date, [
+                'mood' => fake()->numberBetween(2, 5),
+                'sleep' => fake()->numberBetween(1, 5),
+                'water' => fake()->numberBetween(2, 5),
+                'food_quality' => fake()->numberBetween(2, 5),
+                'sports' => fake()->optional(0.4)->numberBetween(1, 5),
+            ]);
+            $checkIns->setValue($user, $meditated, $date, fake()->boolean(70) ? 1 : null);
+            $checkIns->setValue($user, $glasses, $date, fake()->numberBetween(2, 9));
+        }
+    }
+
     private function seedSmallModules(User $user): void
     {
-        foreach (range(29, 0) as $daysAgo) {
-            CheckIn::factory()->forUser($user)->forDate(now()->subDays($daysAgo)->startOfDay()->toDateTime())->create();
-        }
+        $this->seedCheckIn($user);
 
         Clipboard::factory()->forUser($user)->count(2)->create();
         Clipboard::factory()->forUser($user)->withUrl()->create();

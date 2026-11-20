@@ -2,7 +2,6 @@
 
 namespace App\Api\Widgets\Services;
 
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Resources\CheckInSettingsResource;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
@@ -20,7 +19,6 @@ class WidgetService
     private const string DEFAULT_TIME_FORMAT = 'H:i';
     private const string DEFAULT_DATE_FORMAT = 'dd.mm.YYYY';
     private const string COLOR_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
-    public const array CHECK_IN_TRACKERS = ['mood', 'sleep', 'dreams', 'food_quality', 'food_amount', 'water', 'sports', 'work', 'menstruation', 'alcohol', 'smoking', 'social_life'];
     public const array CHECK_IN_SPORTS = [1 => 'dumbbell', 2 => 'bike', 3 => 'mountain', 4 => 'footprints', 5 => 'waves_ladder', 6 => 'yoga'];
     private const array CHECK_IN_COLORS = [1 => '#EF4444', 2 => '#F97316', 3 => '#3B82F6', 4 => '#86EFAC', 5 => '#22C55E'];
     private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
@@ -149,17 +147,14 @@ class WidgetService
 
         $timezone = $user->settings->timezone ?? 'UTC';
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
-        $settings = $user->settings->check_in_settings ?? [];
-        $enabled = $settings['enabled_trackers'] ?? CheckInSettingsResource::DEFAULT_TRACKERS;
-        $sports = $settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS;
+        $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS;
 
         $now = CarbonImmutable::now($timezone);
         $today = $now->startOfDay();
-        $checkIn = $this->gateway->checkInOn($today->toDateString());
+        $values = $this->gateway->checkInValuesOn($today->toDateString());
 
-        $rows = collect(self::CHECK_IN_TRACKERS)
-            ->filter(fn (string $tracker) => in_array($tracker, $enabled, true))
-            ->map(fn (string $tracker) => $this->checkInRow($tracker, $this->checkInValue($checkIn, $tracker), $sports, $locale));
+        $rows = collect($this->gateway->enabledCheckInBuiltIns())
+            ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $locale));
 
         return [
             'kind' => 'check-in',
@@ -217,13 +212,6 @@ class WidgetService
         }
 
         return $ids->map(fn (int $id) => ['value' => $id, 'icon' => 'sport_' . self::CHECK_IN_SPORTS[$id], 'color' => self::CHECK_IN_SPORTS_COLOR])->all();
-    }
-
-    private function checkInValue(?CheckIn $checkIn, string $tracker): ?int
-    {
-        $value = $checkIn?->getAttribute($tracker);
-
-        return is_numeric($value) ? (int) $value : null;
     }
 
     private function runningRow(TimeTrackingEntry $entry, string $timezone): array

@@ -3,8 +3,8 @@
 namespace App\Shared\Services;
 
 use App\Api\Calendars\Services\CalendarService;
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Services\CheckInService;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Dashboard\DTOs\DetectionResult;
 use App\Api\Dashboard\Enums\QuickAddContentType;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
@@ -15,7 +15,6 @@ use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
 use App\Shared\Exceptions\IntegrationAuthException;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -219,11 +218,26 @@ class IntegrationGateway
     /**
      * @throws IntegrationAuthException
      */
-    public function checkInOn(string $date): ?CheckIn
+    /**
+     * @return array<int, string>
+     * @throws IntegrationAuthException
+     */
+    public function enabledCheckInBuiltIns(): array
     {
         $this->checkAuth();
 
-        return app(CheckInService::class)->find($this->user, $date);
+        return app(CheckInTrackerService::class)->enabledBuiltInKeys($this->user);
+    }
+
+    /**
+     * @return array<string, int>
+     * @throws IntegrationAuthException
+     */
+    public function checkInValuesOn(string $date): array
+    {
+        $this->checkAuth();
+
+        return app(CheckInService::class)->builtInValuesOn($this->user, $date);
     }
 
     /**
@@ -233,22 +247,7 @@ class IntegrationGateway
     {
         $this->checkAuth();
 
-        $service = app(CheckInService::class);
-        $checkIn = $service->find($this->user, $date);
-
-        if ($checkIn) {
-            $service->update($this->user, $checkIn, [$tracker => $value]);
-        } elseif ($value !== null) {
-            try {
-                $service->create($this->user, ['date' => $date, $tracker => $value]);
-            } catch (UniqueConstraintViolationException) {
-                // A concurrent request created today's check-in first; apply this value to it.
-                $checkIn = $service->find($this->user, $date);
-                if ($checkIn) {
-                    $service->update($this->user, $checkIn, [$tracker => $value]);
-                }
-            }
-        }
+        app(CheckInService::class)->setBuiltInValue($this->user, $date, $tracker, $value);
     }
 
     /**

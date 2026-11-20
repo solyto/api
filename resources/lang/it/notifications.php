@@ -25,6 +25,11 @@ return [
     'daily_check_in_reminder_title'  => 'Promemoria check-in giornaliero',
     'daily_check_in_reminder_body'   => 'Hai già fatto il check-in di oggi?',
 
+    // Check-in Alert
+    'check_in_alert_title'           => 'Promemoria check-in',
+    'check_in_alert_missing'         => ':tracker: ancora da compilare oggi.',
+    'check_in_alert_below'           => ':tracker: finora :current su :target oggi.',
+
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'La tua giornata',
     'daily_day_reminder_tasks'       => 'Attività (:count):',
