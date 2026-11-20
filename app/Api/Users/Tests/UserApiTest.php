@@ -203,6 +203,18 @@ describe('User settings endpoints', function () {
         expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => false, 'notes' => true]);
     })->with([null, '1.0.15']);
 
+    it('leaves out features older clients do not know', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true, 'goals' => true], 'desktop' => ['home', 'goals'], 'mobile' => null]]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-Client-Version', '1.0.15')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200);
+
+        expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => true]);
+    });
+
     it('returns flat navigation unchanged to older clients', function () {
         $user = makeUser();
         $user->settings()->update(['navigation' => ['calendar' => false]]);
@@ -225,6 +237,17 @@ describe('User settings endpoints', function () {
             'desktop' => ['home', 'notes'],
             'mobile' => ['home'],
         ]);
+    });
+
+    it('keeps the visibility of features an older client does not know when it saves', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true, 'goals' => false], 'desktop' => null, 'mobile' => null]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/navigation', ['navigation' => json_encode(['calendar' => false])])
+            ->assertStatus(200);
+
+        expect(json_decode($user->fresh()->settings->navigation, true)['visible'])->toBe(['goals' => false, 'calendar' => false]);
     });
 
     it('stores nested navigation as sent', function () {

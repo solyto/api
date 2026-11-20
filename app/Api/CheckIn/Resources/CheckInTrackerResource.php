@@ -18,8 +18,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="position", type="integer"),
  *     @OA\Property(property="enabled", type="boolean"),
  *     @OA\Property(property="scored", type="boolean"),
- *     @OA\Property(property="goal", ref="#/components/schemas/CheckInGoal", nullable=true),
- *     @OA\Property(property="alerts", type="array", @OA\Items(ref="#/components/schemas/CheckInAlert"))
+ *     @OA\Property(property="values_count", type="integer", description="How many values the tracker has; only in the list.")
  * )
  *
  * @mixin CheckInTracker
@@ -40,8 +39,7 @@ class CheckInTrackerResource extends JsonResource
             'position' => $this->position,
             'enabled' => $this->enabled,
             'scored' => $this->scored,
-            'goal' => $this->whenLoaded('goal', fn () => $this->goal ? new CheckInGoalResource($this->goal) : null),
-            'alerts' => CheckInAlertResource::collection($this->whenLoaded('alerts')),
+            'values_count' => $this->whenCounted('values'),
         ];
     }
 }

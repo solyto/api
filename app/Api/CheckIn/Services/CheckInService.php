@@ -47,9 +47,9 @@ class CheckInService
     }
 
     /** @return Collection<int, CheckInValue> */
-    public function values(User $user): Collection
+    public function values(User $user, ?string $from = null, ?string $to = null): Collection
     {
-        return $this->cache->remember(
+        $values = $this->cache->remember(
             [self::VALUES_CACHE_KEY, $user->id],
             self::CACHE_TTL,
             function () use ($user) {
@@ -58,6 +58,11 @@ class CheckInService
                     ->get();
             }
         );
+
+        return $values
+            ->filter(fn (CheckInValue $value) => ($from === null || $value->date->format('Y-m-d') >= $from)
+                && ($to === null || $value->date->format('Y-m-d') <= $to))
+            ->values();
     }
 
     /**

@@ -111,6 +111,24 @@ describe('GET /api/v1/check-in/values', function () {
 
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in/values')->assertJsonCount(1, 'data');
     });
+
+    it('limits the values to a date range', function () {
+        $user = makeUser();
+        $tracker = CheckInTracker::factory()->forUser($user)->create();
+        foreach (['2026-09-30', '2026-10-01', '2026-10-15', '2026-10-31', '2026-11-01'] as $date) {
+            CheckInValue::factory()->forTracker($tracker)->on($date, 1)->create();
+        }
+
+        $dates = fn (string $query) => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in/values'.$query)->assertStatus(200)->json('data'))->pluck('date')->all();
+
+        expect($dates('?from=2026-10-01&to=2026-10-31'))->toBe(['2026-10-01', '2026-10-15', '2026-10-31'])
+            ->and($dates('?from=2026-10-31'))->toBe(['2026-10-31', '2026-11-01'])
+            ->and($dates('?to=2026-09-30'))->toBe(['2026-09-30']);
+    });
+
+    it('rejects a broken range', function (string $query) {
+        expectApiError($this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/check-in/values'.$query), 422);
+    })->with(['?from=yesterday', '?from=2026-10-02&to=2026-10-01']);
 });
 
 describe('Check-in for apps before the tracker tables', function () {

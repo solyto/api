@@ -25,10 +25,14 @@ return [
     'daily_check_in_reminder_title'  => 'Tägliche Check-in Erinnerung',
     'daily_check_in_reminder_body'   => 'Hast du deinen täglichen Check-in bereits abgeschlossen?',
 
-    // Check-in Alert
-    'check_in_alert_title'           => 'Check-in-Erinnerung',
-    'check_in_alert_missing'         => ':tracker: heute noch nicht eingetragen.',
-    'check_in_alert_below'           => ':tracker: heute bisher :current von :target.',
+    // Alerts
+    'alert_title'                    => 'Hinweis',
+    'goal_reached_title'             => 'Ziel erreicht',
+    'alert_average_below'            => ':tracker: im Schnitt :average in den letzten :days Tagen (unter :threshold).',
+    'alert_average_above'            => ':tracker: im Schnitt :average in den letzten :days Tagen (über :threshold).',
+    'alert_no_entry_days'            => ':tracker: seit :days Tagen nichts eingetragen.',
+    'alert_entry_days'               => ':tracker: :days Tage in Folge eingetragen.',
+    'alert_goal_reached'             => ':tracker: Du hast dein Ziel erreicht.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'Dein Tag heute',

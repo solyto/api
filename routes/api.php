@@ -5,8 +5,10 @@ use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ExternalCalendarController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
+use App\Api\Alerts\Controllers\AlertController;
 use App\Api\CheckIn\Controllers\CheckInController;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
+use App\Api\Goals\Controllers\GoalController;
 use App\Api\CheckIn\Controllers\CheckInTrackerController;
 use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
@@ -164,6 +166,16 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
     });
 
     Route::apiResource('tags', TagController::class);
+    Route::apiResource('goals', GoalController::class)->except(['show']);
+
+    Route::prefix('alerts')->group(function () {
+        Route::get('', [AlertController::class, 'index']);
+        Route::post('', [AlertController::class, 'store']);
+        Route::get('suggestions', [AlertController::class, 'suggestions']);
+        Route::post('suggestions/{key}', [AlertController::class, 'enableSuggestion']);
+        Route::put('{alert}', [AlertController::class, 'update']);
+        Route::delete('{alert}', [AlertController::class, 'destroy']);
+    });
 
     Route::prefix('notes')->name('notes.')->group(function () {
         Route::post('import', [NotesImportExportController::class, 'import']);
@@ -190,11 +202,6 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::put('trackers/order', [CheckInTrackerController::class, 'reorder']);
         Route::put('trackers/{tracker}', [CheckInTrackerController::class, 'update']);
         Route::delete('trackers/{tracker}', [CheckInTrackerController::class, 'destroy']);
-        Route::put('trackers/{tracker}/goal', [CheckInTrackerController::class, 'setGoal']);
-        Route::delete('trackers/{tracker}/goal', [CheckInTrackerController::class, 'deleteGoal']);
-        Route::post('trackers/{tracker}/alerts', [CheckInTrackerController::class, 'storeAlert']);
-        Route::put('alerts/{alert}', [CheckInTrackerController::class, 'updateAlert']);
-        Route::delete('alerts/{alert}', [CheckInTrackerController::class, 'deleteAlert']);
     });
 
     Route::prefix('calendars')->group(function () {

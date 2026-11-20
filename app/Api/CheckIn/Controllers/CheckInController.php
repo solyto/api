@@ -4,6 +4,7 @@ namespace App\Api\CheckIn\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\CheckIn\Requests\ListCheckInValuesRequest;
 use App\Api\CheckIn\Requests\SetCheckInValueRequest;
 use App\Api\CheckIn\Requests\StoreCheckInRequest;
 use App\Api\CheckIn\Resources\CheckInResource;
@@ -155,9 +156,12 @@ class CheckInController
      * @OA\Get(
      *     path="/check-in/values",
      *     operationId="checkInValuesIndex",
-     *     summary="List the values of all of the user's trackers",
+     *     summary="List the values of all of the user's trackers, optionally within a date range",
      *     tags={"Check-in"},
      *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(name="from", in="query", required=false, description="First day, inclusive", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="to", in="query", required=false, description="Last day, inclusive", @OA\Schema(type="string", format="date")),
      *
      *     @OA\Response(
      *         response=200,
@@ -171,10 +175,10 @@ class CheckInController
      *     )
      * )
      */
-    public function values(Request $request): JsonResponse
+    public function values(ListCheckInValuesRequest $request): JsonResponse
     {
         return ApiResponse::success(
-            CheckInValueResource::collection($this->checkInService->values($request->user())),
+            CheckInValueResource::collection($this->checkInService->values($request->user(), $request->validated('from'), $request->validated('to'))),
             'Check-in values retrieved successfully.'
         );
     }

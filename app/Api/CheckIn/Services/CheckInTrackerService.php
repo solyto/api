@@ -4,8 +4,6 @@ namespace App\Api\CheckIn\Services;
 
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
-use App\Api\CheckIn\Models\CheckInAlert;
-use App\Api\CheckIn\Models\CheckInGoal;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
@@ -17,15 +15,13 @@ class CheckInTrackerService
 {
     public const int MAX_CUSTOM_TRACKERS = 50;
 
-    public const int MAX_ALERTS_PER_TRACKER = 10;
-
     /** @return Collection<int, CheckInTracker> */
     public function list(User $user): Collection
     {
         $this->provisionBuiltIns($user);
 
         return CheckInTracker::forUser($user->id)
-            ->with(['goal', 'alerts'])
+            ->withCount('values')
             ->orderBy('position')
             ->orderBy('id')
             ->get();
@@ -78,7 +74,7 @@ class CheckInTrackerService
             'scored' => $type === CheckInTrackerType::Scale,
         ]);
 
-        return $tracker->load(['goal', 'alerts']);
+        return $tracker;
     }
 
     public function update(CheckInTracker $tracker, array $data): CheckInTracker
@@ -97,7 +93,7 @@ class CheckInTrackerService
             $this->mirrorEnabledSetting($tracker->user()->firstOrFail());
         }
 
-        return $tracker->fresh(['goal', 'alerts']);
+        return $tracker->fresh();
     }
 
     public function isBuiltIn(CheckInTracker $tracker): bool
@@ -153,54 +149,6 @@ class CheckInTrackerService
             ->pluck('key')
             ->values()
             ->all();
-    }
-
-    public function setGoal(CheckInTracker $tracker, array $data): CheckInTracker
-    {
-        CheckInGoal::updateOrCreate(['check_in_tracker_id' => $tracker->id], $data);
-
-        return $tracker->fresh(['goal', 'alerts']);
-    }
-
-    public function deleteGoal(CheckInTracker $tracker): CheckInTracker
-    {
-        $tracker->goal()->delete();
-
-        return $tracker->fresh(['goal', 'alerts']);
-    }
-
-    public function addAlert(CheckInTracker $tracker, array $data): CheckInTracker
-    {
-        if ($tracker->alerts()->count() >= self::MAX_ALERTS_PER_TRACKER) {
-            throw ValidationException::withMessages(['time' => 'This tracker already has the maximum number of reminders.']);
-        }
-
-        $tracker->alerts()->create($this->alertData($tracker, $data));
-
-        return $tracker->fresh(['goal', 'alerts']);
-    }
-
-    public function updateAlert(CheckInAlert $alert, array $data): CheckInTracker
-    {
-        $alert->update([...$this->alertData($alert->tracker, $data), 'last_sent_on' => null]);
-
-        return $alert->tracker->fresh(['goal', 'alerts']);
-    }
-
-    public function deleteAlert(CheckInAlert $alert): CheckInTracker
-    {
-        $tracker = $alert->tracker;
-        $alert->delete();
-
-        return $tracker->fresh(['goal', 'alerts']);
-    }
-
-    private function alertData(CheckInTracker $tracker, array $data): array
-    {
-        return [
-            'time' => $data['time'],
-            'target' => $tracker->type === CheckInTrackerType::Count ? (int) $data['target'] : null,
-        ];
     }
 
     private function nextPosition(User $user): int

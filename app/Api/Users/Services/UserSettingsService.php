@@ -13,6 +13,12 @@ class UserSettingsService
     // older ones read and write only a flat map of feature flags.
     public const string NESTED_NAVIGATION_SINCE = '1.1.0';
 
+    /** The navigation features of 1.0.15, the last release before the nested navigation. */
+    public const array LEGACY_NAVIGATION_FEATURES = [
+        'calendar', 'todos', 'notes', 'libraries', 'contacts', 'checkIn', 'finances',
+        'clipboard', 'dev_requests', 'feeds', 'timeTracking',
+    ];
+
     public function __construct(private readonly CheckInTrackerService $checkInTrackers) {}
 
     public function updateNavigation(User $user, array $navigation): void
@@ -21,7 +27,9 @@ class UserSettingsService
         if (!array_key_exists('visible', $navigation)) {
             $stored = json_decode($user->settings->navigation ?? 'null', true);
             if (is_array($stored) && is_array($stored['visible'] ?? null)) {
-                $navigation = [...$stored, 'visible' => $navigation];
+                // Features the older client doesn't know keep their stored visibility.
+                $unknown = array_diff_key($stored['visible'], array_flip(self::LEGACY_NAVIGATION_FEATURES));
+                $navigation = [...$stored, 'visible' => [...$unknown, ...$navigation]];
             }
         }
 
@@ -36,7 +44,8 @@ class UserSettingsService
             return $navigation;
         }
 
-        return json_encode((object) $decoded['visible']);
+        // 1.0.x renders unknown keys as unnamed toggles, so only send the features it has.
+        return json_encode((object) array_intersect_key($decoded['visible'], array_flip(self::LEGACY_NAVIGATION_FEATURES)));
     }
 
     public function updateLanguage(User $user, string $language): void

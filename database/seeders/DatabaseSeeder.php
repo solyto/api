@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Api\Alerts\Services\AlertService;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\Calendars\Services\CalendarService;
@@ -18,6 +19,7 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
+use App\Api\Goals\Services\GoalService;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Models\LibraryGame;
@@ -290,8 +292,14 @@ class DatabaseSeeder extends Seeder
 
         $meditated = $trackers->create($user, ['name' => 'Meditated', 'type' => 'yes_no', 'icon' => 'flower-2']);
         $glasses = $trackers->create($user, ['name' => 'Glasses of water', 'type' => 'count', 'icon' => 'glass-water']);
-        $trackers->setGoal($meditated, ['period' => 'week', 'comparison' => 'at_least', 'target' => 5]);
-        $trackers->addAlert($glasses, ['time' => '18:00', 'target' => 5]);
+        app(GoalService::class)->create($user, [
+            'source' => 'check_in_tracker', 'check_in_tracker_id' => $meditated->id,
+            'period' => 'week', 'comparison' => 'at_least', 'target' => 5, 'notify_when_reached' => true,
+        ]);
+        app(AlertService::class)->create($user, [
+            'source' => 'check_in_tracker', 'check_in_tracker_id' => $glasses->id,
+            'rule' => 'average_below', 'threshold' => 5, 'days' => 7,
+        ]);
 
         foreach (range(29, 0) as $daysAgo) {
             $date = now()->subDays($daysAgo)->toDateString();

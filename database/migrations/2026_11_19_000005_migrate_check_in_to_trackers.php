@@ -30,8 +30,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('check_in_alerts')->delete();
-        DB::table('check_in_goals')->delete();
         DB::table('check_in_values')->delete();
         DB::table('check_in_trackers')->delete();
     }

@@ -45,10 +45,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="movie_release_email", type="boolean"),
  *     @OA\Property(property="movie_release_push", type="boolean"),
  *     @OA\Property(property="movie_release_telegram", type="boolean"),
- *     @OA\Property(property="check_in_alert_ui", type="boolean"),
- *     @OA\Property(property="check_in_alert_email", type="boolean"),
- *     @OA\Property(property="check_in_alert_push", type="boolean"),
- *     @OA\Property(property="check_in_alert_telegram", type="boolean")
+ *     @OA\Property(property="alert_ui", type="boolean"),
+ *     @OA\Property(property="alert_email", type="boolean"),
+ *     @OA\Property(property="alert_push", type="boolean"),
+ *     @OA\Property(property="alert_telegram", type="boolean")
  * )
  *
  * @mixin UserNotificationSettings
@@ -94,10 +94,10 @@ class NotificationSettingsResource extends JsonResource
             'movie_release_email' => (bool) $this->movie_release_email,
             'movie_release_push' => (bool) $this->movie_release_push,
             'movie_release_telegram' => (bool) $this->movie_release_telegram,
-            'check_in_alert_ui' => (bool) $this->check_in_alert_ui,
-            'check_in_alert_email' => (bool) $this->check_in_alert_email,
-            'check_in_alert_push' => (bool) $this->check_in_alert_push,
-            'check_in_alert_telegram' => (bool) $this->check_in_alert_telegram,
+            'alert_ui' => (bool) $this->alert_ui,
+            'alert_email' => (bool) $this->alert_email,
+            'alert_push' => (bool) $this->alert_push,
+            'alert_telegram' => (bool) $this->alert_telegram,
         ];
     }
 }

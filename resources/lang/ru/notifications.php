@@ -25,10 +25,14 @@ return [
     'daily_check_in_reminder_title' => 'Пора пройти ежедневный опрос',
     'daily_check_in_reminder_body'  => 'Вы уже заполнили ежедневный опрос?',
 
-    // Check-in Alert
-    'check_in_alert_title'          => 'Напоминание об опросе',
-    'check_in_alert_missing'        => ':tracker: сегодня ещё нет данных.',
-    'check_in_alert_below'          => ':tracker: сегодня пока :current из :target.',
+    // Alerts
+    'alert_title'                   => 'Оповещение',
+    'goal_reached_title'            => 'Цель достигнута',
+    'alert_average_below'           => ':tracker: в среднем :average за последние :days дн. (ниже :threshold).',
+    'alert_average_above'           => ':tracker: в среднем :average за последние :days дн. (выше :threshold).',
+    'alert_no_entry_days'           => ':tracker: нет записей :days дн. подряд.',
+    'alert_entry_days'              => ':tracker: записи :days дн. подряд.',
+    'alert_goal_reached'            => ':tracker: вы достигли цели.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'      => 'Планы на день',

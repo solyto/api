@@ -37,24 +37,6 @@ return new class extends Migration
 
             $table->unique(['check_in_tracker_id', 'date']);
         });
-
-        Schema::create('check_in_goals', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('check_in_tracker_id')->unique()->constrained('check_in_trackers')->cascadeOnDelete();
-            $table->enum('period', ['day', 'week', 'month']);
-            $table->enum('comparison', ['at_least', 'at_most']);
-            $table->decimal('target', 10, 2);
-            $table->timestamps();
-        });
-
-        Schema::create('check_in_alerts', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('check_in_tracker_id')->constrained('check_in_trackers')->cascadeOnDelete();
-            $table->time('time');
-            $table->unsignedInteger('target')->nullable();
-            $table->date('last_sent_on')->nullable();
-            $table->timestamps();
-        });
     }
 
     /**
@@ -62,8 +44,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('check_in_alerts');
-        Schema::dropIfExists('check_in_goals');
         Schema::dropIfExists('check_in_values');
         Schema::dropIfExists('check_in_trackers');
     }

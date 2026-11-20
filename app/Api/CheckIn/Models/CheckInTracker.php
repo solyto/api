@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CheckInTracker extends Model
 {
@@ -51,18 +50,6 @@ class CheckInTracker extends Model
     public function values(): HasMany
     {
         return $this->hasMany(CheckInValue::class);
-    }
-
-    /** @return HasOne<CheckInGoal, $this> */
-    public function goal(): HasOne
-    {
-        return $this->hasOne(CheckInGoal::class);
-    }
-
-    /** @return HasMany<CheckInAlert, $this> */
-    public function alerts(): HasMany
-    {
-        return $this->hasMany(CheckInAlert::class)->orderBy('time');
     }
 
     public function scopeForUser(Builder $query, string $userId)

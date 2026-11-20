@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Api\CheckIn\Enums;
+namespace App\Api\Goals\Enums;
 
-enum CheckInGoalPeriod: string
+enum GoalPeriod: string
 {
     case Day = 'day';
     case Week = 'week';

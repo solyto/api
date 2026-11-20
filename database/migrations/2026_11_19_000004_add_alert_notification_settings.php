@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('user_notification_settings', function (Blueprint $table) {
-            $table->boolean('check_in_alert_ui')->default(true);
-            $table->boolean('check_in_alert_email')->default(false);
-            $table->boolean('check_in_alert_push')->default(true);
-            $table->boolean('check_in_alert_telegram')->default(false);
+            $table->boolean('alert_ui')->default(true);
+            $table->boolean('alert_email')->default(false);
+            $table->boolean('alert_push')->default(true);
+            $table->boolean('alert_telegram')->default(false);
         });
     }
 
@@ -20,10 +20,10 @@ return new class extends Migration
     {
         Schema::table('user_notification_settings', function (Blueprint $table) {
             $table->dropColumn([
-                'check_in_alert_ui',
-                'check_in_alert_email',
-                'check_in_alert_push',
-                'check_in_alert_telegram',
+                'alert_ui',
+                'alert_email',
+                'alert_push',
+                'alert_telegram',
             ]);
         });
     }
