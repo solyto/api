@@ -1,6 +1,7 @@
 # Report: optional end-to-end encryption — API side
 
 date: 2026-11-18
+read: true
 branch: `feature/brief_solyto-encrypted` (job `brief`)
 scope: Can solyto offer optional encryption of user data, what does the user give up, and what does the API have to change? Written for the maintainer after a joint review with the frontend (ophelia, app report: `ophelia/encryption-research.md` in the room). Report only. No application code, migrations, config, routes or DAV wiring were changed.
 

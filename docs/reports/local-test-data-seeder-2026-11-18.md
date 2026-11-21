@@ -3,7 +3,7 @@
 date: 2026-11-18
 branch: `main`, tree at `e42264a`
 scope: The maintainer wants to stop testing locally with their own real data, because a real data export (`.zip`) was accidentally committed to this repo. The goal is a seeder that creates one test account full of fake data across every module, so a stray export or dump can't contain anything real. It's for local dev machines only and must never run in production. This is a plan. No code, config, migrations or `.gitignore` were changed.
-read: false
+read: true
 
 ## Summary
 
