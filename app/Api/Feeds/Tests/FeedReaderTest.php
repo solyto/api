@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\Feeds\Services\FeedReader;
+use App\Shared\Services\OutboundUrlGuard;
 use Illuminate\Support\Facades\Http;
 
 covers(FeedReader::class);
@@ -14,6 +15,33 @@ function feedReaderWithFixture(string $fixture): FeedReader
     )]);
 
     return app(FeedReader::class);
+}
+
+function fakeAngak(): void
+{
+    Http::fake([
+        'https://angak.fr/actualites/' => Http::response(
+            file_get_contents(__DIR__.'/../../../../tests/Fixtures/angak_actualites.html'),
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8']
+        ),
+        'https://angak.fr/feed/' => Http::response(
+            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss'),
+            200,
+            ['Content-Type' => 'application/rss+xml; charset=UTF-8']
+        ),
+        'https://angak.fr/comments/feed/' => Http::response(
+            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.atom'),
+            200,
+            ['Content-Type' => 'application/atom+xml; charset=UTF-8']
+        ),
+        'https://angak.fr/actualites/feed/' => Http::response(
+            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+            200,
+            ['Content-Type' => 'application/rss+xml; charset=UTF-8']
+        ),
+        '*' => Http::response('Not found', 404),
+    ]);
 }
 
 describe('FeedReader', function () {
@@ -89,9 +117,76 @@ describe('FeedReader', function () {
         $data = app(FeedReader::class)->getFeedData('https://site.example/blog');
 
         expect($data['title'])->toBe('Fixture Feed');
+        expect($data['url'])->toBe('https://site.example/blog/feed.xml');
         Http::assertSent(fn ($request) => $request->url() === 'https://site.example/blog/feed.xml');
         Http::assertNotSent(fn ($request) => $request->url() === 'https://site.example/feed.xml');
         Http::assertSentCount(3);
+    });
+
+    it('picks the discovered feed under the page path when the first one is empty', function () {
+        fakeAngak();
+
+        $data = app(FeedReader::class)->getFeedData('https://angak.fr/actualites/');
+
+        expect($data['url'])->toBe('https://angak.fr/actualites/feed/');
+        expect($data['title'])->toBe('Fixture Feed');
+        expect($data['items'])->toHaveCount(2);
+    });
+
+    it('returns the URL of a page\'s single discovered feed', function () {
+        Http::fake([
+            'https://single.example/news/' => Http::response(
+                '<!DOCTYPE html><html><head><link rel="alternate" type="application/rss+xml" href="https://single.example/rss.xml"></head><body></body></html>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+            'https://single.example/rss.xml' => Http::response(
+                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                200,
+                ['Content-Type' => 'application/rss+xml']
+            ),
+            '*' => Http::response('Not found', 404),
+        ]);
+
+        $data = app(FeedReader::class)->getFeedData('https://single.example/news/');
+
+        expect($data['url'])->toBe('https://single.example/rss.xml');
+        expect($data['items'])->toHaveCount(2);
+        Http::assertSentCount(2);
+    });
+
+    it('returns a feed URL as its own url', function () {
+        $data = feedReaderWithFixture('feed.rss')->getFeedData('https://fixture.example/feed.rss');
+
+        expect($data['url'])->toBe('https://fixture.example/feed.rss');
+        Http::assertSentCount(1);
+    });
+
+    it('never fetches a discovered feed on a blocked address', function () {
+        app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(
+            fn (string $host) => $host === 'internal.example' ? ['10.0.0.1'] : ['93.184.216.34']
+        ));
+        Http::fake([
+            'https://public.example/news/' => Http::response(
+                '<!DOCTYPE html><html><head>'
+                .'<link rel="alternate" type="application/rss+xml" href="https://internal.example/news/feed/">'
+                .'<link rel="alternate" type="application/rss+xml" href="https://public.example/feed/">'
+                .'</head><body></body></html>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+            'https://public.example/feed/' => Http::response(
+                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                200,
+                ['Content-Type' => 'application/rss+xml']
+            ),
+            '*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.atom'), 200, ['Content-Type' => 'application/atom+xml']),
+        ]);
+
+        $data = app(FeedReader::class)->getFeedData('https://public.example/news/');
+
+        expect($data['url'])->toBe('https://public.example/feed/');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'internal.example'));
     });
 
     it('parses already downloaded content in the charset of its Content-Type', function () {

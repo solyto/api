@@ -259,7 +259,7 @@ class FeedController
      *         @OA\JsonContent(
      *             required={"url"},
      *
-     *             @OA\Property(property="url", type="string", format="uri", example="https://example.com/feed.xml")
+     *             @OA\Property(property="url", type="string", format="uri", example="https://example.com/feed.xml", description="Feed URL, or a website URL whose linked feed is used")
      *         )
      *     ),
      *
@@ -310,7 +310,7 @@ class FeedController
      *             required={"title","url"},
      *
      *             @OA\Property(property="title", type="string"),
-     *             @OA\Property(property="url", type="string", format="uri"),
+     *             @OA\Property(property="url", type="string", format="uri", description="Feed URL, or a website URL whose linked feed is subscribed and stored"),
      *             @OA\Property(property="whitelist", type="string", nullable=true),
      *             @OA\Property(property="blacklist", type="string", nullable=true)
      *         )

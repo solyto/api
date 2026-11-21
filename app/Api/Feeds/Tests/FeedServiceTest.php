@@ -131,6 +131,17 @@ describe('FeedService', function () {
         expect(Feed::sole()->title)->toBe("Tom & Jerry's Blog");
     });
 
+    it('stores an imported feed under its OPML URL', function () {
+        Queue::fake();
+
+        app(FeedService::class)->createImportedSubscription(makeUser(), 'Imported', 'https://example.com/feed.xml', [
+            'title' => 'Example Feed',
+            'items' => ['fake-item'],
+        ]);
+
+        expect(Feed::sole()->url)->toBe('https://example.com/feed.xml');
+    });
+
     it('cuts an overlong remote feed title to the column length', function () {
         Queue::fake();
         $user = makeUser();

@@ -76,6 +76,59 @@ describe('Feed subscriptions CRUD', function () {
         Queue::assertPushed(\App\Api\Feeds\Jobs\SyncFeed::class);
     });
 
+    it('stores the feed URL a website URL resolves to', function () {
+        Queue::fake();
+        $this->mock(FeedReader::class)->shouldReceive('getFeedData')->once()->with('https://angak.fr/actualites/')->andReturn([
+            'url' => 'https://angak.fr/actualites/feed/',
+            'title' => 'Actualités',
+            'items' => ['fake-item'],
+        ]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'Angak', 'url' => 'https://angak.fr/actualites/'])
+            ->assertStatus(201)
+            ->assertJsonPath('data.url', 'https://angak.fr/actualites/feed/');
+
+        expect(Feed::sole()->url)->toBe('https://angak.fr/actualites/feed/');
+    });
+
+    it('reuses the stored feed a website URL resolves to', function () {
+        Queue::fake();
+        $user = makeUser();
+        $feed = Feed::factory()->create(['url' => 'https://angak.fr/actualites/feed/']);
+        FeedSubscription::factory()->forUser(makeUser())->forFeed($feed)->create();
+        $this->mock(FeedReader::class)->shouldReceive('getFeedData')->once()->andReturn([
+            'url' => 'https://angak.fr/actualites/feed/',
+            'title' => 'Actualités',
+            'items' => ['fake-item'],
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'Angak', 'url' => 'https://angak.fr/actualites/'])
+            ->assertStatus(201);
+
+        expect(Feed::count())->toBe(1);
+        expect(FeedSubscription::where('user_id', $user->id)->sole()->feed_id)->toBe($feed->id);
+    });
+
+    it('rejects a website URL whose feed the user already subscribes to with 409', function () {
+        Queue::fake();
+        $user = makeUser();
+        $feed = Feed::factory()->create(['url' => 'https://angak.fr/actualites/feed/']);
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        $this->mock(FeedReader::class)->shouldReceive('getFeedData')->once()->andReturn([
+            'url' => 'https://angak.fr/actualites/feed/',
+            'title' => 'Actualités',
+            'items' => ['fake-item'],
+        ]);
+
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/subscriptions', ['title' => 'Angak', 'url' => 'https://angak.fr/actualites/']), 409);
+
+        expect(Feed::count())->toBe(1);
+        expect(FeedSubscription::where('user_id', $user->id)->count())->toBe(1);
+    });
+
     it('rejects a feed URL on a private address with 422 and fetches nothing', function () {
         Http::fake();
         app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(fn () => ['10.0.0.1']));
@@ -214,6 +267,46 @@ describe('Feed items and discovery', function () {
             ->postJson('/api/v1/feeds/test', ['url' => 'https://example.com/feed.xml'])
             ->assertStatus(200)
             ->assertJsonPath('data.0.title', 'Latest Article');
+    });
+
+    it('tests a website URL with the stored items of the feed it resolves to', function () {
+        $feed = Feed::factory()->create(['url' => 'https://angak.fr/actualites/feed/']);
+        FeedItem::factory()->forFeed($feed)->create(['title' => 'Stored Article']);
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getFeedData')->once()->with('https://angak.fr/actualites/')->andReturn([
+            'url' => 'https://angak.fr/actualites/feed/',
+            'title' => 'Actualités',
+            'items' => [],
+        ]);
+        $reader->shouldReceive('getItems')->never();
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/test', ['url' => 'https://angak.fr/actualites/'])
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Stored Article');
+    });
+
+    it('tests a website URL with the live items of the feed it resolves to', function () {
+        Http::fake([
+            'https://angak.fr/actualites/' => Http::response(
+                file_get_contents(__DIR__.'/../../../../tests/Fixtures/angak_actualites.html'),
+                200,
+                ['Content-Type' => 'text/html; charset=UTF-8']
+            ),
+            'https://angak.fr/actualites/feed/' => Http::response(
+                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                200,
+                ['Content-Type' => 'application/rss+xml']
+            ),
+            '*' => Http::response('Not found', 404),
+        ]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/feeds/test', ['url' => 'https://angak.fr/actualites/'])
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.title', 'First Post');
     });
 
     it('answers 422 when testing a feed that redirects to an unparseable Location', function (string $location) {

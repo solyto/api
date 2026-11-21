@@ -58,11 +58,23 @@ class FeedReader
     }
 
     /**
+     * 'url' is the feed that was read: $url itself when it is a feed, else
+     * the feed discovered on that page. It is the URL before redirects:
+     * httpClient() reports every redirect to SimplePie as a temporary one.
+     *
+     * @return array{url: string, title: ?string, items: array<int, \SimplePie\Item>}|false
+     *
      * @throws BlockedUrlException when the feed URL itself points at a non-public address
      */
     public function getFeedData(string $url): array|false
     {
         $pie = $this->fetchFeed($url);
+        $preferred = $this->preferredDiscoveredFeed($url, $pie);
+
+        if ($preferred !== null && $preferred !== $pie->subscribe_url(true)) {
+            $pie = $this->fetchFeed($preferred);
+        }
+
         $items = $pie->get_items();
 
         if (empty($items)) {
@@ -70,9 +82,37 @@ class FeedReader
         }
 
         return [
+            'url' => $pie->subscribe_url(true) ?? $url,
             'title' => $pie->get_title() ?: null,
             'items' => $items,
         ];
+    }
+
+    /**
+     * SimplePie loads the first feed a page links to, often the site-wide
+     * one (angak.fr: an empty /feed/). A discovered feed under the page's
+     * own path is the one the user pasted the page for
+     * (/actualites/ → /actualites/feed/). A root page has no such feed.
+     */
+    private function preferredDiscoveredFeed(string $pageUrl, SimplePie $pie): ?string
+    {
+        $page = parse_url($pageUrl);
+        $prefix = rtrim($page['path'] ?? '', '/').'/';
+
+        if ($prefix === '/') {
+            return null;
+        }
+
+        foreach ($pie->get_all_discovered_feeds() ?? [] as $candidate) {
+            $candidateUrl = $candidate->get_permanent_uri();
+            $parts = parse_url($candidateUrl);
+
+            if (strcasecmp($parts['host'] ?? '', $page['host'] ?? '') === 0 && str_starts_with($parts['path'] ?? '', $prefix)) {
+                return $candidateUrl;
+            }
+        }
+
+        return null;
     }
 
     /**

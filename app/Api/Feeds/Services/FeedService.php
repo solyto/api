@@ -3,6 +3,7 @@
 namespace App\Api\Feeds\Services;
 
 use App\Shared\Pulse\PulseMetrics;
+use App\Api\Feeds\Exceptions\FeedAlreadySubscribedException;
 use App\Api\Feeds\Exceptions\FeedException;
 use App\Api\Feeds\Exceptions\FeedSubscriptionLimitException;
 use App\Api\Feeds\Jobs\SyncFeed;
@@ -55,37 +56,37 @@ class FeedService
     }
 
     /**
+     * $url may be a website: when the feed it resolves to is already stored,
+     * the stored items are returned instead of the live ones.
+     *
      * @throws ValidationException when the feed host does not resolve
      */
     public function getTestFeedItems(string $url): array
     {
-        $feed = Feed::where('url', $url)->first();
+        $storedItems = $this->storedTestFeedItems($url);
 
-        if ($feed) {
-            $items = $this->getFeedItems($feed->id);
-
-            if ($items->isNotEmpty()) {
-                return $this->hydrateFeedItems($items)->map(fn($item) => [
-                    'id'           => $item->feed_item_id,
-                    'title'        => $item->title,
-                    'link'         => $item->link,
-                    'published_at' => $item->published_at,
-                ])
-                ->values()
-                ->toArray();
-            }
+        if ($storedItems !== null) {
+            return $storedItems;
         }
 
         try {
-            $rssItems = $this->getFeedItemsFromRss($url);
+            $feedData = $this->feedReader->getFeedData($url);
         } catch (UnresolvableHostException) {
             throw ValidationException::withMessages(['url' => 'The feed URL could not be resolved.']);
         } catch (BlockedUrlException) {
             return [];
         }
 
-        if (!$rssItems) {
+        if (!$feedData) {
             return [];
+        }
+
+        if ($feedData['url'] !== $url) {
+            $storedItems = $this->storedTestFeedItems($feedData['url']);
+
+            if ($storedItems !== null) {
+                return $storedItems;
+            }
         }
 
         return array_map(fn($item) => [
@@ -93,7 +94,34 @@ class FeedService
             'title'        => $item->get_title(),
             'link'         => $item->get_link(),
             'published_at' => Carbon::parse($item->get_date()),
-        ], $rssItems);
+        ], $feedData['items']);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null null when no Feed row has $url or it has no items yet
+     */
+    private function storedTestFeedItems(string $url): ?array
+    {
+        $feed = Feed::where('url', $url)->first();
+
+        if (!$feed) {
+            return null;
+        }
+
+        $items = $this->getFeedItems($feed->id);
+
+        if ($items->isEmpty()) {
+            return null;
+        }
+
+        return $this->hydrateFeedItems($items)->map(fn($item) => [
+            'id'           => $item->feed_item_id,
+            'title'        => $item->title,
+            'link'         => $item->link,
+            'published_at' => $item->published_at,
+        ])
+        ->values()
+        ->toArray();
     }
 
     /**
@@ -137,7 +165,11 @@ class FeedService
     }
 
     /**
-     * @param  \Closure(): (array|false)  $fetchFeedData  only called when the Feed row does not exist yet
+     * $url may be a website; the Feed row is stored under the feed URL it
+     * resolved to ($fetchFeedData's 'url'), and an existing row for that URL
+     * is reused. Fetched data without 'url' (OPML import) keeps $url.
+     *
+     * @param  \Closure(): (array|false)  $fetchFeedData  only called when no Feed row has $url
      *
      * @throws FeedException
      * @throws FeedSubscriptionLimitException
@@ -147,8 +179,8 @@ class FeedService
     {
         $feed = Feed::where('url', $url)->first();
 
-        if ($feed && FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
-            throw new \App\Api\Feeds\Exceptions\FeedAlreadySubscribedException('Already subscribed to this feed');
+        if ($feed) {
+            $this->ensureNotSubscribed($userId, $feed);
         }
 
         if ($this->hasReachedSubscriptionLimit($userId)) {
@@ -162,11 +194,18 @@ class FeedService
                 throw new FeedException('Failed to fetch feed items from RSS');
             }
 
-            $feed = Feed::create([
-                'title' => mb_substr($this->plainTitle($feedData['title']) ?: $title, 0, self::MAX_TITLE_LENGTH),
-                'url' => $url,
-                'created_by' => $userId,
-            ]);
+            $feedUrl = $feedData['url'] ?? $url;
+            $feed = $feedUrl === $url ? null : Feed::where('url', $feedUrl)->first();
+
+            if ($feed) {
+                $this->ensureNotSubscribed($userId, $feed);
+            } else {
+                $feed = Feed::create([
+                    'title' => mb_substr($this->plainTitle($feedData['title']) ?: $title, 0, self::MAX_TITLE_LENGTH),
+                    'url' => $feedUrl,
+                    'created_by' => $userId,
+                ]);
+            }
         }
 
         $subscription = FeedSubscription::create([
@@ -183,6 +222,16 @@ class FeedService
         SyncFeed::dispatch($feed->id);
 
         return $subscription;
+    }
+
+    /**
+     * @throws FeedAlreadySubscribedException
+     */
+    private function ensureNotSubscribed(string $userId, Feed $feed): void
+    {
+        if (FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
+            throw new FeedAlreadySubscribedException('Already subscribed to this feed');
+        }
     }
 
     public function getAggregatedItems(string $userId, int $offset = 0, ?int $limit = 50, ?string $feedId = null): array
