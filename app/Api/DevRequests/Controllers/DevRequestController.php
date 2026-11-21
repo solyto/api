@@ -117,7 +117,7 @@ class DevRequestController
      *         @OA\JsonContent(
      *
      *             @OA\Property(property="type", type="string", enum={"feature", "bug"}),
-     *             @OA\Property(property="status", type="string", enum={"backlog", "pending", "in-progress", "waiting-for-deployment", "completed", "cancelled"}),
+     *             @OA\Property(property="status", type="string", enum={"backlog", "pending", "in-progress", "waiting-for-deployment", "waiting-for-user", "completed", "cancelled"}),
      *             @OA\Property(property="title", type="string", maxLength=255),
      *             @OA\Property(property="description", type="string"),
      *             @OA\Property(property="screenshot", type="string", maxLength=255, nullable=true),

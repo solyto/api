@@ -92,9 +92,9 @@ describe('POST /api/v1/check-in', function () {
 describe('GET /api/v1/check-in/marks', function () {
     it('returns check-in dates within the range', function () {
         $user = makeUser();
-        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-06']);
-        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-08']);
-        CheckIn::factory()->forUser($user)->create(['date' => '2026-11-01']);
+        app(CheckInService::class)->saveDay($user, '2026-10-06', ['mood' => 3]);
+        app(CheckInService::class)->saveDay($user, '2026-10-08', ['water' => 2]);
+        app(CheckInService::class)->saveDay($user, '2026-11-01', ['mood' => 5]);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
@@ -106,7 +106,7 @@ describe('GET /api/v1/check-in/marks', function () {
     it('scopes marks to the authenticated user', function () {
         $user = makeUser();
         $other = makeUser();
-        CheckIn::factory()->forUser($other)->create(['date' => '2026-10-06']);
+        app(CheckInService::class)->saveDay($other, '2026-10-06', ['mood' => 3]);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
@@ -155,13 +155,10 @@ describe('CheckInService', function () {
         expect($found->id)->toBe($checkIn->id);
     });
 
-    it('create persists the check-in', function () {
+    it('saveDay persists the day in the old shape', function () {
         $user = makeUser();
 
-        $checkIn = app(CheckInService::class)->create($user, [
-            'date' => now()->toDateString(),
-            'mood' => 1,
-        ]);
+        $checkIn = app(CheckInService::class)->saveDay($user, now()->toDateString(), ['mood' => 1]);
 
         expect($checkIn->user_id)->toBe($user->id);
         expect($checkIn->mood)->toBe(1);

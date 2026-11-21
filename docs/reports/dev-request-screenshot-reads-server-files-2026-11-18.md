@@ -1,6 +1,7 @@
 # Report: Any user can copy server files into the public disk through a dev-request screenshot
 
 date: 2026-11-18
+read: true
 branch: `main`, tree at `2060009`
 scope: Security of `POST /dev-requests` (`DevRequestService::create` → `DevRequestScreenshotService::save`). Written for the maintainer. No application code, config, migrations, or DAV wiring/schema were changed. A throwaway Pest probe and a throwaway PHP script were run and deleted. They read only `composer.json` and wrote only to a faked disk or a temp dir.
 

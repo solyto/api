@@ -20,6 +20,7 @@ describe('DeleteOldDevRequests', function () {
         $recent = DevRequest::factory()->completed()->create(['created_at' => now()->subDay()]);
         $open = DevRequest::factory()->pending()->create(['created_at' => now()->subDays(60)]);
         $waiting = DevRequest::factory()->waitingForDeployment()->create(['created_at' => now()->subDays(60)]);
+        $waitingForUser = DevRequest::factory()->waitingForUser()->create(['created_at' => now()->subDays(60)]);
 
         app(DeleteOldDevRequests::class)->handle();
 
@@ -27,6 +28,7 @@ describe('DeleteOldDevRequests', function () {
         expect(DevRequest::find($recent->id))->not->toBeNull();
         expect(DevRequest::find($open->id))->not->toBeNull();
         expect(DevRequest::find($waiting->id))->not->toBeNull();
+        expect(DevRequest::find($waitingForUser->id))->not->toBeNull();
     });
 });
 

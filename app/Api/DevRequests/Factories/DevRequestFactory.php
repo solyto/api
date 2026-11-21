@@ -15,7 +15,7 @@ class DevRequestFactory extends Factory
     {
         return [
             'type' => $this->faker->randomElement(['feature', 'bug']),
-            'status' => $this->faker->randomElement(['backlog', 'pending', 'in-progress', 'waiting-for-deployment', 'completed', 'cancelled']),
+            'status' => $this->faker->randomElement(['backlog', 'pending', 'in-progress', 'waiting-for-deployment', 'waiting-for-user', 'completed', 'cancelled']),
             'title' => $this->faker->sentence(6),
             'description' => $this->faker->paragraph(),
             'screenshot' => null,
@@ -64,6 +64,13 @@ class DevRequestFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => 'waiting-for-deployment',
+        ]);
+    }
+
+    public function waitingForUser(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'waiting-for-user',
         ]);
     }
 

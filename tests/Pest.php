@@ -1,5 +1,7 @@
 <?php
 
+use App\Api\CheckIn\Enums\CheckInTrackerType;
+use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -224,4 +226,20 @@ function enableMcp(): void
 
     app()->register(\Laravel\Mcp\Server\McpServiceProvider::class);
     app('router')->getRoutes()->refreshNameLookups();
+}
+
+/**
+ * A user's built-in check-in tracker (created with the user).
+ */
+function builtInTracker(User $user, string $key): CheckInTracker
+{
+    return CheckInTracker::forUser($user->id)->where('key', $key)->firstOrFail();
+}
+
+/**
+ * A tracker of the user's own.
+ */
+function ownTracker(User $user, CheckInTrackerType $type = CheckInTrackerType::YesNo): CheckInTracker
+{
+    return CheckInTracker::factory()->forUser($user)->ofType($type)->create();
 }

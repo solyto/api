@@ -12,7 +12,7 @@ class UpdateCheckInSettingsRequest extends FormRequest
         $validSports = implode(',', ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder', 'yoga']);
 
         return [
-            'enabled_trackers'   => 'required|array|min:1',
+            'enabled_trackers'   => 'present|array',
             'enabled_trackers.*' => 'string|in:' . $validTrackers,
             'selected_sports'    => 'required|array|size:5',
             'selected_sports.*'  => 'string|in:' . $validSports,

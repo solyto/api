@@ -2,6 +2,7 @@
 
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Services\CheckInService;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
@@ -18,6 +19,10 @@ function widgetUser(array $settings = []): User
         'date_format' => 'dd.mm.YYYY',
         'time_format' => 'H:i',
     ], $settings));
+
+    if (isset($settings['check_in_settings']['enabled_trackers'])) {
+        app(CheckInTrackerService::class)->setEnabledBuiltIns($user, $settings['check_in_settings']['enabled_trackers']);
+    }
 
     return $user->fresh();
 }
@@ -113,11 +118,7 @@ function checkInRow(array $data, string $tracker): ?array
 
 function widgetCheckIn(User $user, string $date, array $values = []): CheckIn
 {
-    return CheckIn::factory()->forUser($user)->create(array_merge(
-        array_fill_keys(['mood', 'water', 'sports', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount', 'menstruation', 'alcohol', 'smoking', 'social_life'], null),
-        $values,
-        ['date' => $date],
-    ));
+    return app(CheckInService::class)->saveDay($user, $date, $values);
 }
 
 function setCheckIn($test, User $user, string $tracker, mixed $body, ?string $token = null)
@@ -763,7 +764,7 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
         widgetCheckIn($user, today()->toDateString(), ['mood' => 2]);
 
         // The first lookup misses the existing row, as if it was created right after it.
-        $this->app->instance(CheckInService::class, new class(app(UserCacheService::class)) extends CheckInService
+        $this->app->instance(CheckInService::class, new class(app(UserCacheService::class), app(CheckInTrackerService::class)) extends CheckInService
         {
             private bool $missed = false;
 

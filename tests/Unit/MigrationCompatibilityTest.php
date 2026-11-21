@@ -47,6 +47,7 @@ const MIGRATION_COMPATIBILITY_ALLOWLIST = [
     '2026_11_14_000002_recompute_event_occurrence_bounds.php' => 'replaces the `app:calendars:recompute-event-bounds` command (owner, 2026-11-14): touches only the derived firstoccurence/lastoccurence columns of DAV rows whose stored bounds are wrong; no client-visible data, etag or sync token changes. InvalidateSharedCalendarCache::dispatchSync only drops the event caches of those calendars',
     '2026_11_15_000001_add_waiting_for_deployment_status_to_dev_requests.php' => 'only widens the dev_requests.status enum; existing rows are untouched, and clients below 1.1.3 get the new value as in-progress (DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE, owner, 2026-11-15)',
     '2026_11_16_120000_add_file_type_to_clipboards.php' => 'job `pdf-clipboards`: only widens the clipboards.type enum and adds nullable columns; existing rows are untouched, and GET clipboard returns the new `file` entries only with include_files, which no released build sends (rule 13.3)',
+    '2026_11_19_000002_add_waiting_for_user_status_to_dev_requests.php' => 'only widens the dev_requests.status enum; existing rows are untouched, and clients below 1.1.5 get the new value as pending (DevRequestService::WAITING_FOR_USER_SINCE, owner, 2026-11-19)',
 ];
 
 const MIGRATION_COMPATIBILITY_BASELINE = 'tests/Fixtures/client-contract/1.0.15-migrations.txt';

@@ -296,10 +296,11 @@ describe('list-dev-requests and get-dev-request', function () {
         $admin = User::factory()->admin()->create();
         DevRequest::factory()->create(['title' => 'Dark mode please', 'type' => 'feature', 'status' => 'waiting-for-deployment']);
         DevRequest::factory()->create(['title' => 'Crash on login', 'type' => 'bug', 'status' => 'backlog']);
+        DevRequest::factory()->create(['title' => 'Export as CSV', 'type' => 'feature', 'status' => 'waiting-for-user']);
 
         SolytoServer::actingAs($admin)->tool(ListDevRequests::class)
             ->assertOk()
-            ->assertSee(['Dark mode please', 'Crash on login', 'waiting-for-deployment']);
+            ->assertSee(['Dark mode please', 'Crash on login', 'waiting-for-deployment', 'Export as CSV', 'waiting-for-user']);
     });
 
     it('filters by status, type and text', function () {

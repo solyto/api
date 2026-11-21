@@ -56,6 +56,10 @@ class UserNotificationSettings extends Model
         'movie_release_email',
         'movie_release_push',
         'movie_release_telegram',
+        'alert_ui',
+        'alert_email',
+        'alert_push',
+        'alert_telegram',
     ];
 
     protected $casts = [
@@ -95,6 +99,10 @@ class UserNotificationSettings extends Model
         'movie_release_email' => 'boolean',
         'movie_release_push' => 'boolean',
         'movie_release_telegram' => 'boolean',
+        'alert_ui' => 'boolean',
+        'alert_email' => 'boolean',
+        'alert_push' => 'boolean',
+        'alert_telegram' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

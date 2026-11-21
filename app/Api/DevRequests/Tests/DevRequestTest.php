@@ -59,6 +59,12 @@ describe('DevRequest Factory', function () {
         expect($request->status)->toBe('waiting-for-deployment');
     });
 
+    it('creates a request waiting for the user', function () {
+        $request = DevRequest::factory()->waitingForUser()->create();
+
+        expect($request->status)->toBe('waiting-for-user');
+    });
+
     it('creates a completed request', function () {
         $request = DevRequest::factory()->completed()->create();
 

@@ -10,7 +10,7 @@ class UpdateDevRequestRequest extends FormRequest
     {
         return [
             'type' => 'sometimes|required|string|in:feature,bug',
-            'status' => 'sometimes|required|string|in:backlog,pending,in-progress,waiting-for-deployment,completed,cancelled',
+            'status' => 'sometimes|required|string|in:backlog,pending,in-progress,waiting-for-deployment,waiting-for-user,completed,cancelled',
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'screenshot' => 'sometimes|nullable|string|max:255',

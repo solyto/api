@@ -25,6 +25,15 @@ return [
     'daily_check_in_reminder_title'  => 'Daily Check-in Reminder',
     'daily_check_in_reminder_body'   => 'Have you completed your daily check-in yet?',
 
+    // Alerts
+    'alert_title'                    => 'Alert',
+    'goal_reached_title'             => 'Goal reached',
+    'alert_average_below'            => ':tracker: :average on average over the last :days days (below :threshold).',
+    'alert_average_above'            => ':tracker: :average on average over the last :days days (above :threshold).',
+    'alert_no_entry_days'            => ':tracker: nothing logged for :days days.',
+    'alert_entry_days'               => ':tracker: logged :days days in a row.',
+    'alert_goal_reached'             => ':tracker: you reached your goal.',
+
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'Your Day Ahead',
     'daily_day_reminder_tasks'       => 'Tasks (:count):',

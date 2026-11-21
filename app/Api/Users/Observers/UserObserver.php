@@ -2,6 +2,7 @@
 
 namespace App\Api\Users\Observers;
 
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserProfile;
@@ -16,6 +17,7 @@ class UserObserver
         $this->createSettings($user);
         $this->createDav($user);
         $this->createJournalCategory($user);
+        $this->createCheckInTrackers($user);
     }
 
     private function createProfile(User $user): void
@@ -42,5 +44,10 @@ class UserObserver
     private function createJournalCategory(User $user): void
     {
         NoteCategory::provisionJournal($user);
+    }
+
+    private function createCheckInTrackers(User $user): void
+    {
+        app(CheckInTrackerService::class)->provisionBuiltIns($user);
     }
 }

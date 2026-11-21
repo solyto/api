@@ -40,6 +40,7 @@ Schedule::job(\App\Api\Clipboard\Jobs\DeleteOverdueClipboardEntries::class)->dai
  */
 Schedule::command(\App\Api\Users\Commands\SendDailyDayRemindersCommand::class)->hourly();
 Schedule::command(\App\Api\Users\Commands\SendDailyCheckInRemindersCommand::class)->hourly();
+Schedule::command(\App\Api\Alerts\Commands\SendAlertsCommand::class)->hourly()->withoutOverlapping();
 
 /*
  * Export
