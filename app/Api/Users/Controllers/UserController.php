@@ -3,11 +3,14 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Enums\UserGrowthPeriod;
 use App\Api\Users\Models\User;
 use App\Api\Users\Requests\ChangePasswordRequest;
+use App\Api\Users\Requests\ListUsersRequest;
 use App\Api\Users\Requests\RequestAccountDeletionRequest;
 use App\Api\Users\Requests\UpdateProfileImageRequest;
 use App\Api\Users\Requests\UpdateUserRequest;
+use App\Api\Users\Requests\UserGrowthRequest;
 use App\Api\Users\Resources\UserPublicProfileResource;
 use App\Api\Users\Resources\UserResource;
 use App\Api\Users\Services\UserService;
@@ -19,23 +22,44 @@ class UserController
 {
     use AuthorizesRequests;
 
+    // Released frontends send no per_page and expect the whole list on one page.
+    private const int LEGACY_PAGE_SIZE = 1000;
+
     public function __construct(private readonly UserService $userService) {}
 
     /**
      * @OA\Get(
      *     path="/users",
      *     operationId="userIndex",
-     *     summary="List users",
+     *     summary="List users, newest first (admin only)",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
      *
      *     @OA\Parameter(
-     *         name="per_page",
+     *         name="page",
      *         in="query",
-     *         description="Number of items per page",
+     *         description="Page number",
      *         required=false,
      *
-     *         @OA\Schema(type="integer", default=15)
+     *         @OA\Schema(type="integer", minimum=1, default=1)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Users per page; when omitted, 1000 (the page size released frontends rely on)",
+     *         required=false,
+     *
+     *         @OA\Schema(type="integer", minimum=1, maximum=100)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Case-insensitive substring of the name or email",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", maxLength=255)
      *     ),
      *
      *     @OA\Response(
@@ -45,20 +69,81 @@ class UserController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/User"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/User")),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *
+     *                 @OA\Property(property="pagination", ref="#/components/schemas/PaginationMeta")
+     *             )
      *         )
      *     ),
      *
-     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function index(Request $request): JsonResponse
+    public function index(ListUsersRequest $request): JsonResponse
     {
         $this->authorize('viewAny', User::class);
 
-        $users = $this->userService->list(1000);
+        $users = $this->userService->list(
+            $request->integer('per_page', self::LEGACY_PAGE_SIZE),
+            $request->validated('search'),
+        );
 
         return ApiResponse::success(UserResource::collection($users), 'Users retrieved successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/users/growth",
+     *     operationId="userGrowth",
+     *     summary="Cumulative user count at the end of each UTC period (admin only)",
+     *     description="year and month list only periods with signups; week covers the last 52 ISO weeks and day the last 30 days, gap-filled. Ascending.",
+     *     tags={"Users"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="group_by",
+     *         in="query",
+     *         required=true,
+     *
+     *         @OA\Schema(type="string", enum={"year","month","week","day"})
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="User growth retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(
+     *
+     *                     @OA\Property(property="period", type="string", example="2026-W03", description="2026, 2026-01, 2026-W03 or 2026-01-05"),
+     *                     @OA\Property(property="total", type="integer")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     * )
+     */
+    public function growth(UserGrowthRequest $request): JsonResponse
+    {
+        $this->authorize('viewAny', User::class);
+
+        return ApiResponse::success(
+            $this->userService->growth($request->enum('group_by', UserGrowthPeriod::class)),
+            'User growth retrieved successfully.'
+        );
     }
 
     /**

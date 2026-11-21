@@ -3,13 +3,17 @@
 namespace App\Api\Users\Services;
 
 use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Users\Enums\UserGrowthPeriod;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Mails\AccountDeletionMail;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Auth\Passwords\PasswordBroker;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -65,9 +69,54 @@ class UserService
         private readonly UserProfileImageService $profileImageService
     ) {}
 
-    public function list(int $perPage = 15): LengthAwarePaginator
+    public function list(int $perPage, ?string $search = null): LengthAwarePaginator
     {
-        return User::query()->latest()->paginate($perPage);
+        return User::query()
+            ->when($search !== null && $search !== '', function (Builder $query) use ($search) {
+                // '!' as escape character: SQLite and MariaDB disagree on backslashes in string literals.
+                $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search) . '%';
+                $query->where(fn (Builder $query) => $query
+                    ->whereRaw("name like ? escape '!'", [$pattern])
+                    ->orWhereRaw("email like ? escape '!'", [$pattern]));
+            })
+            ->latest()
+            ->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
+    /**
+     * @return list<array{period: string, total: int}>
+     */
+    public function growth(UserGrowthPeriod $groupBy): array
+    {
+        $format = match ($groupBy) {
+            UserGrowthPeriod::Year => 'Y',
+            UserGrowthPeriod::Month => 'Y-m',
+            UserGrowthPeriod::Week => 'o-\\WW',
+            UserGrowthPeriod::Day => 'Y-m-d',
+        };
+
+        $signups = User::query()
+            ->whereNotNull('created_at')
+            ->orderBy('created_at')
+            ->pluck('created_at')
+            ->countBy(fn (CarbonInterface $createdAt): string => $createdAt->copy()->utc()->format($format));
+
+        $now = CarbonImmutable::now('UTC');
+        $periods = match ($groupBy) {
+            UserGrowthPeriod::Week => array_map(fn (int $i): string => $now->subWeeks($i)->format($format), range(51, 0)),
+            UserGrowthPeriod::Day => array_map(fn (int $i): string => $now->subDays($i)->format($format), range(29, 0)),
+            default => array_map('strval', $signups->keys()->all()),
+        };
+
+        // The week/day windows start mid-history: earlier signups are the starting total.
+        $total = $periods === [] ? 0 : $signups->filter(fn (int $count, int|string $period) => (string) $period < $periods[0])->sum();
+
+        return array_map(function (string $period) use (&$total, $signups): array {
+            $total += $signups->get($period, 0);
+
+            return ['period' => $period, 'total' => $total];
+        }, $periods);
     }
 
     public function find(User $user): User

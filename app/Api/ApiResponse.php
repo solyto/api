@@ -26,8 +26,9 @@ class ApiResponse
             $response['meta'] = $meta;
         }
 
-        if (self::isPaginated($data)) {
-            $response['meta'] = array_merge($meta, self::getPaginationMeta($data));
+        $paginator = self::paginator($data);
+        if ($paginator !== null) {
+            $response['meta'] = array_merge($meta, self::getPaginationMeta($paginator));
         }
 
         return response()->json($response, $status);
@@ -103,21 +104,26 @@ class ApiResponse
         return $data instanceof LengthAwarePaginator;
     }
 
-    private static function getPaginationMeta($data): array
+    private static function paginator($data): ?LengthAwarePaginator
     {
-        if (!self::isPaginated($data)) {
-            return [];
+        if ($data instanceof ResourceCollection && $data->resource instanceof LengthAwarePaginator) {
+            return $data->resource;
         }
 
+        return self::isPaginated($data) ? $data : null;
+    }
+
+    private static function getPaginationMeta(LengthAwarePaginator $paginator): array
+    {
         return [
             'pagination' => [
-                'current_page' => $data->currentPage(),
-                'last_page' => $data->lastPage(),
-                'per_page' => $data->perPage(),
-                'total' => $data->total(),
-                'from' => $data->firstItem(),
-                'to' => $data->lastItem(),
-                'has_more_pages' => $data->hasMorePages(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+                'has_more_pages' => $paginator->hasMorePages(),
             ]
         ];
     }
