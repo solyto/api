@@ -339,6 +339,18 @@ describe('User settings endpoints', function () {
         expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => false, 'notes' => true]);
     })->with([null, '1.0.15']);
 
+    it('leaves out features older clients do not know', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true, 'newFeature' => true], 'desktop' => ['home', 'newFeature'], 'mobile' => null]]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->withHeader('X-Client-Version', '1.0.15')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200);
+
+        expect(json_decode($response->json('data.settings.navigation'), true))->toBe(['calendar' => true]);
+    });
+
     it('returns flat navigation unchanged to older clients', function () {
         $user = makeUser();
         $user->settings()->update(['navigation' => ['calendar' => false]]);
@@ -361,6 +373,17 @@ describe('User settings endpoints', function () {
             'desktop' => ['home', 'notes'],
             'mobile' => ['home'],
         ]);
+    });
+
+    it('keeps the visibility of features an older client does not know when it saves', function () {
+        $user = makeUser();
+        $user->settings()->update(['navigation' => ['visible' => ['calendar' => true, 'newFeature' => false], 'desktop' => null, 'mobile' => null]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/navigation', ['navigation' => json_encode(['calendar' => false])])
+            ->assertStatus(200);
+
+        expect(json_decode($user->fresh()->settings->navigation, true)['visible'])->toBe(['newFeature' => false, 'calendar' => false]);
     });
 
     it('stores nested navigation as sent', function () {
@@ -620,15 +643,18 @@ describe('UserSettingsService', function () {
         expect($settings->weather_longitude)->toBe(2.35);
     });
 
-    it('updateCheckInSettings uses updateOrCreate', function () {
+    it('updateCheckInSettings stores the sports and turns the built-in trackers on and off', function () {
         $user = makeUser();
 
         $settings = app(UserSettingsService::class)->updateCheckInSettings($user, [
             'enabled_trackers' => ['mood'],
-            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'],
+            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga'],
         ]);
 
-        expect($settings->user_id)->toBe($user->id);
-        expect($settings->check_in_settings['enabled_trackers'])->toBe(['mood']);
+        expect($settings)->toBe([
+            'enabled_trackers' => ['mood'],
+            'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga'],
+        ]);
+        expect($user->fresh()->settings->check_in_settings['enabled_trackers'])->toBe(['mood']);
     });
 });

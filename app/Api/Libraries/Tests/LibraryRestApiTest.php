@@ -128,6 +128,20 @@ describe('Library movies', function () {
         expect(LibraryMovie::count())->toBe(1);
         expect($movie->fresh()->genres)->toHaveCount(0);
     });
+
+    it('renders genres through the genre resource', function () {
+        $user = makeUser();
+        $movie = LibraryMovie::factory()->forUser($user)->create();
+        $genre = LibraryMovieGenre::factory()->forUser($user)->create(['title' => 'Science Fiction']);
+        $movie->genres()->attach($genre);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/movies')
+            ->assertStatus(200);
+
+        expect($response->json('data.0.genres'))->toBe([['id' => $genre->id, 'title' => 'Science Fiction']]);
+    });
+
     it('returns youtube trailers for a movie', function () {
         Http::fake([
             'https://api.themoviedb.org/3/search/movie*' => Http::response([
@@ -220,6 +234,15 @@ describe('Library links', function () {
             ->assertStatus(200);
 
         expect(LibraryLinkCategory::count())->toBe(0);
+    });
+
+    it('has no show route for a single link category', function () {
+        $user = makeUser();
+        $category = LibraryLinkCategory::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links/categories/'.$category->id)
+            ->assertStatus(405);
     });
 
     it('stores a link in the given category', function () {

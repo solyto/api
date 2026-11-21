@@ -35,7 +35,7 @@ class UserService
      */
     private const array USER_CACHE_KEYS = [
         'address_books', 'book_recommendations', 'book_releases', 'books', 'budgets', 'budgets_v2',
-        'calendars', 'calendars_v2', 'checkin', 'clipboard', 'feed_import', 'games', 'links', 'movie_releases', 'movies',
+        'calendars', 'calendars_v2', 'checkin', 'checkin_values', 'clipboard', 'feed_import', 'games', 'links', 'movie_releases', 'movies',
         'music', 'music_recommendations', 'music_releases', 'note_categories',
         'note_categories_hidden', 'notes', 'notes_hidden', 'notes_hidden_v2', 'notes_newest',
         'notes_newest_v2', 'notes_recent', 'notes_v2', 'plants', 'quotes',

@@ -166,6 +166,7 @@ class TimeTrackingService
         $category->update($data);
 
         $this->cache->forget([self::CACHE_KEY_CATEGORIES, $userId]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
 
         return $category;
     }
@@ -176,6 +177,7 @@ class TimeTrackingService
         $category->delete();
 
         $this->cache->forget([self::CACHE_KEY_CATEGORIES, $userId]);
+        $this->cache->forget([self::CACHE_KEY_PROJECTS, $userId]);
     }
 
     public function listProjects(User $user): Collection

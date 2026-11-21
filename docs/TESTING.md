@@ -26,6 +26,7 @@ directories for Pest's own discovery:
 | `Dav` | `app/Dav/Tests/` | DAV service, protocol, isolation, client fixtures (see [DAV tests](#dav-tests)) |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
 | `Bots` | `app/Bots/Tests/` | bot state machine and commands |
+| `Mcp` | `app/Mcp/Tests/` | the MCP endpoint and its tools |
 | `Plugins` | `app/Plugins/Tests/`, `app/Plugins/*/Tests/` | the plugin framework and each plugin |
 
 Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
@@ -33,11 +34,12 @@ Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
 `tests/Fixtures/http/` (the `php -S` router for `RemoteCalDavClientLiveTest`).
 
 Binding: `tests/Pest.php` is the only Pest bootstrap file Pest loads
-(nested `Pest.php` files are ignored). It binds `Tests\TestCase` to all five
-directories and adds `RefreshDatabase` to everything under `app/Api`, so a
-module test does **not** declare its own `uses(RefreshDatabase::class)`
-(a duplicate is tolerated but redundant). `tests/Unit` and `app/Bots|Dav`
-tests have no database refresh unless they ask for it.
+(nested `Pest.php` files are ignored). It binds `Tests\TestCase` to every
+suite directory and adds `RefreshDatabase` to everything under `app/Api`,
+`app/Plugins` and `app/Mcp/Tests`, so a module test does **not** declare its
+own `uses(RefreshDatabase::class)` (a duplicate is tolerated but redundant).
+`tests/Unit` and `app/Bots|Dav` tests have no database refresh unless they
+ask for it.
 
 ## The test environment (`tests/TestCase.php::createApplication`)
 

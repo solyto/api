@@ -2,6 +2,8 @@
 
 namespace App\Api\Users\Services;
 
+use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
 
@@ -11,13 +13,23 @@ class UserSettingsService
     // older ones read and write only a flat map of feature flags.
     public const string NESTED_NAVIGATION_SINCE = '1.1.0';
 
+    /** The navigation features of 1.0.15, the last release before the nested navigation. */
+    public const array LEGACY_NAVIGATION_FEATURES = [
+        'calendar', 'todos', 'notes', 'libraries', 'contacts', 'checkIn', 'finances',
+        'clipboard', 'dev_requests', 'feeds', 'timeTracking',
+    ];
+
+    public function __construct(private readonly CheckInTrackerService $checkInTrackers) {}
+
     public function updateNavigation(User $user, array $navigation): void
     {
         // A flat write from an older client replaces the visibility but keeps the stored orders.
         if (!array_key_exists('visible', $navigation)) {
             $stored = json_decode($user->settings->navigation ?? 'null', true);
             if (is_array($stored) && is_array($stored['visible'] ?? null)) {
-                $navigation = [...$stored, 'visible' => $navigation];
+                // Features the older client doesn't know keep their stored visibility.
+                $unknown = array_diff_key($stored['visible'], array_flip(self::LEGACY_NAVIGATION_FEATURES));
+                $navigation = [...$stored, 'visible' => [...$unknown, ...$navigation]];
             }
         }
 
@@ -32,7 +44,8 @@ class UserSettingsService
             return $navigation;
         }
 
-        return json_encode((object) $decoded['visible']);
+        // 1.0.x renders unknown keys as unnamed toggles, so only send the features it has.
+        return json_encode((object) array_intersect_key($decoded['visible'], array_flip(self::LEGACY_NAVIGATION_FEATURES)));
     }
 
     public function updateLanguage(User $user, string $language): void
@@ -96,16 +109,35 @@ class UserSettingsService
         $user->settings()->update(['check_in_calendar_mark' => $enabled]);
     }
 
-    public function getCheckInSettings(User $user): UserSettings
+    /**
+     * The settings shape apps before the tracker tables read: on/off of the built-in trackers and the chosen sports.
+     *
+     * @return array{enabled_trackers: array<int, string>, selected_sports: array<int, string>}
+     */
+    public function getCheckInSettings(User $user): array
     {
-        return UserSettings::firstOrCreate(['user_id' => $user->id], []);
+        $settings = UserSettings::firstOrCreate(['user_id' => $user->id], []);
+
+        return [
+            'enabled_trackers' => $this->checkInTrackers->enabledBuiltInKeys($user),
+            'selected_sports' => $settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS,
+        ];
     }
 
-    public function updateCheckInSettings(User $user, array $data): UserSettings
+    /**
+     * @return array{enabled_trackers: array<int, string>, selected_sports: array<int, string>}
+     */
+    public function updateCheckInSettings(User $user, array $data): array
     {
-        return UserSettings::updateOrCreate(
-            ['user_id' => $user->id],
-            ['check_in_settings' => $data]
-        );
+        $settings = UserSettings::firstOrCreate(['user_id' => $user->id], []);
+        $settings->update(['check_in_settings' => [
+            ...($settings->check_in_settings ?? []),
+            'enabled_trackers' => $data['enabled_trackers'],
+            'selected_sports' => $data['selected_sports'],
+        ]]);
+
+        $this->checkInTrackers->setEnabledBuiltIns($user, $data['enabled_trackers']);
+
+        return $this->getCheckInSettings($user);
     }
 }

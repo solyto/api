@@ -11,6 +11,8 @@ class TodoCategoryService
 {
     private const string CACHE_KEY = 'todo_categories';
     private const int CACHE_TTL = 86400;
+    // TodoWorkspaceService caches its workspaces with their categories embedded.
+    private const string CACHE_KEY_WORKSPACES = 'todo_workspaces';
 
     public function __construct(private readonly UserCacheService $cache) {}
 
@@ -45,6 +47,7 @@ class TodoCategoryService
         $category->update($data);
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->cache->forget([self::CACHE_KEY_WORKSPACES, $userId]);
 
         return $category->fresh(['user']);
     }
@@ -55,5 +58,6 @@ class TodoCategoryService
         $category->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->cache->forget([self::CACHE_KEY_WORKSPACES, $userId]);
     }
 }

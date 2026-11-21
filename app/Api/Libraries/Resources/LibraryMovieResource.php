@@ -42,7 +42,7 @@ class LibraryMovieResource extends JsonResource
             'wishlist' => $this->wishlist,
             'category' => $this->category,
             'publication_year' => $this->publication_year,
-            'genres' => $this->whenLoaded('genres', fn () => LibraryMovieResource::collection($this->genres)
+            'genres' => $this->whenLoaded('genres', fn () => LibraryMovieGenreResource::collection($this->genres)
             ),
             'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)
             ),

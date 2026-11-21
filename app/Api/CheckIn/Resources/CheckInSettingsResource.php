@@ -2,7 +2,6 @@
 
 namespace App\Api\CheckIn\Resources;
 
-use App\Api\Users\Models\UserSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,22 +12,19 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="enabled_trackers", type="array", @OA\Items(type="string")),
  *     @OA\Property(property="selected_sports", type="array", @OA\Items(type="string"))
  * )
- *
- * @mixin UserSettings
  */
 class CheckInSettingsResource extends JsonResource
 {
-    public const DEFAULT_TRACKERS = ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount'];
-
     public const DEFAULT_SPORTS = ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'];
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
-        $settings = $this->check_in_settings;
-
         return [
-            'enabled_trackers' => $settings['enabled_trackers'] ?? self::DEFAULT_TRACKERS,
-            'selected_sports' => $settings['selected_sports'] ?? self::DEFAULT_SPORTS,
+            'enabled_trackers' => $this->resource['enabled_trackers'],
+            'selected_sports' => $this->resource['selected_sports'],
         ];
     }
 }

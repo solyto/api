@@ -45,6 +45,10 @@ class UpdateNotificationSettingsRequest extends FormRequest
             'movie_release_email' => 'sometimes|boolean',
             'movie_release_push' => 'sometimes|boolean',
             'movie_release_telegram' => 'sometimes|boolean',
+            'alert_ui' => 'sometimes|boolean',
+            'alert_email' => 'sometimes|boolean',
+            'alert_push' => 'sometimes|boolean',
+            'alert_telegram' => 'sometimes|boolean',
         ];
     }
 }

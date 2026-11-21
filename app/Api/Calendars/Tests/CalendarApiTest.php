@@ -709,6 +709,22 @@ describe('Shared calendar cache invalidation', function () {
             ->json('data'))->pluck('title');
     });
 
+    it('shows a recoloured calendar in its cached events right away', function () {
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'Mine');
+        $colorOf = fn () => collect($this->actingAs($this->owner, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
+            ->assertStatus(200)
+            ->json('data'))->firstWhere('title', 'Mine')['calendar_color'];
+
+        expect($colorOf())->not->toBe('#123456');
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$this->ownerInstance, ['color' => '#123456'])
+            ->assertStatus(200);
+
+        expect($colorOf())->toBe('#123456');
+    });
+
     it('queues an invalidation when the owner writes to a shared calendar', function () {
         ($this->accept)();
         Queue::fake([InvalidateSharedCalendarCache::class]);

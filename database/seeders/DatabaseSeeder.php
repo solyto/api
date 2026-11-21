@@ -2,10 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Api\Alerts\Services\AlertService;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\Calendars\Services\CalendarService;
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Services\CheckInService;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Contacts\Services\ContactService;
 use App\Api\DevRequests\Models\DevRequest;
@@ -17,6 +19,7 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
+use App\Api\Goals\Services\GoalService;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Models\LibraryGame;
@@ -282,11 +285,40 @@ class DatabaseSeeder extends Seeder
         ]);
     }
 
+    private function seedCheckIn(User $user): void
+    {
+        $checkIns = app(CheckInService::class);
+        $trackers = app(CheckInTrackerService::class);
+
+        $meditated = $trackers->create($user, ['name' => 'Meditated', 'type' => 'yes_no', 'icon' => 'flower-2']);
+        $glasses = $trackers->create($user, ['name' => 'Glasses of water', 'type' => 'count', 'icon' => 'glass-water']);
+        app(GoalService::class)->create($user, [
+            'source' => 'check_in_tracker', 'check_in_tracker_id' => $meditated->id,
+            'period' => 'week', 'comparison' => 'at_least', 'target' => 5, 'notify_when_reached' => true,
+        ]);
+        app(AlertService::class)->create($user, [
+            'source' => 'check_in_tracker', 'check_in_tracker_id' => $glasses->id,
+            'rule' => 'average_below', 'threshold' => 5, 'days' => 7,
+        ]);
+
+        foreach (range(29, 0) as $daysAgo) {
+            $date = now()->subDays($daysAgo)->toDateString();
+
+            $checkIns->saveDay($user, $date, [
+                'mood' => fake()->numberBetween(2, 5),
+                'sleep' => fake()->numberBetween(1, 5),
+                'water' => fake()->numberBetween(2, 5),
+                'food_quality' => fake()->numberBetween(2, 5),
+                'sports' => fake()->optional(0.4)->numberBetween(1, 5),
+            ]);
+            $checkIns->setValue($user, $meditated, $date, fake()->boolean(70) ? 1 : null);
+            $checkIns->setValue($user, $glasses, $date, fake()->numberBetween(2, 9));
+        }
+    }
+
     private function seedSmallModules(User $user): void
     {
-        foreach (range(29, 0) as $daysAgo) {
-            CheckIn::factory()->forUser($user)->forDate(now()->subDays($daysAgo)->startOfDay()->toDateTime())->create();
-        }
+        $this->seedCheckIn($user);
 
         Clipboard::factory()->forUser($user)->count(2)->create();
         Clipboard::factory()->forUser($user)->withUrl()->create();
