@@ -2,13 +2,17 @@
 
 namespace App\Api\Widgets\Services;
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\CheckIn\Services\CheckInService;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
+use App\Api\TimeTracking\Services\TimeTrackingService;
 use App\Api\Todos\Models\Todo;
+use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\EventDTO;
-use App\Shared\Services\IntegrationGateway;
 use Carbon\CarbonImmutable;
 
 class WidgetService
@@ -24,12 +28,16 @@ class WidgetService
     private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
     private const string CHECK_IN_MENSTRUATION_COLOR = '#FB7185';
 
-    public function __construct(private readonly IntegrationGateway $gateway) {}
+    public function __construct(
+        private readonly CalendarService $calendarService,
+        private readonly TodoService $todoService,
+        private readonly TimeTrackingService $timeTrackingService,
+        private readonly CheckInService $checkInService,
+        private readonly CheckInTrackerService $checkInTrackerService,
+    ) {}
 
     public function yourDay(User $user): array
     {
-        $this->gateway->setUser($user);
-
         $timezone = $user->settings->timezone ?? 'UTC';
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
         $timeFormat = in_array($user->settings?->time_format, self::TIME_FORMATS, true) ? $user->settings->time_format : self::DEFAULT_TIME_FORMAT;
@@ -39,14 +47,14 @@ class WidgetService
         $today = $now->startOfDay();
         $tomorrow = $today->addDay();
 
-        [$todayEvents, $upcomingEvents] = $this->gateway->widgetEvents()
+        [$todayEvents, $upcomingEvents] = collect($this->calendarService->listWidgetEvents($user))
             ->filter(fn (EventDTO $event) => $event->startDate !== null)
             ->sort(fn (EventDTO $a, EventDTO $b) => [$this->localStart($a, $timezone), !$a->isAllDay] <=> [$this->localStart($b, $timezone), !$b->isAllDay])
             ->partition(fn (EventDTO $event) => $this->localStart($event, $timezone) < $tomorrow);
 
         $sections = [
             'today' => $todayEvents->sortBy(fn (EventDTO $event) => !$event->isAllDay)->map(fn (EventDTO $event) => $this->eventRow($event, $timezone, $today, false, $timeFormat, $dateFormat, $locale)),
-            'due' => $this->gateway->dueTodosInUserTimezone(self::SECTION_LIMIT)
+            'due' => $this->todoService->due($user, $today->toDateString(), self::SECTION_LIMIT)
                 ->map(fn (Todo $todo) => $this->todoRow($todo, $today, $dateFormat, $locale)),
             'upcoming' => $upcomingEvents->map(fn (EventDTO $event) => $this->eventRow($event, $timezone, $today, true, $timeFormat, $dateFormat, $locale)),
         ];
@@ -77,7 +85,7 @@ class WidgetService
      */
     public function unavailableCalendars(): array
     {
-        return $this->gateway->unavailableCalendars();
+        return $this->calendarService->unavailableCalendars();
     }
 
     /**
@@ -85,27 +93,28 @@ class WidgetService
      */
     public function credentialsRejectedCalendars(): array
     {
-        return $this->gateway->credentialsRejectedCalendars();
+        return $this->calendarService->credentialsRejectedCalendars();
     }
 
     public function completeTodo(User $user, Todo $todo): void
     {
-        $this->gateway->setUser($user);
-        $this->gateway->completeTodo($todo);
+        if ($todo->is_completed) {
+            return;
+        }
+
+        $this->todoService->update($todo, ['is_completed' => true]);
     }
 
     public function timeTracking(User $user): array
     {
-        $this->gateway->setUser($user);
-
         $timezone = $user->settings->timezone ?? 'UTC';
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
 
-        $running = $this->gateway->runningTimeTrackingEntry();
+        $running = $this->timeTrackingService->runningEntry($user);
 
         $sections = [
             'running' => collect($running ? [$this->runningRow($running, $timezone)] : []),
-            'projects' => $this->gateway->timeTrackingProjectsByLastUse(self::SECTION_LIMIT, $running?->project_id)
+            'projects' => $this->timeTrackingService->projectsByLastUse($user, self::SECTION_LIMIT, $running?->project_id)
                 ->map(fn (TimeTrackingProject $project) => $this->projectRow($project)),
         ];
 
@@ -131,29 +140,29 @@ class WidgetService
 
     public function startTimeTracking(User $user, TimeTrackingProject $project): void
     {
-        $this->gateway->setUser($user);
-        $this->gateway->startTimeTracking($project);
+        $this->timeTrackingService->switchTo($user, $project);
     }
 
     public function stopTimeTracking(User $user, TimeTrackingEntry $entry): void
     {
-        $this->gateway->setUser($user);
-        $this->gateway->stopTimeTracking($entry);
+        if ($entry->stopped_at !== null) {
+            return;
+        }
+
+        $this->timeTrackingService->stopTimer($entry);
     }
 
     public function checkIn(User $user): array
     {
-        $this->gateway->setUser($user);
-
         $timezone = $user->settings->timezone ?? 'UTC';
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
         $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS;
 
         $now = CarbonImmutable::now($timezone);
         $today = $now->startOfDay();
-        $values = $this->gateway->checkInValuesOn($today->toDateString());
+        $values = $this->checkInService->builtInValuesOn($user, $today->toDateString());
 
-        $rows = collect($this->gateway->enabledCheckInBuiltIns())
+        $rows = collect($this->checkInTrackerService->enabledBuiltInKeys($user))
             ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $locale));
 
         return [
@@ -171,8 +180,7 @@ class WidgetService
 
     public function setCheckIn(User $user, string $tracker, ?int $value): void
     {
-        $this->gateway->setUser($user);
-        $this->gateway->setCheckIn(CarbonImmutable::now($user->settings->timezone ?? 'UTC')->toDateString(), $tracker, $value);
+        $this->checkInService->setBuiltInValue($user, CarbonImmutable::now($user->settings->timezone ?? 'UTC')->toDateString(), $tracker, $value);
     }
 
     private function checkInRow(string $tracker, ?int $value, array $selectedSports, string $locale): array

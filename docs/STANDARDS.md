@@ -397,10 +397,10 @@ constructor spans several lines.
 
 ### 4.2 Collaborators are injected, not located
 
-`app(XService::class)` inside a service method is acceptable only across the
-`IntegrationGateway`/`QuickAddService` seam, where the gateway deliberately
-resolves module services late (`app/Shared/Services/IntegrationGateway.php:26,36,46`)
-and in `ExportService::export:45-61` (15 feature services behind a `match`;
+`app(XService::class)` inside a service method is acceptable only in
+`QuickAddService`, which resolves the target module's service late per
+content type (`app/Shared/Services/QuickAddService.php:97-239`), and in
+`ExportService::export:45-61` (15 feature services behind a `match`;
 injecting all 15 would be worse). Inside a module service, inject.
 
 Check: `grep -rn 'app(' app/Api/*/Services` → `ExportService.php:46-60` only.
@@ -720,8 +720,7 @@ code, `TODO` without an issue (0 today — keep it).
 
 ### 10.2 Docblocks only for `@OA`, `@mixin` on resources, relation generics, and a `@throws` the type system cannot say
 
-Controllers carry the `@OA` operation; resources the `@OA\Schema`;
-`IntegrationGateway` methods `@throws IntegrationAuthException`. A resource
+Controllers carry the `@OA` operation; resources the `@OA\Schema`. A resource
 that reads a wrapped model or DTO through `$this->` carries `@mixin <Class>`
 (imported, short name) after its `@OA\Schema`, so PHPStan sees the wrapped
 type (`TodoResource`, `CalendarResource` → `CalendarDTO`); resources that
@@ -851,14 +850,18 @@ schema, backends or routes is flagged before it is done.
 `user_data` and `longterm` (survives deploys) are separate Redis databases.
 Rules 9.1–9.4 give the shapes.
 
-### 12.8 Cross-module calls go through `app/Shared`
+### 12.8 Domain modules don't call each other's services; entry points may
 
-A module imports another module's **models** when it needs a relation
-(`Todo` ↔ `Tag`, `CalendarEventTodo`), not another module's service. The
-bot and QuickAdd reach todos/calendars/libraries through
-`App\Shared\Services\IntegrationGateway` (`setUser()`, `checkAuth()` on
-every user-bound method, `:32-78`) and `QuickAddService`. A new external
-entry point adds a gateway method.
+A domain module imports another module's **models** when it needs a relation
+(`Todo` ↔ `Tag`, `CalendarEventTodo`), not another module's service.
+
+Entry points and aggregators — `app/Bots`, `app/Mcp` and the Widgets module
+(`app/Api/Widgets`) — call module services directly, like controllers do,
+and pass the `User` per call (rule 4.1). Each entry point is its own
+adapter; there is no shared gateway class with caller-specific methods.
+Logic that more than one caller needs lives in the owning module's service
+(`TimeTrackingService`, `TodoService`, `CheckInService`) or, when it spans
+modules, in a common `app/Shared` service such as `QuickAddService`.
 
 ### 12.9 Tests
 
@@ -1070,6 +1073,11 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   plugin is something a user turns on, with their own credentials if
   needed (AI first). Modules may call plugin services; rule 12.8 only
   covers module-to-module calls (backlog: `user-plugins-storage`).
+- **Entry points call module services directly** (2026-11-21, owner
+  decision; job `remarkable_dissolve-the-integrationgateway`): the bot,
+  the MCP tools and the widgets each call the owning module's services, as
+  controllers do; the user-holding `IntegrationGateway` is dissolved. Domain
+  modules still don't call each other's services (rule 12.8).
 - **Reference module is `app/Api/Todos/`.** Owner's statement (job
   `online`, 2026-10-10); when a rule and the Todos code disagree it is listed
   under Open questions, not silently resolved either way.
@@ -1150,7 +1158,8 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
     byte-identical; rule 4.4 says extract (OQ-3: the reference module too).
   - "`IntegrationGateway` guards every call with `checkAuth()`" —
     `detect()` is deliberately unauthenticated (content detection needs no
-    user); 12.8 says "every user-bound method".
+    user); 12.8 said "every user-bound method". Superseded on 2026-11-21:
+    the gateway is dissolved (Decisions, rule 12.8).
   - "`whenLoaded` … never `$this->category` without it" — kept as 6.1, with
     the three violations named instead of asserted away.
   - "Validation is the first line of defense … existence via `exists:`" —

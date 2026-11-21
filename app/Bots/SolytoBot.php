@@ -2,8 +2,9 @@
 
 namespace App\Bots;
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Dashboard\Enums\QuickAddContentType;
-use App\Shared\Services\IntegrationGateway;
+use App\Api\Todos\Services\TodoService;
 use App\Shared\Services\QuickAddService;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Telegram\Models\TelegramBotConnection;
@@ -28,7 +29,9 @@ class SolytoBot implements BotInterface
     ];
 
     public function __construct(
-        private readonly IntegrationGateway $gateway,
+        private readonly QuickAddService $quickAddService,
+        private readonly TodoService $todoService,
+        private readonly CalendarService $calendarService,
     ) {}
 
     public string $identifier = 'solyto';
@@ -41,6 +44,7 @@ class SolytoBot implements BotInterface
     public string $defaultErrorMessage = SolytoMessage::ERROR->value; // translation key, resolved at send time
 
     private ?TelegramBotConnection $connection = null;
+    private ?User $user = null;
 
     public function entrypoint(): void
     {
@@ -91,8 +95,8 @@ class SolytoBot implements BotInterface
             return;
         }
 
-        $todos = $this->gateway->dueTodos();
-        $appointments = $this->gateway->todayAppointments();
+        $todos = $this->todoService->due($this->user, today()->toDateString());
+        $appointments = collect($this->calendarService->listTodayEvents($this->user));
 
         if ($todos->isEmpty() && $appointments->isEmpty()) {
             $this->replyWithText(SolytoMessage::EMPTY_DAY->trans());
@@ -123,7 +127,7 @@ class SolytoBot implements BotInterface
             return;
         }
 
-        $todos = $this->gateway->todos();
+        $todos = $this->todoService->list($this->user);
 
         if ($todos->isEmpty()) {
             $this->replyWithText(SolytoMessage::NO_TODOS->trans());
@@ -140,10 +144,11 @@ class SolytoBot implements BotInterface
 
     private function processQuickAdd(string $message): void
     {
-        $detection = $this->gateway->detect($message);
+        $detection = $this->quickAddService->detect($message);
 
         if (!$detection->needsConfirmation) {
-            $result = $this->gateway->commit(
+            $result = $this->quickAddService->commit(
+                $this->user,
                 $detection->content,
                 $detection->contentType,
                 $detection->metadata,
@@ -215,7 +220,7 @@ class SolytoBot implements BotInterface
 
         $this->state->destroy();
 
-        $result = $this->gateway->commit($content, $contentType, null);
+        $result = $this->quickAddService->commit($this->user, $content, $contentType, null);
 
         if ($result === null) {
             $this->replyWithText(SolytoMessage::ADD_FAILED->trans());
@@ -227,7 +232,7 @@ class SolytoBot implements BotInterface
 
     private function commitWithType(string $input, QuickAddContentType $type): void
     {
-        $result = $this->gateway->commit($input, $type, null);
+        $result = $this->quickAddService->commit($this->user, $input, $type, null);
 
         if ($result === null) {
             $this->replyWithText(SolytoMessage::ADD_FAILED->trans());
@@ -277,7 +282,7 @@ class SolytoBot implements BotInterface
         $lang = $user->settings->language ?? 'en';
         app()->setLocale(in_array($lang, config('app.locales')) ? $lang : 'en');
 
-        $this->gateway->setUser($user);
+        $this->user = $user;
 
         return true;
     }

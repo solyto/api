@@ -48,6 +48,20 @@ class TodoService
         );
     }
 
+    /**
+     * Not completed and due on $date or earlier; ordered by due date only when limited.
+     *
+     * @return Collection<int, Todo>
+     */
+    public function due(User $user, string $date, ?int $limit = null): Collection
+    {
+        return Todo::forUser($user->id)
+            ->where('is_completed', false)
+            ->whereDate('due_at', '<=', $date)
+            ->when($limit !== null, fn ($query) => $query->orderBy('due_at')->limit($limit))
+            ->get();
+    }
+
     public function find(Todo $todo): Todo
     {
         $todo->load(['category', 'tags', 'subtasks']);

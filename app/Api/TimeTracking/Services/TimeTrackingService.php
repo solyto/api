@@ -9,6 +9,7 @@ use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class TimeTrackingService
 {
@@ -83,6 +84,52 @@ class TimeTrackingService
     public function hasRunningTimer(User $user): bool
     {
         return TimeTrackingEntry::forUser($user->id)->whereNull('stopped_at')->exists();
+    }
+
+    public function runningEntry(User $user): ?TimeTrackingEntry
+    {
+        return TimeTrackingEntry::forUser($user->id)
+            ->whereNull('stopped_at')
+            ->with('project')
+            ->latest('started_at')
+            ->first();
+    }
+
+    /**
+     * Most recently used first (latest entry start), then never used projects by title.
+     *
+     * @return Collection<int, TimeTrackingProject>
+     */
+    public function projectsByLastUse(User $user, int $limit, ?string $exceptProjectId = null): Collection
+    {
+        // MariaDB and SQLite both sort NULL last in descending order, so never used projects follow the used ones.
+        return TimeTrackingProject::forUser($user->id)
+            ->when($exceptProjectId, fn ($query) => $query->whereKeyNot($exceptProjectId))
+            ->withMax('entries', 'started_at')
+            ->orderByDesc('entries_max_started_at')
+            ->orderBy('title')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Starts the project's timer and stops any other running one; a no-op while the project's timer runs.
+     */
+    public function switchTo(User $user, TimeTrackingProject $project): void
+    {
+        DB::transaction(function () use ($user, $project) {
+            $running = TimeTrackingEntry::forUser($user->id)
+                ->whereNull('stopped_at')
+                ->lockForUpdate()
+                ->get();
+
+            $running->reject(fn (TimeTrackingEntry $entry) => $entry->project_id === $project->id)
+                ->each(fn (TimeTrackingEntry $entry) => $this->stopTimer($entry));
+
+            if (!$running->contains('project_id', $project->id)) {
+                $this->startTimer($user, ['project_id' => $project->id]);
+            }
+        }, 3);
     }
 
     public function stopTimer(TimeTrackingEntry $entry): TimeTrackingEntry

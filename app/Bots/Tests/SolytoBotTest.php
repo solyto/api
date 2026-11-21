@@ -5,10 +5,9 @@ use App\Bots\Events\SolytoBotEvent;
 use App\Bots\Messages\SolytoMessage;
 use App\Bots\SolytoBot;
 use App\Bots\State\ConversationState;
-use App\Shared\Services\IntegrationGateway;
-use App\Api\Dashboard\DTOs\DetectionResult;
-use App\Api\Dashboard\Enums\QuickAddContentType;
+use App\Shared\Services\QuickAddService;
 use App\Api\Telegram\Models\TelegramBotConnection;
+use App\Api\Libraries\Models\LibraryLink;
 use App\Api\Todos\Models\Todo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -59,7 +58,7 @@ describe('SolytoBot connect flow', function () {
     function makeBot(array $requestData): SolytoBot
     {
         app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', $requestData));
-        $bot = new SolytoBot(Mockery::mock(IntegrationGateway::class));
+        $bot = app(SolytoBot::class);
         $bot->handleWebhook(request());
         return $bot;
     }
@@ -100,32 +99,6 @@ describe('SolytoBot connect flow', function () {
 });
 
 describe('SolytoBot quick-add flow', function () {
-    it('commits high-confidence detections automatically', function () {
-        $user = makeUser();
-        $connection = TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '999', 'is_confirmed' => true]);
-
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser')->with(Mockery::on(fn ($u) => $u->id === $user->id));
-        $gateway->shouldReceive('detect')->once()->andReturn(
-            new DetectionResult('https://example.com', QuickAddContentType::Links, 0.95, false, null)
-        );
-        $gateway->shouldReceive('commit')->once()->with('https://example.com', QuickAddContentType::Links, null)->andReturn((object) ['id' => 1]);
-
-        app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
-            'update_id' => 1,
-            'message' => [
-                'message_id' => 1,
-                'chat' => ['id' => 999],
-                'from' => ['id' => 999, 'language_code' => 'en'],
-                'text' => 'https://example.com',
-            ],
-        ]));
-        $bot = new SolytoBot($gateway);
-        $bot->handleWebhook(request());
-
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
-    });
-
     it('sends a welcome message for unregistered chats', function () {
         app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
             'update_id' => 1,
@@ -136,68 +109,13 @@ describe('SolytoBot quick-add flow', function () {
                 'text' => 'hi',
             ],
         ]));
-        $bot = new SolytoBot(Mockery::mock(IntegrationGateway::class));
+        $bot = app(SolytoBot::class);
         $bot->handleWebhook(request());
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'sendMessage')
                 && ($request['text'] ?? '') === SolytoMessage::WELCOME_UNREGISTERED->trans();
         });
-    });
-});
-
-describe('SolytoBot day and todos commands', function () {
-    it('lists due todos for the day', function () {
-        $user = makeUser();
-        $connection = TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '888', 'is_confirmed' => true]);
-        Todo::factory()->forUser($user)->create(['title' => 'Write report']);
-
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser')->once();
-        $gateway->shouldReceive('dueTodos')->once()->andReturn(collect([(object) ['title' => 'Write report']]));
-        $gateway->shouldReceive('todayAppointments')->once()->andReturn(collect());
-
-        app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
-            'update_id' => 1,
-            'message' => [
-                'message_id' => 1,
-                'chat' => ['id' => 888],
-                'from' => ['id' => 888, 'language_code' => 'en'],
-                'text' => '/day',
-            ],
-        ]));
-        $bot = new SolytoBot($gateway);
-        $bot->handleWebhook(request());
-
-        Http::assertSent(function ($request) {
-            return str_contains($request->url(), 'sendMessage')
-                && str_contains($request['text'] ?? '', 'Write report');
-        });
-    });
-
-    it('sends an empty-day message when nothing is due', function () {
-        $user = makeUser();
-        $connection = TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '887', 'is_confirmed' => true]);
-
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser')->once();
-        $gateway->shouldReceive('dueTodos')->once()->andReturn(collect());
-        $gateway->shouldReceive('todayAppointments')->once()->andReturn(collect());
-
-        app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
-            'update_id' => 1,
-            'message' => [
-                'message_id' => 1,
-                'chat' => ['id' => 887],
-                'from' => ['id' => 887, 'language_code' => 'en'],
-                'text' => '/day',
-            ],
-        ]));
-        $bot = new SolytoBot($gateway);
-        $bot->handleWebhook(request());
-
-        expect(SolytoMessage::EMPTY_DAY->trans())->toBeString();
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
     });
 });
 
@@ -244,7 +162,7 @@ describe('SolytoBot day command with calendar events', function () {
                 'text' => '/day',
             ],
         ]));
-        $bot = new SolytoBot(app(IntegrationGateway::class));
+        $bot = app(SolytoBot::class);
         $bot->handleWebhook(request());
 
         Http::assertSent(function ($request) {
@@ -280,30 +198,15 @@ describe('SolytoBot action routing', function () {
         $bot->handleWebhook(request());
     }
 
-    it('routes the quick-add type selection to its handler', function () {
-        $user = makeUser();
-        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '555', 'is_confirmed' => true]);
-
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser');
-        $gateway->shouldNotReceive('detect');
-        $gateway->shouldReceive('commit')->once()->with('buy milk', QuickAddContentType::Todo, null)->andReturn((object) ['id' => 1]);
-
-        sendToBotWithAction(new SolytoBot($gateway), 555, 'buy milk', SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value, 'Todo');
-
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
-    });
-
     it('replies with the default error message when a routed handler throws', function () {
         $user = makeUser();
         TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '556', 'is_confirmed' => true]);
 
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser');
-        $gateway->shouldNotReceive('detect');
-        $gateway->shouldReceive('commit')->once()->andThrow(new \RuntimeException('commit failed'));
+        $quickAdd = $this->mock(QuickAddService::class);
+        $quickAdd->shouldNotReceive('detect');
+        $quickAdd->shouldReceive('commit')->once()->andThrow(new \RuntimeException('commit failed'));
 
-        sendToBotWithAction(new SolytoBot($gateway), 556, 'buy milk', SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value, 'Todo');
+        sendToBotWithAction(app(SolytoBot::class), 556, 'buy milk', SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value, 'Todo');
 
         $errorText = __(SolytoMessage::ERROR->value);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
@@ -314,15 +217,106 @@ describe('SolytoBot action routing', function () {
         $user = makeUser();
         TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '557', 'is_confirmed' => true]);
 
-        $gateway = $this->mock(IntegrationGateway::class);
-        $gateway->shouldReceive('setUser');
-        $gateway->shouldReceive('detect')->once()->andReturn(
-            new DetectionResult('https://example.com', QuickAddContentType::Links, 0.95, false, null)
-        );
-        $gateway->shouldReceive('commit')->once()->with('https://example.com', QuickAddContentType::Links, null)->andReturn((object) ['id' => 1]);
+        sendToBotWithAction(app(SolytoBot::class), 557, 'hello', SolytoBotEvent::WELCOME->value, 'https://example.com');
 
-        sendToBotWithAction(new SolytoBot($gateway), 557, 'hello', SolytoBotEvent::WELCOME->value, 'https://example.com');
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
+            && ($request['text'] ?? null) === SolytoMessage::ADDED_LINK->trans());
+        expect(LibraryLink::forUser($user->id)->pluck('url')->all())->toBe(['https://example.com']);
+    });
+});
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage'));
+describe('SolytoBot with real records', function () {
+    function sendToBot(int $chatId, string $text): void
+    {
+        app()->instance('request', \Illuminate\Http\Request::create('/webhook', 'POST', [
+            'update_id' => 1,
+            'message' => [
+                'message_id' => 1,
+                'chat' => ['id' => $chatId],
+                'from' => ['id' => $chatId, 'language_code' => 'en'],
+                'text' => $text,
+            ],
+        ]));
+
+        app(SolytoBot::class)->handleWebhook(request());
+    }
+
+    function sentText(): string
+    {
+        $texts = Http::recorded()
+            ->filter(fn ($pair) => str_contains($pair[0]->url(), 'sendMessage'))
+            ->map(fn ($pair) => $pair[0]['text'] ?? '');
+
+        expect($texts)->toHaveCount(1);
+
+        return $texts->first();
+    }
+
+    afterEach(function () {
+        \Carbon\Carbon::setTestNow();
+    });
+
+    it('lists the open todos of the connected user only', function () {
+        $user = makeUser();
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '600', 'is_confirmed' => true]);
+        Todo::factory()->forUser($user)->create(['title' => 'Water plants', 'is_completed' => false]);
+        Todo::factory()->forUser(makeUser())->create(['title' => 'Someone else', 'is_completed' => false]);
+
+        sendToBot(600, '/todos');
+
+        expect(sentText())->toBe('- Water plants');
+    });
+
+    it('lists todos due today and overdue on /day, without future or completed ones', function () {
+        \Carbon\Carbon::setTestNow('2026-08-14 12:00:00');
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'UTC']);
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '601', 'is_confirmed' => true]);
+        Todo::factory()->forUser($user)->create(['title' => 'Due today', 'is_completed' => false, 'due_at' => '2026-08-14']);
+        Todo::factory()->forUser($user)->create(['title' => 'Overdue', 'is_completed' => false, 'due_at' => '2026-08-10']);
+        Todo::factory()->forUser($user)->create(['title' => 'Future', 'is_completed' => false, 'due_at' => '2026-08-15']);
+        Todo::factory()->forUser($user)->create(['title' => 'Done', 'is_completed' => true, 'due_at' => '2026-08-14']);
+
+        sendToBot(601, '/day');
+
+        $text = sentText();
+        expect($text)->toStartWith(SolytoMessage::DAY->trans())
+            ->toContain('- Due today')
+            ->toContain('- Overdue')
+            ->not->toContain('Future')
+            ->not->toContain('Done');
+    });
+
+    it('replies with the empty-day text when nothing is due', function () {
+        $user = makeUser();
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '602', 'is_confirmed' => true]);
+
+        sendToBot(602, '/day');
+
+        expect(sentText())->toBe(SolytoMessage::EMPTY_DAY->trans());
+    });
+
+    it('adds a link for a high-confidence quick-add', function () {
+        $user = makeUser();
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '603', 'is_confirmed' => true]);
+
+        sendToBot(603, 'https://example.com/article');
+
+        expect(sentText())->toBe(SolytoMessage::ADDED_LINK->trans());
+        expect(LibraryLink::forUser($user->id)->pluck('url')->all())->toBe(['https://example.com/article']);
+    });
+
+    it('adds a todo after the type selection', function () {
+        $user = makeUser();
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '604', 'is_confirmed' => true]);
+        ConversationState::loadOrMake('604_solyto')
+            ->addUserTextEvent('buy milk')
+            ->addActionEvent(SolytoBotEvent::QUICK_ADD_AWAITING_TYPE->value)
+            ->store();
+
+        sendToBot(604, 'Todo');
+
+        expect(sentText())->toBe(SolytoMessage::ADDED_TODO->trans());
+        expect(Todo::forUser($user->id)->pluck('title')->all())->toBe(['buy milk']);
     });
 });
