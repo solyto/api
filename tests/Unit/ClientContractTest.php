@@ -1,6 +1,5 @@
 <?php
 
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\Feeds\Models\FeedSubscription;
@@ -796,7 +795,9 @@ describe('Client contract', function () {
         $user = makeUser();
         $journal = NoteCategory::where('user_id', $user->id)->where('title', NoteCategory::JOURNAL_TITLE)->first();
         Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-06')->create();
-        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-08']);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/check-in', ['date' => '2026-10-08', 'mood' => 3])
+            ->assertStatus(201);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-10-31')
