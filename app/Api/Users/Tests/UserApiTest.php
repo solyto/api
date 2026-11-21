@@ -33,11 +33,147 @@ describe('GET /api/v1/users', function () {
             ->assertJsonPath('success', true);
     });
 
+    it('returns the requested page with pagination meta, newest first', function () {
+        $admin = makeUser(['role' => 'admin', 'created_at' => now()->subYear()]);
+        $users = collect(range(1, 4))->map(fn (int $i) => makeUser(['created_at' => now()->subDays($i)]));
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?per_page=2&page=2')
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $users[2]->id)
+            ->assertJsonPath('data.1.id', $users[3]->id)
+            ->assertJsonPath('meta.pagination.current_page', 2)
+            ->assertJsonPath('meta.pagination.last_page', 3)
+            ->assertJsonPath('meta.pagination.per_page', 2)
+            ->assertJsonPath('meta.pagination.total', 5)
+            ->assertJsonPath('meta.pagination.from', 3)
+            ->assertJsonPath('meta.pagination.to', 4)
+            ->assertJsonPath('meta.pagination.has_more_pages', true);
+    });
+
+    it('keeps the legacy page size of 1000 when per_page is omitted', function () {
+        $admin = makeUser(['role' => 'admin']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users')
+            ->assertStatus(200)
+            ->assertJsonPath('meta.pagination.per_page', 1000);
+    });
+
+    it('rejects an invalid page or per_page', function (string $query) {
+        $admin = makeUser(['role' => 'admin']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?'.$query)
+            ->assertStatus(422);
+    })->with(['per_page=0', 'per_page=101', 'per_page=abc', 'page=0']);
+
+    it('searches name or email case-insensitively before paging', function () {
+        $admin = makeUser(['role' => 'admin', 'name' => 'Admin', 'email' => 'admin@example.com']);
+        $alice = makeUser(['name' => 'Alice', 'email' => 'first@example.com']);
+        $bob = makeUser(['name' => 'Bob', 'email' => 'bob@alicorp.test']);
+        makeUser(['name' => 'Carol', 'email' => 'carol@example.com']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?per_page=1&search=ALI')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.pagination.total', 2);
+
+        $ids = collect($this->actingAs($admin, 'sanctum')->getJson('/api/v1/users?per_page=10&search=ALI')->json('data'))->pluck('id');
+        expect($ids->sort()->values()->all())->toBe(collect([$alice->id, $bob->id])->sort()->values()->all());
+    });
+
+    it('matches LIKE wildcards in the search term literally', function () {
+        $admin = makeUser(['role' => 'admin', 'name' => 'Admin', 'email' => 'admin@example.com']);
+        $underscored = makeUser(['name' => 'a_b', 'email' => 'u1@example.com']);
+        makeUser(['name' => 'axb', 'email' => 'u2@example.com']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?per_page=10&search=a_b')
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $underscored->id);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?per_page=10&search=%25')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    });
+
+    it('returns empty data for a page beyond the last', function () {
+        $admin = makeUser(['role' => 'admin']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users?per_page=10&page=5')
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.pagination.total', 1);
+    });
+
     it('forbids regular users from listing users', function () {
         $user = makeUser();
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/users')
+            ->assertStatus(403);
+    });
+});
+
+describe('GET /api/v1/users/growth', function () {
+    beforeEach(function () {
+        $this->travelTo(Carbon\CarbonImmutable::parse('2026-03-15 12:00:00', 'UTC'));
+
+        $this->admin = makeUser(['role' => 'admin', 'created_at' => '2025-06-02 10:00:00']);
+        foreach (['2025-06-01 08:00:00', '2026-01-10 08:00:00', '2026-01-20 08:00:00', '2026-03-14 08:00:00'] as $createdAt) {
+            makeUser(['created_at' => $createdAt]);
+        }
+    });
+
+    it('returns cumulative totals per year and month, only periods with signups', function (string $groupBy, array $expected) {
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/users/growth?group_by='.$groupBy)
+            ->assertStatus(200)
+            ->assertJsonPath('data', $expected);
+    })->with([
+        'year' => ['year', [['period' => '2025', 'total' => 2], ['period' => '2026', 'total' => 5]]],
+        'month' => ['month', [['period' => '2025-06', 'total' => 2], ['period' => '2026-01', 'total' => 4], ['period' => '2026-03', 'total' => 5]]],
+    ]);
+
+    it('gap-fills the last 30 days, starting from the earlier total', function () {
+        $data = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/users/growth?group_by=day')
+            ->assertStatus(200)
+            ->json('data');
+
+        expect($data)->toHaveCount(30)
+            ->and($data[0])->toBe(['period' => '2026-02-14', 'total' => 4])
+            ->and($data[27])->toBe(['period' => '2026-03-13', 'total' => 4])
+            ->and($data[28])->toBe(['period' => '2026-03-14', 'total' => 5])
+            ->and($data[29])->toBe(['period' => '2026-03-15', 'total' => 5]);
+    });
+
+    it('gap-fills the last 52 ISO weeks', function () {
+        $data = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/users/growth?group_by=week')
+            ->assertStatus(200)
+            ->json('data');
+
+        expect($data)->toHaveCount(52)
+            ->and($data[0])->toBe(['period' => '2025-W12', 'total' => 0])
+            ->and($data[51])->toBe(['period' => '2026-W11', 'total' => 5]);
+    });
+
+    it('rejects an unknown group_by', function () {
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/users/growth?group_by=hour')
+            ->assertStatus(422);
+    });
+
+    it('forbids regular users', function () {
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/users/growth?group_by=year')
             ->assertStatus(403);
     });
 });

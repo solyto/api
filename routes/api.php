@@ -113,6 +113,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
     });
 
     Route::prefix('users')->group(function () {
+        Route::get('growth', [UserController::class, 'growth']);
         Route::get('me', [UserController::class, 'me']);
         Route::post('me/profile-image', [UserController::class, 'updateProfileImage']);
         Route::put('change-password', [UserController::class, 'changePassword']);
