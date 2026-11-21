@@ -98,6 +98,29 @@ describe('Todo workspaces CRUD', function () {
         expect($workspace->fresh()->categories->pluck('id')->all())->toBe([$category->id]);
     });
 
+    it('shows a renamed or deleted category in the workspace list right away', function () {
+        $user = makeUser();
+        $workspace = TodoWorkspace::factory()->forUser($user)->create();
+        $category = TodoCategory::factory()->forUser($user)->create(['title' => 'Work']);
+        $workspace->categories()->attach($category->id);
+        $categoriesOf = fn () => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/todos/workspaces')->json('data'))
+            ->firstWhere('id', $workspace->id)['categories'];
+
+        expect($categoriesOf()[0]['title'])->toBe('Work');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/todos/categories/'.$category->id, ['title' => 'Job'])
+            ->assertStatus(200);
+
+        expect($categoriesOf()[0]['title'])->toBe('Job');
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/todos/categories/'.$category->id)
+            ->assertStatus(200);
+
+        expect($categoriesOf())->toBe([]);
+    });
+
     it('attaches and detaches categories to a workspace', function () {
         $user = makeUser();
         $workspace = TodoWorkspace::factory()->forUser($user)->create();

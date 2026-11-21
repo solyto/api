@@ -311,7 +311,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         });
 
         Route::prefix('links')->name('links.')->group(function () {
-            Route::apiResource('categories', LibraryLinkCategoryController::class);
+            Route::apiResource('categories', LibraryLinkCategoryController::class)->except(['show']);
             Route::get('newest', [LibraryLinkController::class, 'newest']);
 
             Route::apiResource('/', LibraryLinkController::class)->parameters(['' => 'link']);
@@ -452,7 +452,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
     });
 
     Route::prefix('time-tracking')->group(function () {
-        Route::apiResource('categories', TimeTrackingCategoryController::class);
+        Route::apiResource('categories', TimeTrackingCategoryController::class)->except(['show']);
         Route::apiResource('projects', TimeTrackingProjectController::class);
 
         Route::prefix('entries')->name('entries.')->group(function () {
@@ -460,7 +460,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::post('{entry}/stop', [TimeTrackingEntryController::class, 'stop']);
             Route::get('statistics', [TimeTrackingEntryController::class, 'statistics']);
 
-            Route::apiResource('/', TimeTrackingEntryController::class)->parameters(['' => 'entry']);
+            Route::apiResource('/', TimeTrackingEntryController::class)->parameters(['' => 'entry'])->except(['show']);
         });
     });
 

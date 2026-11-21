@@ -28,6 +28,43 @@ describe('Time tracking categories and projects', function () {
         expect(TimeTrackingCategory::count())->toBe(0);
     });
 
+    it('shows a renamed or deleted category in the project list right away', function () {
+        $user = makeUser();
+        $project = TimeTrackingProject::factory()->forUser($user)->create();
+        $category = TimeTrackingCategory::factory()->forUser($user)->create(['title' => 'Work']);
+        $project->categories()->attach($category->id);
+        $categoriesOf = fn () => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/time-tracking/projects')->json('data'))
+            ->firstWhere('id', $project->id)['categories'];
+
+        expect($categoriesOf()[0]['title'])->toBe('Work');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/categories/'.$category->id, ['title' => 'Job'])
+            ->assertStatus(200);
+
+        expect($categoriesOf()[0]['title'])->toBe('Job');
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/time-tracking/categories/'.$category->id)
+            ->assertStatus(200);
+
+        expect($categoriesOf())->toBe([]);
+    });
+
+    it('has no show route for a single category or entry', function () {
+        $user = makeUser();
+        $category = TimeTrackingCategory::factory()->forUser($user)->create();
+        $entry = TimeTrackingEntry::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/categories/'.$category->id)
+            ->assertStatus(405);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries/'.$entry->id)
+            ->assertStatus(405);
+    });
+
     it('stores, lists, updates and deletes projects', function () {
         $user = makeUser();
 

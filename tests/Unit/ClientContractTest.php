@@ -1,6 +1,9 @@
 <?php
 
+use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Clipboard\Models\Clipboard;
+use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
@@ -23,12 +26,17 @@ use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Models\TodoCategory;
 use App\Api\Todos\Models\TodoSubtask;
 use App\Api\Todos\Models\TodoWorkspace;
+use App\Plugins\Ai\Services\AiModelSnapshot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Support\FakeCalDavServer;
 
 uses(RefreshDatabase::class);
 
@@ -137,6 +145,31 @@ describe('Client contract', function () {
         }
     });
 
+    // Since 1.1.0–1.1.4, per route (`since` in the fixture). solyto/app src/lib/config/apiRoutes.ts and its call sites at each tag
+    it('still registers every route 1.1.x calls', function () {
+        $fixture = json_decode(
+            (string) file_get_contents(base_path('tests/Fixtures/client-contract/1.1-routes.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        expect($fixture['routes'])->toBeArray()->not->toBeEmpty();
+
+        $routes = Route::getRoutes();
+
+        foreach ($fixture['routes'] as ['since' => $since, 'method' => $method, 'uri' => $uri]) {
+            $path = '/'.preg_replace('/\{[^}]+\}/', '1', $uri);
+
+            try {
+                $matched = $routes->match(Request::create($path, $method));
+            } catch (NotFoundHttpException|MethodNotAllowedHttpException) {
+                $this->fail("No route matches {$method} {$uri}, which {$since} calls.");
+            }
+
+            expect($matched->uri())->toBe($uri, "{$method} {$uri} is answered by {$matched->uri()} instead.");
+        }
+    });
+
     // Since 1.0.15. solyto/app src/lib/state/Auth.svelte.ts:97-108, src/lib/types/auth.ts:44-49
     it('keeps the token and user keys on login', function () {
         $user = makeUser(['email' => 'contract@example.com', 'password' => Hash::make('password1234')]);
@@ -189,6 +222,27 @@ describe('Client contract', function () {
                     'first_visit', 'temperature_unit',
                 ],
             ]]);
+    });
+
+    // Since 1.1.1. solyto/app src/lib/state/Auth.svelte.ts:87-92
+    it('keeps account_deletion_requires_email in the current user meta', function () {
+        $user = makeUser();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200);
+
+        expect($response->json('meta.account_deletion_requires_email'))->toBeBool();
+    });
+
+    // Since 1.1.2. solyto/app src/lib/state/Auth.svelte.ts:543, src/lib/types/auth.ts:20
+    it('keeps week_start in the current user settings', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200)
+            ->assertJsonPath('data.settings.week_start', 'monday');
     });
 
     // Since 1.0.15. solyto/app src/lib/state/Notes.svelte.ts:52-62, src/lib/types/note.ts:3-12, src/lib/types/tag.ts:1-7
@@ -307,6 +361,20 @@ describe('Client contract', function () {
             ]]]);
     });
 
+    // Since 1.1.3. solyto/app src/lib/components/calendars/NavigationEntry.svelte:39,71, src/lib/components/calendars/CalendarEdit.svelte:83,111, src/lib/components/calendars/DeleteModal.svelte:10,14
+    it('flags external calendars on the calendar list', function () {
+        $user = makeUser();
+        externalCalendar($user, (new FakeCalDavServer())->fake());
+
+        $calendars = collect($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars')
+            ->assertStatus(200)
+            ->json('data'))->keyBy('name');
+
+        expect($calendars['Remote']['is_external'])->toBeTrue()
+            ->and($calendars['My Calendar']['is_external'])->toBeFalse();
+    });
+
     // Since 1.0.15. solyto/app src/lib/state/Calendars.svelte.ts:111-150, src/lib/types/calendar.ts:28-47 (created_at/updated_at are never read)
     it('keeps the event fields on the month event list', function () {
         $user = makeUser();
@@ -332,6 +400,21 @@ describe('Client contract', function () {
                 'is_all_day', 'is_recurring', 'recurrence_rule', 'recurrence_end',
                 'original_start_date', 'calendar_id', 'calendar_name', 'calendar_color', 'etag',
             ]]]);
+    });
+
+    // Since 1.1.3. solyto/app src/lib/state/Calendars.svelte.ts:147-148 (a missing key reads as an empty list)
+    it('lists unavailable and rejected external calendars in the month event meta', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        $remote->credentials = ['alice', 'changed-on-the-server'];
+        $user = makeUser();
+        $calendar = externalCalendar($user, $remote);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->format('Y-m'))
+            ->assertStatus(200);
+
+        expect($response->json('meta.unavailable_calendars'))->toBe([$calendar->instanceId])
+            ->and($response->json('meta.credentials_rejected_calendars'))->toBe([$calendar->instanceId]);
     });
 
     // Since 1.0.15. solyto/app src/lib/state/Contacts.svelte.ts:142-145, src/lib/types/contact.ts:1-7
@@ -375,10 +458,31 @@ describe('Client contract', function () {
             ->assertJsonStructure(['data' => [[
                 'uid', 'uri', 'full_name', 'first_name', 'last_name', 'middle_name', 'prefix',
                 'suffix', 'groups', 'organization', 'note', 'street', 'city', 'state',
-                'postal_code', 'country', 'etag', 'address_book_id', 'address_book_color', 'has_photo',
+                'postal_code', 'country', 'etag', 'address_book_id', 'address_book_color',
                 'email' => [['value', 'type']],
                 'phone' => [['value', 'type']],
             ]]]);
+    });
+
+    // Since 1.1.4. solyto/app src/lib/state/Contacts.svelte.ts:128-129, src/lib/types/contact.ts:42 (a missing has_photo only costs extra photo requests)
+    it('keeps has_photo on the contact list', function () {
+        $user = makeUser();
+        $addressBookId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Work'])
+            ->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
+                'address_book_id' => $addressBookId,
+                'first_name' => 'John',
+                'last_name' => 'Doe',
+            ])
+            ->assertStatus(201);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/address-books/contacts')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.has_photo', false);
     });
 
     // Since 1.0.15. solyto/app src/lib/state/TimeTracking.svelte.ts:48-51, src/lib/types/time_tracking.ts:1-17 (total_duration is never read)
@@ -617,5 +721,372 @@ describe('Client contract', function () {
             ->assertJsonPath('data.0.type', 'image')
             ->assertJsonPath('data.0.file_path', $user->id.'/clipboard/a.png')
             ->assertJsonStructure(['data' => [['id', 'content', 'type', 'file_path', 'created_at', 'updated_at']]]);
+    });
+
+    // Since 1.1.2. solyto/app src/lib/state/DevRequests.svelte.ts:27, src/lib/components/dev-requests/DevRequestEntry.svelte:61-63,87-89
+    it('keeps fixed_in_version on the dev request list', function () {
+        $user = makeUser();
+        DevRequest::factory()->completed()->create(['fixed_in_version' => '1.1.2']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/dev-requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.status', 'completed')
+            ->assertJsonPath('data.0.fixed_in_version', '1.1.2');
+    });
+
+    // Since 1.0.15. solyto/app src/lib/components/settings/notifications/ManagePushNotifications.svelte:20-21
+    it('keeps public_key on the vapid key', function () {
+        $user = makeUser();
+        config(['webpush.vapid.public_key' => 'test-public-key']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notifications/push/vapid-key')
+            ->assertStatus(200)
+            ->assertJsonPath('data.public_key', 'test-public-key');
+    });
+
+    // Since 1.0.15. solyto/app src/lib/state/Feeds.svelte.ts:58,103,116, src/lib/components/feeds/EntryEdit.svelte:26-36, src/lib/types/feed.ts:1-10
+    it('keeps the feed subscription fields with comma-separated keyword strings', function () {
+        $user = makeUser();
+        FeedSubscription::factory()->forUser($user)->withWhitelist(['php', 'laravel'])->withBlacklist(['ads'])->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/subscriptions')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.whitelist', 'php,laravel')
+            ->assertJsonPath('data.0.blacklist', 'ads')
+            ->assertJsonStructure(['data' => [['id', 'feed_id', 'title', 'url', 'whitelist', 'blacklist']]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Integrations.svelte.ts:48-51, src/lib/types/integration.ts:1-9
+    it('keeps every integration flag as a boolean', function () {
+        $response = $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/integrations')
+            ->assertStatus(200);
+
+        foreach (['hardcover', 'tmdb', 'discogs', 'bgg', 'spotify', 'telegram', 'ntfy'] as $integration) {
+            expect($response->json("data.{$integration}"))->toBeBool();
+        }
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Plugins.svelte.ts:32,37, src/lib/components/settings/AiPluginSettings.svelte:46,99,105, src/lib/types/plugin.ts:7-13
+    it('keeps the user plugin fields', function () {
+        $this->app->instance(AiModelSnapshot::class, new AiModelSnapshot(base_path('tests/Fixtures/ai-models.json')));
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/users/me/plugins')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.plugin', 'ai')
+            ->assertJsonStructure(['data' => [['plugin', 'enabled', 'has_api_key', 'settings', 'model_available']]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Plugins.svelte.ts:33,38, src/lib/components/settings/AiPluginSettings.svelte:35,40, src/lib/types/plugin.ts:14-22
+    it('keeps the AI provider fields with their models', function () {
+        $this->app->instance(AiModelSnapshot::class, new AiModelSnapshot(base_path('tests/Fixtures/ai-models.json')));
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/plugins/ai/providers')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['provider', 'name', 'models' => [['id', 'name']]]]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Calendars.svelte.ts:169-175
+    it('returns journal and check-in marks as a plain list of dates', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)->where('title', NoteCategory::JOURNAL_TITLE)->first();
+        Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-06')->create();
+        CheckIn::factory()->forUser($user)->create(['date' => '2026-10-08']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('data', ['2026-10-06']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
+            ->assertStatus(200)
+            ->assertJsonPath('data', ['2026-10-08']);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Notes.svelte.ts:101-112, src/lib/services/JournalService.ts:7-17, src/lib/types/note.ts:28-38
+    it('lists the journal as a system category in the hidden category list', function () {
+        $user = makeUser();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/categories/hidden')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['id', 'title', 'parent_id', 'sort_order', 'is_system', 'is_hidden', 'children']]]);
+
+        expect(collect($response->json('data'))->where('is_system', true))->toHaveCount(1);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Notes.svelte.ts:68-75, src/lib/types/note.ts:3-12
+    it('keeps the note fields on the hidden note list', function () {
+        $user = makeUser();
+        $journal = NoteCategory::where('user_id', $user->id)->where('title', NoteCategory::JOURNAL_TITLE)->first();
+        $note = Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-06')->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/hidden')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $note->id)
+            ->assertJsonPath('data.0.category_id', $journal->id)
+            ->assertJsonStructure(['data' => [['id', 'title', 'content', 'category_id', 'tags', 'is_favorite', 'created_at', 'updated_at']]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/components/settings/FeatureSettings.svelte:41,48,55, src/lib/components/notes/NoteNavigationDesktop.svelte:54
+    it('keeps the journal and calendar mark flags in the current user settings', function () {
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => ['settings' => ['journal_enabled', 'journal_calendar_mark', 'check_in_calendar_mark']]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Finances.svelte.ts:99-104, src/lib/types/finance.ts:3-7
+    it('keeps the budget value fields with a numeric value', function () {
+        $user = makeUser();
+        $budget = Budget::factory()->forUser($user)->create();
+        BudgetValue::factory()->forBudget($budget)->withValue(1250.5)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget/'.$budget->id.'/values')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.value', 1250.5)
+            ->assertJsonStructure(['data' => [['id', 'date', 'value']]]);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/state/Auth.svelte.ts:276-284, src/lib/components/settings/PasswordSettings.svelte:48-53
+    it('answers a password change with success or field errors on current_password and new_password', function () {
+        $user = makeUser(['password' => Hash::make('old-password-1234')]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/change-password', [
+                'current_password' => 'wrong-password',
+                'new_password' => 'New-password-5678!',
+                'new_password_confirmation' => 'New-password-5678!',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors('current_password');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/change-password', [
+                'current_password' => 'old-password-1234',
+                'new_password' => 'New-password-5678!',
+                'new_password_confirmation' => 'something-else',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('new_password');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/change-password', [
+                'current_password' => 'old-password-1234',
+                'new_password' => 'New-password-5678!',
+                'new_password_confirmation' => 'New-password-5678!',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true);
+    });
+
+    // Since 1.1.0. solyto/app src/lib/services/ApiService.ts:124,161
+    it('answers a client below the minimum version with 426 and min_client_version in meta', function () {
+        config(['app.min_client_version' => '1.1.0']);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->withHeaders(['X-Client-Version' => '1.0.15'])
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(426)
+            ->assertJsonPath('meta.min_client_version', '1.1.0');
+    });
+
+    // Since 1.1.1. solyto/app src/lib/components/settings/AccountDeletionSettings.svelte:35-40
+    it('answers a deletion request with data.status or an error on password', function () {
+        Mail::fake();
+        $user = makeUser(['password' => Hash::make('secret-password')]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'wrong-password'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('password');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'email_sent');
+
+        config(['auth.policy.account_deletion_confirmation' => false]);
+        $other = makeUser(['password' => Hash::make('secret-password')]);
+
+        $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'deleted');
+    });
+
+    // Since 1.1.1. solyto/app src/routes/auth/confirm-account-deletion/+page.svelte:39-42
+    it('answers an unknown account deletion token with the invalid_token code', function () {
+        Mail::fake();
+        $user = makeUser(['password' => Hash::make('secret-password')]);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
+            ->assertStatus(200);
+
+        $this->postJson('/api/v1/auth/confirm-account-deletion', ['token' => 'not-the-token', 'email' => $user->email])
+            ->assertStatus(401)
+            ->assertJsonPath('errors', ['invalid_token']);
+    });
+
+    // Since 1.1.2. solyto/app src/lib/state/WidgetBridge.ts:58-69, src/lib/types/auth.ts:55-59
+    it('keeps token and token_expires_at on the widget token', function () {
+        $token = makeUser()->createToken('auth-token-mobile', expiresAt: now()->addDays(30))->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/auth/widget-token')
+            ->assertStatus(201);
+
+        expect($response->json('data.token'))->toBeString()->not->toBeEmpty()
+            ->and($response->json('data.token_expires_at'))->toBeString();
+    });
+
+    // Since 1.1.2. solyto/app src/lib/services/ApiService.ts:146-147,189-200
+    it('answers a throttled request with 429, retry_after in meta and an error code', function () {
+        $credentials = ['email' => 'throttled@example.com', 'password' => 'wrong-password'];
+
+        foreach (range(1, 5) as $ignored) {
+            $this->postJson('/api/v1/auth/login', $credentials)->assertStatus(401);
+        }
+
+        $response = $this->postJson('/api/v1/auth/login', $credentials)->assertStatus(429);
+
+        expect($response->json('meta.retry_after'))->toBeInt()->toBeGreaterThan(0)
+            ->and($response->json('errors.0'))->toBeString();
+    });
+
+    // Since 1.1.3. solyto/app src/lib/state/ExternalCalendars.svelte.ts:44-56,83, src/lib/types/calendar.ts:183-195
+    it('keeps the external account and calendar candidate fields', function () {
+        $remote = (new FakeCalDavServer())->fake();
+        $user = makeUser();
+
+        $accountId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/external/accounts', [
+                'server_url' => FakeCalDavServer::ORIGIN,
+                'username' => 'alice',
+                'password' => 'app-password',
+            ])
+            ->assertStatus(201)
+            ->assertJsonStructure(['data' => ['id', 'server_url', 'username', 'calendars']])
+            ->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/calendars/external/accounts/{$accountId}/available")
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['url', 'name', 'color', 'is_connected']]]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/calendars/external/accounts/{$accountId}/calendars", ['urls' => [$remote->url()]])
+            ->assertStatus(201);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/external/accounts')
+            ->assertStatus(200)
+            ->assertJsonStructure(['data' => [['id', 'server_url', 'username', 'calendars' => [['id', 'remote_url']]]]]);
+    });
+
+    // Since 1.1.3. solyto/app src/lib/services/ExternalCalendarService.ts:9-14,21-23
+    it('answers a failed external account connect with the code the app maps', function (string $case, string $code) {
+        $remote = (new FakeCalDavServer())->fake();
+        match ($case) {
+            'credentials' => $remote->credentials = ['alice', 'other'],
+            'unreachable' => $remote->down = true,
+            default => null,
+        };
+        $serverUrl = match ($case) {
+            'not allowed' => 'http://127.0.0.1:8080',
+            'empty' => FakeCalDavServer::ORIGIN.'/nothing',
+            default => FakeCalDavServer::ORIGIN,
+        };
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->postJson('/api/v1/calendars/external/accounts', [
+                'server_url' => $serverUrl,
+                'username' => 'alice',
+                'password' => 'app-password',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors', [$code]);
+    })->with([
+        'url not allowed' => ['not allowed', 'external_url_not_allowed'],
+        'server unreachable' => ['unreachable', 'external_server_unreachable'],
+        'no calendars' => ['empty', 'external_no_calendars'],
+        'credentials rejected' => ['credentials', 'external_credentials_rejected'],
+    ]);
+
+    // Since 1.1.3. solyto/app src/lib/state/FeedImport.svelte.ts:49-66,103, src/lib/components/feeds/FeedImportModal.svelte:92-100, src/lib/types/feed.ts:63-75
+    it('keeps the feed import state fields and answers an upload during an import with 409', function () {
+        Queue::fake();
+        $user = makeUser();
+        $opml = '<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><body>'
+            .'<outline text="Feed 1" xmlUrl="https://feed1.example/rss"/></body></opml>';
+        $upload = fn () => $this->actingAs($user, 'sanctum')->post(
+            '/api/v1/feeds/import',
+            ['file' => UploadedFile::fake()->createWithContent('feeds.opml', $opml)],
+            ['Accept' => 'application/json']
+        );
+        $stateFields = ['data' => ['stage', 'total', 'processed', 'feeds' => [['url', 'title', 'already_subscribed', 'status']]]];
+
+        $upload()->assertStatus(200)->assertJsonPath('data.stage', 'parsed')->assertJsonStructure($stateFields);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/import/state')
+            ->assertStatus(200)
+            ->assertJsonStructure($stateFields);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
+            ->assertStatus(200);
+
+        $upload()->assertStatus(409);
+    });
+
+    // Since 1.1.4. solyto/app src/lib/state/Clipboard.svelte.ts:23,73, src/lib/components/clipboard/ClipboardList.svelte:84,141
+    it('keeps the file fields on the clipboard list with include_files', function () {
+        $user = makeUser();
+        Clipboard::factory()->forUser($user)->create([
+            'type' => 'file', 'content' => '', 'file_path' => $user->id.'/clipboard/a.pdf',
+            'file_name' => 'a.pdf', 'file_size' => 1024, 'mime_type' => 'application/pdf',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/clipboard?include_files=1')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.type', 'file')
+            ->assertJsonPath('data.0.file_name', 'a.pdf')
+            ->assertJsonPath('data.0.file_size', 1024)
+            ->assertJsonPath('data.0.mime_type', 'application/pdf');
+    });
+
+    // Since 1.1.4. solyto/app src/lib/components/dashboard/Inspiration.svelte:53-55, src/lib/components/dashboard/widgets/NewestNotesWidget.svelte:24-33
+    it('keeps the note fields on the recent notes', function () {
+        $user = makeUser();
+        $note = Note::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/recent')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $note->id)
+            ->assertJsonStructure(['data' => [['id', 'title', 'created_at', 'updated_at']]]);
+    });
+
+    // Since 1.1.4. solyto/app src/lib/state/Finances.svelte.ts:42, src/lib/services/BudgetIntervalService.ts:12-13 (a missing interval reads as monthly)
+    it('keeps interval on the budget list', function () {
+        $user = makeUser();
+        Budget::factory()->forUser($user)->create(['interval' => 'quarterly']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/finances/budget')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.interval', 'quarterly');
     });
 });

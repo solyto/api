@@ -1,0 +1,190 @@
+{
+    "source": "solyto/app 1.1.0–1.1.4: src/lib/config/apiRoutes.ts call sites in src/lib/state and src/lib/components that 1.0.15 does not make (1.0.15-routes.json covers those). since = the first build that calls the route.",
+    "routes": [
+        {
+            "since": "1.1.1",
+            "method": "POST",
+            "uri": "api/v1/auth/confirm-account-deletion"
+        },
+        {
+            "since": "1.1.2",
+            "method": "POST",
+            "uri": "api/v1/auth/logout"
+        },
+        {
+            "since": "1.1.2",
+            "method": "POST",
+            "uri": "api/v1/auth/resend-verification"
+        },
+        {
+            "since": "1.1.2",
+            "method": "POST",
+            "uri": "api/v1/auth/widget-token"
+        },
+        {
+            "since": "1.1.3",
+            "method": "GET",
+            "uri": "api/v1/calendars/external/accounts"
+        },
+        {
+            "since": "1.1.3",
+            "method": "POST",
+            "uri": "api/v1/calendars/external/accounts"
+        },
+        {
+            "since": "1.1.3",
+            "method": "DELETE",
+            "uri": "api/v1/calendars/external/accounts/{account}"
+        },
+        {
+            "since": "1.1.3",
+            "method": "PUT",
+            "uri": "api/v1/calendars/external/accounts/{account}"
+        },
+        {
+            "since": "1.1.3",
+            "method": "GET",
+            "uri": "api/v1/calendars/external/accounts/{account}/available"
+        },
+        {
+            "since": "1.1.3",
+            "method": "POST",
+            "uri": "api/v1/calendars/external/accounts/{account}/calendars"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/check-in/marks"
+        },
+        {
+            "since": "1.1.4",
+            "method": "POST",
+            "uri": "api/v1/clipboard/file"
+        },
+        {
+            "since": "1.1.4",
+            "method": "GET",
+            "uri": "api/v1/clipboard/{clipboard}/file"
+        },
+        {
+            "since": "1.1.3",
+            "method": "POST",
+            "uri": "api/v1/feeds/import"
+        },
+        {
+            "since": "1.1.3",
+            "method": "POST",
+            "uri": "api/v1/feeds/import/select"
+        },
+        {
+            "since": "1.1.3",
+            "method": "GET",
+            "uri": "api/v1/feeds/import/state"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/finances/budget/{budget}/values"
+        },
+        {
+            "since": "1.1.0",
+            "method": "POST",
+            "uri": "api/v1/finances/budget/{budget}/values"
+        },
+        {
+            "since": "1.1.0",
+            "method": "DELETE",
+            "uri": "api/v1/finances/budget/{budget}/values/{value}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/finances/budget/{budget}/values/{value}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/finances/wealth/fields/{field}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "DELETE",
+            "uri": "api/v1/finances/wealth/fields/{field}/values/{value}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/finances/wealth/fields/{field}/values/{value}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/integrations"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/notes/categories/hidden"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/notes/hidden"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/notes/journal/marks"
+        },
+        {
+            "since": "1.1.4",
+            "method": "GET",
+            "uri": "api/v1/notes/recent"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/plugins/ai/providers"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/users/change-password"
+        },
+        {
+            "since": "1.1.1",
+            "method": "POST",
+            "uri": "api/v1/users/me/deletion-request"
+        },
+        {
+            "since": "1.1.0",
+            "method": "GET",
+            "uri": "api/v1/users/me/plugins"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/users/me/plugins/{plugin}"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/check-in-calendar-mark"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/journal"
+        },
+        {
+            "since": "1.1.0",
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/journal-calendar-mark"
+        },
+        {
+            "since": "1.1.2",
+            "method": "PUT",
+            "uri": "api/v1/users/me/settings/week-start"
+        }
+    ]
+}

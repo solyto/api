@@ -102,6 +102,8 @@ class CalendarService
     {
         $this->dav->calendars()->update($user, $instanceId, $calendar);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
+        // Cached events carry the calendar's colour.
+        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
     }
 
     /**

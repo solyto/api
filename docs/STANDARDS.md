@@ -216,17 +216,17 @@ is fixed, not the route. The 80 drifting operations of 2026-10-13
 `time-tracking/entries`, `/user-settings/*` for `users/me/settings/*`, …)
 were fixed module by module (job `fix`, 2026-10-13).
 
-One operation still documents a route that does not exist, and stays on
-purpose (owner decision, 2026-10-13): `LibraryMusicController::searchAlbumOnDeezer()`
-(`GET /libraries/music/search/deezer/{artist}/{album}`). The method has no
-route and is left untouched until the owner decides what to do with it.
-So the constant is not empty and is not deleted. (The empty
+The last drifting operation, `LibraryMusicController::searchAlbumOnDeezer()`
+(`GET /libraries/music/search/deezer/{artist}/{album}`, no route), was
+removed with its annotation and known-drift entry in `2afca11`
+(2026-10-29); Deezer search is `GET /libraries/music/search/deezer/{query}`.
+The constant stays, empty, so a new drift fails the test. (The empty
 `TelegramBotConnectionController::confirmToken()` stub and the empty
 `GET notes/export` stub were deleted with their annotations and route,
 owner decision, 2026-10-14.) `OpenApiSpecTest` compares
 the drift exactly, so a new drift and a silently fixed one both fail.
 
-Check: `OPENAPI_KNOWN_DRIFT` length = 1 (the method above).
+Check: `OPENAPI_KNOWN_DRIFT` length = 0.
 
 ### 2.3 Responses reference the envelope, never redefine it
 
@@ -357,9 +357,13 @@ in the controller is the single place. Do not start a second one.
 
 `LoginRequest::authenticate()` (`app/Api/Users/Requests/LoginRequest.php:21-38`)
 runs `Auth::attempt` and the email-verification check — Laravel Breeze's
-pattern, the owner's code, and the only request with behaviour. Accepted
-as is (Decisions); new requests do not get methods beyond `rules()`,
-`attributes()`, `messages()`.
+pattern, the owner's code. Accepted as is (Decisions); new requests do not
+get methods beyond `rules()`, `attributes()`, `messages()`.
+
+Two older requests also have behaviour, not yet decided:
+`ChangePasswordRequest::withValidator()` (checks the current password,
+`ChangePasswordRequest.php:27`) and `UpdateUserRequest::prepareForValidation()`
+(drops `role` for non-admins and empty password fields, `UpdateUserRequest.php:34`).
 
 ## 4. Services
 
@@ -379,10 +383,17 @@ constructor, so its 7 call sites built it with
 `app()->makeWith(LibraryReleases::class, ['user' => $user])`. It now takes
 `User $user` per method (`LibraryReleases::getMusicReleases(User $user)`).
 
-Good: every other service — `TodoService::list(User $user)`,
+Good: `TodoService::list(User $user)`,
 `CalendarService::listEvents(User $user, string $yearMonth)`.
 
+Known violation: `ExportService` takes `private readonly User $user` in its
+constructor (`app/Api/Export/Services/ExportService.php:31`) and is built
+with `new ExportService($user, $job)` (`ProcessExport.php:38`,
+`ExportUserData.php:39`).
+
 Check: `grep -rn 'makeWith' app` → 0; `grep -rn 'User \$user' app/Api/*/Services --include=*.php | grep __construct` → 0.
+That grep only sees one-line constructors; it misses `ExportService`, whose
+constructor spans several lines.
 
 ### 4.2 Collaborators are injected, not located
 
@@ -1036,6 +1047,19 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   serve (section 13). Dropping support for a build is the owner's
   decision. Compatibility comes from additive changes inside `v1`; there
   is no `v2` and no second API deployment.
+- **Accepted break: clipboard thumbnails in builds up to 1.1.3**
+  (2026-11-16, owner decision; job `maintain_pdf-clipboards`, `verdict.md`):
+  `2026_11_16_120001_move_clipboard_images_to_private_disk` moves images off
+  the public disk. Builds 1.0.0–1.1.3 load them from the public storage URL,
+  so they show broken thumbnails. Text entries and `file_path` are unaffected
+  (pinned in `ClientContractTest`). An exception to rule 13.1, not a precedent.
+- **Accepted break: budget totals in builds up to 1.1.3**
+  (2026-11-17, owner decision; job `degree_budget-items-…`, `tasks.md`):
+  quarterly and yearly budget items appear in the plain budget list. Builds
+  up to 1.1.3 read every value as monthly, so their monthly totals are wrong
+  once a user sets another interval; 1.1.4 is the first build that reads
+  `interval`. An exception to rules 13.1 and 13.3, not a
+  precedent.
 - **The frontend sends its version** (2026-10-14): from the next frontend
   release on, every request carries `X-Client-Version: <major.minor.patch>`.
   The API records it per token, and it may later reject builds below a
