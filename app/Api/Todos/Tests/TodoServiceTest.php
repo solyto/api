@@ -31,4 +31,14 @@ describe('due', function () {
 
         expect($titles)->toBe(['Oldest', 'Middle']);
     });
+
+    it('orders by due date without a limit', function () {
+        Todo::factory()->forUser($this->user)->create(['title' => 'Newest', 'is_completed' => false, 'due_at' => '2026-08-14']);
+        Todo::factory()->forUser($this->user)->create(['title' => 'Oldest', 'is_completed' => false, 'due_at' => '2026-08-01']);
+        Todo::factory()->forUser($this->user)->create(['title' => 'Middle', 'is_completed' => false, 'due_at' => '2026-08-10']);
+
+        $titles = $this->service->due($this->user, '2026-08-14')->pluck('title')->all();
+
+        expect($titles)->toBe(['Oldest', 'Middle', 'Newest']);
+    });
 });

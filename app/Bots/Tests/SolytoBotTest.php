@@ -285,6 +285,33 @@ describe('SolytoBot with real records', function () {
             ->toContain('- Overdue')
             ->not->toContain('Future')
             ->not->toContain('Done');
+        expect(strpos($text, '- Overdue'))->toBeLessThan(strpos($text, '- Due today'));
+    });
+
+    it('uses the user\'s date on /day when it is already tomorrow there', function () {
+        \Carbon\Carbon::setTestNow('2026-08-14 23:30:00');
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'Europe/Berlin']);
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '605', 'is_confirmed' => true]);
+        Todo::factory()->forUser($user)->create(['title' => 'Berlin today', 'is_completed' => false, 'due_at' => '2026-08-15']);
+
+        sendToBot(605, '/day');
+
+        expect(sentText())->toContain('- Berlin today');
+    });
+
+    it('uses the user\'s date on /day when it is still yesterday there', function () {
+        \Carbon\Carbon::setTestNow('2026-08-15 02:00:00');
+        $user = makeUser();
+        $user->settings()->update(['timezone' => 'America/New_York']);
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '606', 'is_confirmed' => true]);
+        Todo::factory()->forUser($user)->create(['title' => 'New York today', 'is_completed' => false, 'due_at' => '2026-08-14']);
+        Todo::factory()->forUser($user)->create(['title' => 'New York tomorrow', 'is_completed' => false, 'due_at' => '2026-08-15']);
+
+        sendToBot(606, '/day');
+
+        expect(sentText())->toContain('- New York today')
+            ->not->toContain('New York tomorrow');
     });
 
     it('replies with the empty-day text when nothing is due', function () {

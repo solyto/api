@@ -49,7 +49,7 @@ class TodoService
     }
 
     /**
-     * Not completed and due on $date or earlier; ordered by due date only when limited.
+     * Not completed and due on $date or earlier, ordered by due date.
      *
      * @return Collection<int, Todo>
      */
@@ -58,7 +58,8 @@ class TodoService
         return Todo::forUser($user->id)
             ->where('is_completed', false)
             ->whereDate('due_at', '<=', $date)
-            ->when($limit !== null, fn ($query) => $query->orderBy('due_at')->limit($limit))
+            ->orderBy('due_at')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get();
     }
 

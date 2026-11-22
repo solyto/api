@@ -95,7 +95,8 @@ class SolytoBot implements BotInterface
             return;
         }
 
-        $todos = $this->todoService->due($this->user, today()->toDateString());
+        $timezone = $this->user->settings->timezone ?? 'UTC';
+        $todos = $this->todoService->due($this->user, today($timezone)->toDateString());
         $appointments = collect($this->calendarService->listTodayEvents($this->user));
 
         if ($todos->isEmpty() && $appointments->isEmpty()) {
@@ -104,7 +105,6 @@ class SolytoBot implements BotInterface
         }
 
         $dayMessage = SolytoMessage::DAY->trans();
-        $timezone = $this->connection->user->settings->timezone ?? 'UTC';
 
         foreach ($appointments as $appointment) {
             if ($appointment->isAllDay) {
