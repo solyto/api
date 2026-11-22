@@ -16,7 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="description", type="string"),
  *     @OA\Property(property="image_url", type="string", format="uri", nullable=true),
  *     @OA\Property(property="feed_id", type="integer"),
- *     @OA\Property(property="published_at", type="string", format="date-time", nullable=true)
+ *     @OA\Property(property="published_at", type="string", format="date-time", nullable=true),
+ *     @OA\Property(property="saved_link_id", type="string", format="uuid", nullable=true, description="ID of the user's library link with the same URL")
  * )
  *
  * @mixin FeedItem
@@ -40,6 +41,7 @@ class FeedItemResource extends JsonResource
             'image_url' => $this->image_url,
             'feed_id' => $this->feed_id,
             'published_at' => $this->published_at,
+            'saved_link_id' => $this->getAttribute('saved_link_id'),
         ];
     }
 }

@@ -2,6 +2,8 @@
 
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Feeds\Models\Feed;
+use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
@@ -11,6 +13,8 @@ use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Models\LibraryGame;
 use App\Api\Libraries\Models\LibraryGameGenre;
+use App\Api\Libraries\Models\LibraryLink;
+use App\Api\Libraries\Models\LibraryLinkCategory;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMovieGenre;
 use App\Api\Libraries\Models\LibraryMusic;
@@ -1089,5 +1093,103 @@ describe('Client contract', function () {
             ->getJson('/api/v1/finances/budget')
             ->assertStatus(200)
             ->assertJsonPath('data.0.interval', 'quarterly');
+    });
+
+    // Since 1.0.15. solyto/app src/lib/types/feed.ts:25-33, src/lib/components/feeds/FeedView.svelte:25,31,37, src/lib/components/feeds/CardEntry.svelte:18-47, src/lib/components/feeds/CompactEntry.svelte:13, src/lib/state/Feeds.svelte.ts:85-86,103
+    it('keeps the feed item fields and the has_more and feed_counts meta', function () {
+        $user = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        $item = FeedItem::factory()->forFeed($feed)->create(['published_at' => '2026-11-08 12:00:00']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items?offset=0&limit=50&feed_id='.$feed->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $item->id)
+            ->assertJsonPath('data.0.feed_id', $feed->id)
+            ->assertJsonPath('data.0.published_at', '2026-11-08T12:00:00.000000Z')
+            ->assertJsonPath('meta.has_more', false)
+            ->assertJsonPath('meta.feed_counts', [$feed->id => 1])
+            ->assertJsonStructure(['data' => [['id', 'title', 'link', 'description', 'image_url', 'feed_id', 'published_at']]]);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/types/library_link.ts:9-19, src/lib/state/LinkLibrary.svelte.ts:74-171, src/lib/components/libraries/LinkEntry.svelte:49-75, src/lib/components/tags/TagFlexList.svelte:12-17 (cover_path and updated_at are never read)
+    it('keeps the link fields on the link list', function () {
+        $user = makeUser();
+        $category = LibraryLinkCategory::factory()->forUser($user)->create();
+        $link = LibraryLink::factory()->forUser($user)->create(['category_id' => $category->id]);
+        $link->tags()->attach(Tag::factory()->forUser($user)->create());
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $link->id)
+            ->assertJsonPath('data.0.url', $link->url)
+            ->assertJsonPath('data.0.category.id', $category->id)
+            ->assertJsonStructure(['data' => [[
+                'id', 'url', 'title', 'is_favorite', 'created_at',
+                'category' => ['id', 'title', 'color'],
+                'tags' => [['id', 'name', 'color']],
+            ]]]);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/types/library_link.ts:3-7, src/lib/state/LinkLibrary.svelte.ts:65, src/lib/components/libraries/CategoryHeader.svelte:65-94
+    it('keeps the link category fields', function () {
+        $user = makeUser();
+        $category = LibraryLinkCategory::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links/categories')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $category->id)
+            ->assertJsonStructure(['data' => [['id', 'title', 'color']]]);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/state/LinkLibrary.svelte.ts:149-151, src/lib/services/ApiService.ts:37 (only a 2xx JSON body is read)
+    it('answers a link create with a 2xx JSON body', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['url' => 'https://example.com/a', 'title' => 'A'])
+            ->assertStatus(201)
+            ->assertJsonPath('success', true);
+    });
+
+    // Since the first release after 1.1.4. solyto/app src/lib/state/Feeds.svelte.ts:149
+    it('returns the created link id on a link create', function () {
+        $user = makeUser();
+
+        $id = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['url' => 'https://example.com/a', 'title' => 'A'])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(LibraryLink::forUser($user->id)->pluck('id')->all())->toBe([$id]);
+    });
+
+    // Since the first release after 1.1.4. solyto/app src/lib/types/feed.ts:33, src/lib/components/feeds/SaveToLibraryButton.svelte:17,23, src/lib/state/Feeds.svelte.ts:155,158
+    it('keeps saved_link_id on feed items, null when the link is not saved', function () {
+        $user = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/saved', 'published_at' => '2026-11-08 12:00:00']);
+        FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/other', 'published_at' => '2026-11-08 11:00:00']);
+        $link = LibraryLink::factory()->forUser($user)->create(['url' => 'https://example.com/saved']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.saved_link_id', $link->id)
+            ->assertJsonPath('data.1.saved_link_id', null);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/state/LinkLibrary.svelte.ts:165-167, src/lib/services/ApiService.ts:58 (only res.ok is read)
+    it('answers a link delete with a 2xx status', function () {
+        $user = makeUser();
+        $link = LibraryLink::factory()->forUser($user)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/libraries/links/'.$link->id)
+            ->assertStatus(200);
     });
 });

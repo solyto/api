@@ -10,6 +10,7 @@ use App\Api\Feeds\Jobs\SyncFeed;
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
+use App\Api\Libraries\Models\LibraryLink;
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Shared\Exceptions\BlockedUrlException;
@@ -33,6 +34,7 @@ class FeedService
     private const int MAX_ITEM_ID_LENGTH = 255;
     private const int MAX_TITLE_LENGTH = 255;
     private const int MAX_TITLE_DECODE_PASSES = 3;
+    private const int SAVED_LINK_LOOKUP_CHUNK = 500;
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -263,7 +265,31 @@ class FeedService
             ? $sorted
             : $sorted->slice($offset, $limit);
 
-        return ['items' => $this->hydrateFeedItems($page), 'counts' => $counts];
+        $items = $this->hydrateFeedItems($page);
+        // After the cache read: cached feed items are shared between users, saved links are per user.
+        $this->attachSavedLinkIds($userId, $items);
+
+        return ['items' => $items, 'counts' => $counts];
+    }
+
+    /**
+     * @param  EloquentCollection<int, FeedItem>  $items
+     */
+    private function attachSavedLinkIds(string $userId, EloquentCollection $items): void
+    {
+        $urls = $items->pluck('link')->filter()->unique()->values();
+        $linkIds = [];
+
+        foreach ($urls->chunk(self::SAVED_LINK_LOOKUP_CHUNK) as $chunk) {
+            // Ascending, so the newest of several links with the same URL wins the key.
+            $linkIds = [...$linkIds, ...LibraryLink::forUser($userId)
+                ->whereIn('url', $chunk->all())
+                ->orderBy('created_at')
+                ->pluck('id', 'url')
+                ->all()];
+        }
+
+        $items->each(fn (FeedItem $item) => $item->setAttribute('saved_link_id', $linkIds[$item->link] ?? null));
     }
 
     /**

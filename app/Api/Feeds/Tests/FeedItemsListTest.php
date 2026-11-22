@@ -3,6 +3,7 @@
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
+use App\Api\Libraries\Models\LibraryLink;
 
 function feedItemAt(Feed $feed, string $publishedAt, string $title = 'Post', string $description = 'Body'): FeedItem
 {
@@ -57,6 +58,7 @@ describe('Feed items list', function () {
                 'image_url' => 'https://example.com/a.jpg',
                 'feed_id' => $feed->id,
                 'published_at' => '2026-11-08T12:00:00.000000Z',
+                'saved_link_id' => null,
             ]])
             ->assertJsonPath('meta', ['has_more' => false, 'feed_counts' => [$feed->id => 1]]);
     });
@@ -239,5 +241,48 @@ describe('Feed items list', function () {
                 'link' => 'https://example.com/latest',
                 'published_at' => '2026-11-08T12:00:00.000000Z',
             ]]);
+    });
+
+    it('returns the id of the user\'s library link with the same url as saved_link_id', function () {
+        $user = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        $saved = FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/saved', 'published_at' => '2026-11-08 12:00:00']);
+        FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/other', 'published_at' => '2026-11-08 11:00:00']);
+        $link = LibraryLink::factory()->forUser($user)->create(['url' => 'https://example.com/saved']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.id', $saved->id)
+            ->assertJsonPath('data.0.saved_link_id', $link->id)
+            ->assertJsonPath('data.1.saved_link_id', null);
+    });
+
+    it('ignores library links of other users for saved_link_id', function () {
+        $user = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/saved']);
+        LibraryLink::factory()->forUser(makeUser())->create(['url' => 'https://example.com/saved']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.saved_link_id', null);
+    });
+
+    it('returns the newest link as saved_link_id when the url is saved twice', function () {
+        $user = makeUser();
+        $feed = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
+        FeedItem::factory()->forFeed($feed)->create(['link' => 'https://example.com/saved']);
+        LibraryLink::factory()->forUser($user)->create(['url' => 'https://example.com/saved', 'created_at' => '2026-11-01 10:00:00']);
+        $newest = LibraryLink::factory()->forUser($user)->create(['url' => 'https://example.com/saved', 'created_at' => '2026-11-02 10:00:00']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/feeds/items')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.saved_link_id', $newest->id);
     });
 });
