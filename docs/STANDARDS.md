@@ -1060,12 +1060,16 @@ Check: `php artisan test tests/Unit/ClientContractTest.php`.
   serve (section 13). Dropping support for a build is the owner's
   decision. Compatibility comes from additive changes inside `v1`; there
   is no `v2` and no second API deployment.
-- **Accepted break: clipboard thumbnails in builds up to 1.1.3**
-  (2026-11-16, owner decision; job `maintain_pdf-clipboards`, `verdict.md`):
-  `2026_11_16_120001_move_clipboard_images_to_private_disk` moves images off
-  the public disk. Builds 1.0.0–1.1.3 load them from the public storage URL,
-  so they show broken thumbnails. Text entries and `file_path` are unaffected
-  (pinned in `ClientContractTest`). An exception to rule 13.1, not a precedent.
+- **Withdrawn break: clipboard images in builds up to 1.1.3**
+  (accepted 2026-11-16, job `maintain_pdf-clipboards`; withdrawn 2026-11-23,
+  owner decision): `2026_11_16_120001_move_clipboard_images_to_private_disk`
+  moved images off the public disk. Builds 1.0.0–1.1.3 show them only from
+  the public storage URL, so the whole image clipboard was unusable there,
+  not just the thumbnails. Since 2026-11-23 the API serves exactly those URLs
+  again (`routes/web.php`, `ClipboardController::legacyImage`; nginx hands
+  `/storage/user/{user}/clipboard/{32 hex}.{ext}` to the API), reading the
+  private disk, without login as before 1.1.4: the random name is the key.
+  Remove route and nginx rule once builds up to 1.1.3 are no longer served.
 - **Accepted break: budget totals in builds up to 1.1.3**
   (2026-11-17, owner decision; job `degree_budget-items-…`, `tasks.md`):
   quarterly and yearly budget items appear in the plain budget list. Builds

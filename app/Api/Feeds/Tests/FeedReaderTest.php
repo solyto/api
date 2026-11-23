@@ -44,6 +44,33 @@ function fakeAngak(): void
     ]);
 }
 
+// A single WordPress post links the site feed first, then the post's own comments feed under the post's path.
+function fakeWordPressPost(string $siteFeed): void
+{
+    $comments = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>'
+        .'<title>Comments on: Some post</title><link>https://blog.example/2026/11/some-post/</link><description></description>'
+        .'<item><title>By: Someone</title><link>https://blog.example/2026/11/some-post/#comment-1</link><description>Nice</description></item>'
+        .'</channel></rss>';
+
+    Http::fake([
+        'https://blog.example/2026/11/some-post/feed/' => Http::response($comments, 200, ['Content-Type' => 'application/rss+xml; charset=UTF-8']),
+        'https://blog.example/2026/11/some-post/' => Http::response(
+            '<!DOCTYPE html><html><head><title>Some post</title>'
+            .'<link rel="alternate" type="application/rss+xml" title="Blog &raquo; Feed" href="https://blog.example/feed/" />'
+            .'<link rel="alternate" type="application/rss+xml" title="Blog &raquo; Some post Comments Feed" href="https://blog.example/2026/11/some-post/feed/" />'
+            .'</head><body><h1>Some post</h1></body></html>',
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8']
+        ),
+        'https://blog.example/feed/' => Http::response(
+            file_get_contents(__DIR__.'/../../../../tests/Fixtures/'.$siteFeed),
+            200,
+            ['Content-Type' => 'application/rss+xml; charset=UTF-8']
+        ),
+        '*' => Http::response('Not found', 404),
+    ]);
+}
+
 describe('FeedReader', function () {
     it('parses an RSS fixture into items', function () {
         $reader = feedReaderWithFixture('feed.rss');
@@ -131,6 +158,21 @@ describe('FeedReader', function () {
         expect($data['url'])->toBe('https://angak.fr/actualites/feed/');
         expect($data['title'])->toBe('Fixture Feed');
         expect($data['items'])->toHaveCount(2);
+    });
+
+    it('keeps the site feed for a WordPress post page, not the post\'s comments', function () {
+        fakeWordPressPost(siteFeed: 'feed.rss');
+
+        $data = app(FeedReader::class)->getFeedData('https://blog.example/2026/11/some-post/');
+
+        expect($data['url'])->toBe('https://blog.example/feed/')
+            ->and($data['title'])->toBe('Fixture Feed');
+    });
+
+    it('never falls back to a comments feed, even when the site feed is empty', function () {
+        fakeWordPressPost(siteFeed: 'feed_empty.rss');
+
+        expect(app(FeedReader::class)->getFeedData('https://blog.example/2026/11/some-post/'))->toBeFalse();
     });
 
     it('returns the URL of a page\'s single discovered feed', function () {

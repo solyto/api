@@ -15,9 +15,13 @@ beforeEach(function () {
     $this->travelTo('2026-11-18 08:00:00');
 });
 
+// "Nothing logged for 7 days" needs a tracker that existed for those 7 days.
 function sportsAlertFor(User $user): Alert
 {
-    return Alert::factory()->forTracker(builtInTracker($user, 'sports'))->rule(AlertRule::NoEntryDays, null, 7)->create();
+    $sports = builtInTracker($user, 'sports');
+    $sports->forceFill(['created_at' => '2026-01-01 00:00:00'])->save();
+
+    return Alert::factory()->forTracker($sports)->rule(AlertRule::NoEntryDays, null, 7)->create();
 }
 
 it('checks users whose local time is 9:00', function () {
@@ -177,6 +181,45 @@ it('tells about a kept weekly at-most goal once, the morning after the week ende
     Notification::assertSentToTimes($user, AlertNotification::class, 2);
 });
 
+it('tells about a reached daily at-least goal every morning', function () {
+    $user = makeUser();
+    $user->settings()->update(['timezone' => 'Europe/Berlin']);
+    $tracker = ownTracker($user, CheckInTrackerType::Count);
+    $tracker->update(['name' => 'Tracker']);
+    $goal = Goal::factory()->forTracker($tracker)->create(['period' => 'day', 'comparison' => 'at_least', 'target' => 8]);
+    Alert::factory()->forGoal($goal)->create();
+    foreach (['2026-11-17', '2026-11-18', '2026-11-19'] as $date) {
+        CheckInValue::factory()->forTracker($tracker)->on($date, 8)->create();
+    }
+
+    runAlertsOn('2026-11-18', '2026-11-19', '2026-11-20');
+    Notification::assertSentToTimes($user, AlertNotification::class, 3);
+    Notification::assertSentTo($user, AlertNotification::class, fn (AlertNotification $n) => alertText($n, $user) === ['Goal reached', 'Tracker: you reached your goal yesterday.']);
+
+    // Nothing logged on the 20th: no notification on the 21st, and none twice on the same day.
+    runAlertsOn('2026-11-21');
+    $this->artisan('app:send-alerts', ['--user' => $user->email]);
+    Notification::assertSentToTimes($user, AlertNotification::class, 3);
+});
+
+it('tells about a reached weekly at-least goal in consecutive weeks', function () {
+    $user = makeUser();
+    $user->settings()->update(['timezone' => 'Europe/Berlin', 'week_start' => 'monday']);
+    $tracker = ownTracker($user);
+    $tracker->update(['name' => 'Tracker']);
+    $goal = Goal::factory()->forTracker($tracker)->create(['period' => 'week', 'comparison' => 'at_least', 'target' => 1]);
+    Alert::factory()->forGoal($goal)->create();
+    // Met on the first day of both weeks, so no morning ever sees it unmet.
+    CheckInValue::factory()->forTracker($tracker)->on('2026-11-16', 1)->create();
+    CheckInValue::factory()->forTracker($tracker)->on('2026-11-23', 1)->create();
+
+    runAlertsOn('2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22', '2026-11-23');
+    Notification::assertSentToTimes($user, AlertNotification::class, 1);
+
+    runAlertsOn('2026-11-24', '2026-11-25');
+    Notification::assertSentToTimes($user, AlertNotification::class, 2);
+});
+
 it('tells about a kept daily at-most goal every morning', function () {
     $user = makeUser();
     $user->settings()->update(['timezone' => 'Europe/Berlin']);
@@ -238,3 +281,20 @@ it('runs hourly with an overlap lock that expires after an hour', function () {
         ->and($event->withoutOverlapping)->toBeTrue()
         ->and($event->expiresAt)->toBe(60);
 });
+
+it('starts an alert fresh after it or its tracker was switched off and on again', function (string $switch) {
+    $user = makeUser();
+    $user->settings()->update(['timezone' => 'Europe/Berlin']);
+    $alert = sportsAlertFor($user);
+    $off = fn (bool $enabled) => $switch === 'alert' ? $alert->update(['enabled' => $enabled]) : $alert->checkInTracker->update(['enabled' => $enabled]);
+
+    runAlertsOn('2026-11-18');
+    Notification::assertSentToTimes($user, AlertNotification::class, 1);
+
+    // Off for a day, then on again while nothing was logged: it alerts again.
+    $off(false);
+    runAlertsOn('2026-11-19');
+    $off(true);
+    runAlertsOn('2026-11-20');
+    Notification::assertSentToTimes($user, AlertNotification::class, 2);
+})->with(['alert', 'tracker']);

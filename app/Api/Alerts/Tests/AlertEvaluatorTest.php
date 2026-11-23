@@ -15,9 +15,10 @@ function evaluateAlert(Alert $alert): array
     return app(AlertEvaluator::class)->evaluate(collect([$alert]), [$alert->user_id => CarbonImmutable::parse('2026-11-18')])[$alert->id];
 }
 
-function trackerWithValues(CheckInTrackerType $type, array $values)
+function trackerWithValues(CheckInTrackerType $type, array $values, string $createdAt = '2026-01-01 00:00:00')
 {
     $tracker = ownTracker(makeUser(), $type);
+    $tracker->forceFill(['created_at' => $createdAt])->save();
     foreach ($values as $date => $value) {
         CheckInValue::factory()->forTracker($tracker)->on($date, $value)->create();
     }
@@ -69,4 +70,27 @@ it('does not judge a 1–5 average without ratings', function () {
     $alert = Alert::factory()->forTracker($tracker)->rule(AlertRule::AverageBelow, 3, 7)->create();
 
     expect(evaluateAlert($alert))->toMatchArray(['active' => false, 'average' => null]);
+});
+
+// A tracker created during the window would otherwise count the days before it existed as empty.
+it('doesn\'t see "nothing logged" before the tracker existed for the whole window', function () {
+    $tracker = trackerWithValues(CheckInTrackerType::YesNo, [], '2026-11-15 10:00:00');
+    $alert = Alert::factory()->forTracker($tracker)->rule(AlertRule::NoEntryDays, null, 7)->create();
+
+    expect(evaluateAlert($alert)['active'])->toBeFalse();
+});
+
+it('doesn\'t judge a count average before the tracker existed for the whole window', function () {
+    $tracker = trackerWithValues(CheckInTrackerType::Count, ['2026-11-16' => 2], '2026-11-15 10:00:00');
+    $alert = Alert::factory()->forTracker($tracker)->rule(AlertRule::AverageBelow, 5, 7)->create();
+
+    expect(evaluateAlert($alert)['active'])->toBeFalse();
+});
+
+it('sees "nothing logged" once the tracker existed for the whole window', function () {
+    // Created on the window's first day (the 11th, for 7 days before the 18th).
+    $tracker = trackerWithValues(CheckInTrackerType::YesNo, [], '2026-11-11 10:00:00');
+    $alert = Alert::factory()->forTracker($tracker)->rule(AlertRule::NoEntryDays, null, 7)->create();
+
+    expect(evaluateAlert($alert)['active'])->toBeTrue();
 });

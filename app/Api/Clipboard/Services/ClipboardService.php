@@ -105,6 +105,14 @@ class ClipboardService
         return $this->fileService->path($clipboard->file_path);
     }
 
+    /** The stored image behind an old public URL, only if a clipboard image entry still points at it. */
+    public function getLegacyImagePath(string $filePath): ?string
+    {
+        $clipboard = Clipboard::where('type', 'image')->where('file_path', $filePath)->first();
+
+        return $clipboard ? $this->getImagePath($clipboard->user_id, $clipboard) : null;
+    }
+
     public function destroy(User $user, Clipboard $clipboard): void
     {
         if ($clipboard->file_path) {

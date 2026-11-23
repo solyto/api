@@ -70,4 +70,15 @@ class Alert extends Model
     {
         return $query->where('user_id', $userId);
     }
+
+    // Switched off itself, or through its tracker or its goal's tracker.
+    public function scopeSwitchedOff(Builder $query)
+    {
+        $trackerOff = fn (Builder $tracker) => $tracker->where('enabled', false);
+
+        return $query->where(fn (Builder $off) => $off
+            ->where('enabled', false)
+            ->orWhereHas('checkInTracker', $trackerOff)
+            ->orWhereHas('goal.checkInTracker', $trackerOff));
+    }
 }

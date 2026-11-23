@@ -69,10 +69,14 @@ class FeedReader
     public function getFeedData(string $url): array|false
     {
         $pie = $this->fetchFeed($url);
-        $preferred = $this->preferredDiscoveredFeed($url, $pie);
 
-        if ($preferred !== null && $preferred !== $pie->subscribe_url(true)) {
-            $pie = $this->fetchFeed($preferred);
+        // The feed SimplePie found first stays; only an empty one falls back to a feed under the page's path.
+        if (empty($pie->get_items())) {
+            $preferred = $this->preferredDiscoveredFeed($url, $pie);
+
+            if ($preferred !== null && $preferred !== $pie->subscribe_url(true)) {
+                $pie = $this->fetchFeed($preferred);
+            }
         }
 
         $items = $pie->get_items();
@@ -93,6 +97,7 @@ class FeedReader
      * one (angak.fr: an empty /feed/). A discovered feed under the page's
      * own path is the one the user pasted the page for
      * (/actualites/ → /actualites/feed/). A root page has no such feed.
+     * A comments feed is never one: WordPress links each post's comments feed under the post's path.
      */
     private function preferredDiscoveredFeed(string $pageUrl, SimplePie $pie): ?string
     {
@@ -107,12 +112,22 @@ class FeedReader
             $candidateUrl = $candidate->get_permanent_uri();
             $parts = parse_url($candidateUrl);
 
-            if (strcasecmp($parts['host'] ?? '', $page['host'] ?? '') === 0 && str_starts_with($parts['path'] ?? '', $prefix)) {
+            if (strcasecmp($parts['host'] ?? '', $page['host'] ?? '') === 0
+                && str_starts_with($parts['path'] ?? '', $prefix)
+                && ! $this->isCommentsFeed($candidate->get_body_content())) {
                 return $candidateUrl;
             }
         }
 
         return null;
+    }
+
+    // The feed's own title, as WordPress writes it in the languages we support: "Comments on: …",
+    // "Kommentare zu: …", "Commentaires sur : …", "Comentarios en: …", "Commenti a: …", "Комментарии к записи: …".
+    private function isCommentsFeed(string $body): bool
+    {
+        return preg_match('#<title[^>]*>(.*?)</title>#is', $body, $title) === 1
+            && preg_match('/comment|kommentar|comentario|коммент/iu', $title[1]) === 1;
     }
 
     /**

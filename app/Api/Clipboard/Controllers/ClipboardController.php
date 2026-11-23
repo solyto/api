@@ -197,6 +197,22 @@ class ClipboardController
     }
 
     /**
+     * A clipboard image at the public storage URL apps up to 1.1.3 load it from ({user}/clipboard/{file}).
+     * Only images: file entries came with 1.1.4, whose apps use GET clipboard/{id}/file.
+     */
+    public function legacyImage(string $user, string $file): BinaryFileResponse
+    {
+        $path = $this->clipboardService->getLegacyImagePath($user.'/clipboard/'.$file);
+        abort_if($path === null, 404);
+
+        return response()->file($path, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
+    /**
      * @OA\Post(
      *     path="/clipboard/file",
      *     operationId="clipboardStoreFile",

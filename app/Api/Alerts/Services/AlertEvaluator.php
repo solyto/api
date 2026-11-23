@@ -23,38 +23,47 @@ class AlertEvaluator
      * before $today, the user's local date), plus what the rule currently sees.
      * One values query for all tracker alerts; goal alerts are grouped per user.
      *
+     * Goal alerts also say which period was judged: period_start (its first day) and
+     * period_finished (whether it ended yesterday). Tracker alerts have null and false there.
+     *
      * @param Collection<int, Alert> $alerts with checkInTracker, goal.checkInTracker and user.settings loaded
      * @param array<string, CarbonImmutable> $todayByUser user id => local date
-     * every_period: notify for every period the rule holds in, not only when it starts to hold.
-     * period_finished: for goals, whether the judged period ended yesterday (for the wording).
-     *
-     * @return array<int, array{active: bool, every_period: bool, period_finished: bool, average: float|null, streak: int|null, last_entry: string|null}>
+     * @return array<int, array{active: bool, average: float|null, streak: int|null, last_entry: string|null, period_start: string|null, period_finished: bool}>
      */
     public function evaluate(Collection $alerts, array $todayByUser): array
     {
         $values = $this->trackerValues($alerts, $todayByUser);
-        $goalsMet = $this->goalsMet($alerts, $todayByUser);
+        $goals = $this->goalsMet($alerts, $todayByUser);
 
         $states = [];
         foreach ($alerts as $alert) {
-            $today = $todayByUser[$alert->user_id];
-
             $states[$alert->id] = $alert->rule === AlertRule::GoalReached
-                ? [
-                    'active' => $goalsMet[$alert->goal_id]['met'] ?? false,
-                    'every_period' => $goalsMet[$alert->goal_id]['every_period'] ?? false,
-                    'period_finished' => $goalsMet[$alert->goal_id]['period_finished'] ?? false,
-                    'average' => null, 'streak' => null, 'last_entry' => null,
-                ]
-                : [...$this->trackerState($alert, $values[$alert->check_in_tracker_id] ?? [], $today), 'every_period' => false, 'period_finished' => false];
+                ? $this->goalState($goals[$alert->goal_id] ?? null)
+                : $this->trackerState($alert, $values[$alert->check_in_tracker_id] ?? [], $todayByUser[$alert->user_id]);
         }
 
         return $states;
     }
 
     /**
+     * @param array{met: bool, period_start: string, period_finished: bool}|null $goal
+     * @return array{active: bool, average: null, streak: null, last_entry: null, period_start: string|null, period_finished: bool}
+     */
+    private function goalState(?array $goal): array
+    {
+        return [
+            'active' => $goal['met'] ?? false,
+            'average' => null,
+            'streak' => null,
+            'last_entry' => null,
+            'period_start' => $goal['period_start'] ?? null,
+            'period_finished' => $goal['period_finished'] ?? false,
+        ];
+    }
+
+    /**
      * @param array<string, int> $values date => value
-     * @return array{active: bool, average: float|null, streak: int|null, last_entry: string|null}
+     * @return array{active: bool, average: float|null, streak: int|null, last_entry: string|null, period_start: null, period_finished: false}
      */
     private function trackerState(Alert $alert, array $values, CarbonImmutable $today): array
     {
@@ -67,20 +76,40 @@ class AlertEvaluator
         $lastEntry = collect(array_keys($values))->filter(fn (string $date) => $date < $today->toDateString())->max();
         $streak = $this->streak($values, $today);
 
+        // "Nothing logged" and count averages treat days without an entry as empty,
+        // so they wait until the tracker has existed for the whole window.
+        $trackerCreatedOn = $alert->checkInTracker->created_at->setTimezone($today->getTimezone())->toDateString();
+        $existedForWindow = $trackerCreatedOn <= $today->subDays($alert->days)->toDateString();
+
         if ($alert->rule->isAverage()) {
             $average = $this->average($alert, $values, $window);
-            $active = $average !== null && ($alert->rule === AlertRule::AverageBelow
+            $countsEmptyDays = $alert->checkInTracker->type === CheckInTrackerType::Count;
+            $canJudge = $average !== null && ($existedForWindow || ! $countsEmptyDays);
+            $crossesThreshold = $alert->rule === AlertRule::AverageBelow
                 ? $average < $alert->threshold
-                : $average > $alert->threshold);
+                : $average > $alert->threshold;
 
-            return ['active' => $active, 'average' => $average, 'streak' => null, 'last_entry' => $lastEntry];
+            return [
+                'active' => $canJudge && $crossesThreshold,
+                'average' => $average,
+                'streak' => null,
+                'last_entry' => $lastEntry,
+                'period_start' => null,
+                'period_finished' => false,
+            ];
         }
 
+        $active = $alert->rule === AlertRule::NoEntryDays
+            ? $existedForWindow && $entries === []
+            : count($entries) === count($window);
+
         return [
-            'active' => $alert->rule === AlertRule::NoEntryDays ? $entries === [] : count($entries) === count($window),
+            'active' => $active,
             'average' => null,
             'streak' => $streak,
             'last_entry' => $lastEntry,
+            'period_start' => null,
+            'period_finished' => false,
         ];
     }
 
@@ -146,11 +175,11 @@ class AlertEvaluator
      *
      * At-least goals are reached as soon as the target is hit during the period. At-most goals
      * are only reached once their period is over: they count on the first check after the period
-     * ended, if it stayed within the limit, and notify for every such period (every day for daily goals).
+     * ended, if it stayed within the limit.
      *
      * @param Collection<int, Alert> $alerts
      * @param array<string, CarbonImmutable> $todayByUser
-     * @return array<int, array{met: bool, every_period: bool, period_finished: bool}> goal id => state
+     * @return array<int, array{met: bool, period_start: string, period_finished: bool}> goal id => state
      */
     private function goalsMet(Collection $alerts, array $todayByUser): array
     {
@@ -165,13 +194,13 @@ class AlertEvaluator
                 $progress = $this->goalProgress->progress($user, $goals->values(), $yesterday);
 
                 foreach ($progress as $goalId => $state) {
-                    $atMost = $goals[$goalId]->comparison === GoalComparison::AtMost;
-
                     $periodFinished = $state['period_end'] === $yesterday->toDateString();
+                    $atMost = $goals[$goalId]->comparison === GoalComparison::AtMost;
+                    $decidedYet = $periodFinished || ! $atMost;
 
                     $met[$goalId] = [
-                        'met' => $atMost ? $state['met'] && $periodFinished : $state['met'],
-                        'every_period' => $atMost,
+                        'met' => $state['met'] && $decidedYet,
+                        'period_start' => $state['period_start'],
                         'period_finished' => $periodFinished,
                     ];
                 }

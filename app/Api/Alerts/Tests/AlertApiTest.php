@@ -18,6 +18,8 @@ describe('POST /api/v1/alerts', function () {
         $user = makeUser();
         $user->settings()->update(['timezone' => 'UTC']);
         $tracker = ownTracker($user, CheckInTrackerType::Count);
+        // A count average needs a tracker that existed for the whole window.
+        $tracker->forceFill(['created_at' => '2026-01-01 00:00:00'])->save();
         CheckInValue::factory()->forTracker($tracker)->on('2026-11-17', 6)->create();
         CheckInValue::factory()->forTracker($tracker)->on('2026-11-16', 1)->create();
 

@@ -2,6 +2,7 @@
 
 namespace App\Api\Alerts\Services;
 
+use App\Api\Alerts\Enums\AlertRule;
 use App\Api\Alerts\Models\Alert;
 use App\Api\Alerts\Notifications\AlertNotification;
 use App\Api\Users\Models\User;
@@ -52,6 +53,9 @@ class AlertDispatcher
     /** @param Builder<Alert> $query */
     private function send(Builder $query, CarbonImmutable $now): int
     {
+        // A copy: where() changes the query it's called on, and the query is used again below.
+        $this->restartSwitchedOffAlerts(clone $query);
+
         $sent = 0;
         $query->where('enabled', true)
             ->with(['user.settings', 'user.notificationSettings', 'checkInTracker', 'goal.checkInTracker'])
@@ -60,6 +64,17 @@ class AlertDispatcher
             });
 
         return $sent;
+    }
+
+    /**
+     * A switched-off alert (or one whose tracker is off) isn't checked, so it can't see its rule stop
+     * holding. Forgetting that it notified lets it start fresh once it's switched on again.
+     *
+     * @param Builder<Alert> $query
+     */
+    private function restartSwitchedOffAlerts(Builder $query): void
+    {
+        $query->switchedOff()->where('is_triggered', true)->update(['is_triggered' => false]);
     }
 
     /** @param Collection<int, Alert> $alerts */
@@ -79,30 +94,22 @@ class AlertDispatcher
 
         $sent = 0;
         foreach ($alerts as $alert) {
-            $active = $states[$alert->id]['active'];
-            $today = $todayByUser[$alert->user_id]->toDateString();
+            $state = $states[$alert->id];
 
-            // No repeats: notify when the rule starts to hold, then stay quiet until it stops holding.
-            // Rules judged per finished period (at-most goals) notify for each period, but once a day at most.
-            $newPeriod = $active
-                && $states[$alert->id]['every_period']
-                && $alert->last_triggered_on?->toDateString() !== $today;
-
-            if ($active === $alert->is_triggered && ! $newPeriod) {
-                continue;
-            }
-
-            if (! $active) {
-                $alert->update(['is_triggered' => false]);
+            if (! $this->shouldNotify($alert, $state)) {
+                // is_triggered follows whether the rule holds.
+                if ($alert->is_triggered !== $state['active']) {
+                    $alert->update(['is_triggered' => $state['active']]);
+                }
 
                 continue;
             }
 
-            $alert->update(['is_triggered' => true, 'last_triggered_on' => $today]);
+            $alert->update(['is_triggered' => true, 'last_triggered_on' => $todayByUser[$alert->user_id]->toDateString()]);
 
             // One user's failure (a mail or Telegram outage) must not cost everyone after them their alerts.
             try {
-                $alert->user->notify($this->notification($alert, $states[$alert->id]));
+                $alert->user->notify($this->notification($alert, $state));
                 $sent++;
             } catch (\Throwable $e) {
                 report($e);
@@ -110,6 +117,31 @@ class AlertDispatcher
         }
 
         return $sent;
+    }
+
+    /**
+     * Goal alerts notify once per period in which the goal is reached. Other alerts notify when
+     * their rule starts to hold, then stay quiet until it stops holding.
+     *
+     * @param array<string, mixed> $state
+     */
+    private function shouldNotify(Alert $alert, array $state): bool
+    {
+        if (! $state['active']) {
+            return false;
+        }
+
+        if ($alert->rule === AlertRule::GoalReached) {
+            return ! $this->notifiedForPeriod($alert, $state['period_start']);
+        }
+
+        return ! $alert->is_triggered;
+    }
+
+    // A notification about a period is sent after the period's first day, so one sent after that day was about this period.
+    private function notifiedForPeriod(Alert $alert, string $periodStart): bool
+    {
+        return $alert->last_triggered_on !== null && $alert->last_triggered_on->toDateString() > $periodStart;
     }
 
     /** @param array<string, mixed> $state */

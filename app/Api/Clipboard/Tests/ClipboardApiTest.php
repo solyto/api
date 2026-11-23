@@ -362,3 +362,55 @@ describe('ClipboardService', function () {
         expect(app(ClipboardService::class)->getImagePath($user->id, $clipboard))->toBeNull();
     });
 });
+
+// Apps up to 1.1.3 show images from the public storage URL ({API}/storage/user/{file_path}); it is their only view of them.
+// Since 1.1.4 the images live on the private disk; the API serves them at that URL again.
+describe('Clipboard images at the URL of apps up to 1.1.3', function () {
+    function storeLegacyClipboardImage(Tests\TestCase $test): array
+    {
+        Storage::fake('private_user_data');
+        $user = makeUser();
+        $id = $test->actingAs($user, 'sanctum')
+            ->post('/api/v1/clipboard/image', ['image' => UploadedFile::fake()->image('photo.png', 20, 20)])
+            ->assertStatus(200)
+            ->json('data.id');
+        app('auth')->forgetGuards();
+
+        return [$user, Clipboard::find($id)];
+    }
+
+    it('serves the image at the old public URL, without a login like before', function () {
+        [, $clipboard] = storeLegacyClipboardImage($this);
+
+        $response = $this->get('/storage/user/'.$clipboard->file_path)
+            ->assertStatus(200)
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+        expect($response->headers->get('Content-Type'))->toStartWith('image/png')
+            ->and($response->headers->getCookies())->toBe([]);
+    });
+
+    it('answers 404 for an unknown name, a deleted image and a file entry', function () {
+        [$user, $clipboard] = storeLegacyClipboardImage($this);
+        $path = $clipboard->file_path;
+
+        $this->get('/storage/user/'.$user->id.'/clipboard/'.str_repeat('0', 32).'.png')->assertStatus(404);
+
+        Clipboard::create(['user_id' => $user->id, 'type' => 'file', 'file_path' => $user->id.'/clipboard/'.str_repeat('a', 32).'.png']);
+        Storage::disk('private_user_data')->put($user->id.'/clipboard/'.str_repeat('a', 32).'.png', 'x');
+        $this->get('/storage/user/'.$user->id.'/clipboard/'.str_repeat('a', 32).'.png')->assertStatus(404);
+
+        $clipboard->delete();
+        $this->get('/storage/user/'.$path)->assertStatus(404);
+    });
+
+    it('only answers for clipboard image names', function () {
+        [$user] = storeLegacyClipboardImage($this);
+        Storage::disk('private_user_data')->put($user->id.'/notes/secret.png', 'x');
+
+        // Other paths aren't this route's: Laravel's own signed-URL storage route refuses them (403).
+        foreach (['/notes/secret.png', '/clipboard/../notes/secret.png'] as $path) {
+            $response = $this->get('/storage/user/'.$user->id.$path);
+            expect($response->status())->toBeIn([403, 404]);
+        }
+    });
+});

@@ -5,7 +5,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 // Copies every user's built-in trackers, settings and check-in values into the tracker tables.
-// The old `check_in` table is left as it is (and kept in sync by the app) so a rollback loses nothing.
+// The old `check_in` table is left as it is and kept in sync by the app, so the built-in values survive a rollback.
+// What a rollback costs:
+// - Redeploying 1.1.4 without migrate:rollback keeps everything, but on the next upgrade this migration counts
+//   as done: check-ins made meanwhile reach the new tables only for users who had no values yet.
+// - migrate:rollback runs down(), which empties both tables: own trackers with their values, and through the
+//   foreign keys all goals and alerts, are gone.
 // Pure DB code on purpose: it must not change when the app code does.
 return new class extends Migration
 {

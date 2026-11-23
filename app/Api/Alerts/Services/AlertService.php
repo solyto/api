@@ -8,6 +8,7 @@ use App\Api\Alerts\Models\Alert;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -44,11 +45,10 @@ class AlertService
             return [];
         }
 
-        // every_period and period_finished are for the dispatcher; they aren't part of the API's state.
-        return array_map(
-            fn (array $state) => array_diff_key($state, ['every_period' => true, 'period_finished' => true]),
-            $this->evaluator->evaluate($alerts, [$user->id => $this->today($user)])
-        );
+        $states = $this->evaluator->evaluate($alerts, [$user->id => $this->today($user)]);
+
+        // Which goal period was judged only matters for sending notifications; the API's state doesn't show it.
+        return array_map(fn (array $state) => Arr::except($state, ['period_start', 'period_finished']), $states);
     }
 
     public function create(User $user, array $data): Alert
