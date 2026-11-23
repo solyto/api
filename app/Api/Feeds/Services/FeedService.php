@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 class FeedService
 {
     private const string CACHE_KEY_USER_FEEDS = 'user_feeds';
+    // v2 since entries hold raw rows instead of models: an old entry must not be read as rows.
     private const string CACHE_KEY_FEED_ITEMS = 'feed_items_v2';
     private const int CACHE_TTL_USER_FEEDS = 86400;
     private const int CACHE_TTL_FEED_ITEMS = 86400;
@@ -35,6 +36,8 @@ class FeedService
     private const int MAX_TITLE_LENGTH = 255;
     private const int MAX_TITLE_DECODE_PASSES = 3;
     private const int SAVED_LINK_LOOKUP_CHUNK = 500;
+    private const string UNRESOLVABLE_URL_MESSAGE = 'The feed URL could not be resolved.';
+    private const string BLOCKED_URL_MESSAGE = 'The feed URL is not allowed.';
 
     public function __construct(
         private readonly FeedReader $feedReader,
@@ -57,12 +60,9 @@ class FeedService
         return true;
     }
 
-    /**
-     * $url may be a website: when the feed it resolves to is already stored,
-     * the stored items are returned instead of the live ones.
-     *
-     * @throws ValidationException when the feed host does not resolve
-     */
+    // $url may be a website: when the feed it resolves to is already stored, the stored items are returned instead of
+    // the live ones.
+    /** @throws ValidationException when the feed host does not resolve */
     public function getTestFeedItems(string $url): array
     {
         $storedItems = $this->storedTestFeedItems($url);
@@ -74,7 +74,7 @@ class FeedService
         try {
             $feedData = $this->feedReader->getFeedData($url);
         } catch (UnresolvableHostException) {
-            throw ValidationException::withMessages(['url' => 'The feed URL could not be resolved.']);
+            throw ValidationException::withMessages(['url' => self::UNRESOLVABLE_URL_MESSAGE]);
         } catch (BlockedUrlException) {
             return [];
         }
@@ -99,9 +99,8 @@ class FeedService
         ], $feedData['items']);
     }
 
-    /**
-     * @return array<int, array<string, mixed>>|null null when no Feed row has $url or it has no items yet
-     */
+    // null when no Feed row has $url or it has no items yet.
+    /** @return array<int, array<string, mixed>>|null */
     private function storedTestFeedItems(string $url): ?array
     {
         $feed = Feed::where('url', $url)->first();
@@ -135,9 +134,9 @@ class FeedService
         try {
             return $this->subscribe($user->id, $title, $url, fn () => $this->feedReader->getFeedData($url), $whitelist, $blacklist);
         } catch (UnresolvableHostException) {
-            throw ValidationException::withMessages(['url' => 'The feed URL could not be resolved.']);
+            throw ValidationException::withMessages(['url' => self::UNRESOLVABLE_URL_MESSAGE]);
         } catch (BlockedUrlException) {
-            throw ValidationException::withMessages(['url' => 'The feed URL is not allowed.']);
+            throw ValidationException::withMessages(['url' => self::BLOCKED_URL_MESSAGE]);
         } catch (FeedSubscriptionLimitException) {
             throw ValidationException::withMessages([
                 'url' => sprintf('You can subscribe to at most %d feeds.', $this->maxSubscriptions()),
@@ -155,24 +154,17 @@ class FeedService
         return (int) config('feeds.max_subscriptions');
     }
 
-    /**
-     * $feedData is what FeedReader::parseFeedData() returned for $url, or
-     * null when the Feed row already exists and nothing was fetched.
-     *
-     * @throws FeedException
-     */
+    // $feedData is what FeedReader::parseFeedData() returned for $url, or null when the Feed row already exists and
+    // nothing was fetched.
+    /** @throws FeedException */
     public function createImportedSubscription(User $user, string $title, string $url, array|false|null $feedData): FeedSubscription
     {
         return $this->subscribe($user->id, $title, $url, fn () => $feedData ?? false, null, null);
     }
 
+    // $fetchFeedData is only called when no Feed row has $url, and returns FeedReader's feed data or false when $url
+    // is not a feed.
     /**
-     * $url may be a website; the Feed row is stored under the feed URL it
-     * resolved to ($fetchFeedData's 'url'), and an existing row for that URL
-     * is reused. Fetched data without 'url' (OPML import) keeps $url.
-     *
-     * @param  \Closure(): (array|false)  $fetchFeedData  only called when no Feed row has $url
-     *
      * @throws FeedException
      * @throws FeedSubscriptionLimitException
      * @throws BlockedUrlException from $fetchFeedData
@@ -190,24 +182,7 @@ class FeedService
         }
 
         if (!$feed) {
-            $feedData = $fetchFeedData();
-
-            if (!$feedData || empty($feedData['items'])) {
-                throw new FeedException('Failed to fetch feed items from RSS');
-            }
-
-            $feedUrl = $feedData['url'] ?? $url;
-            $feed = $feedUrl === $url ? null : Feed::where('url', $feedUrl)->first();
-
-            if ($feed) {
-                $this->ensureNotSubscribed($userId, $feed);
-            } else {
-                $feed = Feed::create([
-                    'title' => mb_substr($this->plainTitle($feedData['title']) ?: $title, 0, self::MAX_TITLE_LENGTH),
-                    'url' => $feedUrl,
-                    'created_by' => $userId,
-                ]);
-            }
+            $feed = $this->feedForFetchedData($userId, $title, $url, $fetchFeedData());
         }
 
         $subscription = FeedSubscription::create([
@@ -226,12 +201,45 @@ class FeedService
         return $subscription;
     }
 
+    // $url may be a website; the Feed row is stored under the feed URL it resolved to ($feedData's 'url'), and an
+    // existing row for that URL is reused. Fetched data without 'url' (OPML import) keeps $url.
+    /**
+     * @throws FeedException
+     * @throws FeedAlreadySubscribedException
+     */
+    private function feedForFetchedData(string $userId, string $title, string $url, array|false $feedData): Feed
+    {
+        if (!$feedData || empty($feedData['items'])) {
+            throw new FeedException('Failed to fetch feed items from RSS');
+        }
+
+        $feedUrl = $feedData['url'] ?? $url;
+
+        if ($feedUrl !== $url) {
+            $storedFeed = Feed::where('url', $feedUrl)->first();
+
+            if ($storedFeed) {
+                $this->ensureNotSubscribed($userId, $storedFeed);
+
+                return $storedFeed;
+            }
+        }
+
+        $feedTitle = $this->plainTitle($feedData['title']) ?: $title;
+
+        return Feed::create([
+            'title' => mb_substr($feedTitle, 0, self::MAX_TITLE_LENGTH),
+            'url' => $feedUrl,
+            'created_by' => $userId,
+        ]);
+    }
+
     /**
      * @throws FeedAlreadySubscribedException
      */
     private function ensureNotSubscribed(string $userId, Feed $feed): void
     {
-        if (FeedSubscription::where('user_id', $userId)->where('feed_id', $feed->id)->exists()) {
+        if (FeedSubscription::forUser($userId)->where('feed_id', $feed->id)->exists()) {
             throw new FeedAlreadySubscribedException('Already subscribed to this feed');
         }
     }
@@ -282,11 +290,13 @@ class FeedService
 
         foreach ($urls->chunk(self::SAVED_LINK_LOOKUP_CHUNK) as $chunk) {
             // Ascending, so the newest of several links with the same URL wins the key.
-            $linkIds = [...$linkIds, ...LibraryLink::forUser($userId)
+            $chunkLinkIds = LibraryLink::forUser($userId)
                 ->whereIn('url', $chunk->all())
                 ->orderBy('created_at')
                 ->pluck('id', 'url')
-                ->all()];
+                ->all();
+
+            $linkIds = [...$linkIds, ...$chunkLinkIds];
         }
 
         $items->each(fn (FeedItem $item) => $item->setAttribute('saved_link_id', $linkIds[$item->link] ?? null));
@@ -364,13 +374,9 @@ class FeedService
         return false;
     }
 
-    /**
-     * Raw rows, not models: serialized models are ~3x the size and every page
-     * unserializes all of them, and sorting on the raw published_at string
-     * avoids building a Carbon per item. Callers hydrate what they return.
-     *
-     * @return Collection<int, \stdClass>
-     */
+    // Raw rows, not models: serialized models are ~3x the size and every page unserializes all of them, and sorting
+    // on the raw published_at string avoids building a Carbon per item. Callers hydrate what they return.
+    /** @return Collection<int, \stdClass> */
     public function getFeedItems(string $feedId): Collection
     {
         return $this->cache->remember(
@@ -402,7 +408,7 @@ class FeedService
             return collect();
         }
 
-        $userFeedIds = FeedSubscription::where('user_id', $userId)->pluck('feed_id');
+        $userFeedIds = FeedSubscription::forUser($userId)->pluck('feed_id');
 
         return FeedSubscription::whereIn('user_id', $friendIds)
             ->whereNotIn('feed_id', $userFeedIds)
@@ -467,12 +473,9 @@ class FeedService
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $userId]);
     }
 
-    /**
-     * Some feeds use very long GUIDs (Google News: 600+ chars), which don't fit
-     * the feed_item_id column and fail the whole sync. Those are stored as a
-     * hash instead, so the same GUID always maps to the same row. Shorter ids
-     * stay as they are, so existing rows keep matching.
-     */
+    // Some feeds use very long GUIDs (Google News: 600+ chars), which don't fit the feed_item_id column and fail the
+    // whole sync. Those are stored as a hash instead, so the same GUID always maps to the same row. Shorter ids stay
+    // as they are, so existing rows keep matching.
     private function storedItemId(?string $id): ?string
     {
         if ($id === null || strlen($id) <= self::MAX_ITEM_ID_LENGTH) {
@@ -492,13 +495,10 @@ class FeedService
         return trim(preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00AD}\x{2060}]/u', '', $value));
     }
 
-    /**
-     * SimplePie hands item and feed titles out as HTML ("LTE &amp; Solar"), but
-     * clients render them as plain text. Many feeds also encode titles twice, which leaves
-     * "&amp;amp;" after SimplePie, so decoding repeats while it still changes
-     * something, capped so a pathological title can't loop for long.
-     * Public because OpmlImportService cleans OPML titles the same way.
-     */
+    // SimplePie hands item and feed titles out as HTML ("LTE &amp; Solar"), but clients render them as plain text.
+    // Many feeds also encode titles twice, which leaves "&amp;amp;" after SimplePie, so decoding repeats while it
+    // still changes something, capped so a pathological title can't loop for long.
+    // Public because OpmlImportService cleans OPML titles the same way.
     public function plainTitle(?string $value): ?string
     {
         if ($value === null) {
@@ -520,24 +520,18 @@ class FeedService
         return $this->sanitizeText($title);
     }
 
-    /**
-     * Some feeds (e.g. F-Droid's "This Week in F-Droid") ship the entire
-     * newsletter as the item description. That overflows the feed_items TEXT
-     * column and fails the whole sync, and the client only ever renders a
-     * short preview — so descriptions are cut to a fixed length at ingest.
-     * Items without a summary get "" so the API always returns a string.
-     */
+    // Some feeds (e.g. F-Droid's "This Week in F-Droid") ship the entire newsletter as the item description. That
+    // overflows the feed_items TEXT column and fails the whole sync, and the client only ever renders a short
+    // preview, so descriptions are cut to a fixed length at ingest. Items without a summary get "" so the API always
+    // returns a string.
     private function truncateDescription(?string $value): string
     {
         return $value === null ? '' : Str::limit($value, self::MAX_DESCRIPTION_LENGTH);
     }
 
-    /**
-     * Resolving an image can cost a full external page fetch per item, so it only
-     * happens for items being stored for the first time. Retrying items that are
-     * already stored but still have no image is opt-in via $backfillImages, since
-     * feeds whose items never carry an image would otherwise refetch every sync.
-     */
+    // Resolving an image can cost a full external page fetch per item, so it only happens for items being stored for
+    // the first time. Retrying items that are already stored but still have no image is opt-in via $backfillImages,
+    // since feeds whose items never carry an image would otherwise refetch every sync.
     public function syncFeed(string $feedId, bool $backfillImages = false): bool
     {
         $feed = Feed::find($feedId);
@@ -572,11 +566,11 @@ class FeedService
         try {
             $items = $this->getFeedItemsFromRss($feed->url);
         } catch (UnresolvableHostException) {
-            $this->recordSyncFailure($feedId, 'The feed URL could not be resolved.');
+            $this->recordSyncFailure($feedId, self::UNRESOLVABLE_URL_MESSAGE);
 
             return false;
         } catch (BlockedUrlException) {
-            $this->recordSyncFailure($feedId, 'The feed URL is not allowed.');
+            $this->recordSyncFailure($feedId, self::BLOCKED_URL_MESSAGE);
 
             return false;
         }
@@ -646,11 +640,8 @@ class FeedService
         $this->cache->forget([self::CACHE_KEY_FEED_ITEMS, $feedId]);
     }
 
-    /**
-     * Items without any date in the feed are treated as published at ingest time,
-     * since there is no better source. Being explicit here matters: the retention
-     * job prunes on published_at, and a null would exempt the item forever.
-     */
+    // Items without any date in the feed are treated as published at ingest time, since there is no better source.
+    // Being explicit here matters: the retention job prunes on published_at, and a null would exempt the item forever.
     private function resolvePublishedAt(\SimplePie\Item $item): Carbon
     {
         $timestamp = $item->get_date('U');

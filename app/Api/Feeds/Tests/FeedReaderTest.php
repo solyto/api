@@ -9,7 +9,7 @@ covers(FeedReader::class);
 function feedReaderWithFixture(string $fixture): FeedReader
 {
     Http::fake(['fixture.example/*' => Http::response(
-        file_get_contents(__DIR__.'/../../../../tests/Fixtures/'.$fixture),
+        file_get_contents(base_path('tests/Fixtures/'.$fixture)),
         200,
         ['Content-Type' => 'application/rss+xml']
     )]);
@@ -21,22 +21,22 @@ function fakeAngak(): void
 {
     Http::fake([
         'https://angak.fr/actualites/' => Http::response(
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/angak_actualites.html'),
+            file_get_contents(base_path('tests/Fixtures/angak_actualites.html')),
             200,
             ['Content-Type' => 'text/html; charset=UTF-8']
         ),
         'https://angak.fr/feed/' => Http::response(
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss'),
+            file_get_contents(base_path('tests/Fixtures/feed_empty.rss')),
             200,
             ['Content-Type' => 'application/rss+xml; charset=UTF-8']
         ),
         'https://angak.fr/comments/feed/' => Http::response(
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.atom'),
+            file_get_contents(base_path('tests/Fixtures/feed.atom')),
             200,
             ['Content-Type' => 'application/atom+xml; charset=UTF-8']
         ),
         'https://angak.fr/actualites/feed/' => Http::response(
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+            file_get_contents(base_path('tests/Fixtures/feed.rss')),
             200,
             ['Content-Type' => 'application/rss+xml; charset=UTF-8']
         ),
@@ -63,7 +63,7 @@ function fakeWordPressPost(string $siteFeed): void
             ['Content-Type' => 'text/html; charset=UTF-8']
         ),
         'https://blog.example/feed/' => Http::response(
-            file_get_contents(__DIR__.'/../../../../tests/Fixtures/'.$siteFeed),
+            file_get_contents(base_path('tests/Fixtures/'.$siteFeed)),
             200,
             ['Content-Type' => 'application/rss+xml; charset=UTF-8']
         ),
@@ -111,7 +111,7 @@ describe('FeedReader', function () {
     });
 
     it('parses already downloaded content into feed data', function () {
-        $data = app(FeedReader::class)->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
+        $data = app(FeedReader::class)->parseFeedData(file_get_contents(base_path('tests/Fixtures/feed.rss')));
 
         expect($data)->toBeArray();
         expect($data['title'])->toBe('Fixture Feed');
@@ -122,7 +122,7 @@ describe('FeedReader', function () {
         $reader = app(FeedReader::class);
 
         expect($reader->parseFeedData('<!DOCTYPE html><html><body><p>Hello</p></body></html>'))->toBeFalse();
-        expect($reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed_empty.rss')))->toBeFalse();
+        expect($reader->parseFeedData(file_get_contents(base_path('tests/Fixtures/feed_empty.rss'))))->toBeFalse();
     });
 
     it('resolves an autodiscovered feed link against the URL after redirects', function () {
@@ -134,7 +134,7 @@ describe('FeedReader', function () {
                 ['Content-Type' => 'text/html']
             ),
             'https://site.example/blog/feed.xml' => Http::response(
-                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                file_get_contents(base_path('tests/Fixtures/feed.rss')),
                 200,
                 ['Content-Type' => 'application/rss+xml']
             ),
@@ -183,7 +183,7 @@ describe('FeedReader', function () {
                 ['Content-Type' => 'text/html']
             ),
             'https://single.example/rss.xml' => Http::response(
-                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                file_get_contents(base_path('tests/Fixtures/feed.rss')),
                 200,
                 ['Content-Type' => 'application/rss+xml']
             ),
@@ -218,11 +218,11 @@ describe('FeedReader', function () {
                 ['Content-Type' => 'text/html']
             ),
             'https://public.example/feed/' => Http::response(
-                file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'),
+                file_get_contents(base_path('tests/Fixtures/feed.rss')),
                 200,
                 ['Content-Type' => 'application/rss+xml']
             ),
-            '*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.atom'), 200, ['Content-Type' => 'application/atom+xml']),
+            '*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.atom')), 200, ['Content-Type' => 'application/atom+xml']),
         ]);
 
         $data = app(FeedReader::class)->getFeedData('https://public.example/news/');
@@ -245,7 +245,7 @@ describe('FeedReader', function () {
     it('keeps parsed content out of later fetches', function () {
         $reader = feedReaderWithFixture('feed.atom');
 
-        $reader->parseFeedData(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'));
+        $reader->parseFeedData(file_get_contents(base_path('tests/Fixtures/feed.rss')));
 
         expect($reader->getFeedData('https://fixture.example/feed.atom')['items'][0]->get_title())->toBe('Atom Post');
     });

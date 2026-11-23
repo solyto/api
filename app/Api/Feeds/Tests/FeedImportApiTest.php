@@ -5,7 +5,11 @@ use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedSubscription;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
+
+// Error bodies are compared byte for byte, timestamp included.
+beforeEach(fn () => $this->freezeTime());
 
 function feedImportOpml(int $count = 2): string
 {
@@ -27,12 +31,31 @@ function feedImportUpload($test, $user, string $content, string $name = 'feeds.o
     );
 }
 
+/** @param  array<int, string>  $urls */
+function feedImportSelect($test, $user, array $urls)
+{
+    return $test->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/import/select', ['urls' => $urls]);
+}
+
+function feedImportState($test, $user)
+{
+    return $test->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/import/state');
+}
+
+function expectFeedImportError($response, int $status, string $message): void
+{
+    expectApiError($response, $status);
+    expect($response->getContent())->toBe(json_encode(['success' => false, 'message' => $message, 'timestamp' => now()->toISOString()]));
+}
+
 describe('Feed import upload', function () {
     it('parses the file and returns the state', function () {
         $user = makeUser();
 
-        feedImportUpload($this, $user, feedImportOpml())->assertStatus(200)->assertJsonPath('success', true)
-            ->assertJsonPath('data.stage', 'parsed')
+        $response = feedImportUpload($this, $user, feedImportOpml());
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data.stage', 'parsed')
             ->assertJsonPath('data.total', 2)
             ->assertJsonPath('data.processed', 0)
             ->assertJsonPath('data.feeds.0', [
@@ -42,8 +65,7 @@ describe('Feed import upload', function () {
                 'status' => null,
             ]);
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/feeds/import/state')
+        feedImportState($this, $user)
             ->assertStatus(200)
             ->assertJsonPath('data.stage', 'parsed')
             ->assertJsonCount(2, 'data.feeds');
@@ -71,10 +93,10 @@ describe('Feed import upload', function () {
 
         $response = feedImportUpload($this, $user, $content);
 
-        expectApiError($response, 422);
+        expectFeedImportError($response, 422, 'This file could not be read as OPML.');
         expect($response->getContent())->not->toContain('root:');
 
-        expectApiError($this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/import/state'), 404);
+        expectFeedImportError(feedImportState($this, $user), 404, 'No feed import found.');
     });
 
     it('rejects a UTF-16 file with a DTD that the byte check cannot see', function () {
@@ -86,22 +108,25 @@ describe('Feed import upload', function () {
             'UTF-8'
         );
 
-        feedImportUpload($this, $user, $content)->assertStatus(422)->assertJsonPath('success', false);
+        expectFeedImportError(feedImportUpload($this, $user, $content), 422, 'This file could not be read as OPML.');
 
-        $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/import/state')->assertStatus(404);
+        expectApiError(feedImportState($this, $user), 404);
     });
 
     it('rejects an unreadable file', function () {
-        expectApiError(feedImportUpload($this, makeUser(), 'this is not xml'), 422);
+        expectFeedImportError(feedImportUpload($this, makeUser(), 'this is not xml'), 422, 'This file could not be read as OPML.');
     });
 
     it('rejects a file without feeds', function () {
-        expectApiError(feedImportUpload($this, makeUser(), feedImportOpml(0)), 422);
+        expectFeedImportError(feedImportUpload($this, makeUser(), feedImportOpml(0)), 422, 'This file contains no feeds.');
     });
 
     it('rejects more than 500 feeds and accepts exactly 500', function () {
-        expectApiError(feedImportUpload($this, makeUser(), feedImportOpml(501)), 422);
-        feedImportUpload($this, makeUser(), feedImportOpml(500))->assertStatus(200)->assertJsonPath('success', true)->assertJsonPath('data.total', 500);
+        expectFeedImportError(feedImportUpload($this, makeUser(), feedImportOpml(501)), 422, 'This file contains more than 500 feeds.');
+
+        $response = feedImportUpload($this, makeUser(), feedImportOpml(500));
+        expectApiSuccess($response);
+        $response->assertJsonPath('data.total', 500);
     });
 
     it('rejects a file over 1 MB', function () {
@@ -116,19 +141,19 @@ describe('Feed import upload', function () {
     });
 
     it('rejects a wrong extension', function () {
-        feedImportUpload($this, makeUser(), feedImportOpml(), 'feeds.txt')->assertStatus(422)->assertJsonPath('success', false)
-            ->assertJsonValidationErrors('file');
+        $response = feedImportUpload($this, makeUser(), feedImportOpml(), 'feeds.txt');
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('file');
     });
 
     it('rejects a new upload while an import is running', function () {
         Queue::fake();
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml())->assertStatus(200);
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
-            ->assertStatus(200);
+        feedImportSelect($this, $user, ['https://feed1.example/rss'])->assertStatus(200);
 
-        expectApiError(feedImportUpload($this, $user, feedImportOpml()), 409);
+        expectFeedImportError(feedImportUpload($this, $user, feedImportOpml()), 409, 'A feed import is already running.');
     });
 
     it('returns 409 for an upload while a select holds the lock', function () {
@@ -137,19 +162,17 @@ describe('Feed import upload', function () {
         $lock = Cache::lock('feed_import_select_'.$user->id, 10);
         $lock->get();
 
-        expectApiError(feedImportUpload($this, $user, feedImportOpml(3)), 409);
+        expectFeedImportError(feedImportUpload($this, $user, feedImportOpml(3)), 409, 'A feed import is already running.');
 
         $lock->release();
-        $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/import/state')->assertJsonPath('data.total', 2);
+        feedImportState($this, $user)->assertJsonPath('data.total', 2);
     });
 
     it('accepts a new upload once a running import has not saved progress for 5 minutes', function () {
         Queue::fake();
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml(2))->assertStatus(200);
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
-            ->assertStatus(200);
+        feedImportSelect($this, $user, ['https://feed1.example/rss'])->assertStatus(200);
 
         $this->travel(299)->seconds();
         expectApiError(feedImportUpload($this, $user, feedImportOpml(3)), 409);
@@ -172,7 +195,7 @@ describe('Feed import upload', function () {
         $user = makeUser();
 
         for ($i = 0; $i < 20; $i++) {
-            feedImportUpload($this, $user, 'not xml')->assertStatus(422);
+            expectApiError(feedImportUpload($this, $user, 'not xml'), 422);
         }
 
         expectApiError(feedImportUpload($this, $user, feedImportOpml()), 429);
@@ -185,10 +208,10 @@ describe('Feed import select', function () {
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml(3));
 
-        $this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/import/select', [
-            'urls' => ['https://feed1.example/rss', 'https://feed3.example/rss', 'https://not-in-file.example/rss'],
-        ])->assertStatus(200)->assertJsonPath('success', true)
-            ->assertJsonPath('data.stage', 'running')
+        $response = feedImportSelect($this, $user, ['https://feed1.example/rss', 'https://feed3.example/rss', 'https://not-in-file.example/rss']);
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data.stage', 'running')
             ->assertJsonPath('data.total', 2)
             ->assertJsonPath('data.processed', 0)
             ->assertJsonPath('data.feeds.0.url', 'https://feed1.example/rss')
@@ -205,8 +228,7 @@ describe('Feed import select', function () {
         FeedSubscription::factory()->forUser($user)->forFeed($feed)->create();
         feedImportUpload($this, $user, feedImportOpml(2));
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss', 'https://feed2.example/rss']])
+        feedImportSelect($this, $user, ['https://feed1.example/rss', 'https://feed2.example/rss'])
             ->assertStatus(200)
             ->assertJsonPath('data.total', 1)
             ->assertJsonPath('data.feeds.0.url', 'https://feed2.example/rss');
@@ -217,34 +239,37 @@ describe('Feed import select', function () {
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml());
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://not-in-file.example/rss']]), 422);
+        expectFeedImportError(
+            feedImportSelect($this, $user, ['https://not-in-file.example/rss']),
+            422,
+            'None of the selected feeds can be imported.'
+        );
 
         Queue::assertNothingPushed();
     });
 
     it('validates the payload', function () {
-        $user = makeUser();
+        $response = feedImportSelect($this, makeUser(), []);
 
-        $this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/import/select', ['urls' => []])->assertStatus(422)->assertJsonPath('success', false)
-            ->assertJsonValidationErrors('urls');
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('urls');
     });
 
     it('returns 404 without an import', function () {
-        expectApiError($this->actingAs(makeUser(), 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 404);
+        expectFeedImportError(feedImportSelect($this, makeUser(), ['https://feed1.example/rss']), 404, 'No feed import found.');
     });
 
     it('returns 409 when the import has already started', function () {
         Queue::fake();
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml());
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
-            ->assertStatus(200);
+        feedImportSelect($this, $user, ['https://feed1.example/rss'])->assertStatus(200);
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed2.example/rss']]), 409);
+        expectFeedImportError(
+            feedImportSelect($this, $user, ['https://feed2.example/rss']),
+            409,
+            'This feed import has already started.'
+        );
     });
 
     it('returns 409 while another select holds the lock', function () {
@@ -254,15 +279,16 @@ describe('Feed import select', function () {
         $lock = Cache::lock('feed_import_select_'.$user->id, 10);
         $lock->get();
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 409);
+        expectFeedImportError(
+            feedImportSelect($this, $user, ['https://feed1.example/rss']),
+            409,
+            'This feed import has already started.'
+        );
         Queue::assertNotPushed(ImportFeedSubscriptions::class);
 
         $lock->release();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
-            ->assertStatus(200);
+        feedImportSelect($this, $user, ['https://feed1.example/rss'])->assertStatus(200);
         Queue::assertPushed(ImportFeedSubscriptions::class, 1);
     });
 
@@ -271,11 +297,8 @@ describe('Feed import select', function () {
         $user = makeUser();
         feedImportUpload($this, $user, feedImportOpml());
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']])
-            ->assertStatus(200);
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 409);
+        feedImportSelect($this, $user, ['https://feed1.example/rss'])->assertStatus(200);
+        expectApiError(feedImportSelect($this, $user, ['https://feed1.example/rss']), 409);
 
         Queue::assertPushed(ImportFeedSubscriptions::class, 1);
     });
@@ -283,7 +306,7 @@ describe('Feed import select', function () {
 
 describe('Feed import state', function () {
     it('returns 404 without an import', function () {
-        expectApiError($this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/feeds/import/state'), 404);
+        expectFeedImportError(feedImportState($this, makeUser()), 404, 'No feed import found.');
     });
 
     it('keeps imports per user', function () {
@@ -292,14 +315,27 @@ describe('Feed import state', function () {
         $other = makeUser();
         feedImportUpload($this, $owner, feedImportOpml());
 
-        expectApiError($this->actingAs($other, 'sanctum')->getJson('/api/v1/feeds/import/state'), 404);
-        expectApiError($this->actingAs($other, 'sanctum')
-            ->postJson('/api/v1/feeds/import/select', ['urls' => ['https://feed1.example/rss']]), 404);
+        expectApiError(feedImportState($this, $other), 404);
+        expectApiError(feedImportSelect($this, $other, ['https://feed1.example/rss']), 404);
 
         Queue::assertNothingPushed();
-        $this->actingAs($owner, 'sanctum')
-            ->getJson('/api/v1/feeds/import/state')
+        feedImportState($this, $owner)
             ->assertStatus(200)
             ->assertJsonPath('data.stage', 'parsed');
+    });
+});
+
+describe('Feed import errors', function () {
+    it('answers them without reporting them', function () {
+        Exceptions::fake();
+        $user = makeUser();
+
+        expectApiError(feedImportState($this, $user), 404);
+        expectApiError(feedImportUpload($this, $user, feedImportOpml(0)), 422);
+        feedImportUpload($this, $user, feedImportOpml())->assertStatus(200);
+        Cache::lock('feed_import_select_'.$user->id, 10)->get();
+        expectApiError(feedImportSelect($this, $user, ['https://feed1.example/rss']), 409);
+
+        Exceptions::assertNothingReported();
     });
 });

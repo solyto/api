@@ -5,6 +5,9 @@ use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
+use App\Api\Feeds\Exceptions\FeedImportConflictException;
+use App\Api\Feeds\Exceptions\FeedImportException;
+use App\Api\Feeds\Exceptions\FeedImportNotFoundException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\ImportException;
@@ -64,6 +67,9 @@ return Application::configure(basePath: dirname(__DIR__))
                   UnreadableCalendarObjectException::class,
                   LimitReachedException::class,
                   BuiltInTrackerException::class,
+                  FeedImportException::class,
+                  FeedImportConflictException::class,
+                  FeedImportNotFoundException::class,
               ]);
 
               $exceptions->render(function (Throwable $e, Request $request) {
@@ -145,6 +151,18 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof LimitReachedException) {
                       return ApiResponse::error($e->getMessage(), 422, ['limit_reached']);
+                  }
+
+                  if ($e instanceof FeedImportException) {
+                      return ApiResponse::error($e->getMessage(), 422);
+                  }
+
+                  if ($e instanceof FeedImportConflictException) {
+                      return ApiResponse::error($e->getMessage(), 409);
+                  }
+
+                  if ($e instanceof FeedImportNotFoundException) {
+                      return ApiResponse::error($e->getMessage(), 404);
                   }
 
                   if ($e instanceof ExternalCalendarUnavailableException) {

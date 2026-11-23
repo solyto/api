@@ -38,8 +38,9 @@ class OpmlImportService
     // chunk (worst case 25 feeds x 5 s fetched one after another = 125 s), and its $timeout of 300 s
     // bounds any gap, so only a job still waiting in the queue can be mistaken for a dead one.
     private const int STALE_AFTER = 300;
+    private const string UNREADABLE_FILE_MESSAGE = 'This file could not be read as OPML.';
 
-    /** FreshRSS scraper types: their URL is a web page, not a feed. */
+    // FreshRSS scraper types: their URL is a web page, not a feed.
     private const array SCRAPER_TYPES = ['html+xpath', 'xml+xpath', 'json+dotnotation', 'jsonfeed'];
 
     public function __construct(
@@ -61,7 +62,7 @@ class OpmlImportService
         }
 
         if (count($feeds) > self::MAX_FEEDS) {
-            throw new FeedImportException('This file contains more than 500 feeds.');
+            throw new FeedImportException(sprintf('This file contains more than %d feeds.', self::MAX_FEEDS));
         }
 
         $subscribed = FeedSubscription::forUser($user->id)
@@ -227,9 +228,10 @@ class OpmlImportService
     private function parse(string $content): array
     {
         if (preg_match('/<!DOCTYPE|<!ENTITY/i', $content)) {
-            throw new FeedImportException('This file could not be read as OPML.');
+            throw new FeedImportException(self::UNREADABLE_FILE_MESSAGE);
         }
 
+        // A bare & (common in exported URLs and titles) is not well-formed XML; escape every & that starts no entity.
         $content = preg_replace('/&(?!(?:[a-zA-Z]+|#[0-9]+|#x[0-9a-fA-F]+);)/', '&amp;', $content);
 
         // Loaded through DOM: simplexml_load_string() with LIBXML_RECOVER returns
@@ -242,13 +244,13 @@ class OpmlImportService
         libxml_use_internal_errors($previous);
 
         if ($document->doctype !== null) {
-            throw new FeedImportException('This file could not be read as OPML.');
+            throw new FeedImportException(self::UNREADABLE_FILE_MESSAGE);
         }
 
         $xml = $loaded && $document->documentElement ? simplexml_import_dom($document) : null;
 
         if (! $xml || ! isset($xml->body)) {
-            throw new FeedImportException('This file could not be read as OPML.');
+            throw new FeedImportException(self::UNREADABLE_FILE_MESSAGE);
         }
 
         $feeds = [];
@@ -271,10 +273,7 @@ class OpmlImportService
                 continue;
             }
 
-            if (in_array(strtolower((string) $outline['type']), self::SCRAPER_TYPES, true)
-                || ! preg_match('#^https?://#i', $url)
-                || strlen($url) > self::MAX_URL_LENGTH
-                || isset($feeds[$url])) {
+            if (! $this->isImportable($outline, $url) || isset($feeds[$url])) {
                 continue;
             }
 
@@ -286,10 +285,18 @@ class OpmlImportService
         }
     }
 
-    /**
-     * @param  array{url: string, title: string}  $feed
-     * @param  \Closure(): (array|false|null)  $feedData
-     */
+    private function isImportable(SimpleXMLElement $outline, string $url): bool
+    {
+        $isScraper = in_array(strtolower((string) $outline['type']), self::SCRAPER_TYPES, true);
+
+        return ! $isScraper
+            && preg_match('#^https?://#i', $url) === 1
+            && strlen($url) <= self::MAX_URL_LENGTH;
+    }
+
+    // $feedData returns null for a feed that is already stored (nothing to fetch), and FeedReader::parseFeedData()'s
+    // result, data or false, for a fetched one.
+    /** @param  array{url: string, title: string}  $feed */
     private function subscribe(User $user, array $feed, \Closure $feedData): FeedImportStatus
     {
         // Content SimplePie chokes on is a feed problem, not a server one.

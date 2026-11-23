@@ -120,6 +120,11 @@ function feedImportStatuses(User $user): array
     );
 }
 
+function runFeedImportJob(User $user): void
+{
+    app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+}
+
 describe('ImportFeedSubscriptions', function () {
     it('gives every selected feed its outcome and finishes', function () {
         Queue::fake();
@@ -127,7 +132,7 @@ describe('ImportFeedSubscriptions', function () {
         $known = Feed::factory()->create(['url' => 'https://known.example/feed']);
         $race = Feed::factory()->create(['url' => 'https://race.example/feed']);
         Http::fake([
-            'https://ok.example/*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200),
+            'https://ok.example/*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200),
             'https://down.example/*' => Http::failedConnection(),
             'https://slow.example/*' => Http::failedConnection('cURL error 28: Operation timed out'),
             'https://missing.example/*' => Http::response('Not found', 404),
@@ -146,7 +151,7 @@ describe('ImportFeedSubscriptions', function () {
         ]);
         FeedSubscription::factory()->forUser($user)->forFeed($race)->create();
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://known.example/feed' => 'subscribed',
@@ -184,19 +189,19 @@ describe('ImportFeedSubscriptions', function () {
         Feed::factory()->create(['url' => 'https://known.example/feed']);
         runningFeedImport($user, ['https://known.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         Http::assertNothingSent();
         expect(feedImportStatuses($user))->toBe(['https://known.example/feed' => 'subscribed']);
     });
 
-    it('fetches with the SimplePie user agent and a 5 second timeout', function () {
+    it('fetches with the SimplePie user agent', function () {
         Queue::fake();
-        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        Http::fake(['*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200)]);
         $user = makeUser();
         runningFeedImport($user, ['https://ok.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://ok.example/feed'
             && $request->hasHeader('User-Agent', Misc::get_default_useragent()));
@@ -214,7 +219,7 @@ describe('ImportFeedSubscriptions', function () {
             return Http::response('', 404);
         });
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(array_count_values($seen))->toBe([0 => 25, 25 => 5]);
         expect(app(OpmlImportService::class)->state($user)->processed())->toBe(30);
@@ -225,7 +230,7 @@ describe('ImportFeedSubscriptions', function () {
         $user = makeUser();
         app(OpmlImportService::class)->start($user, '<opml><body><outline xmlUrl="https://ok.example/feed"/></body></opml>');
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         Http::assertNothingSent();
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('parsed');
@@ -241,7 +246,7 @@ describe('ImportFeedSubscriptions', function () {
         $this->instance(FeedReader::class, $reader);
         runningFeedImport($user, ['https://known.example/feed', 'https://new.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
         expect(feedImportStatuses($user))->toBe([
@@ -253,14 +258,14 @@ describe('ImportFeedSubscriptions', function () {
     it('subscribes a feed with an overlong title and keeps importing the feeds after it', function () {
         Queue::fake();
         $user = makeUser();
-        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        $rss = file_get_contents(base_path('tests/Fixtures/feed.rss'));
         Http::fake([
             'https://long.example/*' => Http::response(str_replace('Fixture Feed', str_repeat('x', 300), $rss), 200),
             '*' => Http::response($rss, 200),
         ]);
         runningFeedImport($user, ['https://before.example/feed', 'https://long.example/feed', 'https://after.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://before.example/feed' => 'subscribed',
@@ -275,7 +280,7 @@ describe('ImportFeedSubscriptions', function () {
         Queue::fake();
         Exceptions::fake();
         $user = makeUser();
-        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        Http::fake(['*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200)]);
         $real = app(FeedService::class);
         $this->mock(FeedService::class, function ($mock) use ($real) {
             $mock->shouldReceive('plainTitle')->andReturnUsing(fn (?string $value) => $real->plainTitle($value));
@@ -288,7 +293,7 @@ describe('ImportFeedSubscriptions', function () {
         });
         runningFeedImport($user, ['https://before.example/feed', 'https://bad.example/feed', 'https://after.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(app(OpmlImportService::class)->state($user)->stage->value)->toBe('finished');
         expect(feedImportStatuses($user))->toBe([
@@ -302,7 +307,7 @@ describe('ImportFeedSubscriptions', function () {
     it('treats a feed body over the size cap as unreachable', function () {
         Queue::fake();
         $user = makeUser();
-        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        $rss = file_get_contents(base_path('tests/Fixtures/feed.rss'));
         Http::fake([
             'https://huge.example/*' => Http::response(str_replace('</channel>', str_repeat(' ', 5 * 1024 * 1024).'</channel>', $rss), 200),
             'https://declared.example/*' => Http::response($rss, 200, ['Content-Length' => (string) (5 * 1024 * 1024 + 1)]),
@@ -310,7 +315,7 @@ describe('ImportFeedSubscriptions', function () {
         ]);
         runningFeedImport($user, ['https://huge.example/feed', 'https://declared.example/feed', 'https://ok.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://huge.example/feed' => 'unreachable',
@@ -325,7 +330,7 @@ describe('ImportFeedSubscriptions', function () {
         app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(
             fn (string $host) => str_starts_with($host, 'private.') ? ['10.0.0.1'] : ['93.184.216.34']
         ));
-        $rss = file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss');
+        $rss = file_get_contents(base_path('tests/Fixtures/feed.rss'));
         Http::fake([
             'https://redirect.example/*' => Http::response('', 302, ['Location' => 'http://private.example/feed']),
             'https://moved.example/feed' => Http::response('', 301, ['Location' => '/new-feed']),
@@ -334,7 +339,7 @@ describe('ImportFeedSubscriptions', function () {
         $user = makeUser();
         runningFeedImport($user, ['https://private.example/feed', 'https://redirect.example/feed', 'https://moved.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://private.example/feed' => 'unreachable',
@@ -351,12 +356,12 @@ describe('ImportFeedSubscriptions', function () {
             'https://slashes.example/*' => Http::response('', 302, ['Location' => '//']),
             'https://scheme.example/*' => Http::response('', 301, ['Location' => 'http://']),
             'https://port.example/*' => Http::response('', 302, ['Location' => 'http://:80/x']),
-            '*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200),
+            '*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200),
         ]);
         $user = makeUser();
         runningFeedImport($user, ['https://slashes.example/feed', 'https://ok.example/feed', 'https://scheme.example/feed', 'https://port.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://slashes.example/feed' => 'unreachable',
@@ -372,11 +377,11 @@ describe('ImportFeedSubscriptions', function () {
         app()->instance(OutboundUrlGuard::class, new OutboundUrlGuard(
             fn (string $host) => $host === 'gone.example' ? [] : ['93.184.216.34']
         ));
-        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        Http::fake(['*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200)]);
         $user = makeUser();
         runningFeedImport($user, ['https://gone.example/feed', 'https://ok.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://gone.example/feed' => 'unreachable',
@@ -397,7 +402,7 @@ describe('ImportFeedSubscriptions', function () {
         $user = makeUser();
         runningFeedImport($user, ['https://cp1252.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe(['https://cp1252.example/feed' => 'subscribed'])
             ->and(Feed::where('url', 'https://cp1252.example/feed')->value('title'))->toBe('Café “News” €');
@@ -406,14 +411,14 @@ describe('ImportFeedSubscriptions', function () {
     it('marks feeds past the subscription limit as limit_reached, counting only the user\'s own', function () {
         Queue::fake();
         config(['feeds.max_subscriptions' => 3]);
-        Http::fake(['*' => Http::response(file_get_contents(__DIR__.'/../../../../tests/Fixtures/feed.rss'), 200)]);
+        Http::fake(['*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200)]);
         $user = makeUser();
         FeedSubscription::factory()->forUser($user)->create();
         FeedSubscription::factory()->forUser(makeUser())->count(5)->create();
         Feed::factory()->create(['url' => 'https://known.example/feed']);
         runningFeedImport($user, ['https://known.example/feed', 'https://one.example/feed', 'https://two.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         expect(feedImportStatuses($user))->toBe([
             'https://known.example/feed' => 'subscribed',
@@ -432,7 +437,7 @@ describe('ImportFeedSubscriptions', function () {
         FeedSubscription::factory()->forUser($user)->create();
         runningFeedImport($user, ['https://one.example/feed', 'https://two.example/feed']);
 
-        app(ImportFeedSubscriptions::class, ['userId' => $user->id])->handle(app(OpmlImportService::class));
+        runFeedImportJob($user);
 
         Http::assertNothingSent();
         expect(feedImportStatuses($user))->toBe([

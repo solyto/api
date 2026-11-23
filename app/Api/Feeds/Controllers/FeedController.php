@@ -275,7 +275,12 @@ class FeedController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Feed URL doesn't seem valid", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error or the feed URL does not resolve (ValidationErrorResponse), or the URL is not a feed or not allowed (ErrorResponse)",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     )
      * )
      */
     public function testFeed(Request $request): JsonResponse
@@ -329,7 +334,12 @@ class FeedController
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=409, description="Already subscribed to this feed", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Feed URL doesn't seem valid, is not allowed, or the subscription limit is reached", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error, the feed URL does not resolve or is not allowed, or the subscription limit is reached (ValidationErrorResponse), or the URL is not a feed (ErrorResponse)",
+     *
+     *         @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")})
+     *     )
      * )
      */
     public function storeSubscription(StoreFeedSubscriptionRequest $request): JsonResponse

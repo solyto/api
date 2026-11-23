@@ -24,15 +24,11 @@ use Psr\Http\Message\StreamInterface;
 use SimplePie\Misc;
 use SimplePie\SimplePie;
 
-/**
- * Every download goes through fetchMany(): each hop is checked by the
- * OutboundUrlGuard and pinned to the address it checked (CURLOPT_RESOLVE),
- * redirects are followed by hand, and a body is cut off once its
- * decompressed size passes MAX_FEED_BYTES. SimplePie fetches through the
- * same path (httpClient()), so its feed autodiscovery is guarded too.
- * Bodies are requested compressed; a body that does not decode as its
- * Content-Encoding says is fetched once more without decoding.
- */
+// Every download goes through fetchMany(): each hop is checked by the OutboundUrlGuard and pinned to the address it
+// checked (CURLOPT_RESOLVE), redirects are followed by hand, and a body is cut off once its decompressed size passes
+// MAX_FEED_BYTES. SimplePie fetches through the same path (httpClient()), so its feed autodiscovery is guarded too.
+// Bodies are requested compressed; a body that does not decode as its Content-Encoding says is fetched once more
+// without decoding.
 class FeedReader
 {
     private const int MAX_FEED_BYTES = 5 * 1024 * 1024;
@@ -57,11 +53,9 @@ class FeedReader
         return $items;
     }
 
+    // 'url' is the feed that was read: $url itself when it is a feed, else the feed discovered on that page. It is the
+    // URL before redirects: httpClient() reports every redirect to SimplePie as a temporary one.
     /**
-     * 'url' is the feed that was read: $url itself when it is a feed, else
-     * the feed discovered on that page. It is the URL before redirects:
-     * httpClient() reports every redirect to SimplePie as a temporary one.
-     *
      * @return array{url: string, title: ?string, items: array<int, \SimplePie\Item>}|false
      *
      * @throws BlockedUrlException when the feed URL itself points at a non-public address
@@ -92,13 +86,10 @@ class FeedReader
         ];
     }
 
-    /**
-     * SimplePie loads the first feed a page links to, often the site-wide
-     * one (angak.fr: an empty /feed/). A discovered feed under the page's
-     * own path is the one the user pasted the page for
-     * (/actualites/ → /actualites/feed/). A root page has no such feed.
-     * A comments feed is never one: WordPress links each post's comments feed under the post's path.
-     */
+    // SimplePie loads the first feed a page links to, often the site-wide one (angak.fr: an empty /feed/). A
+    // discovered feed under the page's own path is the one the user pasted the page for (/actualites/ →
+    // /actualites/feed/). A root page has no such feed. A comments feed is never one: WordPress links each post's
+    // comments feed under the post's path.
     private function preferredDiscoveredFeed(string $pageUrl, SimplePie $pie): ?string
     {
         $page = parse_url($pageUrl);
@@ -112,9 +103,10 @@ class FeedReader
             $candidateUrl = $candidate->get_permanent_uri();
             $parts = parse_url($candidateUrl);
 
-            if (strcasecmp($parts['host'] ?? '', $page['host'] ?? '') === 0
-                && str_starts_with($parts['path'] ?? '', $prefix)
-                && ! $this->isCommentsFeed($candidate->get_body_content())) {
+            $sameHost = strcasecmp($parts['host'] ?? '', $page['host'] ?? '') === 0;
+            $underPagePath = str_starts_with($parts['path'] ?? '', $prefix);
+
+            if ($sameHost && $underPagePath && ! $this->isCommentsFeed($candidate->get_body_content())) {
                 return $candidateUrl;
             }
         }
@@ -130,12 +122,9 @@ class FeedReader
             && preg_match('/comment|kommentar|comentario|коммент/iu', $title[1]) === 1;
     }
 
-    /**
-     * A fresh SimplePie per call: raw data set on a shared instance would
-     * stay there and be served to every later call. The charset of
-     * $contentType (the HTTP header) comes before the XML declaration, as it
-     * does when SimplePie fetches the feed itself.
-     */
+    // A fresh SimplePie per call: raw data set on a shared instance would stay there and be served to every later
+    // call. The charset of $contentType (the HTTP header) comes before the XML declaration, as it does when SimplePie
+    // fetches the feed itself.
     public function parseFeedData(string $content, ?string $contentType = null): array|false
     {
         $pie = new SimplePie;
@@ -160,14 +149,11 @@ class FeedReader
         ];
     }
 
+    // Fetches all URLs concurrently, one pool per redirect hop. A URL comes back as null when it or a hop it redirects
+    // to is blocked by the guard, the connection fails, the body is over MAX_FEED_BYTES, it redirects to a Location
+    // that cannot be parsed, or it redirects more than MAX_REDIRECTS times; otherwise as the final response, whatever
+    // its status. The final response's effectiveUri() is the URL after redirects.
     /**
-     * Fetches all URLs concurrently, one pool per redirect hop. A URL comes
-     * back as null when it or a hop it redirects to is blocked by the guard,
-     * the connection fails, the body is over MAX_FEED_BYTES, it redirects to
-     * a Location that cannot be parsed, or it redirects more than
-     * MAX_REDIRECTS times; otherwise as the final response, whatever its
-     * status. The final response's effectiveUri() is the URL after redirects.
-     *
      * @param  array<array-key, string>  $urls
      * @param  array<string, string>  $headers
      * @return array<array-key, Response|null> keyed like $urls
@@ -189,20 +175,19 @@ class FeedReader
             }
 
             $tooLarge = [];
-            $responses = $pins === [] ? [] : $this->pool($pins, $pending, $timeout, $headers, true, $tooLarge);
+            $responses = $pins === [] ? [] : $this->pool($pins, $pending, $timeout, $headers, decode: true, tooLarge: $tooLarge);
 
             // What curl did on CURLE_BAD_CONTENT_ENCODING for SimplePie's own File: ask again
             // without decoding, for servers that label a plain body as gzip.
             $undecodable = array_filter(
                 $pins,
-                fn ($pin, $key) => ! isset($tooLarge[$key])
-                    && ($responses[$key] ?? null) instanceof Response
-                    && $responses[$key]->transferStats?->getHandlerErrorData() === CURLE_BAD_CONTENT_ENCODING,
-                ARRAY_FILTER_USE_BOTH
+                fn ($key) => ! isset($tooLarge[$key]) && $this->failedToDecode($responses[$key] ?? null),
+                ARRAY_FILTER_USE_KEY
             );
 
             if ($undecodable !== []) {
-                $responses = array_replace($responses, $this->pool($undecodable, $pending, $timeout, $headers, false, $tooLarge));
+                $retried = $this->pool($undecodable, $pending, $timeout, $headers, decode: false, tooLarge: $tooLarge);
+                $responses = array_replace($responses, $retried);
             }
 
             $next = [];
@@ -238,10 +223,9 @@ class FeedReader
         return $ordered;
     }
 
+    // One request per pinned URL, all in one pool. Without $decode the body is kept as sent and identity is asked for
+    // instead of compression.
     /**
-     * One request per pinned URL, all in one pool. Without $decode the body is
-     * kept as sent and identity is asked for instead of compression.
-     *
      * @param  array<array-key, string>  $pins
      * @param  array<array-key, string>  $urls
      * @param  array<string, string>  $headers
@@ -271,6 +255,12 @@ class FeedReader
         });
     }
 
+    private function failedToDecode(Response|\Throwable|null $response): bool
+    {
+        return $response instanceof Response
+            && $response->transferStats?->getHandlerErrorData() === CURLE_BAD_CONTENT_ENCODING;
+    }
+
     /**
      * @throws BlockedUrlException
      */
@@ -289,13 +279,9 @@ class FeedReader
         return $pie;
     }
 
-    /**
-     * fetchMany() follows redirects through the guard itself. SimplePie
-     * resolves relative links (autodiscovery, items) against the last URL it
-     * requested, so a redirected fetch is answered with one 307 to the final
-     * URL, and SimplePie's request for that URL with the response already
-     * fetched.
-     */
+    // fetchMany() follows redirects through the guard itself. SimplePie resolves relative links (autodiscovery, items)
+    // against the last URL it requested, so a redirected fetch is answered with one 307 to the final URL, and
+    // SimplePie's request for that URL with the response already fetched.
     private function httpClient(): ClientInterface
     {
         return new class($this, self::FETCH_TIMEOUT) implements ClientInterface
@@ -332,12 +318,9 @@ class FeedReader
         };
     }
 
-    /**
-     * curl hands the sink decompressed bytes, so counting here caps what a
-     * gzip body inflates to; a progress callback only sees the compressed
-     * bytes on the wire. Accepting fewer bytes than offered makes curl abort
-     * just this transfer, where a throw would reject the whole pool.
-     */
+    // curl hands the sink decompressed bytes, so counting here caps what a gzip body inflates to; a progress callback
+    // only sees the compressed bytes on the wire. Accepting fewer bytes than offered makes curl abort just this
+    // transfer, where a throw would reject the whole pool.
     private function cappedSink(\Closure $onTooLarge): StreamInterface
     {
         $stream = Utils::streamFor(Utils::tryFopen('php://temp', 'w+'));
@@ -364,11 +347,8 @@ class FeedReader
             || strlen($response->body()) > self::MAX_FEED_BYTES;
     }
 
-    /**
-     * Hosts that only serve tracking pixels. Their images are skipped even when
-     * no size is given, so clients never load the tracker. VG Wort counts reads
-     * for German publishers on per-server subdomains, hence the suffix match.
-     */
+    // Hosts that only serve tracking pixels. Their images are skipped even when no size is given, so clients never load
+    // the tracker. VG Wort counts reads for German publishers on per-server subdomains, hence the suffix match.
     private const array TRACKER_HOSTS = [
         'cpx.golem.de',
         'met.vgwort.de',
@@ -424,11 +404,8 @@ class FeedReader
         return $this->extractOgImage($item->get_link());
     }
 
-    /**
-     * Many feeds (e.g. Golem) end every item's HTML with a 1x1 tracking pixel,
-     * which must never become the item image: it is invisible, and every client
-     * would load the tracker.
-     */
+    // Many feeds (e.g. Golem) end every item's HTML with a 1x1 tracking pixel, which must never become the item image:
+    // it is invisible, and every client would load the tracker.
     private function firstImageInHtml(string $html): ?string
     {
         preg_match_all('/<img\b[^>]*>/i', $html, $tags);

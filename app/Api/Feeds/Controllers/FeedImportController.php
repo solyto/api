@@ -3,15 +3,10 @@
 namespace App\Api\Feeds\Controllers;
 
 use App\Api\ApiResponse;
-use App\Api\Feeds\DTOs\FeedImportStateDTO;
-use App\Api\Feeds\Exceptions\FeedImportConflictException;
-use App\Api\Feeds\Exceptions\FeedImportException;
-use App\Api\Feeds\Exceptions\FeedImportNotFoundException;
 use App\Api\Feeds\Requests\ImportFeedsRequest;
 use App\Api\Feeds\Requests\SelectImportFeedsRequest;
 use App\Api\Feeds\Resources\FeedImportStateResource;
 use App\Api\Feeds\Services\OpmlImportService;
-use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -65,10 +60,9 @@ class FeedImportController
      */
     public function start(ImportFeedsRequest $request): JsonResponse
     {
-        return $this->respond(
-            fn () => $this->importService->start($request->user(), $request->file('file')->get()),
-            'Feed import file read successfully.'
-        );
+        $state = $this->importService->start($request->user(), $request->file('file')->get());
+
+        return ApiResponse::success(new FeedImportStateResource($state), 'Feed import file read successfully.');
     }
 
     /**
@@ -112,10 +106,9 @@ class FeedImportController
      */
     public function select(SelectImportFeedsRequest $request): JsonResponse
     {
-        return $this->respond(
-            fn () => $this->importService->select($request->user(), $request->validated()['urls']),
-            'Feed import started successfully.'
-        );
+        $state = $this->importService->select($request->user(), $request->validated()['urls']);
+
+        return ApiResponse::success(new FeedImportStateResource($state), 'Feed import started successfully.');
     }
 
     /**
@@ -142,25 +135,8 @@ class FeedImportController
      */
     public function state(Request $request): JsonResponse
     {
-        return $this->respond(
-            fn () => $this->importService->state($request->user()),
-            'Feed import state retrieved successfully.'
-        );
-    }
+        $state = $this->importService->state($request->user());
 
-    /**
-     * @param  Closure(): FeedImportStateDTO  $call
-     */
-    private function respond(Closure $call, string $message): JsonResponse
-    {
-        try {
-            return ApiResponse::success(new FeedImportStateResource($call()), $message);
-        } catch (FeedImportException $e) {
-            return ApiResponse::error($e->getMessage(), 422);
-        } catch (FeedImportConflictException $e) {
-            return ApiResponse::error($e->getMessage(), 409);
-        } catch (FeedImportNotFoundException $e) {
-            return ApiResponse::error($e->getMessage(), 404);
-        }
+        return ApiResponse::success(new FeedImportStateResource($state), 'Feed import state retrieved successfully.');
     }
 }

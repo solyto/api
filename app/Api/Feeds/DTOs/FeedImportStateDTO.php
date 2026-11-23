@@ -7,7 +7,7 @@ use App\Api\Feeds\Enums\FeedImportStatus;
 
 class FeedImportStateDTO
 {
-    /** Unix time of the last save; null on states cached before it was recorded. */
+    // Unix time of the last save; null on states cached before it was recorded.
     public ?int $updatedAt = null;
 
     /**
