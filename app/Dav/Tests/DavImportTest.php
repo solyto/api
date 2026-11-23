@@ -25,12 +25,8 @@ function remoteResponse(string $href, string $props): string
     return "<d:response><d:href>{$href}</d:href><d:propstat><d:prop>{$props}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
 }
 
-/**
- * Fake a Nextcloud-style remote DAV server: discovery on the principal,
- * a PROPFIND listing on the home set and a REPORT per collection.
- *
- * @param  array<string, array<string, string>>  $collections  name => [object => data]
- */
+// A Nextcloud-style remote: discovery on the principal, a PROPFIND listing on the home set and a REPORT per collection.
+/** @param  array<string, array<string, string>>  $collections  name => [object => data] */
 function fakeRemoteDav(string $kind, array $collections, int $discoveryStatus = 207): void
 {
     $home = $kind === 'calendars' ? '/remote.php/dav/calendars/alice/' : '/remote.php/dav/addressbooks/users/alice/';
@@ -130,7 +126,7 @@ describe('Calendar import', function () {
         ]);
         $dav = app(DavService::class);
         $import = $dav->import()->calendars();
-        $titles = fn () => collect(app(\App\Api\Calendars\Services\CalendarService::class)->listEvents($user, '2030-10'))->pluck('title')->sort()->values()->all();
+        $titles = fn () => collect(app(\App\Api\Calendars\Services\CalendarService::class)->listEvents($user, '2030-10')->events)->pluck('title')->sort()->values()->all();
 
         $import->start($user, REMOTE, 'alice', 'app-password');
         $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
@@ -174,10 +170,9 @@ describe('Calendar import', function () {
             ->and(Cache::has('calendar-import-'.$user->id))->toBeFalse();
 
         Cache::set('calendar-import-'.$user->id, $state, now()->addMinutes(60));
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars/import/select', ['calendars' => ['Personal']])
-            ->assertStatus(404)
-            ->assertJsonPath('message', 'Import state not found');
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars/import/select', ['calendars' => ['Personal']]);
+        expectApiError($response, 404);
+        $response->assertJsonPath('message', 'Import state not found');
     });
 
     it('authenticates against the remote server with the given credentials', function () {
@@ -420,4 +415,29 @@ describe('Contact import', function () {
 
         app(DavService::class)->import()->addressBooks()->start($user, REMOTE, 'alice', 'wrong');
     })->throws(ImportException::class);
+});
+
+describe('Starting an import that cannot read the remote account', function () {
+    it('answers 404 with a fixed message and logs the host only', function (string $kind, string $endpoint, int $discoveryStatus, string $message, string $logMessage) {
+        $this->freezeTime();
+        $user = davUser();
+        fakeRemoteDav($kind, [], $discoveryStatus);
+        $channel = Mockery::spy();
+        Log::shouldReceive('channel')->andReturn($channel);
+
+        $response = $this->actingAs($user, 'sanctum')->postJson($endpoint, [
+            'url' => REMOTE,
+            'username' => 'alice',
+            'secret' => 'app-password',
+        ]);
+
+        expectApiError($response, 404);
+        expect($response->getContent())->toBe(json_encode(['success' => false, 'message' => $message, 'timestamp' => now()->toISOString()]));
+        $channel->shouldHaveReceived('warning')->with($logMessage, ['host' => 'remote.example.com'])->once();
+    })->with([
+        'calendars, principal unreadable' => ['calendars', '/api/v1/calendars/import', 401, 'Could not grab calendars', 'Calendar import could not reach the server'],
+        'calendars, none found' => ['calendars', '/api/v1/calendars/import', 207, 'Could not grab calendars', 'Calendar import could not reach the server'],
+        'address books, principal unreadable' => ['addressbooks', '/api/v1/address-books/import', 401, 'Could not grab address books', 'Contact import could not reach the server'],
+        'address books, none found' => ['addressbooks', '/api/v1/address-books/import', 207, 'Could not grab address books', 'Contact import could not reach the server'],
+    ]);
 });

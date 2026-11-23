@@ -13,11 +13,8 @@ use Sabre\VObject\TimeZoneUtil;
 
 class EventDTO
 {
-    /**
-     * The stored iCalendar object, set only when a single event is read for
-     * an edit (AppCalendarsPDO::getEventByUriCustom()); listings and caches
-     * never carry it.
-     */
+    // Set only when a single event is read for an edit (AppCalendarsPDO::getEventByUriCustom()); listings and caches
+    // never carry it.
     public ?string $storedData = null;
 
     public function __construct(
@@ -284,13 +281,11 @@ class EventDTO
         return $data;
     }
 
+    // The TZID lines of the VTIMEZONE blocks and the properties of the master VEVENT (the one without RECURRENCE-ID),
+    // leaving out nested components such as VALARM. Data without a VEVENT is read as is.
     /**
-     * Pick the lines to read: the TZID lines of the VTIMEZONE blocks and the
-     * properties of the master VEVENT (the one without RECURRENCE-ID), leaving
-     * out nested components such as VALARM. Data without a VEVENT is read as is.
-     *
-     * @param  string[]  $lines
-     * @return string[]
+     * @param  array<int, string>  $lines
+     * @return array<int, string>
      */
     private static function selectEventLines(array $lines): array
     {
@@ -337,13 +332,9 @@ class EventDTO
         return [...$tzidLines, ...$master];
     }
 
-    /**
-     * Split a content line into its upper-cased name, its raw parameters and
-     * its value; the value starts at the first colon outside a quoted
-     * parameter (TZID="W. Europe Standard Time").
-     *
-     * @return array{0: string, 1: string, 2: string}
-     */
+    // Upper-cased name, raw parameters and value; the value starts at the first colon outside a quoted parameter
+    // (TZID="W. Europe Standard Time").
+    /** @return array{0: string, 1: string, 2: string} */
     private static function splitContentLine(string $line): array
     {
         $inQuotes = false;
@@ -449,16 +440,11 @@ class EventDTO
         return implode("\r\n", $lines) . "\r\n";
     }
 
-    /**
-     * The iCalendar to store for an edit: the stored object with this event's
-     * fields applied to its master VEVENT, so the UID, VALARMs, attendees and
-     * other client data survive. EXDATE, RDATE and RECURRENCE-ID exceptions
-     * survive too, unless the series stops recurring or its start moves (they
-     * would no longer match). Without stored data (a new event) this is toVCal().
-     *
-     * @throws UnreadableCalendarObjectException when the stored data can't be read or has no
-     *         main event: rebuilding it would drop what other clients stored.
-     */
+    // The stored object with this event's fields applied to its master VEVENT, so the UID, VALARMs, attendees and other
+    // client data survive. EXDATE, RDATE and exceptions survive too, unless the series stops recurring or its start
+    // moves (they would no longer match). Unreadable stored data is refused: rebuilding it would drop what other
+    // clients stored.
+    /** @throws UnreadableCalendarObjectException */
     public function toVCalForUpdate(): string
     {
         if (!$this->storedData || !$this->startDate) {
@@ -471,6 +457,10 @@ class EventDTO
             throw new UnreadableCalendarObjectException($e);
         }
 
+        if (!$vcalendar instanceof VCalendar) {
+            throw new UnreadableCalendarObjectException();
+        }
+
         $master = null;
         foreach ($vcalendar->VEVENT ?? [] as $vevent) {
             if (!isset($vevent->{'RECURRENCE-ID'})) {
@@ -479,7 +469,7 @@ class EventDTO
             }
         }
 
-        if (!$vcalendar instanceof VCalendar || !$master instanceof VEvent) {
+        if (!$master instanceof VEvent) {
             throw new UnreadableCalendarObjectException();
         }
 

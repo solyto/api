@@ -174,8 +174,18 @@ class ContactImport
         $this->saveState($user->id, $dto);
 
         if (!$books) {
-            throw new ImportException();
+            throw $this->unreachable($dto);
         }
+    }
+
+    // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.
+    private function unreachable(AddressBookImportDTO $dto): ImportException
+    {
+        Log::channel('dav')->warning('Contact import could not reach the server', [
+            'host' => parse_url($dto->url, PHP_URL_HOST),
+        ]);
+
+        return new ImportException('Could not grab address books');
     }
 
     private function discoverAddressBookHome(AddressBookImportDTO $dto): string
@@ -187,12 +197,12 @@ class ContactImport
         );
 
         if (!$response->successful()) {
-            throw new ImportException();
+            throw $this->unreachable($dto);
         }
 
 
         $homes = $this->helper->parseAddressBookHomeFromXml($response->body(), $dto->url);
-        return $homes[0]['url'] ?? throw new ImportException();
+        return $homes[0]['url'] ?? throw $this->unreachable($dto);
     }
 
     private function getAddressBooks(AddressBookImportDTO $dto, string $homeSet): array

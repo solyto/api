@@ -631,9 +631,9 @@ Good (`TodoController.php:160-165`): call the service, return success.
 
 A **typed** domain exception mapped to a non-500 status is different and
 fine where it happens (`FeedController.php:350-355` `FeedAlreadySubscribedException`
-→ 409, `ImportController.php:68` `ImportException`); when the same
-exception is caught in a second controller, it moves into the central map
-instead. `AuthController.php:111,246,331,358` and `PasskeyController.php:34,59`
+→ 409); when the same exception is caught in a second controller, it moves
+into the central map instead (`ImportException` → 404, caught by both import
+controllers until 2026-11-23). `AuthController.php:111,246,331,358` and `PasskeyController.php:34,59`
 (`\RuntimeException`/`ValidationException` → 401, 400 or 422) are this kind
 and stay. The register endpoint's `\RuntimeException` →
 `serverError($e->getMessage())` catch (a 500 with the service's message, not

@@ -7,13 +7,9 @@ use Sabre\DAV\Server;
 use Sabre\DAV\ServerPlugin;
 use Sabre\HTTP\RequestInterface;
 
-/**
- * Sabre's backend API carries no request headers. This hands the client's
- * If-Match to the calendar backend, which sends it on to the remote server
- * of an external calendar, so a remote change between sabre's own
- * precondition check and the write still ends in a 412 (the remote wins).
- * Native calendars ignore it.
- */
+// Sabre's backend API carries no request headers, so the client's If-Match is handed to the calendar backend, which
+// sends it on to an external calendar's server: a remote change between sabre's own precondition check and the write
+// still ends in a 412 (the remote wins). Native calendars ignore it.
 class ExternalPreconditionsPlugin extends ServerPlugin
 {
     public function __construct(private readonly AppCalendarsPDO $backend) {}

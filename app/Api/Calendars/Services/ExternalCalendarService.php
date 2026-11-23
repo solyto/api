@@ -19,11 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Accounts on the user's own CalDAV servers and the calendars connected
- * from them. A connected calendar is a native calendar row plus a link;
- * nothing calendar-level is ever written to the remote server.
- */
+// A connected calendar is a native calendar row plus a link; nothing calendar-level is ever written to the remote server.
 class ExternalCalendarService
 {
     private const string CACHE_KEY_DISCOVERY = 'external_calendar_discovery';
@@ -35,17 +31,13 @@ class ExternalCalendarService
         private readonly UserCacheService $cache,
     ) {}
 
-    /**
-     * @return Collection<int, ExternalCalendarAccount>
-     */
+    /** @return Collection<int, ExternalCalendarAccount> */
     public function listAccounts(User $user): Collection
     {
         return ExternalCalendarAccount::forUser($user->id)->with('calendars')->orderBy('id')->get();
     }
 
-    /**
-     * @throws ExternalCalendarDiscoveryException
-     */
+    /** @throws ExternalCalendarDiscoveryException */
     public function createAccount(User $user, array $data): ExternalCalendarAccount
     {
         $found = $this->discover($data['server_url'], $data['username'], $data['password']);
@@ -62,13 +54,9 @@ class ExternalCalendarService
         return $account->load('calendars');
     }
 
-    /**
-     * Checks the new credentials against the server before they replace the
-     * old ones. Its calendars are then asked again right away instead of
-     * staying flagged unavailable for the rest of the TTL.
-     *
-     * @throws ExternalCalendarDiscoveryException
-     */
+    // The server checks the new credentials before they replace the old ones; its calendars are then
+    // asked again right away instead of staying flagged unavailable for the rest of the TTL.
+    /** @throws ExternalCalendarDiscoveryException */
     public function updateAccount(ExternalCalendarAccount $account, array $data): ExternalCalendarAccount
     {
         $username = $data['username'] ?? $account->username;
@@ -84,10 +72,7 @@ class ExternalCalendarService
         return $account->load('calendars');
     }
 
-    /**
-     * Removes the account and every calendar connected from it, locally
-     * only: the calendars on the remote server stay as they are.
-     */
+    // Locally only: the calendars on the remote server stay as they are.
     public function destroyAccount(User $user, ExternalCalendarAccount $account): void
     {
         foreach ($account->calendars as $link) {
@@ -102,8 +87,6 @@ class ExternalCalendarService
     }
 
     /**
-     * The calendar collections on the account's server.
-     *
      * @return array<int, array{url: string, name: string, color: string, is_connected: bool}>
      *
      * @throws ExternalCalendarDiscoveryException
@@ -120,12 +103,8 @@ class ExternalCalendarService
         return array_map(fn (array $calendar) => $calendar + ['is_connected' => in_array($calendar['url'], $connected, true)], $found);
     }
 
+    // All or nothing: if one collection fails, the calendars this call created are removed.
     /**
-     * Connects collections the server listed: each becomes a native
-     * calendar row (named like the import, made unique with " (n)") linked
-     * to the remote collection. Already connected ones are skipped. All or
-     * nothing: if one fails, the calendars this call created are removed.
-     *
      * @param  array<int, string>  $urls
      * @return array<int, CalendarDTO>
      *
@@ -135,21 +114,22 @@ class ExternalCalendarService
     public function connect(User $user, ExternalCalendarAccount $account, array $urls): array
     {
         $available = collect($this->listAvailable($account))->keyBy('url');
-        $urls = array_values(array_unique(array_map(fn (string $url) => rtrim($url, '/').'/', $urls)));
+        $withSlash = array_map(fn (string $url) => rtrim($url, '/').'/', $urls);
+        $urls = array_values(array_unique($withSlash));
 
-        if (array_diff($urls, $available->keys()->all()) !== []) {
+        $unlisted = array_diff($urls, $available->keys()->all());
+        if ($unlisted !== []) {
             throw ValidationException::withMessages(['urls' => 'Only calendars found on the server can be connected.']);
         }
 
-        $candidates = array_filter(array_map(fn (string $url) => $available[$url], $urls), fn (array $candidate) => !$candidate['is_connected']);
+        $requested = array_map(fn (string $url) => $available[$url], $urls);
+        $candidates = array_filter($requested, fn (array $candidate) => !$candidate['is_connected']);
         $created = [];
 
         try {
             DB::transaction(function () use ($user, $account, $candidates, &$created) {
                 foreach ($candidates as $candidate) {
-                    $calendar = $this->calendars->create($user, [
-                        'name' => $this->uniqueName($user, $candidate['name']),
-                    ] + ($this->isStorableColor($candidate['color']) ? ['color' => $candidate['color']] : []));
+                    $calendar = $this->calendars->create($user, $this->calendarData($user, $candidate));
                     $created[] = $calendar;
 
                     try {
@@ -180,7 +160,23 @@ class ExternalCalendarService
             $this->calendars->markExternal($user, $calendar);
         }
 
-        return array_values(array_filter(array_map(fn (CalendarDTO $calendar) => $this->calendars->get($user, $calendar->instanceId), $created)));
+        $connected = array_map(fn (CalendarDTO $calendar) => $this->calendars->get($user, $calendar->instanceId), $created);
+
+        return array_values(array_filter($connected));
+    }
+
+    /**
+     * @param  array{name: string, color: string}  $candidate
+     * @return array{name: string, color?: string}
+     */
+    private function calendarData(User $user, array $candidate): array
+    {
+        $data = ['name' => $this->uniqueName($user, $candidate['name'])];
+        if ($this->isStorableColor($candidate['color'])) {
+            $data['color'] = $candidate['color'];
+        }
+
+        return $data;
     }
 
     /**
@@ -190,16 +186,15 @@ class ExternalCalendarService
      */
     private function discover(string $url, string $username, #[\SensitiveParameter] string $password): array
     {
+        // Each subclass before its parent: rejected credentials are an unavailable server, an unresolvable host a blocked URL.
         try {
             $found = $this->remote->discover($url, $username, $password);
-        } catch (UnresolvableHostException) {
+        } catch (ExternalCalendarCredentialsRejectedException) {
+            throw new ExternalCalendarDiscoveryException('The server rejected the username or app password.', 'external_credentials_rejected');
+        } catch (UnresolvableHostException|ExternalCalendarUnavailableException) {
             throw new ExternalCalendarDiscoveryException('The server could not be reached or did not answer as a CalDAV server.', 'external_server_unreachable');
         } catch (BlockedUrlException) {
             throw new ExternalCalendarDiscoveryException('The server URL is not allowed.', 'external_url_not_allowed');
-        } catch (ExternalCalendarCredentialsRejectedException) {
-            throw new ExternalCalendarDiscoveryException('The server rejected the username or app password.', 'external_credentials_rejected');
-        } catch (ExternalCalendarUnavailableException) {
-            throw new ExternalCalendarDiscoveryException('The server could not be reached or did not answer as a CalDAV server.', 'external_server_unreachable');
         }
 
         if ($found === []) {
@@ -209,12 +204,8 @@ class ExternalCalendarService
         return $found;
     }
 
-    /**
-     * A cleanup failure is logged, not thrown, so it cannot hide the error
-     * that triggered the cleanup.
-     *
-     * @param  array<int, CalendarDTO>  $created
-     */
+    // A cleanup failure is logged, not thrown, so it cannot hide the error that triggered the cleanup.
+    /** @param  array<int, CalendarDTO>  $created */
     private function removeCreated(User $user, array $created): void
     {
         foreach ($created as $calendar) {
@@ -233,18 +224,22 @@ class ExternalCalendarService
     private function uniqueName(User $user, string $name): string
     {
         $candidate = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH);
-        for ($i = 1; $this->calendars->getByName($user, $candidate) !== null; $i++) {
+        $i = 1;
+        while ($this->nameTaken($user, $candidate)) {
             $suffix = ' ('.$i.')';
             $candidate = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH - mb_strlen($suffix)).$suffix;
+            $i++;
         }
 
         return $candidate;
     }
 
-    /**
-     * calendarinstances.calendarcolor is VARCHAR(10) on pgsql; anything else
-     * the remote sends gets the default colour.
-     */
+    private function nameTaken(User $user, string $name): bool
+    {
+        return $this->calendars->getByName($user, $name) !== null;
+    }
+
+    // calendarinstances.calendarcolor is VARCHAR(10) on pgsql; anything else the remote sends gets the default colour.
     private function isStorableColor(string $color): bool
     {
         return preg_match('/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i', $color) === 1;

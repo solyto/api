@@ -12,10 +12,11 @@ class ImportService
     public function __construct(
         Calendars $calendars,
         AddressBooks $addressBooks,
-        UserCacheService $cache
+        UserCacheService $cache,
+        RemoteCalDavClient $remote
     )
     {
-        $this->calendars = new CalendarImport($calendars, $cache, app(RemoteCalDavClient::class));
+        $this->calendars = new CalendarImport($calendars, $cache, $remote);
         $this->addressBooks = new ContactImport($addressBooks, $cache);
     }
 

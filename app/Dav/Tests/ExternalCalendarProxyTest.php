@@ -24,6 +24,14 @@ function remotePut(\App\Api\Users\Models\User $user, string $object, string $ics
     return davRequest($user, 'PUT', remotePath($user, $object), $ics, ['Content-Type' => 'text/calendar; charset=utf-8'] + $headers);
 }
 
+function remoteOctoberQueryBody(): string
+{
+    return '<?xml version="1.0" encoding="utf-8"?><cal:calendar-query xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">'
+        .'<d:prop><d:getetag/><cal:calendar-data/></d:prop><cal:filter><cal:comp-filter name="VCALENDAR">'
+        .'<cal:comp-filter name="VEVENT"><cal:time-range start="20301001T000000Z" end="20301031T000000Z"/></cal:comp-filter>'
+        .'</cal:comp-filter></cal:filter></cal:calendar-query>';
+}
+
 function remoteSyncBody(string $token = ''): string
 {
     return '<?xml version="1.0" encoding="utf-8"?><d:sync-collection xmlns:d="DAV:">'
@@ -129,11 +137,7 @@ describe('External calendars over DAV', function () {
         $this->remote->put('in.ics', davIcs('in', 'In', '20301015T100000Z', '20301015T110000Z'));
         $this->remote->put('out.ics', davIcs('out', 'Out', '20301120T100000Z', '20301120T110000Z'));
 
-        $body = '<?xml version="1.0" encoding="utf-8"?><cal:calendar-query xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">'
-            .'<d:prop><d:getetag/><cal:calendar-data/></d:prop><cal:filter><cal:comp-filter name="VCALENDAR">'
-            .'<cal:comp-filter name="VEVENT"><cal:time-range start="20301001T000000Z" end="20301031T000000Z"/></cal:comp-filter>'
-            .'</cal:comp-filter></cal:filter></cal:calendar-query>';
-        $response = davRequest($this->user, 'REPORT', remotePath($this->user), $body, ['Depth' => '1']);
+        $response = davRequest($this->user, 'REPORT', remotePath($this->user), remoteOctoberQueryBody(), ['Depth' => '1']);
         $xpath = davXpath($response);
 
         expect($response->getStatus())->toBe(207)
@@ -145,11 +149,7 @@ describe('External calendars over DAV', function () {
         $this->remote->put('good.ics', davIcs('good', 'Good'));
         $this->remote->put('garbage.ics', 'garbage');
 
-        $body = '<?xml version="1.0" encoding="utf-8"?><cal:calendar-query xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">'
-            .'<d:prop><d:getetag/><cal:calendar-data/></d:prop><cal:filter><cal:comp-filter name="VCALENDAR">'
-            .'<cal:comp-filter name="VEVENT"><cal:time-range start="20301001T000000Z" end="20301031T000000Z"/></cal:comp-filter>'
-            .'</cal:comp-filter></cal:filter></cal:calendar-query>';
-        $response = davRequest($this->user, 'REPORT', remotePath($this->user), $body, ['Depth' => '1']);
+        $response = davRequest($this->user, 'REPORT', remotePath($this->user), remoteOctoberQueryBody(), ['Depth' => '1']);
         $xpath = davXpath($response);
 
         expect($response->getStatus())->toBe(207)
@@ -288,12 +288,11 @@ describe('External calendars over DAV', function () {
 
         davRequest($this->user, 'PROPFIND', 'calendars/'.$this->user->email.'/', davPropfindBody(['cs:getctag']), ['Depth' => '1']);
         $asked = count($this->remote->requests);
-        $service = app(\App\Api\Calendars\Services\CalendarService::class);
-        $service->listWidgetEvents($this->user);
+        $listing = app(\App\Api\Calendars\Services\CalendarService::class)->listWidgetEvents($this->user);
 
         expect($asked)->toBe(1)
             ->and($this->remote->requests)->toHaveCount(1)
-            ->and($service->unavailableCalendars())->toBe([$this->calendar->instanceId]);
+            ->and($listing->unavailableCalendars)->toBe([$this->calendar->instanceId]);
     });
 
     it('refuses to share an external calendar over DAV', function () {
@@ -306,12 +305,17 @@ describe('External calendars over DAV', function () {
             ->and(DB::connection('pgsql')->table('calendarinstances')->where('calendarid', $this->calendar->calendarId)->count())->toBe(1);
     });
 
-    it('removes only the link and the local row when the collection is deleted', function () {
+    it('removes only the link, the local row and the remembered remote state when the collection is deleted', function () {
         $this->remote->put('a.ics', davIcs('a'));
+        davRequest($this->user, 'PROPFIND', 'calendars/'.$this->user->email.'/', davPropfindBody(['cs:getctag']), ['Depth' => '1']);
+        $stateKey = ['external_calendar_state', $this->user->id, $this->calendar->calendarId];
+        $cache = app(\App\Shared\Services\UserCacheService::class);
+        expect($cache->get($stateKey))->not->toBeNull();
 
         $response = davRequest($this->user, 'DELETE', remotePath($this->user));
 
         expect($response->getStatus())->toBe(204)
+            ->and($cache->get($stateKey))->toBeNull()
             ->and(\App\Api\Calendars\Models\ExternalCalendar::count())->toBe(0)
             ->and(app(DavService::class)->calendars()->get($this->user, $this->calendar->instanceId))->toBeNull()
             ->and($this->remote->objects)->toHaveKey('a.ics')

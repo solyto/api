@@ -2,10 +2,7 @@
 
 namespace App\Dav\Exceptions;
 
-/**
- * The server refused the username or app password (401/403), during
- * discovery or on a request for a connected calendar.
- */
+// The server refused the username or app password (401/403), during discovery or for a connected calendar.
 class ExternalCalendarCredentialsRejectedException extends ExternalCalendarUnavailableException
 {
     public function __construct(int $remoteStatus = 401)

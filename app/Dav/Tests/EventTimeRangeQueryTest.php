@@ -96,10 +96,8 @@ describe('All-day events at the window edges', function () {
     })->with(['Pacific/Kiritimati', 'Etc/GMT+12']);
 });
 
-/**
- * A weekly series from Monday 2030-01-07 with the 2030-01-14 occurrence
- * moved by an hour, the override written before or after the master.
- */
+// A weekly series from Monday 2030-01-07 with the 2030-01-14 occurrence moved by an hour, the override written
+// before or after the master.
 function rangeSeriesWithOverride(bool $overrideFirst): string
 {
     $master = [

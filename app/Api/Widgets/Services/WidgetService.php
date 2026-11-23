@@ -2,6 +2,7 @@
 
 namespace App\Api\Widgets\Services;
 
+use App\Api\Calendars\DTOs\EventListingDTO;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Services\CheckInService;
@@ -28,6 +29,8 @@ class WidgetService
     private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
     private const string CHECK_IN_MENSTRUATION_COLOR = '#FB7185';
 
+    private ?EventListingDTO $calendarListing = null;
+
     public function __construct(
         private readonly CalendarService $calendarService,
         private readonly TodoService $todoService,
@@ -47,7 +50,8 @@ class WidgetService
         $today = $now->startOfDay();
         $tomorrow = $today->addDay();
 
-        [$todayEvents, $upcomingEvents] = collect($this->calendarService->listWidgetEvents($user))
+        $this->calendarListing = $this->calendarService->listWidgetEvents($user);
+        [$todayEvents, $upcomingEvents] = collect($this->calendarListing->events)
             ->filter(fn (EventDTO $event) => $event->startDate !== null)
             ->sort(fn (EventDTO $a, EventDTO $b) => [$this->localStart($a, $timezone), !$a->isAllDay] <=> [$this->localStart($b, $timezone), !$b->isAllDay])
             ->partition(fn (EventDTO $event) => $this->localStart($event, $timezone) < $tomorrow);
@@ -85,7 +89,7 @@ class WidgetService
      */
     public function unavailableCalendars(): array
     {
-        return $this->calendarService->unavailableCalendars();
+        return $this->calendarListing->unavailableCalendars ?? [];
     }
 
     /**
@@ -93,7 +97,7 @@ class WidgetService
      */
     public function credentialsRejectedCalendars(): array
     {
-        return $this->calendarService->credentialsRejectedCalendars();
+        return $this->calendarListing->credentialsRejectedCalendars ?? [];
     }
 
     public function completeTodo(User $user, Todo $todo): void

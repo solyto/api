@@ -17,14 +17,14 @@ class DavService
     private Principals $principals;
     private ImportService $import;
 
-    public function __construct(private readonly UserCacheService $cache)
+    public function __construct(private readonly UserCacheService $cache, RemoteCalDavClient $remote)
     {
         $pdo = DB::connection('pgsql')->getPdo();
 
         $this->calendars = new Calendars($pdo);
         $this->addressBooks = new AddressBooks($pdo);
         $this->principals = new Principals($pdo);
-        $this->import = new ImportService($this->calendars, $this->addressBooks, $this->cache);
+        $this->import = new ImportService($this->calendars, $this->addressBooks, $this->cache, $remote);
     }
 
     public function calendars(): Calendars
@@ -47,15 +47,7 @@ class DavService
         return $this->import;
     }
 
-    /**
-     * Removes every DAV row the user owns on pgsql: owned calendars (with
-     * their objects, changes and every sharee instance), the instance rows
-     * of calendars shared with the user, address books, subscriptions,
-     * scheduling objects, property storage and the principal with its
-     * proxies and group memberships.
-     *
-     * @return array<string, int|bool>
-     */
+    /** @return array<string, int|bool> */
     public function deleteForUser(User $user): array
     {
         $principalUri = DavHelper::getPrincipalUri($user);

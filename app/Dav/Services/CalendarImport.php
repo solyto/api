@@ -3,7 +3,6 @@
 namespace App\Dav\Services;
 
 use App\Api\Calendars\Services\CalendarService;
-
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\CalendarImportDTO;
@@ -180,7 +179,7 @@ class CalendarImport
         try {
             $calendars = $this->remote->discover($dto->url, $dto->username, Crypt::decryptString($dto->secret));
         } catch (BlockedUrlException|ExternalCalendarUnavailableException) {
-            throw new ImportException();
+            throw $this->unreachable($dto);
         }
 
         $dto->stage = 'select';
@@ -189,8 +188,18 @@ class CalendarImport
         $this->saveState($user->id, $dto);
 
         if (!$calendars) {
-            throw new ImportException();
+            throw $this->unreachable($dto);
         }
+    }
+
+    // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.
+    private function unreachable(CalendarImportDTO $dto): ImportException
+    {
+        Log::channel('dav')->warning('Calendar import could not reach the server', [
+            'host' => parse_url($dto->url, PHP_URL_HOST),
+        ]);
+
+        return new ImportException('Could not grab calendars');
     }
 
     private function getEvents(CalendarImportDTO $dto, string $calendarUrl, string $calendarName): array
@@ -201,10 +210,10 @@ class CalendarImport
                 Crypt::decryptString($dto->secret),
                 'REPORT',
                 $calendarUrl,
-                ['Content-Type' => 'application/xml', 'Depth' => '1'],
-                $this->helper->getEntriesXml(),
-                self::EVENTS_TIMEOUT,
-                self::EVENTS_MAX_BYTES
+                headers: ['Content-Type' => 'application/xml', 'Depth' => '1'],
+                body: $this->helper->getEntriesXml(),
+                timeout: self::EVENTS_TIMEOUT,
+                maxBytes: self::EVENTS_MAX_BYTES
             );
         } catch (ExternalCalendarUnavailableException) {
             $this->logUnreadable($calendarUrl, null);
@@ -234,10 +243,7 @@ class CalendarImport
         Cache::set('calendar-import-' . $userId, $dto, now()->addMinutes(60));
     }
 
-    /**
-     * A session started before the secret was encrypted holds it in
-     * plaintext; it is dropped and reads as expired.
-     */
+    // A session started before the secret was encrypted holds it in plaintext; it is dropped and reads as expired.
     public function getState(string $userId): ?CalendarImportDTO
     {
         $dto = Cache::get('calendar-import-' . $userId);

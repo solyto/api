@@ -5,14 +5,10 @@ namespace App\Dav\Plugins;
 use Sabre\DAV\Server;
 use Sabre\DAV\ServerPlugin;
 
-/**
- * Keeps users from learning about each other through DAV:
- * - sabre grants read-free-busy to every authenticated user, so a
- *   free-busy-query is answered only for users who may read the calendar
- *   (its owner and accepted sharees);
- * - principal URIs carry the email address, so principal-property-search
- *   (attendee lookup) finds nobody. Solyto does not schedule over DAV.
- */
+// Keeps users from learning about each other through DAV. Sabre grants read-free-busy to every authenticated user,
+// so a free-busy-query is answered only for users who may read the calendar (its owner and accepted sharees).
+// Principal URIs carry the email address, so principal-property-search (attendee lookup) finds nobody; solyto does
+// not schedule over DAV.
 class PrivacyPlugin extends ServerPlugin
 {
     private Server $server;

@@ -7,6 +7,7 @@ use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\ImportException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Middleware\RecordClientVersion;
@@ -54,11 +55,12 @@ return Application::configure(basePath: dirname(__DIR__))
               __DIR__.'/../app/Plugins/Ai/Commands',
           ])
           ->withExceptions(function ($exceptions) {
-              // RemoteCalDavClient and AppCalendarsPDO already log the calendar ones; none of these is an app error.
+              // RemoteCalDavClient, AppCalendarsPDO and the imports already log the DAV ones; none of these is an app error.
               $exceptions->dontReport([
                   ExternalCalendarDiscoveryException::class,
                   ExternalCalendarPreconditionFailedException::class,
                   ExternalCalendarUnavailableException::class,
+                  ImportException::class,
                   UnreadableCalendarObjectException::class,
                   LimitReachedException::class,
                   BuiltInTrackerException::class,
@@ -127,6 +129,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof ExternalCalendarPreconditionFailedException) {
                       return ApiResponse::error('The event was changed on its server.', 412, ['external_event_changed']);
+                  }
+
+                  if ($e instanceof ImportException) {
+                      return ApiResponse::error($e->getMessage(), 404);
                   }
 
                   if ($e instanceof UnreadableCalendarObjectException) {

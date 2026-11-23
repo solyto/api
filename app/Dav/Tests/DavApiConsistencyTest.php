@@ -41,11 +41,7 @@ function apiEdit(\Tests\TestCase $test, string $uri, array $fields): \Sabre\VObj
     return \Sabre\VObject\Reader::read(davRequest($test->user, 'GET', $path)->getBodyAsString());
 }
 
-/**
- * Share the user's default calendar with one accepted and one pending sharee.
- *
- * @return array{0: \App\Api\Users\Models\User, 1: \App\Api\Users\Models\User}
- */
+/** @return array{0: \App\Api\Users\Models\User, 1: \App\Api\Users\Models\User} the accepted and the pending sharee */
 function shareDefaultCalendar(\App\Api\Users\Models\User $owner): array
 {
     [$accepted, $pending] = [davUser(), davUser()];
@@ -475,6 +471,25 @@ describe('Events: changing only one occurrence through the API', function () {
         ]));
 
         expect($exceptions[0]->DTSTART->getDateTime()->setTimezone(new \DateTimeZone('Europe/Berlin'))->format('Y-m-d H:i'))->toBe('2030-10-16 11:00');
+    });
+
+    it('stores a changed and a deleted occurrence of a timed series in the series\' zone', function () {
+        $this->user->settings()->update(['timezone' => 'Europe/Berlin']);
+        davRequest($this->user, 'PUT', $this->calendar.'ny.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:ny', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=America/New_York:20301014T090000', 'DTEND;TZID=America/New_York:20301014T093000',
+            'RRULE:FREQ=DAILY;COUNT=4', 'SUMMARY:Call New York', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+
+        occurrenceRequest($this, 'DELETE', 'ny.ics', '2030-10-15T13:00:00.000Z');
+        $stored = occurrenceRequest($this, 'PUT', 'ny.ics', '2030-10-16T13:00:00.000Z', [
+            'title' => 'Call New York (late)', 'start_date' => '2030-10-16 16:00:00', 'end_date' => '2030-10-16 16:30:00',
+        ])->serialize();
+
+        expect($stored)->toContain("EXDATE;TZID=America/New_York:20301015T090000\r\n")
+            ->and($stored)->toContain("RECURRENCE-ID;TZID=America/New_York:20301016T090000\r\n")
+            ->and($stored)->toContain("DTSTART;TZID=America/New_York:20301016T100000\r\n")
+            ->and($stored)->toContain("DTEND;TZID=America/New_York:20301016T103000\r\n");
     });
 
     it('deletes the right day of an all-day series in every time zone', function (string $timezone, string $isoDate) {

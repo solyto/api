@@ -5,12 +5,8 @@ namespace Tests\Support;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
-/**
- * An in-memory CalDAV collection behind Http::fake(), standing in for the
- * user's own server behind an external calendar. It answers GET, PUT
- * (If-Match / If-None-Match), DELETE, PROPFIND (Depth 0 and 1),
- * calendar-query, calendar-multiget and sync-collection.
- */
+// Stands in for the user's own server behind an external calendar: answers GET, PUT (If-Match / If-None-Match),
+// DELETE, PROPFIND (Depth 0 and 1), calendar-query, calendar-multiget and sync-collection behind Http::fake().
 class FakeCalDavServer
 {
     public const string ORIGIN = 'https://dav.example.com';

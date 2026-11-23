@@ -1,16 +1,17 @@
 <?php
 
+use App\Api\Users\Models\User;
 use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function calendarPath(\App\Api\Users\Models\User $user, string $calendar = 'my-calendar', string $object = ''): string
+function calendarPath(User $user, string $calendar = 'my-calendar', string $object = ''): string
 {
     return 'calendars/'.$user->email.'/'.$calendar.'/'.$object;
 }
 
-function putEvent(\App\Api\Users\Models\User $user, string $object, string $ics, array $headers = [], string $calendar = 'my-calendar'): \Sabre\HTTP\Response
+function putEvent(User $user, string $object, string $ics, array $headers = [], string $calendar = 'my-calendar'): \Sabre\HTTP\Response
 {
     return davRequest($user, 'PUT', calendarPath($user, $calendar, $object), $ics, ['Content-Type' => 'text/calendar; charset=utf-8'] + $headers);
 }

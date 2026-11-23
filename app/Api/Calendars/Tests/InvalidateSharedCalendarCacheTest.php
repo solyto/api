@@ -50,7 +50,7 @@ describe('InvalidateSharedCalendarCache', function () {
             'end_date' => '2030-10-10 16:00:00',
             'is_all_day' => false,
         ], $calendar, $user));
-        $titles = fn (User $user) => collect($calendars->listEvents($user, '2030-10'))->pluck('title')->sort()->values()->all();
+        $titles = fn (User $user) => collect($calendars->listEvents($user, '2030-10')->events)->pluck('title')->sort()->values()->all();
         $add($this->owner, $this->calendar, 'Seed');
         $add($this->unrelated, $outsiderCalendar, 'Seed');
         foreach ([$this->owner, $this->accepted, $this->unrelated] as $user) {

@@ -120,3 +120,10 @@ describe('DAV discovery', function () {
             ->and($dav)->toContain('resource-sharing');
     });
 });
+
+describe('DAV route', function () {
+    // Sapi::getRequest() reads PHP's globals, so under test sabre sees the CLI request; only the hand-back is pinned.
+    it('returns sabre\'s response through the DAV route', function () {
+        $this->get('/dav/')->assertHeader('X-Sabre-Version');
+    });
+});

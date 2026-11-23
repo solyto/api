@@ -69,7 +69,7 @@ class EventAttachmentService
             'user_id' => $user->id,
         ]);
 
-        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
+        $this->forgetTodos($user, $eventId);
 
         return true;
     }
@@ -81,7 +81,7 @@ class EventAttachmentService
             ->where('todo_id', $todoId)
             ->delete();
 
-        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
+        $this->forgetTodos($user, $eventId);
     }
 
     public function attachNote(User $user, string $eventId, Note $note): bool
@@ -101,7 +101,7 @@ class EventAttachmentService
             'user_id' => $user->id,
         ]);
 
-        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
+        $this->forgetNotes($user, $eventId);
 
         return true;
     }
@@ -113,20 +113,28 @@ class EventAttachmentService
             ->where('note_id', $noteId)
             ->delete();
 
-        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
+        $this->forgetNotes($user, $eventId);
     }
 
     public function deleteAllForEvent(User $user, string $eventId): void
     {
         CalendarEventTodo::forEvent($eventId)->delete();
         CalendarEventNote::forEvent($eventId)->delete();
+        $this->forgetTodos($user, $eventId);
+        $this->forgetNotes($user, $eventId);
+    }
+
+    private function forgetTodos(User $user, string $eventId): void
+    {
         $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
+    }
+
+    private function forgetNotes(User $user, string $eventId): void
+    {
         $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     private function cacheTags(User $user): array
     {
         return [UserCacheService::userTag($user->id)];

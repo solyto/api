@@ -15,6 +15,11 @@ use Tests\Support\FakeCalDavServer;
 
 uses(RefreshDatabase::class);
 
+function discoveryResponse(string $href, string $props): \GuzzleHttp\Promise\PromiseInterface
+{
+    return Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>'.$href.'</d:href><d:propstat><d:prop>'.$props.'</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207);
+}
+
 describe('RemoteCalDavClient', function () {
     it('sends Basic auth with the account credentials', function () {
         $remote = (new FakeCalDavServer())->fake();
@@ -150,16 +155,15 @@ describe('RemoteCalDavClient', function () {
     });
 
     it('never sends the credentials outside the domain of the server URL during discovery', function (string $step) {
-        $multistatus = fn (string $href, string $props) => Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>'.$href.'</d:href><d:propstat><d:prop>'.$props.'</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207);
         $calendar = '<d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Work</d:displayname>';
 
         Http::fake(fn (Request $request) => match (true) {
-            str_starts_with($request->url(), 'https://evil.net/') => $multistatus('/home/work/', $calendar),
-            $request->url() === 'https://cloud.example.com/' => $multistatus('/', '<d:current-user-principal><d:href>'.($step === 'principal' ? 'https://evil.net/principal/' : '/principal/').'</d:href></d:current-user-principal>'),
-            $request->url() === 'https://cloud.example.com/principal/' => $multistatus('/principal/', '<c:calendar-home-set><d:href>'.($step === 'home-set' ? 'https://evil.net/home/' : '/home/').'</d:href></c:calendar-home-set>'),
+            str_starts_with($request->url(), 'https://evil.net/') => discoveryResponse('/home/work/', $calendar),
+            $request->url() === 'https://cloud.example.com/' => discoveryResponse('/', '<d:current-user-principal><d:href>'.($step === 'principal' ? 'https://evil.net/principal/' : '/principal/').'</d:href></d:current-user-principal>'),
+            $request->url() === 'https://cloud.example.com/principal/' => discoveryResponse('/principal/', '<c:calendar-home-set><d:href>'.($step === 'home-set' ? 'https://evil.net/home/' : '/home/').'</d:href></c:calendar-home-set>'),
             $request->url() === 'https://cloud.example.com/home/' => $step === 'redirect'
                 ? Http::response('', 301, ['Location' => 'https://evil.net/home/'])
-                : $multistatus('/home/work/', $calendar),
+                : discoveryResponse('/home/work/', $calendar),
             default => Http::response('', 404),
         });
 
@@ -184,12 +188,10 @@ describe('RemoteCalDavClient', function () {
     });
 
     it('follows an iCloud-style shard of the same domain through discovery', function () {
-        $multistatus = fn (string $href, string $props) => Http::response('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response><d:href>'.$href.'</d:href><d:propstat><d:prop>'.$props.'</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>', 207);
-
         Http::fake(fn (Request $request) => match ($request->url()) {
-            'https://caldav.icloud.com/' => $multistatus('/', '<d:current-user-principal><d:href>https://p42-caldav.icloud.com/123/principal/</d:href></d:current-user-principal>'),
-            'https://p42-caldav.icloud.com/123/principal/' => $multistatus('/123/principal/', '<c:calendar-home-set><d:href>https://p42-caldav.icloud.com/123/calendars/</d:href></c:calendar-home-set>'),
-            'https://p42-caldav.icloud.com/123/calendars/' => $multistatus('/123/calendars/work/', '<d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Work</d:displayname>'),
+            'https://caldav.icloud.com/' => discoveryResponse('/', '<d:current-user-principal><d:href>https://p42-caldav.icloud.com/123/principal/</d:href></d:current-user-principal>'),
+            'https://p42-caldav.icloud.com/123/principal/' => discoveryResponse('/123/principal/', '<c:calendar-home-set><d:href>https://p42-caldav.icloud.com/123/calendars/</d:href></c:calendar-home-set>'),
+            'https://p42-caldav.icloud.com/123/calendars/' => discoveryResponse('/123/calendars/work/', '<d:resourcetype><d:collection/><c:calendar/></d:resourcetype><d:displayname>Work</d:displayname>'),
             default => Http::response('', 404),
         });
 

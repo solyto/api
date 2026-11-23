@@ -28,8 +28,8 @@ class AppServiceProvider extends ServiceProvider
             $this->app->register(TelescopeServiceProvider::class);
         }
 
-        // One instance per request or job, so callers can ask which external
-        // calendars the last event listing had to leave out.
+        // One instance per request or job, so every caller shares one DAV backend and
+        // forgetRemoteState() reaches the external calendar links that backend holds.
         $this->app->scoped(CalendarService::class);
 
         $this->app->singleton(ImageTransformationService::class, function () {

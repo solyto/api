@@ -4,10 +4,7 @@ namespace App\Dav\Exceptions;
 
 use Sabre\DAV\Exception\PreconditionFailed;
 
-/**
- * The remote server refused a write because the object changed there
- * (412). The remote wins; the caller gets the 412 as-is.
- */
+// The remote refused a write because the object changed there (412): the remote wins, the caller gets the 412 as-is.
 class ExternalCalendarPreconditionFailedException extends PreconditionFailed
 {
     public function __construct()

@@ -3,15 +3,24 @@
 use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Models\Calendar;
 use App\Api\Calendars\Models\CalendarEntry;
+use App\Api\Calendars\Notifications\CalendarShareNotification;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\Notes\Models\Note;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\CalendarDTO;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+
+function expectCalendarNotFound($response): void
+{
+    expectApiError($response, 404);
+    $response->assertJsonPath('message', 'Calendar does not exist.');
+}
 
 describe('Calendar CRUD', function () {
     it('lists calendars including the default one', function () {
@@ -26,12 +35,18 @@ describe('Calendar CRUD', function () {
     it('ignores a calendar list cached before CalendarDTO gained its external fields', function () {
         $user = makeUser();
         // What a 1.1.2 entry unserializes to: the DTO without the fields added since.
+        $fieldsSince112 = ['solytoShared', 'isExternal', 'isUnavailable', 'isCredentialsRejected'];
         $serialized = preg_replace(
-            '/s:\d+:"(solytoShared|isExternal|isUnavailable|isCredentialsRejected)";b:0;/',
+            '/s:\d+:"('.implode('|', $fieldsSince112).')";b:0;/',
             '',
-            serialize(new \App\Dav\DTOs\CalendarDTO(calendarId: 1, instanceId: 1, name: 'stale', displayName: 'Stale'))
+            serialize(new CalendarDTO(calendarId: 1, instanceId: 1, name: 'stale', displayName: 'Stale'))
         );
-        $stale = unserialize(preg_replace('/^(O:\d+:"[^"]+":)\d+:/', '${1}14:', $serialized));
+        // The object header counts the properties, so it drops by the fields removed above.
+        $stale = unserialize(preg_replace_callback(
+            '/^(O:\d+:"[^"]+":)(\d+):/',
+            fn (array $header) => $header[1].($header[2] - count($fieldsSince112)).':',
+            $serialized
+        ));
         app(UserCacheService::class)->store(['calendars', $user->id], 86400, [$stale]);
 
         $this->actingAs($user, 'sanctum')
@@ -63,21 +78,19 @@ describe('Calendar CRUD', function () {
             ->postJson('/api/v1/calendars', ['name' => 'Work'])
             ->assertStatus(201);
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars', ['name' => 'Work'])
-            ->assertStatus(409)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Calendar already exists.');
+        $duplicate = $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => 'Work']);
+
+        expectApiError($duplicate, 409);
+        $duplicate->assertJsonPath('message', 'Calendar already exists.');
     });
 
     // SQLite does not enforce VARCHAR lengths, so the lengths pgsql enforces are asserted.
     it('accepts names up to the 100 characters of calendarinstances.displayname', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars', ['name' => str_repeat('a', 101)])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('name');
+        $tooLong = $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => str_repeat('a', 101)]);
+        expectApiError($tooLong, 422);
+        $tooLong->assertJsonValidationErrors('name');
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/calendars', ['name' => str_repeat('ä', 100)])
             ->assertStatus(201);
@@ -127,11 +140,10 @@ describe('Calendar CRUD', function () {
             ->shouldReceive('create')
             ->andThrow(new \RuntimeException('DAV write failed'));
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars', ['name' => 'Work'])
-            ->assertStatus(500)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'An unexpected error occurred.');
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => 'Work']);
+
+        expectApiError($response, 500);
+        $response->assertJsonPath('message', 'An unexpected error occurred.');
     });
 
     it('deletes a calendar', function () {
@@ -484,6 +496,7 @@ describe('Event attachments', function () {
 
 describe('Calendar tenant isolation', function () {
     it('hides another user\'s calendar and denies writes to it', function () {
+        $this->freezeTime();
         $user = makeUser();
         $other = makeUser();
         $friend = makeUser();
@@ -500,34 +513,32 @@ describe('Calendar tenant isolation', function () {
         expect($ownIds)->not->toContain($otherInstanceId);
 
         // The module answers a calendar the user cannot see with 404.
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/calendars/'.$otherInstanceId, ['color' => '#000000'])->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$otherInstanceId, ['color' => '#000000']));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId)->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/calendars/'.$otherInstanceId.'/share')->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/calendars/'.$otherInstanceId.'/share'));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/share', ['friend_id' => $friend->id])->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$otherInstanceId.'/share', ['friend_id' => $friend->id]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/calendars/'.$otherInstanceId.'/events', [
                 'title' => 'Intruder',
                 'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
                 'end_date' => now()->addDay()->startOfDay()->addHour()->format('Y-m-d H:i:s'),
                 'is_all_day' => false,
                 'calendar_id' => $otherInstanceId,
-            ])->assertJsonPath('message', 'Calendar does not exist.'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/share/'.$friend->id)
-            ->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/share/'.$friend->id));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/unsubscribe')
-            ->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/unsubscribe'));
 
         $otherIds = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/calendars')
@@ -536,6 +547,7 @@ describe('Calendar tenant isolation', function () {
     });
 
     it('denies updating and deleting events in another user\'s calendar', function () {
+        $this->freezeTime();
         $user = makeUser();
         $other = makeUser();
 
@@ -552,8 +564,8 @@ describe('Calendar tenant isolation', function () {
                 'calendar_id' => $otherInstanceId,
             ])
             ->assertStatus(201);
-        $eventUri = $store->json('data.uri') ?? $store->json('data.event.uri');
-        $etag = $store->json('data.etag') ?? $store->json('data.event.etag') ?? 'unknown';
+        $eventUri = $store->json('data.uri');
+        $etag = $store->json('data.etag');
 
         $titles = collect($this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
@@ -561,7 +573,7 @@ describe('Calendar tenant isolation', function () {
             ->json('data'))->pluck('title');
         expect($titles)->not->toContain('Private Meeting');
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri, [
                 'title' => 'Hijacked',
                 'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
@@ -569,14 +581,14 @@ describe('Calendar tenant isolation', function () {
                 'is_all_day' => false,
                 'calendar_id' => $otherInstanceId,
                 'etag' => $etag,
-            ])->assertJsonPath('message', 'Calendar does not exist.'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri)->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri));
 
         $occurrenceDate = now()->addDay()->format('Y-m-d');
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri.'/occurrence/'.$occurrenceDate, [
                 'title' => 'Hijacked',
                 'start_date' => now()->addDay()->startOfDay()->format('Y-m-d H:i:s'),
@@ -584,17 +596,31 @@ describe('Calendar tenant isolation', function () {
                 'is_all_day' => false,
                 'calendar_id' => $otherInstanceId,
                 'etag' => $etag,
-            ])
-            ->assertJsonPath('message', 'Calendar does not exist.'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri.'/occurrence/'.$occurrenceDate)
-            ->assertJsonPath('message', 'Calendar does not exist.'), 404);
+        expectCalendarNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$otherInstanceId.'/events/'.$eventUri.'/occurrence/'.$occurrenceDate));
 
         $otherTitles = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))
             ->json('data'))->pluck('title');
         expect($otherTitles)->toContain('Private Meeting');
+    });
+});
+
+describe('Calendar sharing', function () {
+    it('notifies the friend a calendar is shared with, once', function () {
+        Notification::fake();
+        $owner = makeUser(['name' => 'Alice']);
+        $friend = makeUser();
+        Friend::factory()->forUsers($owner, $friend)->create();
+        $calendar = $this->actingAs($owner, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0];
+
+        expectApiSuccess($this->actingAs($owner, 'sanctum')->postJson('/api/v1/calendars/'.$calendar['id'].'/share', ['friend_id' => $friend->id]));
+
+        Notification::assertSentTo($friend, CalendarShareNotification::class,
+            fn (CalendarShareNotification $notification) => $notification->calendarName === $calendar['name'] && $notification->senderName === 'Alice');
+        Notification::assertCount(1);
     });
 });
 

@@ -11,11 +11,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 
-/**
- * Events are cached per user, so a write to a shared calendar leaves the
- * other members' caches stale. One pending run per calendar; the editor is
- * cleared again too, since one run can cover writes by several members.
- */
+// Events are cached per user, so a write to a shared calendar leaves the other members' caches stale.
+// One pending run per calendar; the editor is cleared again too, since one run can cover writes by several members.
 class InvalidateSharedCalendarCache implements ShouldQueue, ShouldBeUniqueUntilProcessing
 {
     use Queueable, Dispatchable, InteractsWithQueue;

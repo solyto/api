@@ -8,22 +8,15 @@ use App\Api\Calendars\Requests\SelectImportCalendars;
 use App\Api\Calendars\Requests\StartImportRequest;
 use App\Api\Calendars\Resources\ImportStateResource;
 use App\Api\HandlesApiAuth;
-use App\Dav\Exceptions\ImportException;
 use App\Dav\Services\DavService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class ImportController
 {
     use HandlesApiAuth;
 
-    private DavService $dav;
-
-    public function __construct()
-    {
-        $this->dav = app(DavService::class);
-    }
+    public function __construct(private readonly DavService $dav) {}
 
     /**
      * @OA\Post(
@@ -62,16 +55,8 @@ class ImportController
      */
     public function startImport(StartImportRequest $request): JsonResponse
     {
-        try {
-            $validatedData = $request->validated();
-            $this->dav->import()->calendars()->start($request->user(), $validatedData['url'], $validatedData['username'], $validatedData['secret']);
-        } catch (ImportException $e) {
-            // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.
-            Log::channel('dav')->warning('Calendar import could not reach the server', [
-                'host' => parse_url((string) $request->validated('url'), PHP_URL_HOST),
-            ]);
-            return ApiResponse::error('Could not grab calendars', 404);
-        }
+        $validatedData = $request->validated();
+        $this->dav->import()->calendars()->start($request->user(), $validatedData['url'], $validatedData['username'], $validatedData['secret']);
 
         return ApiResponse::success([], 'Import started successfully.');
     }

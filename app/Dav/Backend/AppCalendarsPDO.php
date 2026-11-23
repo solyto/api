@@ -21,12 +21,8 @@ use Sabre\DAV\Exception\Forbidden;
 use Sabre\DAV\Xml\Element\Sharee;
 use Sabre\VObject\Reader;
 
-/**
- * External calendars (ExternalCalendar link rows) are native calendar rows
- * without objects: every object-level call on them goes to the user's own
- * CalDAV server through RemoteCalDavClient, and calendar-level calls stay
- * local. Native calendars take the parent's code paths unchanged.
- */
+// External calendars are native calendar rows without objects: object-level calls on them go to the user's own
+// CalDAV server through RemoteCalDavClient, calendar-level calls stay local. Native calendars take the parent's paths.
 class AppCalendarsPDO extends SabreBackend
 {
     private const string SYNC_TOKEN_MARKER = 'ext-';
@@ -38,6 +34,8 @@ class AppCalendarsPDO extends SabreBackend
     private const int LAST_OCCURRENCE_CAP = 2145916800;
     // calendarinstances.uri is VARCHAR(200); the rest is for uniqueUri()'s "-n" suffix.
     private const int MAX_URI_BASE_LENGTH = 190;
+    // Sabre stores floating all-day DATE values as UTC, up to 14 h off the user's wall clock.
+    private const int FLOATING_DATE_PADDING = 86400;
 
     /** @var array<int, ExternalCalendar|false> pgsql calendarid => link, false for native */
     private array $external = [];
@@ -45,36 +43,30 @@ class AppCalendarsPDO extends SabreBackend
     /** @var array<string, true> */
     private array $loadedPrincipals = [];
 
-    /** The If-Match of the current DAV request, passed on to remote writes. */
+    // The If-Match of the current DAV request, passed on to remote writes.
     private ?string $ifMatch = null;
 
     // Who sent the current DAV request; null outside DAV (API, jobs), which check ownership themselves.
     private ?string $requestPrincipal = null;
 
-    /**
-     * Objects a calendar-query already read with their data, handed to the
-     * multiget sabre runs right after it so they are not fetched twice.
-     *
-     * @var array<int, array<string, array<string, mixed>>>
-     */
+    // Objects a calendar-query already read with their data, handed to the multiget sabre runs right after it
+    // so they are not fetched twice.
+    /** @var array<int, array<string, array<string, mixed>>> */
     private array $prefetched = [];
 
-    /**
-     * Calendars shared with the principal reach DAV clients only once the
-     * invite is accepted, as in the app. listCalendarsCustom() reads the
-     * parent directly, so the app still sees pending invites.
-     */
+    // Calendars shared with the principal reach DAV clients only once the invite is accepted, as in the app.
+    // listCalendarsCustom() reads the parent directly, so the app still sees pending invites.
     public function getCalendarsForUser($principalUri)
     {
         $stmt = $this->pdo->prepare(
             'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1 AND share_invitestatus <> ?'
         );
         $stmt->execute([$principalUri, \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED]);
-        $notAccepted = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $notAcceptedInstanceIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
 
         $calendars = array_values(array_filter(
             parent::getCalendarsForUser($principalUri),
-            fn (array $calendar) => !in_array($calendar['id'][1], $notAccepted, true)
+            fn (array $calendar) => !in_array($calendar['id'][1], $notAcceptedInstanceIds, true)
         ));
 
         $this->loadExternal($principalUri, $calendars);
@@ -101,10 +93,7 @@ class AppCalendarsPDO extends SabreBackend
         return $this->external[$calendarId] ?: null;
     }
 
-    /**
-     * Drops what this instance remembers about a calendar after it was
-     * linked or unlinked, so the next call looks it up again.
-     */
+    // After a calendar was linked or unlinked, so the next call looks it up again.
     public function forgetExternal(int $calendarId): void
     {
         unset($this->external[$calendarId], $this->prefetched[$calendarId]);
@@ -185,22 +174,15 @@ class AppCalendarsPDO extends SabreBackend
         return $this->putRemote($link, $objectUri, $calendarData, false, $this->ifMatch);
     }
 
-    /**
-     * Sabre takes the occurrence bounds from the first VEVENT, so a client
-     * that writes an override before its master would hide the series from
-     * time-range queries.
-     */
+    // Sabre takes the occurrence bounds from the first VEVENT, so a client that writes an override before its
+    // master would hide the series from time-range queries.
     protected function getDenormalizedData($calendarData)
     {
         return array_merge(parent::getDenormalizedData($calendarData), $this->masterOccurrenceBounds($calendarData) ?? []);
     }
 
-    /**
-     * The bounds sabre would store with the master first, or null unless the
-     * object's first component is an override written before its master.
-     *
-     * @return array{firstOccurence: int, lastOccurence: int}|null
-     */
+    // Null unless the object's first component is an override written before its master.
+    /** @return array{firstOccurence: int, lastOccurence: int}|null */
     public function masterOccurrenceBounds(string $calendarData): ?array
     {
         $vCal = Reader::read($calendarData);
@@ -246,10 +228,8 @@ class AppCalendarsPDO extends SabreBackend
         $this->deleteRemote($link, $objectUri, $this->ifMatch);
     }
 
-    /**
-     * The remote narrows by component and time range; the exact filter runs
-     * here on the returned data, as sabre does for its own post-filter.
-     */
+    // The remote narrows by component and time range; the exact filter runs here on the returned data,
+    // as sabre does for its own post-filter.
     public function calendarQuery($calendarId, array $filters)
     {
         $link = $this->linkFor($calendarId);
@@ -271,6 +251,7 @@ class AppCalendarsPDO extends SabreBackend
         foreach ($this->remoteFor($link)->query($link, $component, $start, $end) as $object) {
             $row = $this->objectRow($link, $object);
 
+            // Remote objects were never validated by sabre: one that cannot be read is skipped, not allowed to fail the query.
             try {
                 $matches = $this->validateFilterForObject($row, $filters);
             } catch (\Throwable $e) {
@@ -287,12 +268,8 @@ class AppCalendarsPDO extends SabreBackend
         return $uris;
     }
 
-    /**
-     * The remote sync token travels behind sabre's prefix as
-     * "ext-" + base64url, so it survives as a URI suffix whatever it looks
-     * like. A token that is not ours or that the remote refuses makes the
-     * client resync from scratch.
-     */
+    // The remote sync token travels behind sabre's prefix as "ext-" + base64url, so it survives as a URI suffix
+    // whatever it looks like. A token that is not ours or that the remote refuses makes the client resync from scratch.
     public function getChangesForCalendar($calendarId, $syncToken, $syncLevel, $limit = null)
     {
         $link = $this->linkFor($calendarId);
@@ -328,7 +305,7 @@ class AppCalendarsPDO extends SabreBackend
 
         $link = $this->linkFor($calendarId);
         if ($link) {
-            app(UserCacheService::class)->forget([self::CACHE_KEY_STATE, $link->user_id, $link->calendar_id]);
+            app(UserCacheService::class)->forget($this->stateKey($link));
             $link->delete();
             $this->forgetExternal($link->calendar_id);
         }
@@ -346,7 +323,7 @@ class AppCalendarsPDO extends SabreBackend
              WHERE ci.id = ?'
         );
 
-        // parent::getCalendarsForUser() names its own columns.
+        // A separate query: parent::getCalendarsForUser() names its own columns, so solyto_shared can't be added there.
         $flagged = $this->pdo->prepare(
             'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access = 1 AND solyto_shared'
         );
@@ -363,11 +340,10 @@ class AppCalendarsPDO extends SabreBackend
                 if ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
                     $entry['share-invitestatus'] = (int) $row['share_invitestatus'];
                     $entry['share-href']         = $row['share_href'];
-                    $email = str_replace('principals/', '', $row['owner_principaluri']);
-                    $entry['owner-name'] = User::where('email', $email)->value('name');
+                    $entry['owner-name'] = User::where('email', $this->principalEmail($row['owner_principaluri']))->value('name');
                 }
             }
-            $entry['is-external'] = $this->linkFor($entry['id']) !== null;
+            $entry['is-external'] = $this->isExternal($entry['id']);
             $calendars[] = CalendarDTO::fromSabre($entry);
         }
 
@@ -427,7 +403,7 @@ SQL
             $calendar[$xmlName] = $row[$dbName];
         }
 
-        $calendar['is-external'] = $this->linkFor($calendar['id']) !== null;
+        $calendar['is-external'] = $this->isExternal($calendar['id']);
 
         return CalendarDTO::fromSabre($calendar);
     }
@@ -485,7 +461,7 @@ SQL
             $calendar[$xmlName] = $row[$dbName];
         }
 
-        $calendar['is-external'] = $this->linkFor($calendar['id']) !== null;
+        $calendar['is-external'] = $this->isExternal($calendar['id']);
 
         return CalendarDTO::fromSabre($calendar);
     }
@@ -505,13 +481,9 @@ SQL
         parent::createCalendar($principalUri, $this->uniqueUri($principalUri, $dto->displayName), $calendar);
     }
 
-    /**
-     * (principaluri, uri) is unique, but different display names can slug
-     * alike ("Work" and "work!") or to nothing (emoji-only names).
-     * Transliteration can make the slug longer than the name (one
-     * Cyrillic letter can become three), so it is cut to leave room for a
-     * "-n" suffix in uri's VARCHAR(200).
-     */
+    // (principaluri, uri) is unique, but different display names can slug alike ("Work" and "work!") or to nothing
+    // (emoji-only names). Transliteration can make the slug longer than the name (one Cyrillic letter can become
+    // three), so it is cut to leave room for a "-n" suffix in uri's VARCHAR(200).
     private function uniqueUri(string $principalUri, string $displayName): string
     {
         $base = rtrim(substr(Str::slug($displayName), 0, self::MAX_URI_BASE_LENGTH), '-');
@@ -519,16 +491,24 @@ SQL
             return Str::uuid()->toString();
         }
 
-        $stmt = $this->pdo->prepare(
-            'SELECT 1 FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND uri = ?'
-        );
-
         $candidate = $base;
-        for ($i = 1; $stmt->execute([$principalUri, $candidate]) && $stmt->fetchColumn() !== false; $i++) {
+        $i = 1;
+        while ($this->uriTaken($principalUri, $candidate)) {
             $candidate = $base.'-'.$i;
+            $i++;
         }
 
         return $candidate;
+    }
+
+    private function uriTaken(string $principalUri, string $uri): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND uri = ?'
+        );
+        $stmt->execute([$principalUri, $uri]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     public function updateCalendarCustom(CalendarDTO $dto): void
@@ -580,11 +560,9 @@ SQL
         $events = [];
 
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-            $row['calendardata'] = is_resource($row['calendardata'])
-                ? stream_get_contents($row['calendardata'])
-                : $row['calendardata'];
+            $row['calendardata'] = $this->readData($row['calendardata']);
 
-            // Used by the calendar export, which writes the stored objects.
+            // storedData is for the calendar export, which writes the stored objects.
             $event = EventDTO::fromSabre($row, $calendar);
             $event->storedData = $row['calendardata'];
             $events[] = $event;
@@ -593,12 +571,8 @@ SQL
         return $events;
     }
 
+    // Floating all-day dates pad the bounds by a day; the caller's occurrence loop is the exact filter.
     /**
-     * The VEVENT objects that may overlap the window, read in one query.
-     * Sabre stores floating all-day DATE values as UTC, up to 14 h off the
-     * user's wall clock, so the bounds are padded by a day; the caller's
-     * occurrence loop is the exact filter.
-     *
      * @return array<int, array{id: int|string, uri: string, etag: string, calendardata: string|null}>
      */
     public function getEventObjectsInRange(CalendarDTO $calendar, \DateTimeInterface $start, \DateTimeInterface $end): array
@@ -621,16 +595,16 @@ SQL
         }
 
         $stmt = $this->pdo->prepare('SELECT id, uri, etag, calendardata FROM '.$this->calendarObjectTableName." WHERE calendarid = ? AND componenttype = 'VEVENT' AND (lastoccurence > ? OR lastoccurence >= ?) AND firstoccurence < ?");
-        $stmt->execute([$calendar->calendarId, $start->getTimestamp() - 86400, self::LAST_OCCURRENCE_CAP, $end->getTimestamp() + 86400]);
+        $paddedStart = $start->getTimestamp() - self::FLOATING_DATE_PADDING;
+        $paddedEnd = $end->getTimestamp() + self::FLOATING_DATE_PADDING;
+        $stmt->execute([$calendar->calendarId, $paddedStart, self::LAST_OCCURRENCE_CAP, $paddedEnd]);
 
         // Quoted like Sabre's getCalendarObject(), which this read replaced.
         return array_map(fn (array $row) => [
             'id' => $row['id'],
             'uri' => $row['uri'],
             'etag' => '"'.$row['etag'].'"',
-            'calendardata' => is_resource($row['calendardata'])
-                ? stream_get_contents($row['calendardata'])
-                : $row['calendardata'],
+            'calendardata' => $this->readData($row['calendardata']),
         ], $stmt->fetchAll(\PDO::FETCH_ASSOC));
     }
 
@@ -721,7 +695,6 @@ SQL
                         }
                     }
 
-                    // Skip occurrences outside requested range
                     if ($occEnd && $occEnd <= $start) {
                         $iterator->next();
                         continue;
@@ -757,7 +730,6 @@ SQL
                     $iterator->next();
                 }
             } else if (!isset($vevent->{'RECURRENCE-ID'})) {
-                // Skip single-instance events outside the requested range.
                 // An event ending exactly at the window start, or starting
                 // exactly at the window end, does not overlap it
                 // (exclusive end, RFC 4791/5545).
@@ -801,9 +773,7 @@ SQL
             return null;
         }
 
-        $row['calendardata'] = is_resource($row['calendardata'])
-            ? stream_get_contents($row['calendardata'])
-            : $row['calendardata'];
+        $row['calendardata'] = $this->readData($row['calendardata']);
 
         $event = EventDTO::fromSabre($row, $calendar);
         $event->storedData = $row['calendardata'];
@@ -941,11 +911,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         ]);
     }
 
-    /**
-     * The token is the sharee's mailto: href, not a secret, so the update is
-     * scoped to the caller's own pending instance. Returns the calendar id,
-     * or null if none matched.
-     */
+    // The token is the sharee's mailto: href, not a secret, so the update is scoped to the caller's own pending instance.
     public function acceptShare(string $principalUri, string $shareToken): ?int
     {
         $stmt = $this->pdo->prepare(
@@ -969,10 +935,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $calendarId;
     }
 
-    /**
-     * Scoped like acceptShare(). Only a pending invite can be declined; an
-     * accepted share is left through unsubscribe.
-     */
+    // Scoped like acceptShare(). Only a pending invite can be declined; an accepted share is left through unsubscribe.
     public function declineShare(string $principalUri, string $shareToken): bool
     {
         $stmt = $this->pdo->prepare(
@@ -1015,11 +978,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $deleted;
     }
 
-    /**
-     * The owner plus accepted sharees: the users who load the calendar's events.
-     *
-     * @return array<int, string>
-     */
+    // The owner plus accepted sharees: the users who load the calendar's events.
+    /** @return array<int, string> */
     public function getCalendarMemberIds(int $calendarId): array
     {
         $stmt = $this->pdo->prepare(
@@ -1049,8 +1009,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
         $sharees = [];
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $email = str_replace('principals/', '', $row['principaluri']);
-            $user = User::where('email', $email)->first();
+            $user = User::where('email', $this->principalEmail($row['principaluri']))->first();
 
             if ($user) {
                 $sharees[] = [
@@ -1071,11 +1030,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $sharees;
     }
 
-    /**
-     * Delete a single occurrence from a recurring event: an EXDATE for its
-     * original slot, and its exception VEVENT if it was moved or edited.
-     * This does NOT modify the master event's other properties.
-     */
+    // An EXDATE for the original slot, and its exception VEVENT if it was moved or edited; the master is otherwise untouched.
     public function deleteOccurrenceCustom(CalendarDTO $calendar, string $uri, \DateTimeInterface $occurrenceDate): bool
     {
         [$vCal, $masterEvent, $etag] = $this->readRecurringObject($calendar, $uri);
@@ -1088,12 +1043,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $tz = $masterEvent->DTSTART->getDateTime()->getTimezone();
         $slot = $this->resolveOccurrenceSlot($vCal, $masterEvent, $occurrenceDate, $isAllDay);
 
-        if ($isAllDay) {
-            $masterEvent->add('EXDATE', $slot->format('Ymd'), ['VALUE' => 'DATE']);
-        } else {
-            $slotInTz = \DateTime::createFromInterface($slot)->setTimezone($tz);
-            $masterEvent->add('EXDATE', $slotInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-        }
+        $this->addDateProperty($masterEvent, 'EXDATE', $slot, $isAllDay, $tz);
 
         $existing = $this->findException($vCal, $slot, $isAllDay);
         if ($existing) {
@@ -1103,12 +1053,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $this->writeExisting($calendar, $uri, $vCal->serialize(), $etag);
     }
 
-    /**
-     * Update a single occurrence of a recurring event through an exception
-     * VEVENT with RECURRENCE-ID: the occurrence's existing exception if it was
-     * already moved or edited, otherwise a copy of the master, so alarms and
-     * other client data carry over. This does NOT modify the master event.
-     */
+    // Through the occurrence's exception VEVENT, or else a copy of the master, so alarms and other client data
+    // carry over. The master is untouched.
     public function updateOccurrenceCustom(
         CalendarDTO $calendar,
         string $uri,
@@ -1131,12 +1077,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE'] as $name) {
                 $exceptionEvent->remove($name);
             }
-            if ($isAllDay) {
-                $exceptionEvent->add('RECURRENCE-ID', $slot->format('Ymd'), ['VALUE' => 'DATE']);
-            } else {
-                $slotInTz = \DateTime::createFromInterface($slot)->setTimezone($tz);
-                $exceptionEvent->add('RECURRENCE-ID', $slotInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-            }
+            $this->addDateProperty($exceptionEvent, 'RECURRENCE-ID', $slot, $isAllDay, $tz);
             $vCal->add($exceptionEvent);
         }
 
@@ -1146,20 +1087,11 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $exceptionEvent->remove('DTEND');
         $exceptionEvent->remove('DURATION');
 
-        if ($isAllDay) {
-            $exceptionEvent->add('DTSTART', $updatedData->startDate->format('Ymd'), ['VALUE' => 'DATE']);
-            if ($updatedData->endDate) {
-                $end = \DateTime::createFromInterface($updatedData->endDate)->modify('+1 day');
-                $exceptionEvent->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
-            }
-        } else {
-            // The request's times are in the user's zone; store them in the series' zone.
-            $startInTz = \DateTime::createFromInterface($updatedData->startDate)->setTimezone($tz);
-            $exceptionEvent->add('DTSTART', $startInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-            if ($updatedData->endDate) {
-                $endInTz = \DateTime::createFromInterface($updatedData->endDate)->setTimezone($tz);
-                $exceptionEvent->add('DTEND', $endInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
-            }
+        $this->addDateProperty($exceptionEvent, 'DTSTART', $updatedData->startDate, $isAllDay, $tz);
+        if ($updatedData->endDate) {
+            // An all-day DTEND is exclusive: the day after the last one.
+            $end = $isAllDay ? \DateTime::createFromInterface($updatedData->endDate)->modify('+1 day') : $updatedData->endDate;
+            $this->addDateProperty($exceptionEvent, 'DTEND', $end, $isAllDay, $tz);
         }
 
         foreach (['DESCRIPTION' => $updatedData->description, 'LOCATION' => $updatedData->location] as $name => $value) {
@@ -1173,6 +1105,19 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $this->writeExisting($calendar, $uri, $vCal->serialize(), $etag);
     }
 
+    // All-day values are floating dates; timed ones are stored in the series' zone, while the request's are in the user's.
+    private function addDateProperty(\Sabre\VObject\Component\VEvent $event, string $name, \DateTimeInterface $date, bool $isAllDay, \DateTimeZone $tz): void
+    {
+        if ($isAllDay) {
+            $event->add($name, $date->format('Ymd'), ['VALUE' => 'DATE']);
+
+            return;
+        }
+
+        $dateInTz = \DateTime::createFromInterface($date)->setTimezone($tz);
+        $event->add($name, $dateInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
+    }
+
     /**
      * @param array<int, string> $principalUris
      * @return array<int, string>
@@ -1183,15 +1128,17 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             return [];
         }
 
-        $emails = array_map(fn (string $uri) => str_replace('principals/', '', $uri), $principalUris);
+        $emails = array_map(fn (string $uri) => $this->principalEmail($uri), $principalUris);
 
         return User::whereIn('email', $emails)->pluck('id')->all();
     }
 
-    /**
-     * Recomputed rather than toggled, so the owner's solyto_shared can't
-     * drift from the accepted sharee rows.
-     */
+    private function principalEmail(string $principalUri): string
+    {
+        return str_replace('principals/', '', $principalUri);
+    }
+
+    // Recomputed rather than toggled, so the owner's solyto_shared can't drift from the accepted sharee rows.
     private function recomputeSharedFlag(int $calendarId): void
     {
         $stmt = $this->pdo->prepare(
@@ -1216,9 +1163,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             return [null, null, null];
         }
 
-        $vCalData = is_resource($obj['calendardata'])
-            ? stream_get_contents($obj['calendardata'])
-            : $obj['calendardata'];
+        $vCalData = $this->readData($obj['calendardata']);
 
         if (!$vCalData) {
             return [null, null, null];
@@ -1246,11 +1191,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return [$vCal, null, $obj['etag'] ?? null];
     }
 
-    /**
-     * Writes an object that already exists. Native calendars ignore the
-     * ETag as before; external calendars send it as If-Match, so the remote
-     * refuses (412) when the object changed there since it was read.
-     */
+    // Native calendars ignore the ETag as before; external calendars send it as If-Match, so the remote refuses (412)
+    // when the object changed there since it was read.
     private function writeExisting(CalendarDTO $calendar, string $uri, string $data, ?string $etag): bool
     {
         $link = $this->externalCalendar($calendar->calendarId);
@@ -1277,27 +1219,28 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $this->markStateStale($link);
     }
 
-    /**
-     * @param  int|array{0: int, 1: int}  $calendarId
-     */
+    /** @param  int|array{0: int, 1: int}  $calendarId */
     private function linkFor(int|array $calendarId): ?ExternalCalendar
     {
         return $this->externalCalendar((int) (is_array($calendarId) ? $calendarId[0] : $calendarId));
     }
 
-    /**
-     * One query per principal and request: every calendar of the listing is
-     * marked native or external, so object calls that follow need no lookup.
-     *
-     * @param  array<int, array<string, mixed>>  $calendars
-     */
+    /** @param  int|array{0: int, 1: int}  $calendarId */
+    private function isExternal(int|array $calendarId): bool
+    {
+        return $this->linkFor($calendarId) !== null;
+    }
+
+    // One query per principal and request: every calendar of the listing is marked native or external,
+    // so object calls that follow need no lookup.
+    /** @param  array<int, array<string, mixed>>  $calendars */
     private function loadExternal(string $principalUri, array $calendars): void
     {
         if (!isset($this->loadedPrincipals[$principalUri])) {
             $this->loadedPrincipals[$principalUri] = true;
 
             $links = ExternalCalendar::with('account')
-                ->whereIn('user_id', User::select('id')->where('email', str_replace('principals/', '', $principalUri)))
+                ->whereIn('user_id', User::select('id')->where('email', $this->principalEmail($principalUri)))
                 ->get();
 
             foreach ($links as $link) {
@@ -1310,14 +1253,9 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         }
     }
 
+    // When the remote is down the last known ctag and sync token are served (and kept for another TTL), so the
+    // calendar never drops out of the home listing: a client would delete its copy. Requests into it then get a 503.
     /**
-     * ctag and sync token of an external calendar come from the remote, not
-     * from the local row. The remote answer is kept for the external cache
-     * TTL; when the remote is down the last known values are served (and
-     * kept for another TTL), so the calendar never drops out of the home
-     * listing (a client would delete its copy). Requests into the collection
-     * then get a 503.
-     *
      * @param  array<string, mixed>  $calendar
      * @return array<string, mixed>
      */
@@ -1342,7 +1280,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             $calendar['{http://sabredav.org/ns}sync-token'] = $syncToken;
         }
 
-        $ctag = $state['ctag'] ?? ($syncToken !== null ? 'http://sabre.io/ns/sync/'.$syncToken : null);
+        $ctagFromSyncToken = $syncToken !== null ? 'http://sabre.io/ns/sync/'.$syncToken : null;
+        $ctag = $state['ctag'] ?? $ctagFromSyncToken;
         if ($ctag !== null) {
             $calendar['{'.Plugin::NS_CALENDARSERVER.'}getctag'] = $ctag;
         }
@@ -1350,16 +1289,15 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $calendar;
     }
 
-    /**
-     * @return array{ctag: ?string, sync_token: ?string}
-     */
+    /** @return array{ctag: ?string, sync_token: ?string} */
     private function remoteState(ExternalCalendar $link): array
     {
         $cache = app(UserCacheService::class);
-        $key = [self::CACHE_KEY_STATE, $link->user_id, $link->calendar_id];
+        $key = $this->stateKey($link);
         $cached = $cache->get($key);
 
-        if (is_array($cached) && $cached['fetched_at'] > time() - (int) config('calendars.external.cache_ttl')) {
+        $isFresh = is_array($cached) && $cached['fetched_at'] > time() - (int) config('calendars.external.cache_ttl');
+        if ($isFresh) {
             return $cached['state'];
         }
 
@@ -1383,10 +1321,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $state;
     }
 
-    /**
-     * Throwable, since odd remote property types surface as \Error. Only the
-     * class is logged: parser messages can quote calendar data.
-     */
+    // Throwable, since odd remote property types surface as \Error. Only the class is logged: parser messages
+    // can quote calendar data.
     private function logSkippedObject(int $calendarId, string $uri, \Throwable $e): void
     {
         Log::channel('dav')->warning('Calendar object skipped: cannot be parsed', [
@@ -1399,12 +1335,24 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     private function markStateStale(ExternalCalendar $link): void
     {
         $cache = app(UserCacheService::class);
-        $key = [self::CACHE_KEY_STATE, $link->user_id, $link->calendar_id];
+        $key = $this->stateKey($link);
         $cached = $cache->get($key);
 
         if (is_array($cached)) {
             $cache->store($key, 0, ['fetched_at' => 0, 'state' => $cached['state']]);
         }
+    }
+
+    /** @return array<int, string|int> */
+    private function stateKey(ExternalCalendar $link): array
+    {
+        return [self::CACHE_KEY_STATE, $link->user_id, $link->calendar_id];
+    }
+
+    // Stream from pgsql's BYTEA, a string from SQLite and the remote.
+    private function readData(mixed $data): mixed
+    {
+        return is_resource($data) ? stream_get_contents($data) : $data;
     }
 
     private function encodeSyncToken(string $remoteToken): string
@@ -1429,25 +1377,29 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
      */
     private function objectRow(ExternalCalendar $link, array $object): array
     {
-        return [
+        $row = [
             'id' => $this->externalObjectId($link, $object['uri']),
             'uri' => $object['uri'],
             'etag' => $object['etag'],
             'size' => $object['size'],
             'lastmodified' => null,
             'calendarid' => [$link->calendar_id, $link->instance_id],
-        ] + (isset($object['calendardata']) ? ['calendardata' => $object['calendardata']] : []);
+        ];
+        if (isset($object['calendardata'])) {
+            $row['calendardata'] = $object['calendardata'];
+        }
+
+        return $row;
     }
 
-    /**
-     * External events have no calendarobjects row, so their id (used to key
-     * event attachments) is derived from the link and the object name: stable
-     * while the remote keeps the file name, and in [2^52, 2^53) so it never
-     * meets a native autoincrement id and stays exact as a JSON number.
-     */
+    // External events have no calendarobjects row, so their id (used to key event attachments) is derived from the
+    // link and the object name: stable while the remote keeps the file name, and in [2^52, 2^53) so it never meets
+    // a native autoincrement id and stays exact as a JSON number.
     private function externalObjectId(ExternalCalendar $link, string $uri): int
     {
-        return (1 << 52) | (int) hexdec(substr(hash('sha256', $link->id.'/'.$uri), 0, 13));
+        $hashBits = (int) hexdec(substr(hash('sha256', $link->id.'/'.$uri), 0, 13));
+
+        return (1 << 52) | $hashBits;
     }
 
     private function remoteFor(ExternalCalendar $link): RemoteCalDavClient
@@ -1466,18 +1418,11 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return $this->requestPrincipal === null || $this->requestPrincipal === 'principals/'.$link->user->email;
     }
 
-    /**
-     * The original slot (RECURRENCE-ID) of the occurrence a client means by
-     * $occurrenceDate, in this order: an exception's RECURRENCE-ID, a regular
-     * occurrence of the series, an exception moved to that time (older
-     * clients sent the moved time), else $occurrenceDate itself.
-     */
+    // The original slot (RECURRENCE-ID) a client means by $occurrenceDate, in this order: an exception's
+    // RECURRENCE-ID, a regular occurrence of the series, an exception moved to that time (older clients sent the
+    // moved time), else $occurrenceDate itself.
     private function resolveOccurrenceSlot(\Sabre\VObject\Component\VCalendar $vCal, \Sabre\VObject\Component\VEvent $masterEvent, \DateTimeInterface $occurrenceDate, bool $isAllDay): \DateTimeInterface
     {
-        $matches = static fn (\DateTimeInterface $date): bool => $isAllDay
-            ? $date->format('Ymd') === $occurrenceDate->format('Ymd')
-            : $date->getTimestamp() === $occurrenceDate->getTimestamp();
-
         $exception = $this->findException($vCal, $occurrenceDate, $isAllDay);
         if ($exception) {
             return $exception->{'RECURRENCE-ID'}->getDateTime();
@@ -1486,14 +1431,16 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $series = new \Sabre\VObject\Recur\EventIterator([$masterEvent]);
         $series->fastForward(\DateTime::createFromInterface($occurrenceDate)->modify('-1 day'));
         while ($series->valid() && $series->getDtStart() <= \DateTime::createFromInterface($occurrenceDate)->modify('+1 day')) {
-            if ($matches($series->getDtStart())) {
+            if (self::isSameSlot($series->getDtStart(), $occurrenceDate, $isAllDay)) {
                 return $occurrenceDate;
             }
             $series->next();
         }
 
         foreach ($vCal->select('VEVENT') as $vevent) {
-            if (isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->DTSTART) && $matches($vevent->DTSTART->getDateTime())) {
+            $isMovedHere = isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->DTSTART)
+                && self::isSameSlot($vevent->DTSTART->getDateTime(), $occurrenceDate, $isAllDay);
+            if ($isMovedHere) {
                 return $vevent->{'RECURRENCE-ID'}->getDateTime();
             }
         }
@@ -1507,15 +1454,18 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             if (!isset($vevent->{'RECURRENCE-ID'})) {
                 continue;
             }
-            $recurrenceId = $vevent->{'RECURRENCE-ID'}->getDateTime();
-            $same = $isAllDay
-                ? $recurrenceId->format('Ymd') === $slot->format('Ymd')
-                : $recurrenceId->getTimestamp() === $slot->getTimestamp();
-            if ($same) {
+            if (self::isSameSlot($vevent->{'RECURRENCE-ID'}->getDateTime(), $slot, $isAllDay)) {
                 return $vevent;
             }
         }
 
         return null;
+    }
+
+    private static function isSameSlot(\DateTimeInterface $date, \DateTimeInterface $slot, bool $isAllDay): bool
+    {
+        return $isAllDay
+            ? $date->format('Ymd') === $slot->format('Ymd')
+            : $date->getTimestamp() === $slot->getTimestamp();
     }
 }

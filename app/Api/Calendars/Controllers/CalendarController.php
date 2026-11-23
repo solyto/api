@@ -3,7 +3,7 @@
 namespace App\Api\Calendars\Controllers;
 
 use App\Api\ApiResponse;
-use App\Api\Calendars\Notifications\CalendarShareNotification;
+use App\Api\Calendars\DTOs\EventListingDTO;
 use App\Api\Calendars\Requests\ShareCalendarRequest;
 use App\Api\Calendars\Requests\StoreCalendarRequest;
 use App\Api\Calendars\Requests\StoreEventRequest;
@@ -202,14 +202,7 @@ class CalendarController
      */
     public function listEvents(Request $request, string $yearMonth): JsonResponse
     {
-        return ApiResponse::success(
-            EventResource::collection($this->calendarService->listEvents($request->user(), $yearMonth)),
-            'Calendar events retrieved successfully.',
-            meta: [
-                'unavailable_calendars' => $this->calendarService->unavailableCalendars(),
-                'credentials_rejected_calendars' => $this->calendarService->credentialsRejectedCalendars(),
-            ]
-        );
+        return $this->eventListing($this->calendarService->listEvents($request->user(), $yearMonth));
     }
 
     /**
@@ -236,14 +229,7 @@ class CalendarController
      */
     public function listWidgetEvents(Request $request): JsonResponse
     {
-        return ApiResponse::success(
-            EventResource::collection($this->calendarService->listWidgetEvents($request->user())),
-            'Calendar events retrieved successfully.',
-            meta: [
-                'unavailable_calendars' => $this->calendarService->unavailableCalendars(),
-                'credentials_rejected_calendars' => $this->calendarService->credentialsRejectedCalendars(),
-            ]
-        );
+        return $this->eventListing($this->calendarService->listWidgetEvents($request->user()));
     }
 
     /**
@@ -269,8 +255,8 @@ class CalendarController
      *             required={"title", "start_date", "end_date", "is_all_day", "calendar_id"},
      *
      *             @OA\Property(property="title", type="string", maxLength=255, example="Team Meeting"),
-     *             @OA\Property(property="start_date", type="string", format="date", example="2024-01-15 10:00:00"),
-     *             @OA\Property(property="end_date", type="string", format="date", example="2024-01-15 11:00:00"),
+     *             @OA\Property(property="start_date", type="string", format="date-time", example="2024-01-15 10:00:00"),
+     *             @OA\Property(property="end_date", type="string", format="date-time", example="2024-01-15 11:00:00"),
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true, example="Weekly sync meeting"),
      *             @OA\Property(property="location", type="string", maxLength=255, nullable=true, example="Conference Room A"),
      *             @OA\Property(property="is_all_day", type="boolean", example=false),
@@ -340,8 +326,8 @@ class CalendarController
      *             required={"title", "start_date", "end_date", "is_all_day", "calendar_id", "etag"},
      *
      *             @OA\Property(property="title", type="string", maxLength=255, example="Team Meeting"),
-     *             @OA\Property(property="start_date", type="string", format="date", example="2024-01-15 10:00:00"),
-     *             @OA\Property(property="end_date", type="string", format="date", example="2024-01-15 11:00:00"),
+     *             @OA\Property(property="start_date", type="string", format="date-time", example="2024-01-15 10:00:00"),
+     *             @OA\Property(property="end_date", type="string", format="date-time", example="2024-01-15 11:00:00"),
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true, example="Weekly sync meeting"),
      *             @OA\Property(property="location", type="string", maxLength=255, nullable=true, example="Conference Room A"),
      *             @OA\Property(property="is_all_day", type="boolean", example=false),
@@ -349,7 +335,7 @@ class CalendarController
      *             @OA\Property(property="is_recurring", type="boolean", example=false),
      *             @OA\Property(property="recurrence_rule", type="string", nullable=true, example="FREQ=WEEKLY"),
      *             @OA\Property(property="recurrence_end", type="string", format="date", nullable=true, example="2024-12-31"),
-     *             @OA\Property(property="occurrence_start_date", type="string", format="date", nullable=true, example="2024-01-17 10:00:00", description="For a series edit: the listed start of the occurrence that was edited. The series moves by the difference between start_date and this value; without it, start_date becomes the series start."),
+     *             @OA\Property(property="occurrence_start_date", type="string", format="date-time", nullable=true, example="2024-01-17 10:00:00", description="For a series edit: the listed start of the occurrence that was edited. The series moves by the difference between start_date and this value; without it, start_date becomes the series start."),
      *             @OA\Property(property="etag", type="string", example="abc123")
      *         )
      *     ),
@@ -547,9 +533,7 @@ class CalendarController
             return ApiResponse::error('Event is not recurring', 400);
         }
 
-        // The frontend sends UTC (toISOString()); all-day slots need the user's local date.
-        $userTz = new \DateTimeZone($request->user()->settings->timezone);
-        $parsedDate = (new \DateTime($occurrenceDate, $userTz))->setTimezone($userTz);
+        $parsedDate = $this->occurrenceDate($request, $occurrenceDate);
 
         if (! $this->calendarService->destroyEventOccurrence($request->user(), $calendar, $eventUri, $parsedDate)) {
             return ApiResponse::error('Error deleting occurrence', 500);
@@ -599,8 +583,8 @@ class CalendarController
      *             required={"title", "start_date", "end_date", "is_all_day", "calendar_id", "etag"},
      *
      *             @OA\Property(property="title", type="string", maxLength=255, example="Team Meeting"),
-     *             @OA\Property(property="start_date", type="string", format="date", example="2024-01-15 10:00:00"),
-     *             @OA\Property(property="end_date", type="string", format="date", example="2024-01-15 11:00:00"),
+     *             @OA\Property(property="start_date", type="string", format="date-time", example="2024-01-15 10:00:00"),
+     *             @OA\Property(property="end_date", type="string", format="date-time", example="2024-01-15 11:00:00"),
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true, example="Weekly sync meeting"),
      *             @OA\Property(property="location", type="string", maxLength=255, nullable=true, example="Conference Room A"),
      *             @OA\Property(property="is_all_day", type="boolean", example=false),
@@ -650,9 +634,7 @@ class CalendarController
             return ApiResponse::error('Event is not recurring', 400);
         }
 
-        // The frontend sends UTC (toISOString()); all-day slots need the user's local date.
-        $userTz = new \DateTimeZone($request->user()->settings->timezone);
-        $parsedDate = (new \DateTime($occurrenceDate, $userTz))->setTimezone($userTz);
+        $parsedDate = $this->occurrenceDate($request, $occurrenceDate);
         $dto = EventDTO::fromRequest($request->validated(), $calendar, $request->user());
 
         if (! $this->calendarService->updateEventOccurrence($request->user(), $calendar, $eventUri, $parsedDate, $dto)) {
@@ -775,7 +757,6 @@ class CalendarController
         }
 
         $this->calendarService->share($calendar, $request->user(), $recipient);
-        $recipient->notify(new CalendarShareNotification($calendar->displayName, $request->user()->name));
 
         return ApiResponse::success(null, 'Calendar shared successfully.');
     }
@@ -988,5 +969,25 @@ class CalendarController
         $this->calendarService->declineInvite($request->user(), $token);
 
         return ApiResponse::success(null, 'Invite declined successfully.');
+    }
+
+    // The frontend sends UTC (toISOString()); all-day slots need the user's local date.
+    private function occurrenceDate(Request $request, string $occurrenceDate): \DateTime
+    {
+        $userTz = new \DateTimeZone($request->user()->settings->timezone);
+
+        return (new \DateTime($occurrenceDate, $userTz))->setTimezone($userTz);
+    }
+
+    private function eventListing(EventListingDTO $listing): JsonResponse
+    {
+        return ApiResponse::success(
+            EventResource::collection($listing->events),
+            'Calendar events retrieved successfully.',
+            meta: [
+                'unavailable_calendars' => $listing->unavailableCalendars,
+                'credentials_rejected_calendars' => $listing->credentialsRejectedCalendars,
+            ]
+        );
     }
 }

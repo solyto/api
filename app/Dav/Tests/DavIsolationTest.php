@@ -13,7 +13,7 @@ function sharedInstanceUri(User $sharee): string
 {
     return DB::connection('pgsql')->table('calendarinstances')
         ->where('principaluri', 'principals/'.$sharee->email)
-        ->where('access', '>', 1)
+        ->where('access', '>', \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER)
         ->value('uri');
 }
 

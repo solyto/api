@@ -145,11 +145,9 @@ describe('CalendarSharing', function () {
 
 describe('per-user DAV deletion', function () {
     it('keeps the owner calendar and objects when deleting the sharee', function () {
-        $owner = makeUser();
-        $sharee = makeUser();
+        $owner = davUser();
+        $sharee = davUser();
         $dav = app(DavService::class);
-        $dav->principals()->create($owner->email);
-        $dav->principals()->create($sharee->email);
 
         $calendar = $dav->calendars()->list($owner)[0];
         $dav->calendars()->events()->create($calendar, EventDTO::fromRequest([
@@ -181,8 +179,8 @@ describe('per-user DAV deletion', function () {
     });
 
     it('removes the sharee instance too when deleting the owner', function () {
-        $owner = makeUser();
-        $sharee = makeUser();
+        $owner = davUser();
+        $sharee = davUser();
         $dav = app(DavService::class);
 
         $calendar = $dav->calendars()->list($owner)[0];

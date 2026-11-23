@@ -16,14 +16,12 @@ class CacheInvalidationPlugin extends ServerPlugin
 {
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
+    // The job is unique until it runs, so a client syncing a burst of writes causes one run, not one per write.
+    private const int SHARED_INVALIDATION_DELAY_SECONDS = 10;
 
-    /**
-     * Sharees of an owner's calendar that is about to be deleted, keyed by
-     * path. Sabre removes every sharee instance with the owner's, so they
-     * can't be looked up after the unbind.
-     *
-     * @var array<string, array{calendarId: int, userIds: array<int, string>}>
-     */
+    // Sharees of an owner's calendar about to be deleted, by path: sabre removes every sharee instance with the
+    // owner's, so they can't be looked up after the unbind.
+    /** @var array<string, array{calendarId: int, userIds: array<int, string>}> */
     private array $pendingSharees = [];
 
     public function __construct(private readonly UserCacheService $cache) {}
@@ -147,8 +145,9 @@ class CacheInvalidationPlugin extends ServerPlugin
 
             $this->cache->flushTags([CalendarService::eventCacheTag($userId, $calendar)]);
 
-            if ((int) $instance->access > 1 || (bool) $instance->solyto_shared) {
-                InvalidateSharedCalendarCache::dispatch($calendar)->delay(now()->addSeconds(10));
+            $isSharedInstance = (int) $instance->access > 1;
+            if ($isSharedInstance || (bool) $instance->solyto_shared) {
+                InvalidateSharedCalendarCache::dispatch($calendar)->delay(now()->addSeconds(self::SHARED_INVALIDATION_DELAY_SECONDS));
             }
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendar events', [
@@ -191,6 +190,7 @@ class CacheInvalidationPlugin extends ServerPlugin
                 'userIds'    => DB::table('users')->whereIn('email', $emails)->pluck('id')->all(),
             ];
         } catch (\Throwable $e) {
+            // Logged, not thrown: the delete goes ahead, and the sharees' caches expire on their own.
             Log::channel('dav')->error('DAV cache invalidation failed to collect calendar sharees', [
                 'email'       => $email,
                 'calendarUri' => $calendarUri,
@@ -214,6 +214,7 @@ class CacheInvalidationPlugin extends ServerPlugin
                 $this->cache->flushTags([CalendarService::eventCacheTag($userId, $pending['calendarId'])]);
             }
         } catch (\Throwable $e) {
+            // Logged, not thrown: the delete already happened, and the sharees' caches expire on their own.
             Log::channel('dav')->error('DAV cache invalidation failed for calendar sharees', [
                 'path'  => $path,
                 'error' => $e->getMessage(),

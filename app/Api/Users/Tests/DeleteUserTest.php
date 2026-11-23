@@ -200,7 +200,7 @@ describe('app:users:delete', function () {
         [$user, $other] = [davUser(), davUser()];
 
         $read = fn (User $u) => [
-            'events' => collect($calendars->listEvents($u, '2030-10'))->pluck('title')->sort()->values()->all(),
+            'events' => collect($calendars->listEvents($u, '2030-10')->events)->pluck('title')->sort()->values()->all(),
             'contacts' => collect($contacts->listContacts($u))->pluck('fullName')->sort()->values()->all(),
             'todos' => $attachments->getTodoAttachments($u, 'event-1')->pluck('title')->all(),
             'notes' => $attachments->getNoteAttachments($u, 'event-1')->pluck('title')->all(),

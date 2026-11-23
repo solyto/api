@@ -34,10 +34,8 @@ function boundsRows(): \Illuminate\Support\Collection
         ->keyBy('uri');
 }
 
-/**
- * The owner's calendar, shared with an accepted sharee, holds one stale
- * override-first series among rows the migration must leave alone.
- */
+// The owner's calendar, shared with an accepted sharee, holds one stale override-first series among rows the
+// migration must leave alone.
 function boundsFixture(\Tests\TestCase $test): void
 {
     $test->owner = davUser();
@@ -121,7 +119,7 @@ describe('recompute_event_occurrence_bounds migration and the event cache', func
         boundsFixture($this);
         Log::shouldReceive('channel')->with('dav')->andReturn(Mockery::spy());
         // fine.ics keeps June from being empty, which would not be cached.
-        $june = fn ($user) => collect(app(CalendarService::class)->listEvents($user, '2030-06'))->pluck('uri')->unique()->sort()->values()->all();
+        $june = fn ($user) => collect(app(CalendarService::class)->listEvents($user, '2030-06')->events)->pluck('uri')->unique()->sort()->values()->all();
         expect($june($this->owner))->toBe(['fine.ics'])
             ->and($june($this->sharee))->toBe(['fine.ics']);
 

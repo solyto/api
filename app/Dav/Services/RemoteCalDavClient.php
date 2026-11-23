@@ -2,12 +2,12 @@
 
 namespace App\Dav\Services;
 
-use App\Shared\Pulse\PulseMetrics;
 use App\Api\Calendars\Models\ExternalCalendar;
 use App\Dav\Exceptions\ExternalCalendarCredentialsRejectedException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Shared\Exceptions\BlockedUrlException;
+use App\Shared\Pulse\PulseMetrics;
 use App\Shared\Services\OutboundUrlGuard;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\FnStream;
@@ -22,13 +22,9 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Sabre\DAV\Exception\BadRequest;
 
-/**
- * HTTP client for the user's own CalDAV server behind an external calendar.
- * Object names are translated by file name only: the last segment of a
- * remote href, URL-decoded, is our object URI; hrefs that are not direct
- * children of the remote collection are skipped. Credentials never reach
- * logs, caches or exception messages.
- */
+// Object names are translated by file name only: the last segment of a remote href, URL-decoded, is our object URI;
+// hrefs that are not direct children of the remote collection are skipped. Credentials never reach logs, caches or
+// exception messages.
 class RemoteCalDavClient
 {
     private const string NS_DAV = 'DAV:';
@@ -40,9 +36,7 @@ class RemoteCalDavClient
 
     public function __construct(private readonly OutboundUrlGuard $guard) {}
 
-    /**
-     * @return array{uri: string, etag: ?string, size: int, calendardata: string}|null
-     */
+    /** @return array{uri: string, etag: ?string, size: int, calendardata: string}|null */
     public function getObject(ExternalCalendar $calendar, string $name): ?array
     {
         if (!$this->isObjectName($name)) {
@@ -51,7 +45,7 @@ class RemoteCalDavClient
 
         $response = $this->sendFor($calendar, 'GET', $this->objectUrl($calendar, $name));
 
-        if (in_array($response->status(), [404, 410], true)) {
+        if ($this->isGone($response->status())) {
             return null;
         }
 
@@ -67,12 +61,8 @@ class RemoteCalDavClient
         ];
     }
 
-    /**
-     * Creates refuse to overwrite (If-None-Match: *); updates pass the
-     * client's If-Match through, so a remote 412 means the remote won.
-     *
-     * @return string|null the new ETag, when the remote sends one
-     */
+    // Creates refuse to overwrite (If-None-Match: *); updates pass the client's If-Match through, so a remote 412
+    // means the remote won. Returns the new ETag when the remote sends one.
     public function putObject(ExternalCalendar $calendar, string $name, string $data, bool $create, ?string $ifMatch = null): ?string
     {
         $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
@@ -83,10 +73,7 @@ class RemoteCalDavClient
         }
 
         $response = $this->sendFor($calendar, 'PUT', $this->objectUrl($calendar, $name), $headers, $data);
-
-        if ($response->status() === 412) {
-            throw new ExternalCalendarPreconditionFailedException();
-        }
+        $this->failIfChangedOnRemote($response);
 
         if (!$response->successful()) {
             throw $this->unavailable($calendar->remote_url, $response->status());
@@ -100,19 +87,14 @@ class RemoteCalDavClient
         $headers = $ifMatch !== null && $ifMatch !== '' ? ['If-Match' => $this->ifMatchHeader($ifMatch)] : [];
 
         $response = $this->sendFor($calendar, 'DELETE', $this->objectUrl($calendar, $name), $headers);
+        $this->failIfChangedOnRemote($response);
 
-        if ($response->status() === 412) {
-            throw new ExternalCalendarPreconditionFailedException();
-        }
-
-        if (!$response->successful() && !in_array($response->status(), [404, 410], true)) {
+        if (!$response->successful() && !$this->isGone($response->status())) {
             throw $this->unavailable($calendar->remote_url, $response->status());
         }
     }
 
-    /**
-     * @return array<int, array{uri: string, etag: ?string, size: int}>
-     */
+    /** @return array<int, array{uri: string, etag: ?string, size: int}> */
     public function listObjects(ExternalCalendar $calendar): array
     {
         $body = $this->xml('<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getetag/><d:getcontenttype/><d:getcontentlength/></d:prop></d:propfind>');
@@ -160,10 +142,8 @@ class RemoteCalDavClient
         return $this->objectsWithData($calendar, $this->multistatus($calendar, 'REPORT', $calendar->remote_url, $body, '1')['responses']);
     }
 
+    // Narrowed to one component type and, when given, a time range; callers apply their exact filter on the data.
     /**
-     * A calendar-query narrowed to one component type and, when given, a
-     * time range. Callers apply their exact filter on the returned data.
-     *
      * @return array<int, array{uri: string, etag: ?string, size: int, calendardata: string}>
      */
     public function query(ExternalCalendar $calendar, ?string $component, ?\DateTimeInterface $start = null, ?\DateTimeInterface $end = null): array
@@ -189,12 +169,8 @@ class RemoteCalDavClient
         return $this->objectsWithData($calendar, $this->multistatus($calendar, 'REPORT', $calendar->remote_url, $body, '1')['responses']);
     }
 
-    /**
-     * The remote collection's ctag and sync token. The sync token is null
-     * when the remote does not support sync-collection.
-     *
-     * @return array{ctag: ?string, sync_token: ?string}
-     */
+    // The sync token is null when the remote does not support sync-collection.
+    /** @return array{ctag: ?string, sync_token: ?string} */
     public function collectionState(ExternalCalendar $calendar): array
     {
         $body = $this->xml('<d:propfind xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/"><d:prop><cs:getctag/><d:sync-token/><d:supported-report-set/></d:prop></d:propfind>');
@@ -202,7 +178,9 @@ class RemoteCalDavClient
         $props = $responses[0]['props'] ?? [];
 
         $syncToken = $this->text($props['{DAV:}sync-token'] ?? null);
-        if (isset($props['{DAV:}supported-report-set']) && $props['{DAV:}supported-report-set']->getElementsByTagNameNS(self::NS_DAV, 'sync-collection')->length === 0) {
+        $reports = $props['{DAV:}supported-report-set'] ?? null;
+        $lacksSyncCollection = $reports !== null && $reports->getElementsByTagNameNS(self::NS_DAV, 'sync-collection')->length === 0;
+        if ($lacksSyncCollection) {
             $syncToken = null;
         }
 
@@ -212,10 +190,8 @@ class RemoteCalDavClient
         ];
     }
 
-    /**
-     * @return array{sync_token: string, modified: array<int, string>, deleted: array<int, string>, truncated: bool}|null
-     *         null when the remote no longer accepts the token
-     */
+    // Null when the remote no longer accepts the token.
+    /** @return array{sync_token: string, modified: array<int, string>, deleted: array<int, string>, truncated: bool}|null */
     public function syncCollection(ExternalCalendar $calendar, string $syncToken): ?array
     {
         $body = $this->xml('<d:sync-collection xmlns:d="DAV:"><d:sync-token>'.htmlspecialchars($syncToken, ENT_XML1).'</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/></d:prop></d:sync-collection>');
@@ -242,7 +218,7 @@ class RemoteCalDavClient
                 continue;
             }
 
-            if (in_array($entry['status'], [404, 410], true)) {
+            if ($this->isGone($entry['status'])) {
                 $deleted[] = $name;
             } else {
                 $modified[] = $name;
@@ -257,22 +233,15 @@ class RemoteCalDavClient
         ];
     }
 
+    // Only hosts of the URL's registrable domain get the credentials, at every step and redirect hop (caldav.icloud.com
+    // hands out p42-caldav.icloud.com). An href to another domain is treated as not found. Empty when the server
+    // answered but lists no calendars.
     /**
-     * Generic CalDAV discovery: /.well-known/caldav (RFC 6764) or the URL
-     * itself → current-user-principal (RFC 5397) → calendar-home-set →
-     * calendar collections. Without a principal it falls back to the
-     * Nextcloud path principals/users/<username>/.
-     *
-     * Only hosts of the URL's registrable domain get the credentials, at
-     * every step and every redirect hop (caldav.icloud.com hands out
-     * p42-caldav.icloud.com). An href to another domain is treated as not
-     * found, and calendars on another domain are not offered.
-     *
-     * @return array<int, array{url: string, name: string, color: string}> empty when the server answered but lists no calendars
+     * @return array<int, array{url: string, name: string, color: string}>
      *
      * @throws BlockedUrlException
      * @throws ExternalCalendarCredentialsRejectedException
-     * @throws ExternalCalendarUnavailableException when the server cannot be reached or gives no usable answer
+     * @throws ExternalCalendarUnavailableException
      */
     public function discover(string $url, string $username, #[\SensitiveParameter] string $password): array
     {
@@ -282,11 +251,12 @@ class RemoteCalDavClient
         $origin = $this->origin($base);
         $credentials = [$username, $password];
 
-        // The well-known probe is optional on most servers, so its failure says nothing about the account.
+        // RFC 6764 well-known URL, else the URL itself; the probe is optional on most servers, so its failure says
+        // nothing about the account. Without a principal, the Nextcloud path.
         $failures = [];
-        $principal = $this->findHref($credentials, $base, $origin.'.well-known/caldav', '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal')
-            ?? $this->findHref($credentials, $base, $base, '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal', $failures)
-            ?? $base.'principals/users/'.rawurlencode($username).'/';
+        $principal = $this->findHref($credentials, $base, $origin.'.well-known/caldav', '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal');
+        $principal ??= $this->findHref($credentials, $base, $base, '<d:current-user-principal/>', self::NS_DAV, 'current-user-principal', $failures);
+        $principal ??= $base.'principals/users/'.rawurlencode($username).'/';
 
         $home = $this->findHref($credentials, $base, $principal, '<c:calendar-home-set/>', self::NS_CALDAV, 'calendar-home-set', $failures);
         if ($home === null) {
@@ -329,25 +299,17 @@ class RemoteCalDavClient
         return $calendars;
     }
 
-    /**
-     * Sends a request with the given credentials to a URL that already went
-     * through discovery, e.g. the import's per-collection REPORT, following
-     * redirects. $timeout (seconds) and $maxBytes override the external
-     * calendar limits from config/calendars.php for this request only.
-     *
-     * @param  array<string, string>  $headers
-     */
+    // For a URL that already went through discovery, e.g. the import's per-collection REPORT. $timeout (seconds) and
+    // $maxBytes override the external calendar limits from config/calendars.php for this request only.
+    /** @param  array<string, string>  $headers */
     public function send(string $username, #[\SensitiveParameter] string $password, string $method, string $url, array $headers = [], ?string $body = null, ?int $timeout = null, ?int $maxBytes = null): Response
     {
-        return $this->sendFollowing([$username, $password], $method, $url, $headers, $body, null, $timeout, $maxBytes)[0];
+        return $this->sendFollowing([$username, $password], $method, $url, $headers, $body, timeout: $timeout, maxBytes: $maxBytes)[0];
     }
 
-    /**
-     * A link stored before discovery kept to the account's domain may point
-     * elsewhere; it is refused rather than sent the app password.
-     *
-     * @param  array<string, string>  $headers
-     */
+    // A link stored before discovery kept to the account's domain may point elsewhere; it is refused rather than
+    // sent the app password.
+    /** @param  array<string, string>  $headers */
     private function sendFor(ExternalCalendar $calendar, string $method, string $url, array $headers = [], ?string $body = null): Response
     {
         $account = $calendar->account;
@@ -441,12 +403,9 @@ class RemoteCalDavClient
         return $response;
     }
 
-    /**
-     * Mirrors FeedReader::cappedSink(): curl hands the sink decompressed
-     * bytes, so counting here caps what a gzip body inflates to (the
-     * Content-Length check above only sees the compressed size). Accepting
-     * fewer bytes than offered makes curl abort the transfer.
-     */
+    // Mirrors FeedReader::cappedSink(): curl hands the sink decompressed bytes, so counting here caps what a gzip body
+    // inflates to (the Content-Length check only sees the compressed size). Accepting fewer bytes than offered makes
+    // curl abort the transfer.
     private function cappedSink(int $maxBytes, \Closure $onTooLarge): StreamInterface
     {
         $stream = Utils::streamFor(Utils::tryFopen('php://temp', 'w+'));
@@ -467,17 +426,14 @@ class RemoteCalDavClient
         ]);
     }
 
+    // Redirects are followed by hand so every hop goes through the URL guard. The credentials stay on the trusted
+    // host ($trusted, the first URL when null) and its registrable domain; any other host gets this and every later
+    // hop without them. A 401/403 from a host that got no credentials says nothing about them: reported as unreachable.
+    // Returns the response and the URL that gave it.
     /**
-     * Follows redirects by hand so every hop goes through the URL guard.
-     * The credentials stay on the trusted host ($trusted, the first URL when
-     * null) and on hosts of its registrable domain (caldav.icloud.com →
-     * p42-caldav.icloud.com); any other host gets this and every later hop
-     * without them. A 401/403 from a host that got no credentials says
-     * nothing about them, so it is reported as unreachable.
-     *
      * @param  array{0: string, 1: string}|null  $credentials
      * @param  array<string, string>  $headers
-     * @return array{0: Response, 1: string} the response and the URL that gave it
+     * @return array{0: Response, 1: string}
      */
     private function sendFollowing(?array $credentials, string $method, string $url, array $headers = [], ?string $body = null, ?string $trusted = null, ?int $timeout = null, ?int $maxBytes = null): array
     {
@@ -503,7 +459,9 @@ class RemoteCalDavClient
             $next = $this->resolveUrl($response->header('Location'), $url);
 
             // Every hop carries the Basic auth credentials, so a downgrade would send them in plaintext.
-            if (strtolower((string) parse_url($url, PHP_URL_SCHEME)) === 'https' && strtolower((string) parse_url($next, PHP_URL_SCHEME)) !== 'https') {
+            $isDowngrade = strtolower((string) parse_url($url, PHP_URL_SCHEME)) === 'https'
+                && strtolower((string) parse_url($next, PHP_URL_SCHEME)) !== 'https';
+            if ($isDowngrade) {
                 throw $this->unavailable($url, $response->status(), 'insecure redirect');
             }
 
@@ -513,12 +471,9 @@ class RemoteCalDavClient
         throw $this->unavailable($url, null, 'redirects');
     }
 
+    // The first href inside the property of a Depth 0 PROPFIND, as an absolute URL; null when the request or the
+    // property is missing or the href leaves the domain of $trusted. A failed request is added to $failures.
     /**
-     * The first href inside the given property of a Depth 0 PROPFIND, as an
-     * absolute URL, or null when the request or the property is missing or
-     * the href leaves the domain of $trusted. A failed request is added to
-     * $failures.
-     *
      * @param  array{0: string, 1: string}  $credentials
      * @param  array<int, ExternalCalendarUnavailableException>  $failures
      */
@@ -557,11 +512,9 @@ class RemoteCalDavClient
         return null;
     }
 
+    // Rejected credentials win over an unreachable server; plain client errors (404, 405, ...) mean the server
+    // answered but has no calendars there, so discovery returns empty.
     /**
-     * Rejected credentials win over an unreachable server; failures that are
-     * plain client errors (404, 405, ...) mean the server answered but has no
-     * calendars there, so discovery returns empty.
-     *
      * @param  array<int, ExternalCalendarUnavailableException>  $failures
      *
      * @throws ExternalCalendarCredentialsRejectedException
@@ -576,7 +529,8 @@ class RemoteCalDavClient
         }
 
         foreach ($failures as $failure) {
-            if ($failure->remoteStatus === null || $failure->remoteStatus < 400 || $failure->remoteStatus >= 500) {
+            $isClientError = $failure->remoteStatus !== null && $failure->remoteStatus >= 400 && $failure->remoteStatus < 500;
+            if (!$isClientError) {
                 throw $failure;
             }
         }
@@ -612,9 +566,7 @@ class RemoteCalDavClient
         }
     }
 
-    /**
-     * @return array{responses: array<int, array{href: string, status: ?int, props: array<string, \DOMElement>}>, sync_token: ?string}
-     */
+    /** @return array{responses: array<int, array{href: string, status: ?int, props: array<string, \DOMElement>}>, sync_token: ?string} */
     private function multistatus(ExternalCalendar $calendar, string $method, string $url, string $body, string $depth): array
     {
         $response = $this->sendFor($calendar, $method, $url, ['Depth' => $depth, 'Content-Type' => 'application/xml; charset=utf-8'], $body);
@@ -622,9 +574,7 @@ class RemoteCalDavClient
         return $this->parseMultistatusResponse($url, $response);
     }
 
-    /**
-     * @return array{responses: array<int, array{href: string, status: ?int, props: array<string, \DOMElement>}>, sync_token: ?string}
-     */
+    /** @return array{responses: array<int, array{href: string, status: ?int, props: array<string, \DOMElement>}>, sync_token: ?string} */
     private function parseMultistatusResponse(string $url, Response $response): array
     {
         if ($response->status() !== 207) {
@@ -632,6 +582,7 @@ class RemoteCalDavClient
         }
 
         $dom = new \DOMDocument();
+        // Silenced: a malformed body is the remote's fault and reported below, not a PHP warning.
         if (!@$dom->loadXML($response->body(), LIBXML_NONET)) {
             throw $this->unavailable($url, 207, 'unparsable');
         }
@@ -647,7 +598,7 @@ class RemoteCalDavClient
             $props = [];
 
             foreach ($element->childNodes as $propstat) {
-                if (!$propstat instanceof \DOMElement || $propstat->namespaceURI !== self::NS_DAV || $propstat->localName !== 'propstat') {
+                if (!$this->isElement($propstat, self::NS_DAV, 'propstat')) {
                     continue;
                 }
 
@@ -710,11 +661,7 @@ class RemoteCalDavClient
         return $objects;
     }
 
-    /**
-     * Our object URI for a remote href: its last segment, URL-decoded, when
-     * the href is a direct child of the remote collection on the same host.
-     * The collection itself yields null silently; anything else is logged.
-     */
+    // The collection itself yields null silently; anything that is not a direct child on the same host is logged.
     public function childName(ExternalCalendar $calendar, string $href): ?string
     {
         $collection = parse_url($calendar->remote_url);
@@ -750,10 +697,8 @@ class RemoteCalDavClient
         return $name;
     }
 
-    /**
-     * @throws BadRequest for "", "." and "..", which the HTTP client would
-     *         resolve to the collection or its parent
-     */
+    // "", "." and ".." are refused: the HTTP client would resolve them to the collection or its parent.
+    /** @throws BadRequest */
     public function objectUrl(ExternalCalendar $calendar, string $name): string
     {
         if (!$this->isObjectName($name)) {
@@ -768,6 +713,18 @@ class RemoteCalDavClient
         return !in_array($name, ['', '.', '..'], true);
     }
 
+    private function isGone(?int $status): bool
+    {
+        return in_array($status, [404, 410], true);
+    }
+
+    private function failIfChangedOnRemote(Response $response): void
+    {
+        if ($response->status() === 412) {
+            throw new ExternalCalendarPreconditionFailedException();
+        }
+    }
+
     public function normalizeEtag(?string $etag): ?string
     {
         $etag = trim((string) $etag);
@@ -779,12 +736,8 @@ class RemoteCalDavClient
         return str_starts_with($etag, '"') || str_starts_with($etag, 'W/') ? $etag : '"'.$etag.'"';
     }
 
-    /**
-     * If-Match uses strong comparison (RFC 9110 13.1.1), so a weak tag never
-     * matches. A server behind a compressing proxy (nginx gzip) weakens its
-     * strong ETags on GET, so the W/ prefix is dropped here only; the stored
-     * tag stays as the remote sent it.
-     */
+    // If-Match uses strong comparison (RFC 9110 13.1.1), so a weak tag never matches. A server behind a compressing
+    // proxy (nginx gzip) weakens its strong ETags on GET, so the W/ prefix is dropped here only; the stored tag stays.
     private function ifMatchHeader(string $etag): string
     {
         if (trim($etag) === '*') {
@@ -811,12 +764,17 @@ class RemoteCalDavClient
     private function firstChild(\DOMElement $parent, string $namespace, string $name): ?\DOMElement
     {
         foreach ($parent->childNodes as $child) {
-            if ($child instanceof \DOMElement && $child->namespaceURI === $namespace && $child->localName === $name) {
+            if ($this->isElement($child, $namespace, $name)) {
                 return $child;
             }
         }
 
         return null;
+    }
+
+    private function isElement(\DOMNode $node, string $namespace, string $name): bool
+    {
+        return $node instanceof \DOMElement && $node->namespaceURI === $namespace && $node->localName === $name;
     }
 
     private function text(?\DOMElement $element): ?string

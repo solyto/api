@@ -2,16 +2,17 @@
 
 namespace App\Dav\Controllers;
 
-use App\Shared\Pulse\PulseMetrics;
 use App\Dav\Factories\DavServerFactory;
+use App\Shared\Pulse\PulseMetrics;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Sabre\HTTP\Response as SabreResponse;
 use Sabre\HTTP\Sapi;
 
 class DavController
 {
-    public function handle(Request $request, DavServerFactory $factory)
+    public function handle(Request $request, DavServerFactory $factory): Response
     {
         // Measured per method and client for the Pulse DAV card: Slow Requests only ever shows the one dav/{path} route.
         $startedAt = PulseMetrics::startTimer();
@@ -23,7 +24,7 @@ class DavController
         }
     }
 
-    private function serve(DavServerFactory $factory)
+    private function serve(DavServerFactory $factory): Response
     {
         $server = $factory->createServer();
         $server->setLogger(Log::channel('dav'));

@@ -30,7 +30,7 @@ class ListUpcomingEvents extends SolytoTool
         $until = $from->copy()->addDays($days);
 
         // listEvents covers the month three months either side, so the current month's listing spans the whole window.
-        $events = collect($this->calendars->listEvents($user, $from->format('Y-m')))
+        $events = collect($this->calendars->listEvents($user, $from->format('Y-m'))->events)
             ->filter(fn (EventDTO $event) => $event->startDate < $until && ($event->endDate ?? $event->startDate) >= $from)
             ->sortBy(fn (EventDTO $event) => $event->startDate)
             ->values();

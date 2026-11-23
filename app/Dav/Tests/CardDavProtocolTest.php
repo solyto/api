@@ -1,16 +1,17 @@
 <?php
 
+use App\Api\Users\Models\User;
 use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function addressBookPath(\App\Api\Users\Models\User $user, string $addressBook = 'contacts', string $object = ''): string
+function addressBookPath(User $user, string $addressBook = 'contacts', string $object = ''): string
 {
     return 'addressbooks/'.$user->email.'/'.$addressBook.'/'.$object;
 }
 
-function putCard(\App\Api\Users\Models\User $user, string $object, string $vcard, array $headers = [], string $addressBook = 'contacts'): \Sabre\HTTP\Response
+function putCard(User $user, string $object, string $vcard, array $headers = [], string $addressBook = 'contacts'): \Sabre\HTTP\Response
 {
     return davRequest($user, 'PUT', addressBookPath($user, $addressBook, $object), $vcard, ['Content-Type' => 'text/vcard; charset=utf-8'] + $headers);
 }
