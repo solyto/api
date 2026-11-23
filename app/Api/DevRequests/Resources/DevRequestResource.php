@@ -35,11 +35,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class DevRequestResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
         $userVote = null;
@@ -48,17 +44,22 @@ class DevRequestResource extends JsonResource
             $userVote = $vote?->vote_type;
         }
 
+        // Older clients don't know the waiting statuses and get the status they replaced instead.
+        $clientKnowsWaitingForDeployment = ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE);
+        $clientKnowsWaitingForUser = ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_USER_SINCE);
+        $status = match (true) {
+            $this->status === 'waiting-for-deployment' && ! $clientKnowsWaitingForDeployment => 'in-progress',
+            $this->status === 'waiting-for-user' && ! $clientKnowsWaitingForUser => 'pending',
+            default => $this->status,
+        };
+
         $upvotes = $this->votes->where('vote_type', 'up')->count();
         $downvotes = $this->votes->where('vote_type', 'down')->count();
 
         return [
             'id' => $this->id,
             'type' => $this->type,
-            'status' => match (true) {
-                $this->status === 'waiting-for-deployment' && ! ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_DEPLOYMENT_SINCE) => 'in-progress',
-                $this->status === 'waiting-for-user' && ! ClientVersionHelper::isAtLeast($request, DevRequestService::WAITING_FOR_USER_SINCE) => 'pending',
-                default => $this->status,
-            },
+            'status' => $status,
             'priority' => $this->priority,
             'title' => $this->title,
             'description' => $this->description,

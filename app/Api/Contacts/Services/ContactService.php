@@ -91,7 +91,7 @@ class ContactService
     {
         $this->dav->addressBooks()->delete($addressBook->id);
         $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $user->id]);
-        $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+        $this->forgetContacts($user->id, $addressBook->id);
     }
 
     public function listContacts(User $user): array
@@ -145,7 +145,7 @@ class ContactService
     public function createContact(User $user, AddressBookDTO $addressBook, array $data): ContactDTO
     {
         $contact = $this->dav->addressBooks()->contacts()->create($addressBook, ContactDTO::fromRequest($data, $addressBook));
-        $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+        $this->forgetContacts($user->id, $addressBook->id);
         return $contact;
     }
 
@@ -154,7 +154,7 @@ class ContactService
         $contact->updateFromRequest($data);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+            $this->forgetContacts($user->id, $addressBook->id);
         }
         return $updated;
     }
@@ -163,7 +163,7 @@ class ContactService
     {
         $success = $this->dav->addressBooks()->contacts()->delete($addressBook, $contact);
         if ($success) {
-            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+            $this->forgetContacts($user->id, $addressBook->id);
         }
         return $success;
     }
@@ -174,7 +174,7 @@ class ContactService
         $contact->updatePhoto($photo);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+            $this->forgetContacts($user->id, $addressBook->id);
         }
         return $updated;
     }
@@ -184,9 +184,14 @@ class ContactService
         $contact->photo = null;
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
+            $this->forgetContacts($user->id, $addressBook->id);
         }
         return $updated;
+    }
+
+    private function forgetContacts(string $userId, int $addressBookId): void
+    {
+        $this->cache->forgetTagged(self::contactCacheTags($userId), self::contactCacheKey($userId, $addressBookId));
     }
 
     private function convertPhotoString(?string $photo): ?string

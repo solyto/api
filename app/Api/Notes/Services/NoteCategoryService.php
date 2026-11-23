@@ -28,10 +28,7 @@ class NoteCategoryService
         );
     }
 
-    /**
-     * The categories listRoots leaves out (hidden or system, and their
-     * descendants), as a tree rooted at the topmost hidden ones.
-     */
+    // Rooted at the topmost hidden or system categories.
     public function listHidden(User $user): Collection
     {
         return $this->cache->remember(
@@ -39,11 +36,6 @@ class NoteCategoryService
             self::CACHE_TTL,
             fn() => $this->tree($user->id, true)
         );
-    }
-
-    public function find(NoteCategory $category): NoteCategory
-    {
-        return $category;
     }
 
     public function create(User $user, array $data): NoteCategory
@@ -85,11 +77,8 @@ class NoteCategoryService
         return $category->fresh(['user']);
     }
 
-    /**
-     * Builds the visible or the hidden tree from one flat load. Roots are
-     * ordered by title, children by sort_order, as the descendants relation
-     * does; a with('descendants') constraint would only filter the first level.
-     */
+    // One flat load instead of with('descendants'): a constraint there would only filter the first level.
+    // Roots are ordered by title, children by sort_order, as the descendants relation does.
     private function tree(string $userId, bool $hidden): Collection
     {
         $hiddenIds = array_flip($this->noteService->hiddenCategoryIds($userId));
@@ -113,34 +102,11 @@ class NoteCategoryService
             ->values();
     }
 
-    /**
-     * Category writes change which notes are hidden, so the note lists go too.
-     */
-    private function forgetUser(string $userId): void
+    // Category writes change which notes are hidden, so the note lists go too.
+    public function forgetUser(string $userId): void
     {
         $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_HIDDEN, $userId]);
-        $this->noteService->forgetLists($userId);
-    }
-
-    public function getAncestors(NoteCategory $category): Collection
-    {
-        $ancestors = collect();
-        $parent = $category->parent;
-
-        while ($parent) {
-            $ancestors->prepend($parent);
-            $parent = $parent->parent;
-        }
-
-        return $ancestors;
-    }
-
-    public function getFullPath(NoteCategory $category, string $separator = ' > '): string
-    {
-        $path = $this->getAncestors($category)->pluck('title')->toArray();
-        $path[] = $category->title;
-
-        return implode($separator, $path);
+        $this->noteService->forgetUser($userId);
     }
 }

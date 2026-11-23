@@ -71,10 +71,7 @@ class TagController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function show(Request $request, Tag $tag): JsonResponse
@@ -113,10 +110,7 @@ class TagController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTagRequest $request): JsonResponse
@@ -162,14 +156,8 @@ class TagController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTagRequest $request, Tag $tag): JsonResponse
@@ -207,10 +195,7 @@ class TagController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroy(Request $request, Tag $tag): JsonResponse

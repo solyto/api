@@ -2,7 +2,6 @@
 
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
-use App\Api\Notes\Services\NoteCategoryService;
 use App\Api\Users\Models\User;
 
 describe('Note Factory', function () {
@@ -168,19 +167,6 @@ describe('NoteCategory Model', function () {
         // with their own `descendants` loaded.
         expect($parent->descendants)->toHaveCount(1);
         expect($parent->descendants->first()->descendants)->toHaveCount(1);
-    });
-
-    it('returns full path', function () {
-        $user = User::factory()->create();
-        $parent = NoteCategory::factory()->forUser($user)->withTitle('Parent')->create();
-        $child = NoteCategory::factory()->forUser($user)->withParent($parent)->create([
-            'title' => 'Child',
-        ]);
-
-        $service = app(NoteCategoryService::class);
-
-        expect($service->getFullPath($parent))->toBe('Parent');
-        expect($service->getFullPath($child))->toContain('Parent > Child');
     });
 
     it('scopes roots correctly', function () {

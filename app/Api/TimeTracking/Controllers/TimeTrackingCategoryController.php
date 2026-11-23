@@ -74,10 +74,7 @@ class TimeTrackingCategoryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTimeTrackingCategoryRequest $request): JsonResponse
@@ -127,14 +124,8 @@ class TimeTrackingCategoryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTimeTrackingCategoryRequest $request, TimeTrackingCategory $category): JsonResponse
@@ -175,10 +166,7 @@ class TimeTrackingCategoryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroy(Request $request, TimeTrackingCategory $category): JsonResponse

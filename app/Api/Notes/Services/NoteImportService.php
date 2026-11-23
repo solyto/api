@@ -9,13 +9,22 @@ use Illuminate\Support\Str;
 
 class NoteImportService
 {
+    public function __construct(
+        private readonly NoteService $notes,
+        private readonly NoteCategoryService $categories,
+    ) {}
+
     public function importFile(UploadedFile $file, string $userId): bool
     {
-        if ($file->getClientOriginalExtension() === 'md') {
-            return $this->importMarkdownFile($file, $userId);
-        } else {
-            return $this->importZipFile($file, $userId);
-        }
+        $imported = $file->getClientOriginalExtension() === 'md'
+            ? $this->importMarkdownFile($file, $userId)
+            : $this->importZipFile($file, $userId);
+
+        // The import writes notes and folders directly, so the cached lists are stale now.
+        $this->notes->forgetUser($userId);
+        $this->categories->forgetUser($userId);
+
+        return $imported;
     }
 
     private function importMarkdownFile(UploadedFile $file, string $userId, ?int $categoryId = null): bool

@@ -49,9 +49,8 @@ describe('Todo categories CRUD', function () {
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/todos/categories/'.$category->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/todos/categories/'.$category->id), 403);
     });
 });
 
@@ -149,16 +148,16 @@ describe('Todo workspaces CRUD', function () {
         $workspace = TodoWorkspace::factory()->forUser($user)->create();
         $foreignCategory = TodoCategory::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/todos/workspaces', ['title' => 'Projects', 'categories' => [$foreignCategory->id]])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos/workspaces', ['title' => 'Projects', 'categories' => [$foreignCategory->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('categories.0');
 
         foreach (['attach', 'detach'] as $action) {
-            $this->actingAs($user, 'sanctum')
-                ->postJson('/api/v1/todos/workspaces/'.$workspace->id.'/categories/'.$action, [
-                    'categories' => [$foreignCategory->id],
-                ])
-                ->assertStatus(422);
+            $response = $this->actingAs($user, 'sanctum')
+                ->postJson('/api/v1/todos/workspaces/'.$workspace->id.'/categories/'.$action, ['categories' => [$foreignCategory->id]]);
+            expectApiError($response, 422);
+            $response->assertJsonValidationErrors('categories.0');
         }
 
         expect(TodoWorkspace::count())->toBe(1);
@@ -199,7 +198,7 @@ describe('Todo CRUD', function () {
         expect(Todo::count())->toBe(0);
     });
 
-    it('completing a todo sets completed_at', function () {
+    it('sets completed_at when a todo is completed', function () {
         $user = makeUser();
         $todo = Todo::factory()->forUser($user)->pending()->create();
 
@@ -229,25 +228,25 @@ describe('Todo CRUD', function () {
         $foreignCategory = TodoCategory::factory()->forUser($other)->create();
         $foreignTag = Tag::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/todos', ['title' => 'Buy milk', 'tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/todos/'.$todo->id, ['category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/todos/'.$todo->id, ['category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/todos/'.$todo->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/todos/'.$todo->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
         expect(Todo::count())->toBe(1);
         expect($todo->fresh()->category_id)->toBeNull();

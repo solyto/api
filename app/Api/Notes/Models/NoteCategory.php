@@ -14,10 +14,7 @@ class NoteCategory extends Model
 {
     use HasFactory;
 
-    /**
-     * Title of the server-managed personal journal folder.
-     */
-    public const JOURNAL_TITLE = '.journal';
+    public const string JOURNAL_TITLE = '.journal';
 
     protected static function newFactory(): NoteCategoryFactory
     {
@@ -45,11 +42,7 @@ class NoteCategory extends Model
         'is_hidden' => 'boolean',
     ];
 
-    /**
-     * Provision the root-level journal folder for a user, unless that user
-     * already owns one. Shared by the new-user observer and the backfill
-     * migration so the journal definition lives in one place.
-     */
+    // Shared by the new-user observer and the backfill migration, so the journal is defined in one place.
     public static function provisionJournal(User $user): self
     {
         return static::firstOrCreate(

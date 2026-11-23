@@ -7,7 +7,10 @@ use App\Shared\Services\UserCacheService;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 
-const PLUGIN_TEST_KEY = 'sk-test-secret-key-1234567890';
+function pluginTestKey(): string
+{
+    return 'sk-test-secret-key-1234567890';
+}
 
 beforeEach(function () {
     $this->app->instance(AiModelSnapshot::class, new AiModelSnapshot(base_path('tests/Fixtures/ai-models.json')));
@@ -17,7 +20,7 @@ function aiPayload(array $overrides = []): array
 {
     return array_merge([
         'enabled' => true,
-        'api_key' => PLUGIN_TEST_KEY,
+        'api_key' => pluginTestKey(),
         'provider' => 'openai',
         'model' => 'gpt-a',
     ], $overrides);
@@ -41,7 +44,7 @@ describe('GET /api/v1/users/me/plugins', function () {
     it('shows the stored state in the same shape as the single endpoint', function () {
         $user = makeUser();
         UserPlugin::factory()->forUser($user)->create([
-            'credentials' => ['api_key' => PLUGIN_TEST_KEY],
+            'credentials' => ['api_key' => pluginTestKey()],
             'settings' => ['provider' => 'openai', 'model' => 'gpt-b'],
         ]);
 
@@ -93,7 +96,7 @@ describe('GET /api/v1/users/me/plugins/{plugin}', function () {
         $plugin = UserPlugin::factory()->forUser($user)->create();
         $foreign = new Encrypter(Encrypter::generateKey('aes-256-cbc'), 'aes-256-cbc');
         DB::table('user_plugins')->where('id', $plugin->id)
-            ->update(['credentials' => $foreign->encrypt(json_encode(['api_key' => PLUGIN_TEST_KEY]), false)]);
+            ->update(['credentials' => $foreign->encrypt(json_encode(['api_key' => pluginTestKey()]), false)]);
 
         $show = $this->actingAs($user, 'sanctum')->getJson('/api/v1/users/me/plugins/ai');
         $index = $this->actingAs($user, 'sanctum')->getJson('/api/v1/users/me/plugins');
@@ -110,7 +113,7 @@ describe('GET /api/v1/users/me/plugins/{plugin}', function () {
         $reentered = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload());
         expectApiSuccess($reentered);
         $reentered->assertJsonPath('data.has_api_key', true);
-        expect($plugin->fresh()->credentials)->toBe(['api_key' => PLUGIN_TEST_KEY]);
+        expect($plugin->fresh()->credentials)->toBe(['api_key' => pluginTestKey()]);
     });
 });
 
@@ -127,8 +130,8 @@ describe('PUT /api/v1/users/me/plugins/{plugin}', function () {
             ->assertJsonPath('data.model_available', true);
 
         $raw = DB::table('user_plugins')->where('user_id', $user->id)->value('credentials');
-        expect($raw)->not->toContain(PLUGIN_TEST_KEY)
-            ->and(json_decode(decrypt($raw, false), true))->toBe(['api_key' => PLUGIN_TEST_KEY]);
+        expect($raw)->not->toContain(pluginTestKey())
+            ->and(json_decode(decrypt($raw, false), true))->toBe(['api_key' => pluginTestKey()]);
     });
 
     it('keeps the stored key when api_key is left out', function () {
@@ -144,7 +147,7 @@ describe('PUT /api/v1/users/me/plugins/{plugin}', function () {
             ->assertJsonPath('data.has_api_key', true)
             ->assertJsonPath('data.settings.provider', 'mistral');
         expect(UserPlugin::forUser($user->id)->count())->toBe(1)
-            ->and(UserPlugin::forUser($user->id)->first()->credentials)->toBe(['api_key' => PLUGIN_TEST_KEY]);
+            ->and(UserPlugin::forUser($user->id)->first()->credentials)->toBe(['api_key' => pluginTestKey()]);
     });
 
     it('requires an api_key when none is stored yet', function () {
@@ -186,7 +189,7 @@ describe('PUT /api/v1/users/me/plugins/{plugin}', function () {
         $user = makeUser();
 
         $response = $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/plugins/ai', ['api_key' => PLUGIN_TEST_KEY]);
+            ->putJson('/api/v1/users/me/plugins/ai', ['api_key' => pluginTestKey()]);
 
         expectApiError($response, 422);
         $response->assertJsonValidationErrors(['enabled', 'provider', 'model']);
@@ -220,7 +223,7 @@ describe('User plugin secrecy and isolation', function () {
 
         foreach ($responses as $response) {
             expectApiSuccess($response);
-            expect($response->getContent())->not->toContain(PLUGIN_TEST_KEY)
+            expect($response->getContent())->not->toContain(pluginTestKey())
                 ->and($response->getContent())->not->toContain('"api_key"')
                 ->and($response->getContent())->not->toContain('"credentials"');
         }

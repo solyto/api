@@ -33,26 +33,18 @@ class WeatherService
 
     private function fetchHourlyForecast(float $latitude, float $longitude, string $timezone): array
     {
-        $url = self::API_BASE_URL . '?' . http_build_query([
+        return $this->fetch([
             'latitude' => $latitude,
             'longitude' => $longitude,
             'hourly' => 'temperature_2m,relative_humidity_2m,rain,wind_speed_10m,cloud_cover,weather_code',
             'timezone' => $timezone,
             'forecast_days' => 1,
         ]);
-
-        $res = Http::get($url);
-
-        if (!$res->successful()) {
-            return [];
-        }
-
-        return $res->json();
     }
 
     private function fetchDailyForecast(float $latitude, float $longitude, string $timezone): array
     {
-        $url = self::API_BASE_URL . '?' . http_build_query([
+        return $this->fetch([
             'latitude' => $latitude,
             'longitude' => $longitude,
             'daily' => 'weather_code,sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,rain_sum,snowfall_sum,cloud_cover_mean,wind_speed_10m_max,relative_humidity_2m_mean',
@@ -60,8 +52,12 @@ class WeatherService
             'timezone' => $timezone,
             'forecast_days' => 1,
         ]);
+    }
 
-        $res = Http::get($url);
+    // A failed request returns [], which UserCacheService::remember does not cache.
+    private function fetch(array $query): array
+    {
+        $res = Http::get(self::API_BASE_URL . '?' . http_build_query($query));
 
         if (!$res->successful()) {
             return [];

@@ -39,10 +39,6 @@ class NoteService
         );
     }
 
-    /**
-     * The notes the plain list leaves out: those in a hidden or system
-     * category, or in a descendant of one.
-     */
     public function listHidden(User $user): array
     {
         return $this->rememberList(
@@ -69,10 +65,7 @@ class NoteService
         );
     }
 
-    /**
-     * The most recently created or edited notes; creating a note sets
-     * updated_at too.
-     */
+    // Creating a note sets updated_at too, so new notes count as recently changed.
     public function recent(User $user): array
     {
         return $this->rememberList(
@@ -86,13 +79,8 @@ class NoteService
         );
     }
 
-    /**
-     * Ids of the user's categories that the plain lists leave out: every
-     * category with is_hidden or is_system set, plus all of its descendants
-     * at any depth (docs/STANDARDS.md 13.3).
-     *
-     * @return array<int, int>
-     */
+    // Hidden and system categories stay out of the plain lists with all their descendants (docs/STANDARDS.md 13.3).
+    /** @return array<int, int> */
     public function hiddenCategoryIds(string $userId): array
     {
         $categories = NoteCategory::forUser($userId)->get(['id', 'parent_id', 'is_hidden', 'is_system']);
@@ -117,16 +105,7 @@ class NoteService
         return array_values($hidden);
     }
 
-    public function find(Note $note): Note
-    {
-        return $note;
-    }
-
-    /**
-     * Dates (Y-m-d) within [$from, $to] that the user has a journal entry for.
-     * The journal folder is identified by is_system, not title, and is read
-     * even while hidden.
-     */
+    // The journal folder is found by is_system, not by title, and is read even while hidden.
     public function journalMarks(User $user, string $from, string $to): array
     {
         $journalCategoryIds = NoteCategory::forUser($user->id)
@@ -187,16 +166,8 @@ class NoteService
         $this->forgetUser($userId);
     }
 
-    /**
-     * Category writes change which notes are hidden, so NoteCategoryService
-     * forgets every note list through here.
-     */
-    public function forgetLists(string $userId): void
-    {
-        $this->forgetUser($userId);
-    }
-
-    private function forgetUser(string $userId): void
+    // Public because category writes change which notes are hidden; NoteCategoryService calls it.
+    public function forgetUser(string $userId): void
     {
         $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_HIDDEN, $userId]);
@@ -204,23 +175,21 @@ class NoteService
         $this->cache->forget([self::CACHE_KEY_RECENT, $userId]);
     }
 
-    /**
-     * Lists are cached as the response arrays, not as models: a serialised
-     * model holds its attributes twice (attributes and original), and with
-     * the full note content that doubles the cached size.
-     */
     private function rememberList(string $key, string $userId, callable $query): array
     {
-        return $this->cache->remember(
-            [$key, $userId],
-            self::CACHE_TTL,
-            fn () => json_decode(json_encode(NoteResource::collection($query()), JSON_THROW_ON_ERROR), true)
-        );
+        return $this->cache->remember([$key, $userId], self::CACHE_TTL, fn () => $this->toResponseArrays($query()));
     }
 
-    /**
-     * Uncategorised notes stay visible: SQL NOT IN never matches NULL.
-     */
+    // Cached as response arrays, not models: a serialised model holds its attributes twice (attributes and
+    // original), which with the full note content doubles the cached size.
+    private function toResponseArrays(Collection $notes): array
+    {
+        $json = json_encode(NoteResource::collection($notes), JSON_THROW_ON_ERROR);
+
+        return json_decode($json, true);
+    }
+
+    // Uncategorised notes stay visible: SQL NOT IN never matches NULL.
     private function whereVisible(Builder $query, string $userId): void
     {
         $query->whereNull('category_id')

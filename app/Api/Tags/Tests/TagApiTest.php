@@ -44,8 +44,7 @@ describe('Tag CRUD', function () {
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/tags/'.$tag->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/tags/'.$tag->id), 403);
     });
 });

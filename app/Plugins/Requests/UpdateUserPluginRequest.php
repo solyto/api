@@ -17,11 +17,12 @@ class UpdateUserPluginRequest extends FormRequest
         $plugin = $this->route('plugin');
         $provider = is_string($this->input('provider')) ? AiProviderEnum::tryFrom($this->input('provider')) : null;
         $models = $provider ? array_column($snapshot->models($provider), 'id') : [];
+        $keyAlreadyStored = $userPluginService->hasApiKey($this->user(), $plugin);
 
         return match ($plugin) {
             PluginEnum::AI => [
                 'enabled' => 'required|boolean',
-                'api_key' => ($userPluginService->hasApiKey($this->user(), $plugin) ? 'sometimes' : 'required').'|string',
+                'api_key' => [$keyAlreadyStored ? 'sometimes' : 'required', 'string'],
                 'provider' => ['required', 'string', Rule::enum(AiProviderEnum::class)],
                 'model' => ['required', 'string', Rule::in($models)],
             ],

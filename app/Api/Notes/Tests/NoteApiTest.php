@@ -5,8 +5,14 @@ use App\Api\Notes\Models\NoteCategory;
 use App\Api\Notes\Services\NoteImportService;
 use App\Api\Notes\Services\NoteService;
 use App\Api\Tags\Models\Tag;
+use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Http\UploadedFile;
+
+function journalFolder(User $user): NoteCategory
+{
+    return NoteCategory::forUser($user->id)->where('title', NoteCategory::JOURNAL_TITLE)->firstOrFail();
+}
 
 describe('Note CRUD', function () {
     it('lists, stores, shows, updates and deletes notes', function () {
@@ -103,9 +109,8 @@ describe('Note CRUD', function () {
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/notes/'.$note->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/'.$note->id), 403);
     });
 
     it('rejects another user\'s category and tags on store and update', function () {
@@ -115,25 +120,25 @@ describe('Note CRUD', function () {
         $foreignCategory = NoteCategory::factory()->forUser($other)->create();
         $foreignTag = Tag::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Meeting', 'tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/notes/'.$note->id, ['category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/'.$note->id, ['category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/notes/'.$note->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/'.$note->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
         expect(Note::count())->toBe(1);
         expect($note->fresh()->category_id)->toBeNull();
@@ -176,10 +181,10 @@ describe('Note categories CRUD', function () {
         $other = makeUser();
         $foreignParent = NoteCategory::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/notes/categories', ['title' => 'Child', 'parent_id' => $foreignParent->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('parent_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes/categories', ['title' => 'Child', 'parent_id' => $foreignParent->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('parent_id');
 
         expect(NoteCategory::where('title', 'Child')->exists())->toBeFalse();
     });
@@ -211,9 +216,7 @@ describe('Journal folder', function () {
     it('provisions a system, hidden, root-level journal folder per user', function () {
         $user = makeUser();
 
-        $journal = NoteCategory::where('user_id', $user->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($user);
 
         expect($journal)->not->toBeNull();
         expect($journal->is_system)->toBeTrue();
@@ -232,17 +235,13 @@ describe('Journal folder', function () {
 
     it('rejects renaming and deleting a system folder', function () {
         $user = makeUser();
-        $journal = NoteCategory::where('user_id', $user->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($user);
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/notes/categories/'.$journal->id, ['title' => 'Renamed'])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notes/categories/'.$journal->id, ['title' => 'Renamed']), 403);
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/notes/categories/'.$journal->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/notes/categories/'.$journal->id), 403);
 
         expect($journal->fresh()->title)->toBe(NoteCategory::JOURNAL_TITLE);
         expect(NoteCategory::whereKey($journal->id)->exists())->toBeTrue();
@@ -287,9 +286,7 @@ describe('Note category visibility', function () {
 
     it('allows toggling hidden on a system folder', function () {
         $user = makeUser();
-        $journal = NoteCategory::where('user_id', $user->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($user);
 
         $this->actingAs($user, 'sanctum')
             ->patchJson('/api/v1/notes/categories/'.$journal->id.'/hidden', ['hidden' => false])
@@ -301,9 +298,10 @@ describe('Note category visibility', function () {
         $user = makeUser();
         $category = NoteCategory::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', [])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', []);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('hidden');
     });
 
     it('forbids toggling hidden on another user folder', function () {
@@ -311,9 +309,8 @@ describe('Note category visibility', function () {
         $other = makeUser();
         $category = NoteCategory::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/notes/categories/'.$category->id.'/hidden', ['hidden' => true]), 403);
     });
 
     it('excludes notes in hidden folders from newest but keeps uncategorized notes', function () {
@@ -371,7 +368,7 @@ describe('Hidden notes and categories', function () {
 
     it('returns exactly the notes in hidden folders and their descendants', function () {
         $user = makeUser();
-        $journal = NoteCategory::forUser($user->id)->where('title', NoteCategory::JOURNAL_TITLE)->firstOrFail();
+        $journal = journalFolder($user);
         $hidden = NoteCategory::factory()->forUser($user)->hidden()->create();
         $hiddenChild = NoteCategory::factory()->forUser($user)->withParent($hidden)->create();
         $visible = NoteCategory::factory()->forUser($user)->create();
@@ -451,9 +448,7 @@ describe('Hidden notes and categories', function () {
 describe('Journal marks endpoint', function () {
     it('returns journal entry dates within the range, even while the folder is hidden', function () {
         $user = makeUser();
-        $journal = NoteCategory::where('user_id', $user->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($user);
 
         expect($journal->is_hidden)->toBeTrue();
 
@@ -470,9 +465,7 @@ describe('Journal marks endpoint', function () {
 
     it('ignores notes outside the journal folder and non-date titles', function () {
         $user = makeUser();
-        $journal = NoteCategory::where('user_id', $user->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($user);
         $other = NoteCategory::factory()->forUser($user)->create();
 
         Note::factory()->forUser($user)->forCategory($journal)->withTitle('2026-10-05')->create();
@@ -489,9 +482,7 @@ describe('Journal marks endpoint', function () {
     it('scopes marks to the authenticated user', function () {
         $user = makeUser();
         $other = makeUser();
-        $journal = NoteCategory::where('user_id', $other->id)
-            ->where('title', NoteCategory::JOURNAL_TITLE)
-            ->first();
+        $journal = journalFolder($other);
 
         Note::factory()->forUser($other)->forCategory($journal)->withTitle('2026-10-06')->create();
 
@@ -501,28 +492,37 @@ describe('Journal marks endpoint', function () {
             ->assertJsonPath('data', []);
     });
 
-    it('rejects a missing or malformed range', function () {
+    it('rejects a missing, reversed or malformed range', function (string $query, array $fields) {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/notes/journal/marks')
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes/journal/marks'.$query);
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/notes/journal/marks?from=2026-10-01&to=2026-09-01')
-            ->assertStatus(422);
-
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/notes/journal/marks?from=01.10.2026&to=31.10.2026')
-            ->assertStatus(422);
-    });
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors($fields);
+    })->with([
+        'missing' => ['', ['from', 'to']],
+        'reversed' => ['?from=2026-10-01&to=2026-09-01', ['to']],
+        'malformed' => ['?from=01.10.2026&to=31.10.2026', ['from', 'to']],
+    ]);
 
     it('rejects a range longer than 366 days', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/notes/journal/marks?from=2025-01-01&to=2026-10-01')
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2025-01-01&to=2026-01-03');
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['to' => 'The date range must not exceed 366 days.']);
+    });
+
+    it('accepts a range of exactly 366 days', function () {
+        $user = makeUser();
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/notes/journal/marks?from=2025-01-01&to=2026-01-02');
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data', []);
     });
 });
 
@@ -538,6 +538,17 @@ describe('Note import', function () {
             ->assertJsonPath('success', true);
 
         expect(Note::where('user_id', $user->id)->where('title', 'ideas')->exists())->toBeTrue();
+    });
+
+    it('lists the imported note right away, even after the list was cached', function () {
+        $user = makeUser();
+        Note::factory()->create(['user_id' => $user->id, 'title' => 'existing']);
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->assertOk();
+
+        $file = UploadedFile::fake()->createWithContent('ideas.md', '# Ideas');
+        $this->actingAs($user, 'sanctum')->post('/api/v1/notes/import', ['file' => $file])->assertOk();
+
+        expect(collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/notes')->json('data'))->pluck('title'))->toContain('ideas');
     });
 
     it('imports a zip file with a markdown note', function () {
@@ -568,14 +579,13 @@ describe('Note import', function () {
 
         $file = UploadedFile::fake()->createWithContent('notes.txt', 'plain text');
 
-        $this->actingAs($user, 'sanctum')
-            ->post('/api/v1/notes/import', ['file' => $file])
-            ->assertStatus(400);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->post('/api/v1/notes/import', ['file' => $file]), 400);
     });
 });
 
 describe('NoteService', function () {
-    it('create attaches tags', function () {
+    it('attaches tags on create', function () {
         $user = makeUser();
         $tag = Tag::factory()->forUser($user)->create();
 
@@ -588,7 +598,7 @@ describe('NoteService', function () {
         expect($note->tags->pluck('id'))->toContain($tag->id);
     });
 
-    it('update syncs tags', function () {
+    it('syncs tags on update', function () {
         $user = makeUser();
         $tag = Tag::factory()->forUser($user)->create();
         $note = Note::factory()->forUser($user)->create();

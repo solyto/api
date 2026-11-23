@@ -27,18 +27,23 @@ class TimeTrackingProjectResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $totalDuration = $this->whenAggregated('entries', 'duration_minutes', 'sum');
-
         return [
             'id' => $this->id,
             'title' => $this->title,
             'description' => $this->description,
             'color' => $this->color,
-            'categories' => $this->whenLoaded('categories', fn () => TimeTrackingCategoryResource::collection($this->categories)
-            ),
-            'total_duration' => $totalDuration instanceof MissingValue ? $totalDuration : (int) $totalDuration,
+            'categories' => $this->whenLoaded('categories', fn () => TimeTrackingCategoryResource::collection($this->categories)),
+            'total_duration' => $this->totalDuration(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    // Only where the service loaded the sum; a project without entries sums to null, which is sent as 0.
+    private function totalDuration(): MissingValue|int
+    {
+        $sum = $this->whenAggregated('entries', 'duration_minutes', 'sum');
+
+        return $sum instanceof MissingValue ? $sum : (int) $sum;
     }
 }

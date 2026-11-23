@@ -11,10 +11,11 @@ class TodoCategoryService
 {
     private const string CACHE_KEY = 'todo_categories';
     private const int CACHE_TTL = 86400;
-    // TodoWorkspaceService caches its workspaces with their categories embedded.
-    private const string CACHE_KEY_WORKSPACES = 'todo_workspaces';
 
-    public function __construct(private readonly UserCacheService $cache) {}
+    public function __construct(
+        private readonly UserCacheService $cache,
+        private readonly TodoWorkspaceService $todoWorkspaceService,
+    ) {}
 
     public function list(User $user): Collection
     {
@@ -23,11 +24,6 @@ class TodoCategoryService
             self::CACHE_TTL,
             fn() => TodoCategory::forUser($user->id)->get()
         );
-    }
-
-    public function find(TodoCategory $category): TodoCategory
-    {
-        return $category;
     }
 
     public function create(User $user, array $data): TodoCategory
@@ -46,8 +42,7 @@ class TodoCategoryService
         $userId = $category->user_id;
         $category->update($data);
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->cache->forget([self::CACHE_KEY_WORKSPACES, $userId]);
+        $this->forgetUser($userId);
 
         return $category->fresh(['user']);
     }
@@ -57,7 +52,13 @@ class TodoCategoryService
         $userId = $category->user_id;
         $category->delete();
 
+        $this->forgetUser($userId);
+    }
+
+    // Workspaces embed their categories, so a changed category drops the workspace list too.
+    private function forgetUser(string $userId): void
+    {
         $this->cache->forget([self::CACHE_KEY, $userId]);
-        $this->cache->forget([self::CACHE_KEY_WORKSPACES, $userId]);
+        $this->todoWorkspaceService->forgetUser($userId);
     }
 }

@@ -19,7 +19,6 @@ describe('GET /api/v1/weather/today', function () {
             'https://api.open-meteo.com/v1/forecast*' => Http::response([
                 'latitude' => 52.52,
                 'longitude' => 13.41,
-                'current' => ['temperature_2m' => 21.3, 'weather_code' => 1],
                 'daily' => [
                     'time' => [now()->toDateString()],
                     'weather_code' => [1],
@@ -61,6 +60,27 @@ describe('GET /api/v1/weather/today', function () {
             ->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.city', 'Berlin');
+    });
+
+    it('returns not configured when the location has no longitude', function () {
+        Http::fake();
+        $user = makeUser();
+        $user->settings()->update(['weather_city' => 'Berlin', 'weather_latitude' => 52.52, 'weather_longitude' => null]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/weather/today')
+            ->assertStatus(200)
+            ->assertJsonPath('data.configured', false);
+
+        Http::assertNothingSent();
+    });
+
+    it('answers 500 when the forecast cannot be fetched', function () {
+        Http::fake(['https://api.open-meteo.com/v1/forecast*' => Http::response([], 500)]);
+        $user = makeUser();
+        $user->settings()->update(['weather_city' => 'Berlin', 'weather_latitude' => 52.52, 'weather_longitude' => 13.41]);
+
+        expectApiError($this->actingAs($user, 'sanctum')->getJson('/api/v1/weather/today'), 500);
     });
 });
 

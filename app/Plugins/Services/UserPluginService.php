@@ -81,17 +81,12 @@ class UserPluginService
         );
     }
 
-    /**
-     * The user's usable AI configuration, or null when the plugin is missing, disabled,
-     * has no readable key, or points at a model that is not in the snapshot.
-     *
-     * @return array{provider: AiProviderEnum, api_key: string, model: string}|null
-     */
+    /** @return array{provider: AiProviderEnum, api_key: string, model: string}|null */
     public function aiConfig(User $user): ?array
     {
         $row = $this->row($user, PluginEnum::AI);
 
-        if ($row === null || ! $row->enabled || ! $this->apiKeyStored($row) || ! $this->aiModelAvailable($row->settings ?? [])) {
+        if (! $this->isUsableAi($row)) {
             return null;
         }
 
@@ -105,6 +100,15 @@ class UserPluginService
     public function hasApiKey(User $user, PluginEnum $plugin): bool
     {
         return $this->apiKeyStored($this->row($user, $plugin));
+    }
+
+    // Usable: enabled, with a readable key, and a model that is still in the snapshot.
+    private function isUsableAi(?UserPlugin $row): bool
+    {
+        return $row !== null
+            && $row->enabled
+            && $this->apiKeyStored($row)
+            && $this->aiModelAvailable($row->settings ?? []);
     }
 
     private function forgetAiRecommendations(User $user): void

@@ -283,11 +283,10 @@ describe('Quick-add endpoints', function () {
     it('rejects an invalid content type', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/dashboard/quick-add/commit', [
-                'content' => 'x',
-                'content_type' => 'invalid',
-            ])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dashboard/quick-add/commit', ['content' => 'x', 'content_type' => 'invalid']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('content_type');
     });
 });

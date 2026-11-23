@@ -6,6 +6,11 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function () {
     $this->snapshot = new AiModelSnapshot(base_path('tests/Fixtures/ai-models.json'));
+    $this->tempSnapshotPath = sys_get_temp_dir().'/ai-models-'.uniqid().'.json';
+});
+
+afterEach(function () {
+    File::delete($this->tempSnapshotPath);
 });
 
 describe('AiModelSnapshot', function () {
@@ -23,13 +28,10 @@ describe('AiModelSnapshot', function () {
     });
 
     it('returns nothing for a provider missing from the file', function () {
-        $path = sys_get_temp_dir().'/ai-models-'.uniqid().'.json';
-        File::put($path, '{"openai": []}');
-        $snapshot = new AiModelSnapshot($path);
+        File::put($this->tempSnapshotPath, '{"openai": []}');
+        $snapshot = new AiModelSnapshot($this->tempSnapshotPath);
 
         expect($snapshot->models(AiProviderEnum::MISTRAL))->toBe([])
             ->and($snapshot->has(AiProviderEnum::MISTRAL, 'mistral-small'))->toBeFalse();
-
-        File::delete($path);
     });
 });

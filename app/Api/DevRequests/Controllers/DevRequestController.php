@@ -138,14 +138,8 @@ class DevRequestController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized - Admin only"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Unauthorized - Admin only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateDevRequestRequest $request, DevRequest $devRequest): JsonResponse
@@ -276,10 +270,7 @@ class DevRequestController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function storeComment(StoreDevRequestCommentRequest $request, DevRequest $devRequest): JsonResponse

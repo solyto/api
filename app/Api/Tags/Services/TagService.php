@@ -23,11 +23,6 @@ class TagService
         );
     }
 
-    public function find(Tag $tag): Tag
-    {
-        return $tag;
-    }
-
     public function create(User $user, array $data): Tag
     {
         $data['user_id'] = $user->id;

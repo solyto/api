@@ -5,14 +5,13 @@ namespace App\Api\Notes\Controllers;
 use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
 use App\Api\Notes\Models\Note;
+use App\Api\Notes\Requests\ListJournalMarksRequest;
 use App\Api\Notes\Requests\StoreNoteRequest;
 use App\Api\Notes\Requests\UpdateNoteRequest;
 use App\Api\Notes\Resources\NoteResource;
 use App\Api\Notes\Services\NoteService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class NoteController
 {
@@ -158,18 +157,9 @@ class NoteController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function journalMarks(Request $request): JsonResponse
+    public function journalMarks(ListJournalMarksRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from' => 'required|date_format:Y-m-d',
-            'to' => 'required|date_format:Y-m-d|after_or_equal:from',
-        ]);
-
-        if (Carbon::parse($validated['from'])->diffInDays(Carbon::parse($validated['to'])) > 366) {
-            throw ValidationException::withMessages([
-                'to' => 'The date range must not exceed 366 days.',
-            ]);
-        }
+        $validated = $request->validated();
 
         return ApiResponse::success(
             $this->noteService->journalMarks($request->user(), $validated['from'], $validated['to']),

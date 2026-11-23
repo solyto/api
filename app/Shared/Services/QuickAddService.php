@@ -57,7 +57,9 @@ class QuickAddService
     {
         $content = UrlHelper::extractUrl($content) ?? $content;
 
-        if (Str::contains($content, [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl(), MusicServiceEnum::SPOTIFY->baseUrl()])) {
+        $musicUrls = [MusicServiceEnum::DEEZER->baseUrl(), MusicServiceEnum::DISCOGS->baseUrl(), MusicServiceEnum::SPOTIFY->baseUrl()];
+
+        if (Str::contains($content, $musicUrls)) {
             return $this->makeResult($content, QuickAddContentType::Music, 0.95);
         }
 
@@ -140,8 +142,9 @@ class QuickAddService
     private function commitTodo(User $user, string $content, ?array $metadata): Todo
     {
         $todoService = app(TodoService::class);
+        $data = $todoService->parse($user, ['title' => $metadata['title'] ?? $content]);
 
-        return $todoService->create($user, $todoService->parse($user, ['title' => $metadata['title'] ?? $content]));
+        return $todoService->create($user, $data);
     }
 
     private function commitMusic(User $user, string $url): ?LibraryMusic
@@ -201,9 +204,11 @@ class QuickAddService
             return null;
         }
 
+        $isSeries = in_array($dto->getType(), ['tv', 'series'], true);
+
         return $service->create($user, [
             'title' => $dto->getTitle(),
-            'category' => in_array($dto->getType(), ['tv', 'series'], true) ? 'series' : 'movie',
+            'category' => $isSeries ? 'series' : 'movie',
             'publication_year' => $dto->getReleaseYear(),
             'cover_path' => $dto->getCover(),
             'link' => $dto->getLink(),

@@ -16,11 +16,11 @@ class DevRequestScreenshotService
 
     public function load(int $devRequestId, string $fileName): string | false
     {
-        if (!Storage::disk('public')->exists('dev-requests/' . $devRequestId . '/' . $fileName)) {
+        if (!Storage::disk('public')->exists($this->path($devRequestId, $fileName))) {
             return false;
         }
 
-        return Storage::disk('public')->get('dev-requests/' . $devRequestId . '/' . $fileName);
+        return Storage::disk('public')->get($this->path($devRequestId, $fileName));
     }
 
     /**
@@ -36,6 +36,7 @@ class DevRequestScreenshotService
 
         // The extension comes from the decoded bytes, never from the client.
         $bytes = base64_decode(substr($dataUri, strlen($matches[0])), true);
+        // Bytes that are no image make getimagesizefromstring warn as well as return false; false is all we need.
         $info = $bytes === false ? false : @getimagesizefromstring($bytes);
 
         if ($info === false || !isset(self::EXTENSIONS[$info['mime']])) {
@@ -49,9 +50,14 @@ class DevRequestScreenshotService
     {
         $fileName = 'screenshot.' . $extension;
 
-        return Storage::disk('public')->put('dev-requests/' . $devRequestId . '/' . $fileName, $bytes)
+        return Storage::disk('public')->put($this->path($devRequestId, $fileName), $bytes)
             ? $fileName
             : false;
+    }
+
+    private function path(int $devRequestId, string $fileName): string
+    {
+        return 'dev-requests/' . $devRequestId . '/' . $fileName;
     }
 
     private function invalid(): ValidationException

@@ -8,6 +8,7 @@ use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -95,11 +96,8 @@ class TimeTrackingService
             ->first();
     }
 
-    /**
-     * Most recently used first (latest entry start), then never used projects by title.
-     *
-     * @return Collection<int, TimeTrackingProject>
-     */
+    // Most recently used first (latest entry start), then never used projects by title.
+    /** @return Collection<int, TimeTrackingProject> */
     public function projectsByLastUse(User $user, int $limit, ?string $exceptProjectId = null): Collection
     {
         // MariaDB and SQLite both sort NULL last in descending order, so never used projects follow the used ones.
@@ -112,9 +110,7 @@ class TimeTrackingService
             ->get();
     }
 
-    /**
-     * Starts the project's timer and stops any other running one; a no-op while the project's timer runs.
-     */
+    // Stops any other running timer; a no-op while the project's own timer runs.
     public function switchTo(User $user, TimeTrackingProject $project): void
     {
         DB::transaction(function () use ($user, $project) {
@@ -149,16 +145,26 @@ class TimeTrackingService
         return $entry;
     }
 
-    /**
-     * @param  int[]  $categoryIds  Keeps projects tagged with any of these categories; empty means all.
-     */
+    // A comma-separated category_ids list and a single category_id combine into one filter.
+    public function statisticsCategoryIds(?string $categoryIdList, int|string|null $categoryId): array
+    {
+        $categoryIds = array_map('intval', array_filter(explode(',', $categoryIdList ?? '')));
+
+        if ($categoryId !== null) {
+            $categoryIds[] = (int) $categoryId;
+        }
+
+        return $categoryIds;
+    }
+
+    // $categoryIds keeps projects tagged with any of them; empty means all projects.
     public function getStatistics(User $user, Carbon $from, Carbon $to, array $categoryIds = []): array
     {
         $entries = TimeTrackingEntry::forUser($user->id)
             ->whereNotNull('stopped_at')
             ->where('started_at', '>=', $from)
             ->where('started_at', '<=', $to)
-            ->when($categoryIds, fn ($query) => $query->whereHas('project.categories', fn ($q) => $q->whereIn('time_tracking_categories.id', $categoryIds)))
+            ->when($categoryIds, fn ($query) => $this->whereProjectInCategories($query, $categoryIds))
             ->with('project')
             ->get();
 
@@ -285,6 +291,14 @@ class TimeTrackingService
         $project->delete();
 
         $this->forgetUser($userId);
+    }
+
+    private function whereProjectInCategories(Builder $query, array $categoryIds): void
+    {
+        $query->whereHas(
+            'project.categories',
+            fn (Builder $categories) => $categories->whereIn('time_tracking_categories.id', $categoryIds)
+        );
     }
 
     private function forgetUser(string $userId): void

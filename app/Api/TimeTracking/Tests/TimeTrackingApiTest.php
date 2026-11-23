@@ -4,6 +4,21 @@ use App\Api\TimeTracking\Models\TimeTrackingCategory;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\TimeTracking\Services\TimeTrackingService;
+use App\Api\Users\Models\User;
+
+function lastWeekStatisticsUrl(string $filter = ''): string
+{
+    return '/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().$filter;
+}
+
+function trackedYesterday(User $user, TimeTrackingProject $project, int $minutes): TimeTrackingEntry
+{
+    return TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
+        'started_at' => now()->subDay(),
+        'stopped_at' => now(),
+        'duration_minutes' => $minutes,
+    ]);
+}
 
 describe('Time tracking categories and projects', function () {
     it('stores, lists and deletes categories', function () {
@@ -56,13 +71,11 @@ describe('Time tracking categories and projects', function () {
         $category = TimeTrackingCategory::factory()->forUser($user)->create();
         $entry = TimeTrackingEntry::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/categories/'.$category->id)
-            ->assertStatus(405);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/categories/'.$category->id), 405);
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/'.$entry->id)
-            ->assertStatus(405);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/time-tracking/entries/'.$entry->id), 405);
     });
 
     it('stores, lists, updates and deletes projects', function () {
@@ -152,15 +165,15 @@ describe('Time tracking categories and projects', function () {
         $project = TimeTrackingProject::factory()->forUser($user)->create();
         $foreignCategory = TimeTrackingCategory::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/time-tracking/projects', ['title' => 'Solyto', 'category_ids' => [$foreignCategory->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_ids.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/projects', ['title' => 'Solyto', 'category_ids' => [$foreignCategory->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_ids.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/time-tracking/projects/'.$project->id, ['category_ids' => [$foreignCategory->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_ids.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/time-tracking/projects/'.$project->id, ['category_ids' => [$foreignCategory->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_ids.0');
 
         expect(TimeTrackingProject::count())->toBe(1);
         expect($project->fresh()->categories)->toHaveCount(0);
@@ -232,12 +245,26 @@ describe('Time tracking entries', function () {
             ->assertStatus(201)
             ->assertJsonPath('data.description', 'Focus');
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/time-tracking/entries/start', [
-                'project_id' => $project->id,
-            ])
-            ->assertStatus(409);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 409);
     });
+
+    it('rejects a timer start without a known project or with a long description', function (array $payload, string $field) {
+        $user = makeUser();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/time-tracking/entries/start', $payload);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors($field);
+        expect(TimeTrackingEntry::count())->toBe(0);
+    })->with([
+        'no project' => [[], 'project_id'],
+        'unknown project' => [['project_id' => '00000000-0000-0000-0000-000000000000'], 'project_id'],
+        'description over 255 characters' => [fn () => [
+            'project_id' => TimeTrackingProject::factory()->create()->id,
+            'description' => str_repeat('a', 256),
+        ], 'description'],
+    ]);
 
     it('stops a running timer and records the duration', function () {
         $user = makeUser();
@@ -262,9 +289,8 @@ describe('Time tracking entries', function () {
         $user = makeUser();
         $entry = TimeTrackingEntry::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/time-tracking/entries/'.$entry->id.'/stop')
-            ->assertStatus(409);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/time-tracking/entries/'.$entry->id.'/stop'), 409);
     });
 
     it('keeps project total_duration fresh across entry mutations', function () {
@@ -359,11 +385,7 @@ describe('TimeTrackingService statistics', function () {
         $user = makeUser();
         $project = TimeTrackingProject::factory()->forUser($user)->withColor('#AABBCC')->create();
 
-        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
-            'started_at' => now()->subDay(),
-            'stopped_at' => now(),
-            'duration_minutes' => 30,
-        ]);
+        trackedYesterday($user, $project, 30);
 
         $stats = app(TimeTrackingService::class)->getStatistics($user, now()->subWeek(), now());
 
@@ -376,11 +398,7 @@ describe('TimeTrackingService statistics', function () {
         $project = TimeTrackingProject::factory()->forUser($user)->create(['color' => null]);
         $project->categories()->attach($category);
 
-        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
-            'started_at' => now()->subDay(),
-            'stopped_at' => now(),
-            'duration_minutes' => 30,
-        ]);
+        trackedYesterday($user, $project, 30);
 
         $stats = app(TimeTrackingService::class)->getStatistics($user, now()->subWeek(), now());
 
@@ -396,19 +414,11 @@ describe('TimeTrackingService statistics', function () {
         $project->categories()->attach($category);
         $otherProject->categories()->attach($otherCategory);
 
-        TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
-            'started_at' => now()->subDay(),
-            'stopped_at' => now(),
-            'duration_minutes' => 30,
-        ]);
-        TimeTrackingEntry::factory()->forUser($user)->forProject($otherProject)->create([
-            'started_at' => now()->subDay(),
-            'stopped_at' => now(),
-            'duration_minutes' => 45,
-        ]);
+        trackedYesterday($user, $project, 30);
+        trackedYesterday($user, $otherProject, 45);
 
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_id='.$category->id)
+            ->getJson(lastWeekStatisticsUrl('&category_id='.$category->id))
             ->assertStatus(200)
             ->assertJsonPath('data.total_minutes', 30)
             ->assertJsonCount(1, 'data.by_project');
@@ -422,16 +432,12 @@ describe('TimeTrackingService statistics', function () {
             $category = TimeTrackingCategory::factory()->forUser($user)->create();
             $project = TimeTrackingProject::factory()->forUser($user)->create();
             $project->categories()->attach($category);
-            TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
-                'started_at' => now()->subDay(),
-                'stopped_at' => now(),
-                'duration_minutes' => $minutes,
-            ]);
+            trackedYesterday($user, $project, $minutes);
             $categories[] = $category;
         }
 
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_ids='.$categories[0]->id.','.$categories[1]->id)
+            ->getJson(lastWeekStatisticsUrl('&category_ids='.$categories[0]->id.','.$categories[1]->id))
             ->assertStatus(200)
             ->assertJsonPath('data.total_minutes', 75)
             ->assertJsonCount(2, 'data.by_project');
@@ -440,17 +446,60 @@ describe('TimeTrackingService statistics', function () {
     it('rejects malformed category_ids', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_ids=3,abc')
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')->getJson(lastWeekStatisticsUrl('&category_ids=3,abc'));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_ids');
     });
 
     it('rejects an unknown category filter', function () {
         $user = makeUser();
 
+        $response = $this->actingAs($user, 'sanctum')->getJson(lastWeekStatisticsUrl('&category_id=999999'));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
+    });
+
+    it('combines category_id and category_ids and echoes the range', function () {
+        $user = makeUser();
+        $categories = TimeTrackingCategory::factory()->forUser($user)->count(3)->create();
+
+        foreach ($categories as $index => $category) {
+            $project = TimeTrackingProject::factory()->forUser($user)->create();
+            $project->categories()->attach($category);
+            TimeTrackingEntry::factory()->forUser($user)->forProject($project)->create([
+                'started_at' => '2026-03-10 12:00:00',
+                'stopped_at' => '2026-03-10 13:00:00',
+                'duration_minutes' => 10 * ($index + 1),
+            ]);
+        }
+
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString().'&category_id=999999')
-            ->assertStatus(422);
+            ->getJson('/api/v1/time-tracking/entries/statistics?from=2026-03-10&to=2026-03-10&category_id='.$categories[0]->id.'&category_ids='.$categories[2]->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.total_minutes', 40)
+            ->assertJsonPath('data.from', '2026-03-10')
+            ->assertJsonPath('data.to', '2026-03-10');
+    });
+
+    it('rejects a missing or reversed range', function (string $query, array $fields) {
+        $user = makeUser();
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/time-tracking/entries/statistics'.$query);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors($fields);
+    })->with([
+        'missing' => ['', ['from', 'to']],
+        'reversed' => ['?from=2026-03-10&to=2026-03-09', ['to']],
+    ]);
+
+    it('rejects a category id sent as a list', function () {
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson(lastWeekStatisticsUrl('&category_id[]=5'));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['category_id']);
     });
 
     it('returns empty statistics when no entries exist', function () {
@@ -554,14 +603,10 @@ describe('Time tracking tenant isolation', function () {
         $user = makeUser();
         $other = makeUser();
         $project = TimeTrackingProject::factory()->forUser($other)->create();
-        TimeTrackingEntry::factory()->forUser($other)->forProject($project)->create([
-            'started_at' => now()->subDay(),
-            'stopped_at' => now(),
-            'duration_minutes' => 30,
-        ]);
+        trackedYesterday($other, $project, 30);
 
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/time-tracking/entries/statistics?from='.now()->subWeek()->toDateString().'&to='.now()->toDateString())
+            ->getJson(lastWeekStatisticsUrl())
             ->assertStatus(200)
             ->assertJsonPath('data.total_minutes', 0)
             ->assertJsonCount(0, 'data.by_project');

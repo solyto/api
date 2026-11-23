@@ -6,7 +6,9 @@ use App\Api\ApiResponse;
 use App\Api\HandlesApiAuth;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
+use App\Api\TimeTracking\Requests\StartTimeTrackingTimerRequest;
 use App\Api\TimeTracking\Requests\StoreTimeTrackingEntryRequest;
+use App\Api\TimeTracking\Requests\TimeTrackingStatisticsRequest;
 use App\Api\TimeTracking\Requests\UpdateTimeTrackingEntryRequest;
 use App\Api\TimeTracking\Resources\TimeTrackingEntryResource;
 use App\Api\TimeTracking\Services\TimeTrackingService;
@@ -64,8 +66,8 @@ class TimeTrackingEntryController
      *             @OA\Property(property="started_at", type="string", format="date-time", description="Day anchor when has_exact_times is false."),
      *             @OA\Property(property="stopped_at", type="string", format="date-time", description="Informational when has_exact_times is false."),
      *             @OA\Property(property="duration_minutes", type="integer", minimum=1, description="Authoritative value for duration-only entries."),
-     *             @OA\Property(property="has_exact_times", type="boolean", nullable=true, description="False makes the entry duration-only; started_at's date then anchors it."),
-     *             @OA\Property(property="project_id", type="integer")
+     *             @OA\Property(property="has_exact_times", type="boolean", description="False makes the entry duration-only; started_at's date then anchors it."),
+     *             @OA\Property(property="project_id", type="string", format="uuid")
      *         )
      *     ),
      *
@@ -80,18 +82,15 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTimeTrackingEntryRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $project = TimeTrackingProject::find($data['project_id']);
 
-        abort_unless($project && $this->isResourceOwner($request, $project), 403);
+        abort_unless($this->ownsProject($request, $data['project_id']), 403);
 
         $entry = $this->timeTrackingService->createEntry($request->user(), $data);
 
@@ -126,8 +125,8 @@ class TimeTrackingEntryController
      *             @OA\Property(property="started_at", type="string", format="date-time", description="Day anchor when has_exact_times is false."),
      *             @OA\Property(property="stopped_at", type="string", format="date-time", nullable=true, description="Informational when has_exact_times is false."),
      *             @OA\Property(property="duration_minutes", type="integer", minimum=0, description="Authoritative value for duration-only entries."),
-     *             @OA\Property(property="has_exact_times", type="boolean", nullable=true, description="Set or clear the exact-times flag; false makes the entry duration-only."),
-     *             @OA\Property(property="project_id", type="integer")
+     *             @OA\Property(property="has_exact_times", type="boolean", description="Set or clear the exact-times flag; false makes the entry duration-only."),
+     *             @OA\Property(property="project_id", type="string", format="uuid")
      *         )
      *     ),
      *
@@ -142,14 +141,8 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTimeTrackingEntryRequest $request, TimeTrackingEntry $entry): JsonResponse
@@ -159,8 +152,7 @@ class TimeTrackingEntryController
         $validated = $request->validated();
 
         if (isset($validated['project_id'])) {
-            $project = TimeTrackingProject::find($validated['project_id']);
-            abort_unless($project && $this->isResourceOwner($request, $project), 403);
+            abort_unless($this->ownsProject($request, $validated['project_id']), 403);
         }
 
         $entry = $this->timeTrackingService->updateEntry($entry, $validated);
@@ -197,10 +189,7 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroy(Request $request, TimeTrackingEntry $entry): JsonResponse
@@ -225,7 +214,7 @@ class TimeTrackingEntryController
      *         @OA\JsonContent(
      *             required={"project_id"},
      *
-     *             @OA\Property(property="project_id", type="integer"),
+     *             @OA\Property(property="project_id", type="string", format="uuid"),
      *             @OA\Property(property="description", type="string", maxLength=255, nullable=true)
      *         )
      *     ),
@@ -241,30 +230,16 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=409,
-     *         description="A timer is already running (only one active timer per user; stop it first)"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=409, description="A timer is already running (only one active timer per user; stop it first)", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function start(Request $request): JsonResponse
+    public function start(StartTimeTrackingTimerRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'project_id' => 'required|exists:time_tracking_projects,id',
-            'description' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
-        $project = TimeTrackingProject::find($validated['project_id']);
-
-        abort_unless($project && $this->isResourceOwner($request, $project), 403);
+        abort_unless($this->ownsProject($request, $validated['project_id']), 403);
 
         if ($this->timeTrackingService->hasRunningTimer($request->user())) {
             return ApiResponse::error('A timer is already running. Stop it first.', 409);
@@ -305,14 +280,8 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=409,
-     *         description="Timer already stopped"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=409, description="Timer already stopped", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function stop(Request $request, TimeTrackingEntry $entry): JsonResponse
@@ -382,34 +351,30 @@ class TimeTrackingEntryController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function statistics(Request $request): JsonResponse
+    public function statistics(TimeTrackingStatisticsRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from' => 'required|date',
-            'to' => 'required|date|after_or_equal:from',
-            'category_id' => 'nullable|exists:time_tracking_categories,id',
-            'category_ids' => ['nullable', 'string', 'regex:/^\d+(,\d+)*$/'],
-        ]);
+        $validated = $request->validated();
 
-        $categoryIds = array_map('intval', array_filter(explode(',', $validated['category_ids'] ?? '')));
-        if (isset($validated['category_id'])) {
-            $categoryIds[] = (int) $validated['category_id'];
-        }
-
-        $from = Carbon::parse($validated['from'])->startOfDay();
-        $to = Carbon::parse($validated['to'])->endOfDay();
-
-        $stats = $this->timeTrackingService->getStatistics($request->user(), $from, $to, $categoryIds);
+        $stats = $this->timeTrackingService->getStatistics(
+            $request->user(),
+            Carbon::parse($validated['from'])->startOfDay(),
+            Carbon::parse($validated['to'])->endOfDay(),
+            $this->timeTrackingService->statisticsCategoryIds($validated['category_ids'] ?? null, $validated['category_id'] ?? null),
+        );
 
         return ApiResponse::success(array_merge($stats, [
             'from' => $validated['from'],
             'to' => $validated['to'],
         ]), 'Statistics retrieved successfully.');
+    }
+
+    private function ownsProject(Request $request, string $projectId): bool
+    {
+        $project = TimeTrackingProject::find($projectId);
+
+        return $project !== null && $this->isResourceOwner($request, $project);
     }
 }

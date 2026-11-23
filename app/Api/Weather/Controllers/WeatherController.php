@@ -41,10 +41,10 @@ class WeatherController
      */
     public function today(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $settings = $user->settings;
+        $settings = $request->user()->settings;
+        $hasLocation = $settings && $settings->weather_latitude && $settings->weather_longitude;
 
-        if (!$settings || !$settings->weather_latitude || !$settings->weather_longitude) {
+        if (!$hasLocation) {
             return ApiResponse::success([
                 'city' => null,
                 'configured' => false,

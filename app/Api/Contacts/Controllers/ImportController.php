@@ -16,12 +16,7 @@ class ImportController
 {
     use HandlesApiAuth;
 
-    private DavService $dav;
-
-    public function __construct()
-    {
-        $this->dav = app(DavService::class);
-    }
+    public function __construct(private readonly DavService $dav) {}
 
     /**
      * @OA\Post(

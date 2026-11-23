@@ -12,19 +12,12 @@ class DeleteOldDevRequests implements ShouldQueue
 {
     use Queueable, Dispatchable, InteractsWithQueue;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct()
-    {
-        //
-    }
+    private const int KEEP_CLOSED_DAYS = 30;
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        DevRequest::where('created_at', '<', now()->subDays(30))->whereIn('status', ['cancelled', 'completed'])->delete();
+        DevRequest::where('created_at', '<', now()->subDays(self::KEEP_CLOSED_DAYS))
+            ->whereIn('status', ['cancelled', 'completed'])
+            ->delete();
     }
 }

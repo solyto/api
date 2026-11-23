@@ -45,10 +45,7 @@ class QuickAddController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function detect(DetectRequest $request): JsonResponse
@@ -87,10 +84,7 @@ class QuickAddController
      *         @OA\JsonContent(ref="#/components/schemas/SuccessResponse")
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function commit(CommitRequest $request): JsonResponse

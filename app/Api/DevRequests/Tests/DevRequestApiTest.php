@@ -6,6 +6,7 @@ use App\Api\DevRequests\Models\DevRequestVote;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
@@ -20,7 +21,8 @@ describe('DevRequest CRUD', function () {
                 'type' => 'feature',
             ])
             ->assertStatus(201)
-            ->assertJsonPath('data.title', 'Dark mode');
+            ->assertJsonPath('data.title', 'Dark mode')
+            ->assertJsonPath('data.status', 'pending');
 
         $requestId = $store->json('data.id');
 
@@ -52,9 +54,10 @@ describe('DevRequest CRUD', function () {
     it('rejects invalid dev requests', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/dev-requests', ['title' => ''])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/dev-requests', ['title' => '']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('title');
     });
 });
 
@@ -97,8 +100,11 @@ describe('DevRequest fixed_in_version', function () {
         $admin = makeUser(['role' => 'admin']);
         $devRequest = DevRequest::factory()->create(['status' => 'completed']);
 
-        expectApiError($this->actingAs($admin, 'sanctum')
-            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => $version]), 422);
+        $response = $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/dev-requests/'.$devRequest->id, ['fixed_in_version' => $version]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('fixed_in_version');
 
         expect($devRequest->fresh()->fixed_in_version)->toBeNull();
     })->with(['v1.2', '1.2-beta', '1..2', '1.2.', '123456789.123456789.1']);
@@ -268,8 +274,11 @@ describe('DevRequest voting', function () {
         $user = makeUser();
         $devRequest = DevRequest::factory()->create();
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/dev-requests/'.$devRequest->id.'/vote', ['vote' => 'sideways']), 422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/dev-requests/'.$devRequest->id.'/vote', ['vote' => 'sideways']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('vote');
 
         expect(DevRequestVote::count())->toBe(0);
     });
@@ -292,7 +301,10 @@ describe('DevRequest screenshot', function () {
     });
 
     it('rejects a screenshot that is not an image data URI', function (string $screenshot) use ($store) {
-        expectApiError($store($this, ['screenshot' => $screenshot, 'screenshot_name' => 'x.json']), 422);
+        $response = $store($this, ['screenshot' => $screenshot, 'screenshot_name' => 'x.json']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('screenshot');
 
         expect(DevRequest::count())->toBe(0);
         expect(Storage::disk('public')->allFiles())->toBe([]);
@@ -474,15 +486,18 @@ describe('DevRequest ntfy announcement', function () {
         Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-dev-requests');
     });
 
-    it('still creates the dev request when ntfy fails', function (Closure $fake) use ($store) {
+    it('still creates the dev request when ntfy fails', function (Closure $fakeNtfyFailure, string $warning) use ($store) {
         config(['services.ntfy.url' => 'https://ntfy.example.test', 'services.ntfy.topic' => 'solyto-admin']);
-        $fake();
+        Http::preventStrayRequests();
+        $fakeNtfyFailure();
+        Log::spy();
 
         $store($this)->assertStatus(201)->assertJsonPath('data.title', 'Dark mode');
 
         expect(DevRequest::where('title', 'Dark mode')->exists())->toBeTrue();
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message) => $message === $warning);
     })->with([
-        'error response' => fn () => fn () => Http::fake(['*' => Http::response('boom', 500)]),
-        'connection error' => fn () => fn () => Http::fake(fn () => throw new ConnectionException('Connection refused')),
+        'error response' => [fn () => Http::fake(['*' => Http::response('boom', 500)]), 'ntfy publish failed'],
+        'connection error' => [fn () => Http::fake(fn () => throw new ConnectionException('Connection refused')), 'ntfy publish failed: connection error'],
     ]);
 });

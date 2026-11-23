@@ -1,5 +1,23 @@
 <?php
 
+use Illuminate\Http\UploadedFile;
+
+function expectAddressBookNotFound($response): void
+{
+    expectApiError($response, 404);
+    $response->assertJsonPath('message', 'Address Book does not exist');
+}
+
+function expectContactNotFound($response): void
+{
+    expectApiError($response, 404);
+    $response->assertJsonPath('message', 'Contact does not exist');
+}
+
+function contactPhoto(): UploadedFile
+{
+    return UploadedFile::fake()->image('photo.png', 100, 100);
+}
 
 describe('Address books (DAV-backed)', function () {
     it('lists, stores, updates and deletes address books', function () {
@@ -34,11 +52,10 @@ describe('Address books (DAV-backed)', function () {
             ->postJson('/api/v1/address-books', ['name' => 'Personal'])
             ->assertStatus(201);
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
-            ->assertStatus(409)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Address Book already exists.');
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books', ['name' => 'Personal']);
+
+        expectApiError($response, 409);
+        $response->assertJsonPath('message', 'Address Book already exists.');
     });
 
     it('lists contacts from all address books', function () {
@@ -111,7 +128,7 @@ describe('Contact photos', function () {
 
         $this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$withPhoto.'/photo', [
-                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+                'photo' => contactPhoto(),
             ])
             ->assertStatus(200);
 
@@ -154,7 +171,7 @@ describe('Contact photos', function () {
 
         $this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contact['uri'].'/photo', [
-                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+                'photo' => contactPhoto(),
             ])
             ->assertStatus(200)
             ->assertJsonPath('success', true);
@@ -186,7 +203,7 @@ describe('Contact tenant isolation', function () {
 
         $this->actingAs($other, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo', [
-                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
+                'photo' => contactPhoto(),
             ])
             ->assertStatus(200);
 
@@ -210,34 +227,34 @@ describe('Contact tenant isolation', function () {
             ->assertJsonPath('data', []);
 
         // The module answers an address book the user cannot see with 404.
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#000000'])->assertJsonPath('message', 'Address Book does not exist'), 404);
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#000000']));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId)->assertJsonPath('message', 'Address Book does not exist'), 404);
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId));
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/address-books/'.$addressBookId.'/contacts', [
                 'address_book_id' => $addressBookId,
                 'first_name' => 'Intruder',
-            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri, [
                 'address_book_id' => $addressBookId,
                 'first_name' => 'Hijacked',
-            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri)->assertJsonPath('message', 'Address Book does not exist'), 404);
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri));
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo', [
-                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
-            ])->assertJsonPath('message', 'Address Book does not exist'), 404);
+                'photo' => contactPhoto(),
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo')->assertJsonPath('message', 'Address Book does not exist'), 404);
+        expectAddressBookNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$contactUri.'/photo'));
 
         $otherContacts = collect($this->actingAs($other, 'sanctum')
             ->getJson('/api/v1/address-books/contacts')
@@ -256,25 +273,21 @@ describe('Contact tenant isolation', function () {
 
         $missingUri = 'missing-contact.vcf';
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectContactNotFound($this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri, [
                 'address_book_id' => $addressBookId,
                 'first_name' => 'Nobody',
-            ])
-            ->assertJsonPath('message', 'Contact does not exist'), 404);
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri)
-            ->assertJsonPath('message', 'Contact does not exist'), 404);
+        expectContactNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri));
 
-        expectApiError($this->actingAs($user, 'sanctum')
+        expectContactNotFound($this->actingAs($user, 'sanctum')
             ->post('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri.'/photo', [
-                'photo' => \Illuminate\Http\UploadedFile::fake()->image('photo.png', 100, 100),
-            ])
-            ->assertJsonPath('message', 'Contact does not exist'), 404);
+                'photo' => contactPhoto(),
+            ]));
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri.'/photo')
-            ->assertJsonPath('message', 'Contact does not exist'), 404);
+        expectContactNotFound($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/address-books/'.$addressBookId.'/contacts/'.$missingUri.'/photo'));
     });
 });

@@ -71,10 +71,7 @@ class TimeTrackingProjectController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function show(Request $request, TimeTrackingProject $project): JsonResponse
@@ -120,10 +117,7 @@ class TimeTrackingProjectController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function store(StoreTimeTrackingProjectRequest $request): JsonResponse
@@ -175,14 +169,8 @@ class TimeTrackingProjectController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
     public function update(UpdateTimeTrackingProjectRequest $request, TimeTrackingProject $project): JsonResponse
@@ -223,10 +211,7 @@ class TimeTrackingProjectController
      *         )
      *     ),
      *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Unauthorized"
-     *     )
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
     public function destroy(Request $request, TimeTrackingProject $project): JsonResponse

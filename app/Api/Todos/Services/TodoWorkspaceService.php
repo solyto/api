@@ -41,7 +41,7 @@ class TodoWorkspaceService
 
         $workspace->load(['user', 'categories']);
 
-        $this->cache->forget([self::CACHE_KEY, $user->id]);
+        $this->forgetUser($user->id);
 
         return $workspace;
     }
@@ -52,7 +52,7 @@ class TodoWorkspaceService
         $workspace->update($data);
         $workspace->load(['user', 'categories']);
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->forgetUser($userId);
 
         return $workspace;
     }
@@ -63,7 +63,7 @@ class TodoWorkspaceService
         $workspace->categories()->detach();
         $workspace->delete();
 
-        $this->cache->forget([self::CACHE_KEY, $userId]);
+        $this->forgetUser($userId);
     }
 
     public function attachCategories(TodoWorkspace $workspace, array $categoryIds): TodoWorkspace
@@ -72,7 +72,7 @@ class TodoWorkspaceService
         $workspace->categories()->syncWithoutDetaching($categoryIds);
         $workspace->load('categories');
 
-        $this->cache->forget([self::CACHE_KEY, $workspace->user_id]);
+        $this->forgetUser($workspace->user_id);
 
         return $workspace;
     }
@@ -82,8 +82,14 @@ class TodoWorkspaceService
         $workspace->categories()->detach($categoryIds);
         $workspace->load('categories');
 
-        $this->cache->forget([self::CACHE_KEY, $workspace->user_id]);
+        $this->forgetUser($workspace->user_id);
 
         return $workspace;
+    }
+
+    // Public because workspaces embed their categories; TodoCategoryService calls it when a category changes.
+    public function forgetUser(string $userId): void
+    {
+        $this->cache->forget([self::CACHE_KEY, $userId]);
     }
 }

@@ -59,11 +59,19 @@ class DevRequestService
             return $devRequest;
         });
 
-        Notification::route(NtfyChannel::class, config('services.ntfy.topics.dev_requests') ?: config('services.ntfy.topic'))->notify(new DevRequestCreatedNotification($devRequest->title));
+        $this->notifyOperator($devRequest);
 
-        $devRequest->load('votes')->loadCount('comments');
+        // refresh() picks up the database defaults, e.g. the initial status.
+        $devRequest->refresh()->load('votes')->loadCount('comments');
 
         return $devRequest;
+    }
+
+    private function notifyOperator(DevRequest $devRequest): void
+    {
+        $topic = config('services.ntfy.topics.dev_requests') ?: config('services.ntfy.topic');
+
+        Notification::route(NtfyChannel::class, $topic)->notify(new DevRequestCreatedNotification($devRequest->title));
     }
 
     public function update(DevRequest $devRequest, array $data): DevRequest

@@ -48,11 +48,7 @@ class TodoService
         );
     }
 
-    /**
-     * Not completed and due on $date or earlier, ordered by due date.
-     *
-     * @return Collection<int, Todo>
-     */
+    /** @return Collection<int, Todo> */
     public function due(User $user, string $date, ?int $limit = null): Collection
     {
         return Todo::forUser($user->id)
