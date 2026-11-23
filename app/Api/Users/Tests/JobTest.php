@@ -2,6 +2,7 @@
 
 use App\Api\Clipboard\Jobs\DeleteOverdueClipboardEntries;
 use App\Api\Clipboard\Models\Clipboard;
+use App\Api\Clipboard\Services\ClipboardService;
 use App\Api\DevRequests\Jobs\DeleteOldDevRequests;
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\Libraries\Jobs\GenerateCoverPreview;
@@ -10,6 +11,8 @@ use App\Api\Users\Jobs\DeleteOldFriendRequests;
 use App\Api\Users\Jobs\ScaleProfileImage;
 use App\Api\Users\Models\FriendRequest;
 use App\Shared\Services\Images\ImageTransformationService;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -68,6 +71,50 @@ describe('DeleteOverdueClipboardEntries', function () {
         expect(Clipboard::find($old->id))->toBeNull();
         Storage::disk('private_user_data')->assertMissing('u/clipboard/doc.pdf');
         Storage::disk('private_user_data')->assertExists('u/clipboard/new.pdf');
+    });
+
+    it('keeps an entry that becomes overdue after the overdue entries were selected', function () {
+        Storage::fake('private_user_data');
+        Storage::disk('private_user_data')->put('u/clipboard/edge.pdf', 'bytes');
+        $this->travelTo(now()->startOfSecond());
+
+        $edge = Clipboard::factory()->create([
+            'type' => 'file',
+            'file_path' => 'u/clipboard/edge.pdf',
+            'created_at' => now()->subDay()->addSecond(),
+        ]);
+        $old = Clipboard::factory()->create(['created_at' => now()->subDays(2)]);
+
+        DB::listen(function (QueryExecuted $query) {
+            if (str_starts_with($query->sql, 'select')) {
+                $this->travel(5)->seconds();
+            }
+        });
+
+        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+
+        expect(Clipboard::find($old->id))->toBeNull();
+        expect(Clipboard::find($edge->id))->not->toBeNull();
+        Storage::disk('private_user_data')->assertExists('u/clipboard/edge.pdf');
+    });
+
+    it('drops expired entries from the cached clipboard list', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $expiring = Clipboard::factory()->forUser($user)->create();
+        $kept = Clipboard::factory()->forUser($user)->create();
+        $otherEntry = Clipboard::factory()->forUser($other)->create();
+        $service = app(ClipboardService::class);
+        $service->list($user);
+        $service->list($other);
+
+        Clipboard::whereKey($expiring->id)->update(['created_at' => now()->subDays(2)]);
+        Clipboard::factory()->forUser($other)->create();
+
+        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+
+        expect($service->list($user)->pluck('id')->all())->toBe([$kept->id]);
+        expect($service->list($other)->pluck('id')->all())->toBe([$otherEntry->id]);
     });
 });
 

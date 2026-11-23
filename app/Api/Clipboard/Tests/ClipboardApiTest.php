@@ -3,6 +3,8 @@
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Clipboard\Services\ClipboardService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 describe('Clipboard list and store', function () {
@@ -103,12 +105,35 @@ describe('Clipboard images', function () {
         Storage::disk('user_data')->put($user->id.'/avatar.png', 'other');
         Clipboard::factory()->forUser($user)->create(['type' => 'image', 'file_path' => $path]);
         Clipboard::factory()->forUser($user)->create(['type' => 'image', 'file_path' => $user->id.'/clipboard/gone.png']);
+        Log::spy();
 
         (require database_path('migrations/2026_11_16_120001_move_clipboard_images_to_private_disk.php'))->up();
 
         Storage::disk('user_data')->assertMissing($path);
         Storage::disk('user_data')->assertExists($user->id.'/avatar.png');
         expect(Storage::disk('private_user_data')->get($path))->toBe('png-bytes');
+        Log::shouldHaveReceived('warning')->once();
+        Log::shouldHaveReceived('warning')->once()->with('Clipboard image to move is missing.', [
+            'path' => $user->id.'/clipboard/gone.png',
+            'from' => 'user_data',
+            'to' => 'private_user_data',
+        ]);
+    });
+
+    it('deletes stored files when rolling back the file type', function () {
+        Storage::fake('private_user_data');
+        $user = makeUser();
+        $path = $user->id.'/clipboard/doc.pdf';
+        Storage::disk('private_user_data')->put($path, 'pdf-bytes');
+        Storage::disk('private_user_data')->put($user->id.'/clipboard/image.png', 'png-bytes');
+        Clipboard::factory()->forUser($user)->create(['type' => 'file', 'file_path' => $path]);
+        Clipboard::factory()->forUser($user)->create(['type' => 'image', 'file_path' => $user->id.'/clipboard/image.png']);
+
+        (require database_path('migrations/2026_11_16_120000_add_file_type_to_clipboards.php'))->down();
+
+        Storage::disk('private_user_data')->assertMissing($path);
+        Storage::disk('private_user_data')->assertExists($user->id.'/clipboard/image.png');
+        expect(DB::table('clipboards')->where('type', 'file')->count())->toBe(0);
     });
 
     it('returns 404 when requesting an image for a text entry', function () {

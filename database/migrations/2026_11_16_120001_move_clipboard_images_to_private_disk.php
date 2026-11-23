@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 return new class extends Migration
@@ -22,23 +23,33 @@ return new class extends Migration
         $target = Storage::disk($to);
 
         DB::table('clipboards')->where('type', 'image')->whereNotNull('file_path')->pluck('file_path')
-            ->each(function (string $path) use ($source, $target) {
+            ->each(function (string $path) use ($source, $target, $from, $to) {
+                $context = ['path' => $path, 'from' => $from, 'to' => $to];
+
                 if (!$source->exists($path)) {
+                    Log::warning('Clipboard image to move is missing.', $context);
+
                     return;
                 }
 
                 $stream = $source->readStream($path);
 
                 if (!$stream) {
+                    Log::warning('Clipboard image could not be read.', $context);
+
                     return;
                 }
 
                 $written = $target->writeStream($path, $stream);
                 fclose($stream);
 
-                if ($written) {
-                    $source->delete($path);
+                if (!$written) {
+                    Log::warning('Clipboard image could not be written.', $context);
+
+                    return;
                 }
+
+                $source->delete($path);
             });
     }
 };

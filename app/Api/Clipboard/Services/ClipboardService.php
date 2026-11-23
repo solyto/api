@@ -13,6 +13,7 @@ class ClipboardService
 {
     private const string CACHE_KEY = 'clipboard';
     private const int CACHE_TTL = 86400;
+    private const int CHUNK = 100;
 
     public function __construct(
         private readonly ClipboardImageService $imageService,
@@ -113,6 +114,30 @@ class ClipboardService
         $this->cache->forget([self::CACHE_KEY, $user->id]);
 
         $clipboard->delete();
+    }
+
+    // Rows are deleted by the ids whose files were just removed, so an entry crossing the cutoff mid-run keeps its file.
+    public function deleteOverdue(): void
+    {
+        $userIds = [];
+
+        Clipboard::where('created_at', '<', now()->subDay())
+            ->select(['id', 'user_id', 'file_path'])
+            ->chunkById(self::CHUNK, function (Collection $entries) use (&$userIds) {
+                foreach ($entries as $entry) {
+                    if ($entry->file_path) {
+                        $this->fileService->delete($entry->file_path);
+                    }
+
+                    $userIds[$entry->user_id] = true;
+                }
+
+                Clipboard::whereKey($entries->pluck('id'))->delete();
+            });
+
+        foreach (array_keys($userIds) as $userId) {
+            $this->cache->forget([self::CACHE_KEY, $userId]);
+        }
     }
 
     // The name is only shown and sent back in Content-Disposition; control characters, quotes and path separators go.
