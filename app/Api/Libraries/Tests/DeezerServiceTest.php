@@ -78,7 +78,7 @@ describe('DeezerService::getNewReleasesForArtists', function () {
         expect(array_keys($releases))->toBe([399, 1171, 5]);
         expect(array_column($releases[399], 'id'))->toBe([1]);
         expect($releases[1171])->toBe([]);
-        expect($releases[5])->toBeNull();
+        expect($releases[5])->toBe([]);
         Http::assertSentCount(3);
     });
 

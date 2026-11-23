@@ -3,12 +3,14 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Models\LibraryBook;
+use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Users\Models\User;
 use App\Plugins\Ai\Services\AiService;
 
 class LibraryRecommender
 {
-    private const RESPONSE_SCHEMA = [
+    private const array RESPONSE_SCHEMA = [
         'type' => 'json_schema',
         'json_schema' => [
             'name' => 'recommendations_response',
@@ -35,8 +37,8 @@ class LibraryRecommender
             ],
         ],
     ];
-    private const BOOKS_PROMPT = 'You are a book recommendation service. Based on the user\'s favorites (including their genres), recommend books they are likely to enjoy.';
-    private const MUSIC_PROMPT = 'You are a music recommendation service. Based on the user\'s favorites (including genres, type, and format), recommend music they are likely to enjoy.';
+    private const string BOOKS_PROMPT = 'You are a book recommendation service. Based on the user\'s favorites (including their genres), recommend books they are likely to enjoy.';
+    private const string MUSIC_PROMPT = 'You are a music recommendation service. Based on the user\'s favorites (including genres, type, and format), recommend music they are likely to enjoy.';
 
     public function __construct(
         private readonly AiService $aiService
@@ -48,17 +50,7 @@ class LibraryRecommender
 
         $item = $type->getModel()::forUser($user->id)->where('rating', '>=', 4)->inRandomOrder()->first();
 
-        if (!$item) {
-            return null;
-        }
-
-        return [
-            'id' => $item->id,
-            'title' => $item->title,
-            'creator' => $item->author ?? $item->artist,
-            'cover' => $item->cover_path,
-            'link' => $item->link,
-        ];
+        return $this->toRecommendation($item);
     }
 
     public function unrated(LibraryTypeEnum $type, User $user): ?array
@@ -67,36 +59,16 @@ class LibraryRecommender
 
         $item = $type->getModel()::forUser($user->id)->where('rating', null)->inRandomOrder()->first();
 
-        if (!$item) {
-            return null;
-        }
-
-        return [
-            'id' => $item->id,
-            'title' => $item->title,
-            'creator' => $item->author ?? $item->artist,
-            'cover' => $item->cover_path,
-            'link' => $item->link,
-        ];
+        return $this->toRecommendation($item);
     }
 
     public function random(LibraryTypeEnum $type, User $user): ?array
     {
         $this->assertType($type);
 
-        $item =  $type->getModel()::forUser($user->id)->inRandomOrder()->first();
+        $item = $type->getModel()::forUser($user->id)->inRandomOrder()->first();
 
-        if (!$item) {
-            return null;
-        }
-
-        return [
-            'id' => $item->id,
-            'title' => $item->title,
-            'creator' => $item->author ?? $item->artist,
-            'cover' => $item->cover_path,
-            'link' => $item->link,
-        ];
+        return $this->toRecommendation($item);
     }
 
     public function new(LibraryTypeEnum $type, User $user): ?array
@@ -125,7 +97,26 @@ class LibraryRecommender
 
         $answer = $this->aiService->respondStructured($user, $prompt, $message, self::RESPONSE_SCHEMA);
 
-        return $answer === null ? null : ['recommendations' => $this->usableRecommendations($answer['recommendations'] ?? [])];
+        if ($answer === null) {
+            return null;
+        }
+
+        return ['recommendations' => $this->usableRecommendations($answer['recommendations'] ?? [])];
+    }
+
+    private function toRecommendation(LibraryBook|LibraryMusic|null $item): ?array
+    {
+        if (!$item) {
+            return null;
+        }
+
+        return [
+            'id' => $item->id,
+            'title' => $item->title,
+            'creator' => $item->author ?? $item->artist,
+            'cover' => $item->cover_path,
+            'link' => $item->link,
+        ];
     }
 
     // Only OpenAI enforces the response schema; other providers' models may return entries that can't be shown.
@@ -146,7 +137,7 @@ class LibraryRecommender
     private function assertType(LibraryTypeEnum $type): void
     {
         if (!$type->hasRecommender()) {
-            throw new \Exception('No recommender for type ' . $type->value);
+            throw new \LogicException('No recommender for type ' . $type->value);
         }
     }
 

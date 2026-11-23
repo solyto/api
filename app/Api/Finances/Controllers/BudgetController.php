@@ -236,6 +236,7 @@ class BudgetController
 
         return ApiResponse::success(null, 'Budget deleted successfully.');
     }
+
     /**
      * @OA\Get(
      *     path="/finances/budget/{budget}/values",

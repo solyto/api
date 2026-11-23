@@ -34,8 +34,7 @@ class BudgetResource extends JsonResource
             'type' => $this->type,
             'interval' => $this->interval,
             'value' => $this->value,
-            'values' => $this->whenLoaded('values', fn () => BudgetValueResource::collection($this->values->sortBy('date')->values())
-            ),
+            'values' => $this->whenLoaded('values', fn () => BudgetValueResource::collection($this->values->sortBy('date')->values())),
             'tags' => $this->whenLoaded('tags', fn () => TagResource::collection($this->tags)),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

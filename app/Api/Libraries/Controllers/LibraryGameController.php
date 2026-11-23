@@ -279,7 +279,8 @@ class LibraryGameController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/GameSearchResult"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/GameSearchResult")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/LibrarySearchMeta")
      *         )
      *     ),
      *
@@ -288,11 +289,12 @@ class LibraryGameController
      */
     public function search(Request $request, GameServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryGameService->search($service, $query);
+        $search = $this->libraryGameService->search($service, $query);
 
         return ApiResponse::success(
-            GameSearchResultResource::collection(collect($results ?? [])),
-            'Search results retrieved successfully.'
+            GameSearchResultResource::collection(collect($search->results)),
+            'Search results retrieved successfully.',
+            meta: ['unavailable' => $search->unavailable],
         );
     }
 

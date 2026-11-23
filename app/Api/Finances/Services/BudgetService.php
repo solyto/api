@@ -148,7 +148,7 @@ class BudgetService
 
     private function writeValue(Budget $budget, string $date, float|int|string $amount): BudgetValue
     {
-        $value = BudgetValue::where('budget_id', $budget->id)->whereDate('date', $date)->first();
+        $value = $budget->values()->whereDate('date', $date)->first();
 
         if ($value) {
             $value->update(['value' => $amount]);
@@ -156,16 +156,15 @@ class BudgetService
             return $value;
         }
 
-        return BudgetValue::create([
+        return $budget->values()->create([
             'date' => $date,
             'value' => $amount,
-            'budget_id' => $budget->id,
         ]);
     }
 
     private function syncCurrentValue(Budget $budget): void
     {
-        $latest = BudgetValue::where('budget_id', $budget->id)->orderByDesc('date')->firstOrFail();
+        $latest = $budget->values()->orderByDesc('date')->firstOrFail();
 
         $budget->update(['value' => $latest->value]);
     }

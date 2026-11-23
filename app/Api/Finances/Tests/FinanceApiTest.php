@@ -4,7 +4,6 @@ use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
-use App\Api\Finances\Services\WealthService;
 use App\Api\Tags\Models\Tag;
 use Illuminate\Support\Facades\DB;
 
@@ -49,9 +48,8 @@ describe('Budget CRUD', function () {
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/finances/budget/'.$budget->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/budget/'.$budget->id), 403);
     });
 
     it('lists budgets from highest to lowest value', function () {
@@ -117,20 +115,20 @@ describe('Budget interval', function () {
         $user = makeUser();
         $budget = Budget::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/finances/budget', [
                 'title' => 'Groceries',
                 'type' => 'expense',
                 'interval' => 'weekly',
                 'value' => 50,
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['interval']);
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['interval']);
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/finances/budget/'.$budget->id, ['interval' => 'weekly'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['interval']);
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['interval' => 'weekly']);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['interval']);
 
         expect($budget->fresh()->interval)->toBe('monthly');
     });
@@ -217,20 +215,20 @@ describe('Budget tags', function () {
         $foreignTag = Tag::factory()->forUser(makeUser())->create();
         $budget = Budget::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/finances/budget', [
                 'title' => 'Donations',
                 'type' => 'income',
                 'value' => 50,
                 'tags' => [$foreignTag->id],
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/finances/budget/'.$budget->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/budget/'.$budget->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
         expect(Budget::count())->toBe(1)
             ->and($budget->tags()->count())->toBe(0);
@@ -384,17 +382,32 @@ describe('Wealth values', function () {
         expect($values->first()->value)->toBe(200.0);
     });
 
+    it('updates today\'s value in place when no date is given', function () {
+        $user = makeUser();
+        $field = WealthField::factory()->forUser($user)->create();
+        $url = '/api/v1/finances/wealth/fields/'.$field->id.'/value';
+
+        $this->actingAs($user, 'sanctum')->putJson($url, ['value' => 100])->assertStatus(200);
+        $first = WealthValue::where('field_id', $field->id)->sole();
+        $this->actingAs($user, 'sanctum')->putJson($url, ['value' => 200])->assertStatus(200);
+
+        $values = WealthValue::where('field_id', $field->id)->get();
+        expect($values)->toHaveCount(1)
+            ->and($values->first()->id)->toBe($first->id)
+            ->and($values->first()->value)->toBe(200.0);
+    });
+
     it('rejects a date in the future', function () {
         $user = makeUser();
         $field = WealthField::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/value', [
                 'value' => 10,
                 'date' => today()->addDay()->toDateString(),
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['date']);
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['date']);
     });
 
     it('updates the amount and the date of a value', function () {
@@ -419,12 +432,12 @@ describe('Wealth values', function () {
         $value = WealthValue::factory()->forField($field)->historical(5)->create();
         WealthValue::factory()->forField($field)->historical(7)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$value->id, [
                 'date' => today()->subDays(7)->toDateString(),
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['date']);
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['date']);
 
         expect($value->fresh()->date->toDateString())->toBe(today()->subDays(5)->toDateString());
     });
@@ -446,17 +459,14 @@ describe('Wealth values', function () {
         $field = WealthField::factory()->forUser(makeUser())->create();
         $value = WealthValue::factory()->forField($field)->withValue(10)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/value', ['value' => 1])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/value', ['value' => 1]), 403);
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$value->id, ['value' => 1])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$value->id, ['value' => 1]), 403);
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$value->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$value->id), 403);
 
         expect(WealthValue::count())->toBe(1);
         expect($value->fresh()->value)->toBe(10.0);
@@ -467,13 +477,11 @@ describe('Wealth values', function () {
         $field = WealthField::factory()->forUser($user)->create();
         $foreignValue = WealthValue::factory()->forField(WealthField::factory()->forUser(makeUser())->create())->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$foreignValue->id, ['value' => 1])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$foreignValue->id, ['value' => 1]), 403);
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$foreignValue->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/'.$foreignValue->id), 403);
 
         expect(WealthValue::count())->toBe(1);
     });
@@ -482,9 +490,8 @@ describe('Wealth values', function () {
         $user = makeUser();
         $field = WealthField::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/999999')
-            ->assertStatus(404);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/wealth/fields/'.$field->id.'/values/999999'), 404);
     });
 
     it('uses the latest date as current value after a backfill and orders values by date', function () {
@@ -620,20 +627,20 @@ describe('Budget values', function () {
         $value = BudgetValue::factory()->forBudget($budget)->historical(3)->create();
         BudgetValue::factory()->forBudget($budget)->historical(5)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/finances/budget/'.$budget->id.'/values', [
                 'value' => 20,
                 'date' => today()->addDay()->toDateString(),
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['date']);
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['date']);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/finances/budget/'.$budget->id.'/values/'.$value->id, [
                 'date' => today()->subDays(5)->toDateString(),
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['date']);
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['date']);
     });
 
     it('refuses to delete the last value of a budget item', function () {
@@ -641,9 +648,11 @@ describe('Budget values', function () {
         $budget = Budget::factory()->forUser($user)->withValue(100)->create();
         $value = BudgetValue::factory()->forBudget($budget)->withValue(100)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/finances/budget/'.$budget->id.'/values/'.$value->id)
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/finances/budget/'.$budget->id.'/values/'.$value->id);
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'A budget item needs at least one value.')
+            ->assertJsonMissingPath('errors');
 
         expect(BudgetValue::count())->toBe(1);
         expect($budget->fresh()->value)->toBe(100.0);
@@ -672,10 +681,10 @@ describe('Budget values', function () {
         BudgetValue::factory()->forBudget($budget)->historical(400)->create();
         $base = '/api/v1/finances/budget/'.$budget->id.'/values';
 
-        $this->actingAs($user, 'sanctum')->getJson($base)->assertStatus(403);
-        $this->actingAs($user, 'sanctum')->postJson($base, ['value' => 1])->assertStatus(403);
-        $this->actingAs($user, 'sanctum')->putJson($base.'/'.$value->id, ['value' => 1])->assertStatus(403);
-        $this->actingAs($user, 'sanctum')->deleteJson($base.'/'.$value->id)->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')->getJson($base), 403);
+        expectApiError($this->actingAs($user, 'sanctum')->postJson($base, ['value' => 1]), 403);
+        expectApiError($this->actingAs($user, 'sanctum')->putJson($base.'/'.$value->id, ['value' => 1]), 403);
+        expectApiError($this->actingAs($user, 'sanctum')->deleteJson($base.'/'.$value->id), 403);
 
         expect(BudgetValue::count())->toBe(2);
         expect($value->fresh()->value)->toBe(10.0);
@@ -688,8 +697,8 @@ describe('Budget values', function () {
         $foreign = BudgetValue::factory()->forBudget(Budget::factory()->forUser(makeUser())->create())->create();
         $base = '/api/v1/finances/budget/'.$budget->id.'/values/'.$foreign->id;
 
-        $this->actingAs($user, 'sanctum')->putJson($base, ['value' => 1])->assertStatus(403);
-        $this->actingAs($user, 'sanctum')->deleteJson($base)->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')->putJson($base, ['value' => 1]), 403);
+        expectApiError($this->actingAs($user, 'sanctum')->deleteJson($base), 403);
 
         expect($foreign->fresh())->not->toBeNull();
     });
@@ -731,21 +740,5 @@ describe('Budget values', function () {
         $this->actingAs($user, 'sanctum')
             ->deleteJson('/api/v1/finances/budget/'.$budget->id.'/values/'.$value->id);
         $list()->assertJsonPath('data.0.value', 7);
-    });
-});
-
-describe('WealthService', function () {
-    it('storeValue replaces the value of the same day', function () {
-        $user = makeUser();
-        $field = WealthField::factory()->forUser($user)->create();
-        $service = app(WealthService::class);
-
-        $first = $service->storeValue($field, ['value' => 99.99]);
-        $second = $service->storeValue($field, ['value' => 11.5]);
-
-        expect($second->id)->toBe($first->id);
-        expect($second->field_id)->toBe($field->id);
-        expect($second->value)->toBe(11.5);
-        expect(WealthValue::where('field_id', $field->id)->count())->toBe(1);
     });
 });

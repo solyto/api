@@ -356,7 +356,8 @@ class LibraryMusicController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/MusicSearchResult"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/MusicSearchResult")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/LibrarySearchMeta")
      *         )
      *     ),
      *
@@ -365,11 +366,12 @@ class LibraryMusicController
      */
     public function search(Request $request, MusicServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryMusicService->search($service, $query);
+        $search = $this->libraryMusicService->search($service, $query);
 
         return ApiResponse::success(
-            MusicSearchResultResource::collection(collect($results ?? [])),
-            'Search results retrieved successfully.'
+            MusicSearchResultResource::collection(collect($search->results)),
+            'Search results retrieved successfully.',
+            meta: ['unavailable' => $search->unavailable],
         );
     }
 

@@ -34,6 +34,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -1191,5 +1192,16 @@ describe('Client contract', function () {
         $this->actingAs($user, 'sanctum')
             ->deleteJson('/api/v1/libraries/links/'.$link->id)
             ->assertStatus(200);
+    });
+
+    // Since 1.0.15. solyto/app src/lib/state/MusicLibrary.svelte.ts:242-247, src/lib/components/libraries/music/MusicSearch.svelte:19
+    it('answers a library search whose provider is down with 200 and an empty data list', function () {
+        Http::preventStrayRequests();
+        Http::fake(['https://api.deezer.com/search/album?q=*' => Http::failedConnection()]);
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/libraries/music/search/deezer/Kid%20A')
+            ->assertStatus(200)
+            ->assertJsonPath('data', []);
     });
 });

@@ -71,15 +71,15 @@ describe('Library games', function () {
         $game = LibraryGame::factory()->forUser($user)->create();
         $foreignGenre = LibraryGameGenre::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/games', ['title' => 'Hollow Knight', 'platform' => 'pc', 'genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/games', ['title' => 'Hollow Knight', 'platform' => 'pc', 'genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/games/'.$game->id, ['genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/games/'.$game->id, ['genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
         expect(LibraryGame::count())->toBe(1);
         expect($game->fresh()->genres)->toHaveCount(0);
@@ -115,15 +115,15 @@ describe('Library movies', function () {
         $movie = LibraryMovie::factory()->forUser($user)->create();
         $foreignGenre = LibraryMovieGenre::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/movies', ['title' => 'Dune Part Two', 'category' => 'movie', 'genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/movies', ['title' => 'Dune Part Two', 'category' => 'movie', 'genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/movies/'.$movie->id, ['genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/movies/'.$movie->id, ['genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
         expect(LibraryMovie::count())->toBe(1);
         expect($movie->fresh()->genres)->toHaveCount(0);
@@ -240,9 +240,8 @@ describe('Library links', function () {
         $user = makeUser();
         $category = LibraryLinkCategory::factory()->forUser($user)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/libraries/links/categories/'.$category->id)
-            ->assertStatus(405);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/links/categories/'.$category->id), 405);
     });
 
     it('stores a link in the given category', function () {
@@ -272,10 +271,10 @@ describe('Library links', function () {
         $user = makeUser();
         $foreignCategory = LibraryLinkCategory::factory()->forUser(makeUser())->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/links', ['title' => 'Todos', 'url' => 'https://example.com/todos', 'category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['title' => 'Todos', 'url' => 'https://example.com/todos', 'category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
         expect(LibraryLink::count())->toBe(0);
     });
@@ -287,20 +286,20 @@ describe('Library links', function () {
         $foreignTag = Tag::factory()->forUser($other)->create();
         $foreignCategory = LibraryLinkCategory::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/links', ['url' => 'https://example.com/article', 'tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/links', ['url' => 'https://example.com/article', 'tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/links/'.$link->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/links/'.$link->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/links/'.$link->id, ['category_id' => $foreignCategory->id])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('category_id');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/links/'.$link->id, ['category_id' => $foreignCategory->id]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('category_id');
 
         expect(LibraryLink::count())->toBe(1);
         expect($link->fresh()->category_id)->toBeNull();
@@ -345,15 +344,15 @@ describe('Library quotes', function () {
         $quote = LibraryQuote::factory()->forUser($user)->create();
         $foreignTag = Tag::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/quotes', ['quote' => 'Be the change', 'tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/quotes', ['quote' => 'Be the change', 'tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/quotes/'.$quote->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/quotes/'.$quote->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
         expect(LibraryQuote::count())->toBe(1);
         expect($quote->fresh()->tags)->toHaveCount(0);
@@ -450,9 +449,8 @@ describe('Cover serving', function () {
     it('returns 404 for missing covers', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->get('/api/v1/libraries/covers/books/missing.jpg')
-            ->assertStatus(404);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->get('/api/v1/libraries/covers/books/missing.jpg'), 404);
     });
 });
 

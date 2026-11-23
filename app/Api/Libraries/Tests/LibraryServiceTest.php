@@ -1,8 +1,12 @@
 <?php
 
 use App\Api\Libraries\Enums\LibraryTypeEnum;
+use App\Api\Libraries\Enums\MusicServiceEnum;
 use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMusic;
+use App\Api\Libraries\Services\External\DeezerService;
+use App\Api\Libraries\Services\External\HardcoverService;
+use App\Api\Libraries\Services\External\SpotifyService;
 use App\Api\Libraries\Services\LibraryBookService;
 use App\Api\Libraries\Services\LibraryRecommender;
 use App\Api\Libraries\Services\LibraryReleases;
@@ -10,18 +14,18 @@ use App\Plugins\Ai\Services\AiService;
 use Illuminate\Support\Facades\Cache;
 
 describe('LibraryRecommender', function () {
-    it('throws for types without a recommender', function () {
-        $this->mock(AiService::class);
+    beforeEach(function () {
+        $this->ai = $this->mock(AiService::class);
+    });
 
+    it('throws for types without a recommender', function () {
         expect(fn () => app(LibraryRecommender::class)->favorite(LibraryTypeEnum::MOVIE, makeUser()))
-            ->toThrow(\Exception::class);
+            ->toThrow(\LogicException::class);
     });
 
     it('recommends a favorite book', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert', 'title' => 'Dune']);
-
-        $this->mock(AiService::class);
 
         $favorite = app(LibraryRecommender::class)->favorite(LibraryTypeEnum::BOOK, $user);
 
@@ -33,16 +37,12 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => null, 'title' => 'Unrated']);
 
-        $this->mock(AiService::class);
-
         expect(app(LibraryRecommender::class)->unrated(LibraryTypeEnum::BOOK, $user)['title'])->toBe('Unrated');
     });
 
     it('returns null for favorite when nothing is rated 4 or higher', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 3]);
-
-        $this->mock(AiService::class);
 
         expect(app(LibraryRecommender::class)->favorite(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
@@ -51,15 +51,11 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 3]);
 
-        $this->mock(AiService::class);
-
         expect(app(LibraryRecommender::class)->unrated(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 
     it('returns null for random when the library is empty', function () {
         $user = makeUser();
-
-        $this->mock(AiService::class);
 
         expect(app(LibraryRecommender::class)->random(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
@@ -68,13 +64,12 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert', 'title' => 'Dune']);
 
-        $ai = $this->mock(AiService::class);
-        $ai->shouldReceive('respondStructured')
+        $this->ai->shouldReceive('respondStructured')
             ->once()
             ->withArgs(fn ($passedUser, $prompt, $input) => $passedUser->is($user) && str_contains($input, 'Dune by Frank Herbert'))
             ->andReturn([
-            'recommendations' => [['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi']],
-        ]);
+                'recommendations' => [['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi']],
+            ]);
 
         $result = app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user);
 
@@ -85,7 +80,7 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
 
-        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn(null);
+        $this->ai->shouldReceive('respondStructured')->once()->andReturn(null);
 
         expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
@@ -95,7 +90,7 @@ describe('LibraryRecommender', function () {
         LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
         $good = ['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi'];
 
-        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn([
+        $this->ai->shouldReceive('respondStructured')->once()->andReturn([
             'recommendations' => [$good, ['title' => 'No creator'], 'just a string', ['title' => 42, 'creator' => 'Someone']],
         ]);
 
@@ -106,7 +101,7 @@ describe('LibraryRecommender', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
 
-        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn(['recommendations' => 'Dune']);
+        $this->ai->shouldReceive('respondStructured')->once()->andReturn(['recommendations' => 'Dune']);
 
         expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBe(['recommendations' => []]);
     });
@@ -114,7 +109,7 @@ describe('LibraryRecommender', function () {
     it('new() returns null without favorites', function () {
         $user = makeUser();
 
-        $this->mock(AiService::class)->shouldNotReceive('respondStructured');
+        $this->ai->shouldNotReceive('respondStructured');
 
         expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
@@ -125,7 +120,7 @@ describe('LibraryReleases', function () {
         $user = makeUser();
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
-        $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
+        $deezer = $this->mock(DeezerService::class);
         $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
         $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
             'id' => 1,
@@ -144,18 +139,21 @@ describe('LibraryReleases', function () {
         expect($releases[0]->getArtist())->toBe('Radiohead');
     });
 
-    it('skips artists with no new releases', function () {
+    it('skips artists with no new releases', function (?array $artistReleases) {
         $user = makeUser();
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
-        $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
+        $deezer = $this->mock(DeezerService::class);
         $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
-        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => null]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => $artistReleases]);
 
         $service = app(LibraryReleases::class);
 
         expect($service->getMusicReleases($user))->toBe([]);
-    });
+    })->with([
+        'none found' => [[]],
+        'lookup failed' => [null],
+    ]);
 
     it('gives every artist its releases when two artists resolve to the same deezer id', function () {
         $user = makeUser();
@@ -173,7 +171,7 @@ describe('LibraryReleases', function () {
             'release_date' => $releaseDate,
         ];
 
-        $deezer = $this->mock(\App\Api\Libraries\Services\External\DeezerService::class);
+        $deezer = $this->mock(DeezerService::class);
         $deezer->shouldReceive('searchManyArtists')
             ->once()
             ->with(['Radiohead', 'Thom Yorke', 'Nobody', 'Portishead'])
@@ -193,7 +191,7 @@ describe('LibraryReleases', function () {
         $user = makeUser();
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
-        $spotify = $this->mock(\App\Api\Libraries\Services\External\SpotifyService::class);
+        $spotify = $this->mock(SpotifyService::class);
         $spotify->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => '5K4W6rqBFWDnAN6FQUkS6x']]);
         $spotify->shouldReceive('getNewReleases')->with('5K4W6rqBFWDnAN6FQUkS6x')->andReturn([[
             'id' => '4aawyAB9vmqN3uQ7FjRGTy',
@@ -210,7 +208,7 @@ describe('LibraryReleases', function () {
         expect($releases)->toHaveCount(1);
         expect($releases[0]->getTitle())->toBe('Fresh Album');
         expect($releases[0]->getArtist())->toBe('Radiohead');
-        expect($releases[0]->getProvider())->toBe(\App\Api\Libraries\Enums\MusicServiceEnum::SPOTIFY->value);
+        expect($releases[0]->getProvider())->toBe(MusicServiceEnum::SPOTIFY->value);
         expect($releases[0]->getId())->toBe('4aawyAB9vmqN3uQ7FjRGTy');
         expect($releases[0]->getArtistId())->toBe('5K4W6rqBFWDnAN6FQUkS6x');
     });
@@ -219,7 +217,7 @@ describe('LibraryReleases', function () {
         $user = makeUser();
         LibraryMusic::factory()->forUser($user)->create(['rating' => 5, 'artist' => 'Radiohead']);
 
-        $spotify = $this->mock(\App\Api\Libraries\Services\External\SpotifyService::class);
+        $spotify = $this->mock(SpotifyService::class);
         $spotify->shouldReceive('searchArtists')->with('Radiohead')->andReturn([['id' => '5K4W6rqBFWDnAN6FQUkS6x']]);
         $spotify->shouldReceive('getNewReleases')->with('5K4W6rqBFWDnAN6FQUkS6x')->andReturn(null);
 
@@ -232,7 +230,7 @@ describe('LibraryReleases', function () {
         $user = makeUser();
         LibraryBook::factory()->forUser($user)->create(['rating' => 5, 'author' => 'Frank Herbert']);
 
-        $hardcover = $this->mock(\App\Api\Libraries\Services\External\HardcoverService::class);
+        $hardcover = $this->mock(HardcoverService::class);
         $hardcover->shouldReceive('getNewReleasesForAuthors')->with(['Frank Herbert'])->andReturn([[[
             'id' => 1,
             'slug' => 'children-of-dune',
@@ -272,7 +270,7 @@ describe('LibraryReleases', function () {
             'contributions' => [],
         ];
 
-        $hardcover = $this->mock(\App\Api\Libraries\Services\External\HardcoverService::class);
+        $hardcover = $this->mock(HardcoverService::class);
         $hardcover->shouldReceive('getNewReleasesForAuthors')
             ->once()
             ->with(['Frank Herbert', 'Ursula K. Le Guin', 'Nobody'])

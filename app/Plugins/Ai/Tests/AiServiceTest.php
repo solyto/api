@@ -12,17 +12,19 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
+use OpenAI\Contracts\ClientContract;
+use OpenAI\Contracts\Resources\ChatContract;
+use OpenAI\Responses\Chat\CreateResponse;
+use OpenAI\Responses\Meta\MetaInformation;
+use Psr\Http\Client\ClientInterface;
 
 beforeEach(function () {
     $this->app->instance(AiModelSnapshot::class, new AiModelSnapshot(base_path('tests/Fixtures/ai-models.json')));
 });
 
-/**
- * Build a fake chat completion response.
- */
-function fakeChatResponse(string $content, array $usage = ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15]): \OpenAI\Responses\Chat\CreateResponse
+function fakeChatResponse(string $content, array $usage = ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15]): CreateResponse
 {
-    return \OpenAI\Responses\Chat\CreateResponse::from([
+    return CreateResponse::from([
         'id' => 'chatcmpl-test',
         'object' => 'chat.completion',
         'created' => time(),
@@ -33,37 +35,28 @@ function fakeChatResponse(string $content, array $usage = ['prompt_tokens' => 10
             'finish_reason' => 'stop',
         ]],
         'usage' => $usage,
-    ], \OpenAI\Responses\Meta\MetaInformation::from([]));
+    ], MetaInformation::from([]));
 }
 
-/**
- * Build a mocked OpenAI client that returns the given responses for chat()->create().
- */
-function mockedOpenAiClient($response): \OpenAI\Contracts\ClientContract
+function mockedOpenAiClient(CreateResponse $response): ClientContract
 {
-    $chat = Mockery::mock(\OpenAI\Contracts\Resources\ChatContract::class);
+    $chat = Mockery::mock(ChatContract::class);
     $chat->shouldReceive('create')->andReturn($response);
 
-    $client = Mockery::mock(\OpenAI\Contracts\ClientContract::class);
+    $client = Mockery::mock(ClientContract::class);
     $client->shouldReceive('chat')->andReturn($chat);
 
     return $client;
 }
 
-/**
- * Build an AiService backed by the given OpenAI client or PSR-18 HTTP client.
- */
-function makeAiService(?\OpenAI\Contracts\ClientContract $client = null, ?\Psr\Http\Client\ClientInterface $httpClient = null): AiService
+function makeAiService(?ClientContract $client = null, ?ClientInterface $httpClient = null): AiService
 {
     return new AiService(app(UserPluginService::class), $client, $httpClient);
 }
 
-/**
- * An OpenAI client that fails the test if any request is made.
- */
-function unusedOpenAiClient(): \OpenAI\Contracts\ClientContract
+function unusedOpenAiClient(): ClientContract
 {
-    $client = Mockery::mock(\OpenAI\Contracts\ClientContract::class);
+    $client = Mockery::mock(ClientContract::class);
     $client->shouldNotReceive('chat');
 
     return $client;
@@ -75,7 +68,7 @@ describe('AiService', function () {
         UserPlugin::factory()->forUser($this->user)->create(['settings' => ['provider' => 'openai', 'model' => 'gpt-a']]);
     });
 
-    it('respond returns the chat message content', function () {
+    it('returns the chat message content', function () {
         $service = makeAiService(mockedOpenAiClient(fakeChatResponse('Hello there!')));
 
         $result = $service->respond($this->user, 'You are helpful', 'Hi');
@@ -83,18 +76,23 @@ describe('AiService', function () {
         expect($result)->toBe('Hello there!');
     });
 
-    it('respond handles an array of messages', function () {
-        $service = makeAiService(mockedOpenAiClient(fakeChatResponse('ok')));
-
-        $result = $service->respond($this->user, 'System', [
+    it('sends a list of messages after the system prompt', function () {
+        $conversation = [
             ['role' => 'user', 'content' => 'one'],
             ['role' => 'assistant', 'content' => 'two'],
-        ]);
+        ];
+        $chat = Mockery::mock(ChatContract::class);
+        $chat->shouldReceive('create')
+            ->once()
+            ->withArgs(fn (array $request) => $request['messages'] === [['role' => 'system', 'content' => 'System'], ...$conversation])
+            ->andReturn(fakeChatResponse('ok'));
+        $client = Mockery::mock(ClientContract::class);
+        $client->shouldReceive('chat')->andReturn($chat);
 
-        expect($result)->toBe('ok');
+        expect(makeAiService($client)->respond($this->user, 'System', $conversation))->toBe('ok');
     });
 
-    it('respondStructured decodes the json response', function () {
+    it('decodes a structured JSON answer', function () {
         $service = makeAiService(mockedOpenAiClient(fakeChatResponse(json_encode(['recommendations' => []]))));
 
         $result = $service->respondStructured($this->user, 'Prompt', 'input', ['type' => 'json_schema']);
@@ -102,7 +100,7 @@ describe('AiService', function () {
         expect($result)->toBe(['recommendations' => []]);
     });
 
-    it('respondStructured gives null for an answer that is not a json object', function (string $content) {
+    it('gives no structured answer when the answer is not a JSON object', function (string $content) {
         $service = makeAiService(mockedOpenAiClient(fakeChatResponse($content)));
 
         expect($service->respondStructured($this->user, 'Prompt', 'input', ['type' => 'json_schema']))->toBeNull();
@@ -161,17 +159,17 @@ describe('AiService when the AI plugin is unavailable', function () {
         expect($service->respondStructured($user, 'Prompt', 'input', ['type' => 'json_schema']))->toBeNull()
             ->and($service->respond($user, 'Prompt', 'input'))->toBeNull();
     })->with([
-        'no plugin row' => [fn () => fn (User $user) => null],
-        'plugin disabled' => [fn () => fn (User $user) => UserPlugin::factory()->forUser($user)->create(['enabled' => false])],
-        'no api key' => [fn () => fn (User $user) => UserPlugin::factory()->forUser($user)->create(['credentials' => null])],
-        'empty api key' => [fn () => fn (User $user) => UserPlugin::factory()->forUser($user)->create(['credentials' => ['api_key' => '']])],
-        'unreadable api key' => [fn () => function (User $user) {
+        'no plugin row' => [fn (User $user) => null],
+        'plugin disabled' => [fn (User $user) => UserPlugin::factory()->forUser($user)->create(['enabled' => false])],
+        'no api key' => [fn (User $user) => UserPlugin::factory()->forUser($user)->create(['credentials' => null])],
+        'empty api key' => [fn (User $user) => UserPlugin::factory()->forUser($user)->create(['credentials' => ['api_key' => '']])],
+        'unreadable api key' => [function (User $user) {
             $plugin = UserPlugin::factory()->forUser($user)->create();
             $foreign = new Encrypter(Encrypter::generateKey('aes-256-cbc'), 'aes-256-cbc');
             DB::table('user_plugins')->where('id', $plugin->id)
                 ->update(['credentials' => $foreign->encrypt(json_encode(['api_key' => 'sk-lost']), false)]);
         }],
-        'model not in the snapshot' => [fn () => fn (User $user) => UserPlugin::factory()->forUser($user)->create([
+        'model not in the snapshot' => [fn (User $user) => UserPlugin::factory()->forUser($user)->create([
             'settings' => ['provider' => 'openai', 'model' => 'gpt-retired'],
         ])],
     ]);

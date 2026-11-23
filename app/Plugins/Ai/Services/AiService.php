@@ -16,9 +16,6 @@ class AiService
         private readonly ?ClientInterface $httpClient = null,
     ) {}
 
-    /**
-     * Returns null without making a request when the user's AI plugin is not usable.
-     */
     public function respond(
         User $user,
         string $prompt,
@@ -51,9 +48,6 @@ class AiService
         return $response->choices[0]->message->content;
     }
 
-    /**
-     * Returns null without making a request when the user's AI plugin is not usable.
-     */
     public function respondStructured(
         User $user,
         string $prompt,

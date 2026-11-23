@@ -7,9 +7,14 @@ use App\Api\Libraries\Models\LibraryBookGenre;
 use App\Api\Libraries\Models\LibraryMusic;
 use App\Api\Libraries\Models\LibraryMusicGenre;
 use App\Api\Libraries\Services\External\DeezerService;
+use App\Api\Libraries\Services\External\DiscogsService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Tags\Models\Tag;
 use App\Plugins\Models\UserPlugin;
+use Calliostro\Discogs\DiscogsApiClient;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Promise\PromiseInterface;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 
@@ -90,25 +95,25 @@ describe('Library book CRUD', function () {
         $foreignTag = Tag::factory()->forUser($other)->create();
         $payload = ['title' => 'Dune', 'author' => 'Frank Herbert', 'pages' => 412];
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/books', $payload + ['genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/books', $payload + ['genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/libraries/books', $payload + ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/libraries/books', $payload + ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/books/'.$book->id, ['genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/books/'.$book->id, ['genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/books/'.$book->id, ['tags' => [$foreignTag->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('tags.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/books/'.$book->id, ['tags' => [$foreignTag->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('tags.0');
 
         expect(LibraryBook::count())->toBe(1);
         expect($book->fresh()->genres)->toHaveCount(0);
@@ -170,20 +175,20 @@ describe('Library music CRUD', function () {
         $music = LibraryMusic::factory()->forUser($user)->create();
         $foreignGenre = LibraryMusicGenre::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/libraries/music', [
                 'title' => 'OK Computer',
                 'artist' => 'Radiohead',
                 'type' => 'album',
                 'genres' => [$foreignGenre->id],
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+            ]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/libraries/music/'.$music->id, ['genres' => [$foreignGenre->id]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('genres.0');
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/libraries/music/'.$music->id, ['genres' => [$foreignGenre->id]]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('genres.0');
 
         expect(LibraryMusic::count())->toBe(1);
         expect($music->fresh()->genres)->toHaveCount(0);
@@ -341,7 +346,8 @@ describe('Library search endpoints', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/libraries/books/search/hardcover/Dune')
             ->assertStatus(200)
-            ->assertJsonPath('data.0.title', 'Dune');
+            ->assertJsonPath('data.0.title', 'Dune')
+            ->assertJsonPath('meta.unavailable', false);
     });
 
     it('searches music via deezer', function () {
@@ -363,7 +369,8 @@ describe('Library search endpoints', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/libraries/music/search/deezer/Kid%20A')
             ->assertStatus(200)
-            ->assertJsonPath('data.0.title', 'Kid A');
+            ->assertJsonPath('data.0.title', 'Kid A')
+            ->assertJsonPath('meta.unavailable', false);
     });
 
     it('searches music via spotify', function () {
@@ -454,13 +461,156 @@ describe('Library search endpoints', function () {
     });
 });
 
+function bindDiscogsAnswering(Closure $answer): void
+{
+    $guzzle = Mockery::mock(GuzzleClient::class);
+    $guzzle->shouldReceive('get')->andReturnUsing($answer);
+
+    app()->instance(DiscogsService::class, new DiscogsService(new DiscogsApiClient($guzzle)));
+}
+
+function fakeSpotifySearch(PromiseInterface $searchResponse): void
+{
+    config([
+        'services.spotify.client_id' => 'test-client-id',
+        'services.spotify.client_secret' => 'test-client-secret',
+    ]);
+
+    Http::fake([
+        'https://accounts.spotify.com/api/token' => Http::response(['access_token' => 'tok123']),
+        'https://api.spotify.com/v1/search*' => $searchResponse,
+    ]);
+}
+
+$searchesWithoutResults = [
+    'hardcover' => ['/api/v1/libraries/books/search/hardcover/Nothing', fn () => Http::fake([
+        'https://api.hardcover.app/v1/graphql' => Http::response(['data' => ['search' => ['results' => ['hits' => []]]]]),
+    ])],
+    'goodreads' => ['/api/v1/libraries/books/search/goodreads/Nothing', fn () => Http::fake()],
+    'deezer' => ['/api/v1/libraries/music/search/deezer/Nothing', fn () => Http::fake([
+        'https://api.deezer.com/search/album?q=*' => Http::response(['data' => [], 'total' => 0]),
+    ])],
+    'spotify' => ['/api/v1/libraries/music/search/spotify/Nothing', fn () => fakeSpotifySearch(
+        Http::response(['albums' => ['items' => []]])
+    )],
+    'discogs' => ['/api/v1/libraries/music/search/discogs/Nothing', fn () => bindDiscogsAnswering(
+        fn () => new Response(200, [], json_encode(['results' => []]))
+    )],
+    'tmdb' => ['/api/v1/libraries/movies/search/tmdb/Nothing', fn () => Http::fake([
+        'https://api.themoviedb.org/3/search/movie*' => Http::response(['results' => []]),
+    ])],
+    'imdb' => ['/api/v1/libraries/movies/search/imdb/Nothing', fn () => Http::fake()],
+    'steam' => ['/api/v1/libraries/games/search/steam/Nothing', fn () => Http::fake([
+        'https://store.steampowered.com/api/storesearch*' => Http::response(['total' => 0, 'items' => []]),
+    ])],
+    'bgg' => ['/api/v1/libraries/games/search/bgg/Nothing', fn () => Http::fake([
+        'https://boardgamegeek.com/xmlapi2/search*' => Http::response('<?xml version="1.0" encoding="utf-8"?><items total="0"></items>'),
+    ])],
+];
+
+// Every case here answered 200 with an empty list before the unavailable flag existed.
+$searchesWithProviderDown = [
+    'hardcover error' => ['/api/v1/libraries/books/search/hardcover/Dune', fn () => Http::fake([
+        'https://api.hardcover.app/v1/graphql' => Http::response([], 500),
+    ])],
+    'deezer error' => ['/api/v1/libraries/music/search/deezer/Kid%20A', fn () => Http::fake([
+        'https://api.deezer.com/search/album?q=*' => Http::response([], 500),
+    ])],
+    'deezer unreachable' => ['/api/v1/libraries/music/search/deezer/Kid%20A', fn () => Http::fake([
+        'https://api.deezer.com/search/album?q=*' => Http::failedConnection(),
+    ])],
+    'spotify error' => ['/api/v1/libraries/music/search/spotify/Kid%20A', fn () => fakeSpotifySearch(
+        Http::response([], 503)
+    )],
+    'tmdb error' => ['/api/v1/libraries/movies/search/tmdb/Alien', fn () => Http::fake([
+        'https://api.themoviedb.org/3/search/movie*' => Http::response([], 500),
+    ])],
+    'tmdb unreachable' => ['/api/v1/libraries/movies/search/tmdb/Alien', fn () => Http::fake([
+        'https://api.themoviedb.org/3/search/movie*' => Http::failedConnection(),
+    ])],
+    'steam error' => ['/api/v1/libraries/games/search/steam/Hollow%20Knight', fn () => Http::fake([
+        'https://store.steampowered.com/api/storesearch*' => Http::response([], 500),
+    ])],
+    'steam unreachable' => ['/api/v1/libraries/games/search/steam/Hollow%20Knight', fn () => Http::fake([
+        'https://store.steampowered.com/api/storesearch*' => Http::failedConnection(),
+    ])],
+    'bgg error' => ['/api/v1/libraries/games/search/bgg/Catan', fn () => Http::fake([
+        'https://boardgamegeek.com/xmlapi2/search*' => Http::response('', 500),
+    ])],
+    'bgg unreachable' => ['/api/v1/libraries/games/search/bgg/Catan', fn () => Http::fake([
+        'https://boardgamegeek.com/xmlapi2/search*' => Http::failedConnection(),
+    ])],
+];
+
+describe('Library search when the provider finds nothing or is down', function () use ($searchesWithoutResults, $searchesWithProviderDown) {
+    beforeEach(function () {
+        Http::preventStrayRequests();
+    });
+
+    it('answers 200 with an empty list when the provider finds nothing', function (string $path, Closure $fakeProvider) {
+        $fakeProvider();
+
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson($path);
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data', [])
+            ->assertJsonPath('message', 'Search results retrieved successfully.');
+    })->with($searchesWithoutResults);
+
+    it('answers 200 with an empty list when the provider is down', function (string $path, Closure $fakeProvider) {
+        $fakeProvider();
+
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson($path);
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data', [])
+            ->assertJsonPath('message', 'Search results retrieved successfully.');
+    })->with($searchesWithProviderDown);
+
+    it('flags the provider as unavailable when it is down', function (string $path, Closure $fakeProvider) {
+        $fakeProvider();
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson($path)
+            ->assertJsonPath('meta.unavailable', true);
+    })->with($searchesWithProviderDown);
+
+    it('does not flag the provider as unavailable when it finds nothing', function (string $path, Closure $fakeProvider) {
+        $fakeProvider();
+
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson($path)
+            ->assertJsonPath('meta.unavailable', false);
+    })->with($searchesWithoutResults);
+
+    it('answers 500 when hardcover cannot be reached', function () {
+        Http::fake(['https://api.hardcover.app/v1/graphql' => Http::failedConnection()]);
+
+        expectApiError($this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/libraries/books/search/hardcover/Dune'), 500);
+    });
+
+    it('answers 500 when boardgamegeek answers with unreadable XML', function () {
+        Http::fake(['https://boardgamegeek.com/xmlapi2/search*' => Http::response('<html>maintenance</html')]);
+
+        expectApiError($this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/libraries/games/search/bgg/Catan'), 500);
+    });
+
+    it('answers 500 when discogs answers with an error', function () {
+        bindDiscogsAnswering(fn () => new Response(500, [], json_encode(['message' => 'Server error', 'error' => 500])));
+
+        expectApiError($this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/libraries/music/search/discogs/Violator'), 500);
+    });
+});
+
 describe('Library recommend endpoints', function () {
     it('recommends a random book and returns 404 without books', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/libraries/books/recommend/random')
-            ->assertStatus(404);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/books/recommend/random'), 404);
 
         $book = LibraryBook::factory()->forUser($user)->create(['title' => 'Dune']);
 
@@ -474,9 +624,8 @@ describe('Library recommend endpoints', function () {
     it('recommends a random music item and returns 404 without music', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/libraries/music/recommend/random')
-            ->assertStatus(404);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/libraries/music/recommend/random'), 404);
 
         $music = LibraryMusic::factory()->forUser($user)->create(['title' => 'Kind of Blue']);
 
@@ -505,11 +654,11 @@ describe('Library NEW recommendations without a usable AI plugin', function () {
 
         expect(Arr::except($withoutAi->json(), 'timestamp'))->toBe(Arr::except($withoutFavorites->json(), 'timestamp'));
     })->with([
-        'books' => ['books', fn () => fn ($user) => LibraryBook::factory()->forUser($user)->create(['rating' => 5])],
-        'music' => ['music', fn () => fn ($user) => LibraryMusic::factory()->forUser($user)->create(['rating' => 5])],
+        'books' => ['books', fn ($user) => LibraryBook::factory()->forUser($user)->create(['rating' => 5])],
+        'music' => ['music', fn ($user) => LibraryMusic::factory()->forUser($user)->create(['rating' => 5])],
     ])->with([
-        'no plugin' => [fn () => fn ($user) => null],
-        'plugin disabled' => [fn () => fn ($user) => UserPlugin::factory()->forUser($user)->create(['enabled' => false])],
+        'no plugin' => [fn ($user) => null],
+        'plugin disabled' => [fn ($user) => UserPlugin::factory()->forUser($user)->create(['enabled' => false])],
     ]);
 });
 

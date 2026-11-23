@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\DTOs\GameReleaseDTO;
+use App\Api\Libraries\DTOs\SearchResultsDTO;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\GameServiceEnum;
 use App\Api\Libraries\Services\External\BggService;
@@ -103,12 +104,12 @@ class LibraryGameService
         $this->cache->forget([self::CACHE_KEY, $userId]);
     }
 
-    public function search(GameServiceEnum $service, string $query): ?array
+    public function search(GameServiceEnum $service, string $query): SearchResultsDTO
     {
-        return match ($service) {
+        return SearchResultsDTO::fromProvider(match ($service) {
             GameServiceEnum::STEAM => $this->steamService->searchGames($query),
             GameServiceEnum::BGG   => $this->bggService->searchGames($query),
-        };
+        });
     }
 
     public function import(GameServiceEnum $service, string $url): ?GameReleaseDTO

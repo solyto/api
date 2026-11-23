@@ -63,15 +63,14 @@ class WealthService
     {
         $date = $data['date'] ?? Carbon::today()->toDateString();
 
-        $value = WealthValue::where('field_id', $field->id)->whereDate('date', $date)->first();
+        $value = $field->values()->whereDate('date', $date)->first();
 
         if ($value) {
             $value->update(['value' => $data['value']]);
         } else {
-            $value = WealthValue::create([
+            $value = $field->values()->create([
                 'date' => $date,
                 'value' => $data['value'],
-                'field_id' => $field->id,
             ]);
         }
 

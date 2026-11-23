@@ -406,7 +406,8 @@ class LibraryMovieController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/MovieSearchResult"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/MovieSearchResult")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/LibrarySearchMeta")
      *         )
      *     ),
      *
@@ -415,11 +416,12 @@ class LibraryMovieController
      */
     public function search(Request $request, MovieServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryMovieService->search($service, $query);
+        $search = $this->libraryMovieService->search($service, $query);
 
         return ApiResponse::success(
-            MovieSearchResultResource::collection(collect($results ?? [])),
-            'Search results retrieved successfully.'
+            MovieSearchResultResource::collection(collect($search->results)),
+            'Search results retrieved successfully.',
+            meta: ['unavailable' => $search->unavailable],
         );
     }
 }

@@ -4,6 +4,7 @@ namespace App\Api\Libraries\Services;
 
 use App\Shared\Pulse\PulseMetrics;
 use App\Api\Libraries\DTOs\MusicReleaseDTO;
+use App\Api\Libraries\DTOs\SearchResultsDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\MusicServiceEnum;
@@ -144,17 +145,21 @@ class LibraryMusicService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            fn () => PulseMetrics::timedReleaseLookup('music', 'request', fn () => $this->libraryReleases->getMusicReleases($user))
+            fn () => PulseMetrics::timedReleaseLookup(
+                'music',
+                'request',
+                fn () => $this->libraryReleases->getMusicReleases($user)
+            )
         );
     }
 
-    public function search(MusicServiceEnum $service, string $query): ?array
+    public function search(MusicServiceEnum $service, string $query): SearchResultsDTO
     {
-        return match ($service) {
+        return SearchResultsDTO::fromProvider(match ($service) {
             MusicServiceEnum::DEEZER  => $this->deezerService->searchAlbum($query),
             MusicServiceEnum::DISCOGS => $this->discogsService->search($query),
             MusicServiceEnum::SPOTIFY => $this->spotifyService->searchAlbum($query),
-        };
+        });
     }
 
     public function import(MusicServiceEnum $service, string $url): ?MusicReleaseDTO

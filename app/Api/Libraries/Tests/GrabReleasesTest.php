@@ -8,6 +8,9 @@ use App\Api\Libraries\Models\LibraryBook;
 use App\Api\Libraries\Models\LibraryMovie;
 use App\Api\Libraries\Models\LibraryMovieGenre;
 use App\Api\Libraries\Models\LibraryMusic;
+use App\Api\Libraries\Notifications\BookReleaseNotification;
+use App\Api\Libraries\Notifications\MovieReleaseNotification;
+use App\Api\Libraries\Notifications\MusicReleaseNotification;
 use App\Api\Libraries\Services\External\DeezerService;
 use App\Api\Libraries\Services\External\HardcoverService;
 use App\Api\Libraries\Services\External\TmdbService;
@@ -16,6 +19,22 @@ use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
+function grabReleases(string $job): void
+{
+    app($job)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+}
+
+function deezerRelease(int|string $id): array
+{
+    return [
+        'id' => $id,
+        'title' => 'Album '.$id,
+        'link' => 'https://deezer.com/album/'.$id,
+        'cover_big' => null,
+        'release_date' => now()->toDateString(),
+    ];
+}
+
 describe('GrabMusicReleases', function () {
     beforeEach(function () {
         $this->user = makeUser();
@@ -23,21 +42,15 @@ describe('GrabMusicReleases', function () {
 
         $deezer = $this->mock(DeezerService::class);
         $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
-        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
-            'id' => 10,
-            'title' => 'Fresh Album',
-            'link' => 'https://deezer.com/album/10',
-            'cover_big' => 'https://cover.example/10.jpg',
-            'release_date' => now()->toDateString(),
-        ]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [deezerRelease(10)]]);
     });
 
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMusicReleases::class);
 
-        Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+        Notification::assertSentTo($this->user, MusicReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('music_release_notified_'.$this->user->id);
         expect($notified)->toBe([10]);
@@ -47,9 +60,9 @@ describe('GrabMusicReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('music_release_notified_'.$this->user->id, [10]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMusicReleases::class);
 
-        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+        Notification::assertNotSentTo($this->user, MusicReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('music_release_notified_'.$this->user->id);
         expect($notified)->toBe([10]);
@@ -58,43 +71,38 @@ describe('GrabMusicReleases', function () {
     it('notifies only the releases not yet in the notified set', function () {
         Notification::fake();
         Cache::store('longterm')->put('music_release_notified_'.$this->user->id, [10]);
+        $deezer = $this->mock(DeezerService::class);
+        $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [deezerRelease(10), deezerRelease(11)]]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMusicReleases::class);
 
-        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+        Notification::assertSentToTimes($this->user, MusicReleaseNotification::class, 1);
+        Notification::assertSentTo($this->user, MusicReleaseNotification::class, fn ($notification) => $notification->title === 'Album 11');
+        expect(Cache::store('longterm')->get('music_release_notified_'.$this->user->id))->toBe([10, 11]);
     });
 
     it('tolerates string release ids (spotify) in the notified set', function () {
         Notification::fake();
 
-        // Replace the beforeEach deezer mock: the DTO built from this raw
-        // release carries a Spotify-style 22-char string id (TASK-2 widened
-        // MusicReleaseDTO::id to int|string). The job's strict in_array dedup
-        // must store and compare it as a string.
+        // The job's dedup compares strictly, so a string id must be stored and compared as a string.
         $deezer = $this->mock(DeezerService::class);
         $deezer->shouldReceive('searchManyArtists')->with(['Radiohead'])->andReturn([[['id' => 6]]]);
-        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [[
-            'id' => '4aawyAB9vmqN3uQ7FjRGTy',
-            'title' => 'Fresh Album',
-            'link' => 'https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy',
-            'cover_big' => null,
-            'release_date' => now()->toDateString(),
-        ]]]);
+        $deezer->shouldReceive('getNewReleasesForArtists')->with([6])->andReturn([6 => [deezerRelease('4aawyAB9vmqN3uQ7FjRGTy')]]);
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMusicReleases::class);
 
-        Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+        Notification::assertSentTo($this->user, MusicReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('music_release_notified_'.$this->user->id);
         expect($notified)->toBe(['4aawyAB9vmqN3uQ7FjRGTy']);
 
-        // Re-fake so the assertion below only counts notifications from the
-        // second run (the dedup must suppress the already-notified string id).
+        // A fresh fake counts only the second run's notifications.
         Notification::fake();
 
-        app(GrabMusicReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMusicReleases::class);
 
-        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MusicReleaseNotification::class);
+        Notification::assertNotSentTo($this->user, MusicReleaseNotification::class);
     });
 });
 
@@ -119,9 +127,9 @@ describe('GrabBookReleases', function () {
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabBookReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabBookReleases::class);
 
-        Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\BookReleaseNotification::class);
+        Notification::assertSentTo($this->user, BookReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('book_release_notified_'.$this->user->id);
         expect($notified)->toBe([20]);
@@ -131,9 +139,9 @@ describe('GrabBookReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('book_release_notified_'.$this->user->id, [20]);
 
-        app(GrabBookReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabBookReleases::class);
 
-        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\BookReleaseNotification::class);
+        Notification::assertNotSentTo($this->user, BookReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('book_release_notified_'.$this->user->id);
         expect($notified)->toBe([20]);
@@ -162,9 +170,9 @@ describe('GrabMovieReleases', function () {
     it('notifies a new release and remembers it in the long-term cache', function () {
         Notification::fake();
 
-        app(GrabMovieReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMovieReleases::class);
 
-        Notification::assertSentTo($this->user, \App\Api\Libraries\Notifications\MovieReleaseNotification::class);
+        Notification::assertSentTo($this->user, MovieReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('movie_release_notified_'.$this->user->id);
         expect($notified)->toBe(['tt123']);
@@ -174,9 +182,9 @@ describe('GrabMovieReleases', function () {
         Notification::fake();
         Cache::store('longterm')->put('movie_release_notified_'.$this->user->id, ['tt123']);
 
-        app(GrabMovieReleases::class)->handle(app(UserCacheService::class), app(LibraryReleases::class));
+        grabReleases(GrabMovieReleases::class);
 
-        Notification::assertNotSentTo($this->user, \App\Api\Libraries\Notifications\MovieReleaseNotification::class);
+        Notification::assertNotSentTo($this->user, MovieReleaseNotification::class);
 
         $notified = Cache::store('longterm')->get('movie_release_notified_'.$this->user->id);
         expect($notified)->toBe(['tt123']);

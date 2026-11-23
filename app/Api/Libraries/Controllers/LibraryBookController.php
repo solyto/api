@@ -355,7 +355,8 @@ class LibraryBookController
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/BookSearchResult"))
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/BookSearchResult")),
+     *             @OA\Property(property="meta", ref="#/components/schemas/LibrarySearchMeta")
      *         )
      *     ),
      *
@@ -364,11 +365,12 @@ class LibraryBookController
      */
     public function search(Request $request, BookServiceEnum $service, string $query): JsonResponse
     {
-        $results = $this->libraryBookService->search($service, $query);
+        $search = $this->libraryBookService->search($service, $query);
 
         return ApiResponse::success(
-            BookSearchResultResource::collection(collect($results ?? [])),
-            'Search results retrieved successfully.'
+            BookSearchResultResource::collection(collect($search->results)),
+            'Search results retrieved successfully.',
+            meta: ['unavailable' => $search->unavailable],
         );
     }
 

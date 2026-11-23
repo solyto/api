@@ -153,7 +153,7 @@ class HardcoverService
     {
         $books = $response['data']['books'] ?? null;
 
-        if (!$books) {
+        if ($books === null) {
             return null;
         }
 

@@ -3,6 +3,7 @@
 namespace App\Api\Libraries\Services;
 
 use App\Api\Libraries\DTOs\MovieReleaseDTO;
+use App\Api\Libraries\DTOs\SearchResultsDTO;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\MovieServiceEnum;
 use App\Api\Libraries\Models\LibraryMovie;
@@ -11,6 +12,7 @@ use App\Api\Libraries\Services\External\ImdbService;
 use App\Api\Libraries\Services\External\TmdbService;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 class LibraryMovieService
@@ -120,19 +122,7 @@ class LibraryMovieService
 
     public function trailers(LibraryMovie $movie): array
     {
-        if ($movie->category === 'series') {
-            $results = $this->tmdbService->searchTv($movie->title);
-            if (empty($results)) {
-                return [];
-            }
-            $videos = $this->tmdbService->getTvVideos($results[0]['id']);
-        } else {
-            $results = $this->tmdbService->searchMovie($movie->title, $movie->publication_year);
-            if (empty($results)) {
-                return [];
-            }
-            $videos = $this->tmdbService->getMovieVideos(array_values($results)[0]->getId());
-        }
+        $videos = $movie->category === 'series' ? $this->seriesVideos($movie) : $this->movieVideos($movie);
 
         return collect($videos ?? [])
             ->filter(fn ($v) => $v['site'] === 'YouTube' && $v['type'] === 'Trailer')
@@ -140,12 +130,12 @@ class LibraryMovieService
             ->toArray();
     }
 
-    public function search(MovieServiceEnum $service, string $query): ?array
+    public function search(MovieServiceEnum $service, string $query): SearchResultsDTO
     {
-        return match ($service) {
+        return SearchResultsDTO::fromProvider(match ($service) {
             MovieServiceEnum::TMDB => $this->tmdbService->searchMovie($query),
             MovieServiceEnum::IMDB => [],
-        };
+        });
     }
 
     public function import(MovieServiceEnum $service, string $url): ?MovieReleaseDTO
@@ -189,5 +179,29 @@ class LibraryMovieService
         $genre->delete();
 
         $this->cache->forget([self::CACHE_KEY, $userId]);
+    }
+
+    private function seriesVideos(LibraryMovie $movie): ?array
+    {
+        $matches = $this->tmdbService->searchTv($movie->title);
+
+        if (empty($matches)) {
+            return [];
+        }
+
+        return $this->tmdbService->getTvVideos($matches[0]['id']);
+    }
+
+    private function movieVideos(LibraryMovie $movie): ?array
+    {
+        $matches = $this->tmdbService->searchMovie($movie->title, $movie->publication_year);
+
+        if (empty($matches)) {
+            return [];
+        }
+
+        $firstMatch = Arr::first($matches);
+
+        return $this->tmdbService->getMovieVideos($firstMatch->getId());
     }
 }

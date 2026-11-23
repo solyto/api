@@ -38,7 +38,7 @@ describe('HardcoverService::getNewReleasesForAuthors', function () {
         expect(array_keys($releases))->toBe([0, 1, 2]);
         expect(array_column($releases[0], 'id'))->toBe([1]);
         expect(array_column($releases[1], 'id'))->toBe([3]);
-        expect($releases[2])->toBeNull();
+        expect($releases[2])->toBe([]);
 
         Http::assertSentCount(3);
         Http::assertSent(fn (Request $request) => $request->url() === 'https://api.hardcover.app/v1/graphql'

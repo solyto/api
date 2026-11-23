@@ -120,7 +120,7 @@ class DeezerService
 
     private function filterNewReleases(?array $albums): ?array
     {
-        if (!$albums) {
+        if ($albums === null) {
             return null;
         }
 

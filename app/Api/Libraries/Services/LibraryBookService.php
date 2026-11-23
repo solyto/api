@@ -4,6 +4,7 @@ namespace App\Api\Libraries\Services;
 
 use App\Shared\Pulse\PulseMetrics;
 use App\Api\Libraries\DTOs\BookReleaseDTO;
+use App\Api\Libraries\DTOs\SearchResultsDTO;
 use App\Api\Libraries\Enums\LibraryRecommendationEnum;
 use App\Api\Libraries\Enums\LibraryTypeEnum;
 use App\Api\Libraries\Enums\BookServiceEnum;
@@ -141,16 +142,20 @@ class LibraryBookService
         return $this->cache->remember(
             [self::CACHE_KEY_RELEASES, $user->id],
             self::CACHE_TTL_RELEASES,
-            fn () => PulseMetrics::timedReleaseLookup('books', 'request', fn () => $this->libraryReleases->getBookReleases($user))
+            fn () => PulseMetrics::timedReleaseLookup(
+                'books',
+                'request',
+                fn () => $this->libraryReleases->getBookReleases($user)
+            )
         );
     }
 
-    public function search(BookServiceEnum $service, string $query): ?array
+    public function search(BookServiceEnum $service, string $query): SearchResultsDTO
     {
-        return match ($service) {
+        return SearchResultsDTO::fromProvider(match ($service) {
             BookServiceEnum::HARDCOVER => $this->hardcoverService->searchBooks($query),
             BookServiceEnum::GOODREADS => [],
-        };
+        });
     }
 
     public function import(BookServiceEnum $service, string $url): ?BookReleaseDTO

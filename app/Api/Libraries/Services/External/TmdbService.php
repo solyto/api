@@ -205,10 +205,7 @@ class TmdbService
         return $this->buildDetailDTO($type, $result, (string) $result['id'], $url, MovieServiceEnum::TMDB->value);
     }
 
-    /**
-     * Resolves an IMDb title ID (tt…) through TMDB, preferring a movie match over a TV match.
-     * The DTO keeps the IMDb ID, URL and provider.
-     */
+    // A title can match both a movie and a series; the movie wins. The DTO keeps the IMDb id, URL and provider.
     public function importByImdbId(string $imdbId, string $url): ?MovieReleaseDTO
     {
         $found = $this->get("/find/{$imdbId}", ['external_source' => 'imdb_id', 'language' => 'en-US']);
@@ -236,18 +233,22 @@ class TmdbService
     {
         $isMovie = $type === 'movie';
         $date = $isMovie ? ($result['release_date'] ?? null) : ($result['first_air_date'] ?? null);
+        $runtime = $isMovie ? ($result['runtime'] ?? null) : ($result['episode_run_time'][0] ?? null);
 
+        // An entry can lack a key read here (title, name, a genre's name); reading it throws, and the entry can't be imported.
         try {
+            $title = $isMovie ? $result['title'] : $result['name'];
+
             return new MovieReleaseDTO(
                 id: $id,
-                title: $isMovie ? $result['title'] : $result['name'],
+                title: $title,
                 url: $url,
                 provider: $provider,
-                type: $isMovie ? 'movie' : 'tv',
+                type: $type,
                 description: $result['overview'] ?? null,
                 cover: isset($result['poster_path']) ? self::IMAGE_BASE_URL . $result['poster_path'] : null,
                 releaseYear: !empty($date) ? (int) substr($date, 0, 4) : null,
-                runtime: $isMovie ? ($result['runtime'] ?? null) : ($result['episode_run_time'][0] ?? null),
+                runtime: $runtime,
                 genres: array_map(fn($g) => $g['name'], $result['genres'] ?? []),
             );
         } catch (\Exception) {
