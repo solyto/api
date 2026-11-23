@@ -26,13 +26,21 @@ return [
     'daily_check_in_reminder_body'  => 'Вы уже заполнили ежедневный опрос?',
 
     // Alerts
-    'alert_title'                   => 'Оповещение',
+    'alert_title'                   => 'Ежедневный опрос',
     'goal_reached_title'            => 'Цель достигнута',
+    'goal_kept_title'               => 'Цель соблюдена',
     'alert_average_below'           => ':tracker: в среднем :average за последние :days дн. (ниже :threshold).',
     'alert_average_above'           => ':tracker: в среднем :average за последние :days дн. (выше :threshold).',
     'alert_no_entry_days'           => ':tracker: нет записей :days дн. подряд.',
     'alert_entry_days'              => ':tracker: записи :days дн. подряд.',
-    'alert_goal_reached'            => ':tracker: вы достигли цели.',
+    'alert_goal_reached_this_week'  => ':tracker: вы достигли цели на этой неделе.',
+    'alert_goal_reached_this_month' => ':tracker: вы достигли цели в этом месяце.',
+    'alert_goal_reached_yesterday'  => ':tracker: вчера вы достигли цели.',
+    'alert_goal_reached_last_week'  => ':tracker: на прошлой неделе вы достигли цели.',
+    'alert_goal_reached_last_month' => ':tracker: в прошлом месяце вы достигли цели.',
+    'alert_goal_kept_yesterday'     => ':tracker: вчера вы уложились в рамки цели.',
+    'alert_goal_kept_last_week'     => ':tracker: на прошлой неделе вы уложились в рамки цели.',
+    'alert_goal_kept_last_month'    => ':tracker: в прошлом месяце вы уложились в рамки цели.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'      => 'Планы на день',

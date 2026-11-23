@@ -188,6 +188,18 @@ describe('DELETE /api/v1/check-in/trackers/{tracker}', function () {
             ->and(Alert::where('user_id', $user->id)->count())->toBe(0);
     });
 
+    it('no longer lists the deleted tracker\'s values, even after they were cached', function () {
+        $user = makeUser();
+        $tracker = ownTracker($user);
+        CheckInValue::factory()->forTracker($tracker)->on('2026-10-01', 1)->create();
+        $values = fn () => collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in/values')->assertOk()->json('data'));
+        expect($values()->where('tracker_id', $tracker->id))->toHaveCount(1);
+
+        $this->actingAs($user, 'sanctum')->deleteJson("/api/v1/check-in/trackers/{$tracker->id}")->assertOk();
+
+        expect($values()->where('tracker_id', $tracker->id))->toHaveCount(0);
+    });
+
     it('refuses to delete a built-in tracker', function () {
         $user = makeUser();
         $mood = builtInTracker($user, 'mood');

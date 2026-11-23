@@ -3,6 +3,8 @@
 namespace App\Api\Alerts\Notifications;
 
 use App\Api\Alerts\Enums\AlertRule;
+use App\Api\Goals\Enums\GoalComparison;
+use App\Api\Goals\Enums\GoalPeriod;
 use App\Shared\Notifications\BaseNotification;
 use App\Shared\Notifications\Channels\TelegramMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -17,6 +19,9 @@ class AlertNotification extends BaseNotification
         public ?int $days = null,
         public ?float $threshold = null,
         public ?float $average = null,
+        public ?GoalComparison $goalComparison = null,
+        public ?GoalPeriod $goalPeriod = null,
+        public bool $periodFinished = false,
     ) {}
 
     protected function getNotificationType(): string
@@ -71,17 +76,39 @@ class AlertNotification extends BaseNotification
 
     private function title(): string
     {
-        return $this->rule === AlertRule::GoalReached ? __('notifications.goal_reached_title') : __('notifications.alert_title');
+        return match (true) {
+            $this->rule !== AlertRule::GoalReached => __('notifications.alert_title'),
+            $this->goalComparison === GoalComparison::AtMost => __('notifications.goal_kept_title'),
+            default => __('notifications.goal_reached_title'),
+        };
     }
 
     private function body(): string
     {
-        return __('notifications.alert_' . $this->rule->value, [
+        return __('notifications.' . $this->bodyKey(), [
             'tracker' => $this->trackerKey !== null ? __('widgets.tracker_' . $this->trackerKey) : $this->trackerName,
             'days' => $this->days,
             'threshold' => $this->formatNumber($this->threshold),
             'average' => $this->formatNumber($this->average),
         ]);
+    }
+
+    // Goals say which period they were reached in: "this week" while it runs, "last week" once it ended.
+    // At-most goals are only judged after their period, so they always look back.
+    private function bodyKey(): string
+    {
+        if ($this->rule !== AlertRule::GoalReached) {
+            return 'alert_' . $this->rule->value;
+        }
+
+        $kind = $this->goalComparison === GoalComparison::AtMost ? 'kept' : 'reached';
+        $when = match ($this->goalPeriod ?? GoalPeriod::Week) {
+            GoalPeriod::Day => 'yesterday',
+            GoalPeriod::Week => $this->periodFinished ? 'last_week' : 'this_week',
+            GoalPeriod::Month => $this->periodFinished ? 'last_month' : 'this_month',
+        };
+
+        return "alert_goal_{$kind}_{$when}";
     }
 
     private function link(): string

@@ -2,6 +2,7 @@
 
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -114,7 +115,32 @@ describe('Check-in data migration', function () {
         expect(DB::table('check_in')->get()->toArray())->toEqual($before);
     });
 
-    it('skips users who already have trackers, so running it again changes nothing', function () {
+    it('copies the history of users whose built-in trackers the app already created', function () {
+        $user = legacyCheckInUser(['enabled_trackers' => ['water', 'alcohol']]);
+        app(CheckInTrackerService::class)->provisionBuiltIns($user);
+        legacyCheckInRow($user, '2026-10-01', ['mood' => 4, 'alcohol' => 1]);
+
+        runCheckInMigration();
+
+        expect(CheckInTracker::forUser($user->id)->count())->toBe(12)
+            ->and(CheckInTracker::forUser($user->id)->where('enabled', true)->orderBy('position')->pluck('key')->all())->toBe(['water', 'alcohol'])
+            ->and(migratedValues($user))->toBe([['alcohol', '2026-10-01', 1], ['mood', '2026-10-01', 4]]);
+    });
+
+    it('migrates users in several chunks', function () {
+        $users = collect(range(1, 120))->map(function (int $i) {
+            $user = legacyCheckInUser();
+            legacyCheckInRow($user, '2026-10-01', ['mood' => $i % 5 + 1]);
+
+            return [$user, $i % 5 + 1];
+        });
+
+        runCheckInMigration();
+
+        $users->each(fn (array $pair) => expect(migratedValues($pair[0]))->toBe([['mood', '2026-10-01', $pair[1]]]));
+    });
+
+    it('skips users who already have values, so running it again changes nothing', function () {
         $user = legacyCheckInUser();
         legacyCheckInRow($user, '2026-10-01', ['mood' => 4]);
 

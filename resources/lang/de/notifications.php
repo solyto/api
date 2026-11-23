@@ -26,13 +26,21 @@ return [
     'daily_check_in_reminder_body'   => 'Hast du deinen täglichen Check-in bereits abgeschlossen?',
 
     // Alerts
-    'alert_title'                    => 'Hinweis',
+    'alert_title'                    => 'Check-in',
     'goal_reached_title'             => 'Ziel erreicht',
+    'goal_kept_title'                => 'Ziel eingehalten',
     'alert_average_below'            => ':tracker: im Schnitt :average in den letzten :days Tagen (unter :threshold).',
     'alert_average_above'            => ':tracker: im Schnitt :average in den letzten :days Tagen (über :threshold).',
     'alert_no_entry_days'            => ':tracker: seit :days Tagen nichts eingetragen.',
     'alert_entry_days'               => ':tracker: :days Tage in Folge eingetragen.',
-    'alert_goal_reached'             => ':tracker: Du hast dein Ziel erreicht.',
+    'alert_goal_reached_this_week'   => ':tracker: Du hast dein Ziel für diese Woche erreicht.',
+    'alert_goal_reached_this_month'  => ':tracker: Du hast dein Ziel für diesen Monat erreicht.',
+    'alert_goal_reached_yesterday'   => ':tracker: Du hast dein Ziel gestern erreicht.',
+    'alert_goal_reached_last_week'   => ':tracker: Du hast dein Ziel letzte Woche erreicht.',
+    'alert_goal_reached_last_month'  => ':tracker: Du hast dein Ziel letzten Monat erreicht.',
+    'alert_goal_kept_yesterday'      => ':tracker: Du hast dein Ziel gestern eingehalten.',
+    'alert_goal_kept_last_week'      => ':tracker: Du hast dein Ziel letzte Woche eingehalten.',
+    'alert_goal_kept_last_month'     => ':tracker: Du hast dein Ziel letzten Monat eingehalten.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'Dein Tag heute',

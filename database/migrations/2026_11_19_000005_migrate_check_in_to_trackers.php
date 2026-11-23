@@ -16,13 +16,19 @@ return new class extends Migration
 
     private const array DEFAULT_ENABLED = ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount'];
 
-    private const int CHUNK = 500;
+    // Each chunk holds all of its users' check-ins and values in memory; 50 users with a year of
+    // daily check-ins on every tracker stay around 150 MB.
+    private const int CHUNK = 50;
 
     public function up(): void
     {
         DB::transaction(function () {
+            // Skip users who already have values, not users who have trackers: the app creates the
+            // built-in trackers on first use, and those users' history must still be copied.
             DB::table('users')
-                ->whereNotIn('id', DB::table('check_in_trackers')->select('user_id'))
+                ->whereNotIn('id', DB::table('check_in_trackers')
+                    ->join('check_in_values', 'check_in_values.check_in_tracker_id', '=', 'check_in_trackers.id')
+                    ->select('check_in_trackers.user_id'))
                 ->select('id')
                 ->chunkById(self::CHUNK, fn (Collection $users) => $this->migrateUsers($users->pluck('id')->all()));
         });
@@ -59,7 +65,8 @@ return new class extends Migration
                 ];
             }
         }
-        DB::table('check_in_trackers')->insert($trackers);
+        // Trackers the app already created keep their row, but take the on/off state from the settings.
+        DB::table('check_in_trackers')->upsert($trackers, ['user_id', 'key'], ['enabled']);
 
         $trackerIds = DB::table('check_in_trackers')
             ->whereIn('user_id', $userIds)

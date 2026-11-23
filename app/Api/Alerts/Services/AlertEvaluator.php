@@ -6,6 +6,7 @@ use App\Api\Alerts\Enums\AlertRule;
 use App\Api\Alerts\Models\Alert;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\Goals\Enums\GoalComparison;
 use App\Api\Goals\Services\GoalProgressService;
 use App\Api\Users\Models\User;
 use Carbon\CarbonImmutable;
@@ -24,7 +25,10 @@ class AlertEvaluator
      *
      * @param Collection<int, Alert> $alerts with checkInTracker, goal.checkInTracker and user.settings loaded
      * @param array<string, CarbonImmutable> $todayByUser user id => local date
-     * @return array<int, array{active: bool, average: float|null, streak: int|null, last_entry: string|null}>
+     * every_period: notify for every period the rule holds in, not only when it starts to hold.
+     * period_finished: for goals, whether the judged period ended yesterday (for the wording).
+     *
+     * @return array<int, array{active: bool, every_period: bool, period_finished: bool, average: float|null, streak: int|null, last_entry: string|null}>
      */
     public function evaluate(Collection $alerts, array $todayByUser): array
     {
@@ -36,8 +40,13 @@ class AlertEvaluator
             $today = $todayByUser[$alert->user_id];
 
             $states[$alert->id] = $alert->rule === AlertRule::GoalReached
-                ? ['active' => $goalsMet[$alert->goal_id] ?? false, 'average' => null, 'streak' => null, 'last_entry' => null]
-                : $this->trackerState($alert, $values[$alert->check_in_tracker_id] ?? [], $today);
+                ? [
+                    'active' => $goalsMet[$alert->goal_id]['met'] ?? false,
+                    'every_period' => $goalsMet[$alert->goal_id]['every_period'] ?? false,
+                    'period_finished' => $goalsMet[$alert->goal_id]['period_finished'] ?? false,
+                    'average' => null, 'streak' => null, 'last_entry' => null,
+                ]
+                : [...$this->trackerState($alert, $values[$alert->check_in_tracker_id] ?? [], $today), 'every_period' => false, 'period_finished' => false];
         }
 
         return $states;
@@ -133,11 +142,15 @@ class AlertEvaluator
     }
 
     /**
-     * Whether each goal's current period is met, counting completed days only.
+     * Whether each goal is reached, counting completed days only.
+     *
+     * At-least goals are reached as soon as the target is hit during the period. At-most goals
+     * are only reached once their period is over: they count on the first check after the period
+     * ended, if it stayed within the limit, and notify for every such period (every day for daily goals).
      *
      * @param Collection<int, Alert> $alerts
      * @param array<string, CarbonImmutable> $todayByUser
-     * @return array<int, bool> goal id => met
+     * @return array<int, array{met: bool, every_period: bool, period_finished: bool}> goal id => state
      */
     private function goalsMet(Collection $alerts, array $todayByUser): array
     {
@@ -147,11 +160,20 @@ class AlertEvaluator
             ->each(function (Collection $userAlerts, string $userId) use ($todayByUser, &$met) {
                 /** @var User $user */
                 $user = $userAlerts->first()->user;
-                $goals = $userAlerts->pluck('goal')->filter();
-                $progress = $this->goalProgress->progress($user, $goals, $todayByUser[$userId]->subDay());
+                $goals = $userAlerts->pluck('goal')->filter()->keyBy('id');
+                $yesterday = $todayByUser[$userId]->subDay();
+                $progress = $this->goalProgress->progress($user, $goals->values(), $yesterday);
 
-                foreach ($progress as $goalId => $goal) {
-                    $met[$goalId] = $goal['met'];
+                foreach ($progress as $goalId => $state) {
+                    $atMost = $goals[$goalId]->comparison === GoalComparison::AtMost;
+
+                    $periodFinished = $state['period_end'] === $yesterday->toDateString();
+
+                    $met[$goalId] = [
+                        'met' => $atMost ? $state['met'] && $periodFinished : $state['met'],
+                        'every_period' => $atMost,
+                        'period_finished' => $periodFinished,
+                    ];
                 }
             });
 

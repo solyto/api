@@ -80,9 +80,15 @@ class AlertDispatcher
         $sent = 0;
         foreach ($alerts as $alert) {
             $active = $states[$alert->id]['active'];
+            $today = $todayByUser[$alert->user_id]->toDateString();
 
             // No repeats: notify when the rule starts to hold, then stay quiet until it stops holding.
-            if ($active === $alert->is_triggered) {
+            // Rules judged per finished period (at-most goals) notify for each period, but once a day at most.
+            $newPeriod = $active
+                && $states[$alert->id]['every_period']
+                && $alert->last_triggered_on?->toDateString() !== $today;
+
+            if ($active === $alert->is_triggered && ! $newPeriod) {
                 continue;
             }
 
@@ -92,7 +98,7 @@ class AlertDispatcher
                 continue;
             }
 
-            $alert->update(['is_triggered' => true, 'last_triggered_on' => $todayByUser[$alert->user_id]->toDateString()]);
+            $alert->update(['is_triggered' => true, 'last_triggered_on' => $today]);
 
             // One user's failure (a mail or Telegram outage) must not cost everyone after them their alerts.
             try {
@@ -118,6 +124,9 @@ class AlertDispatcher
             days: $alert->days,
             threshold: $alert->threshold,
             average: $state['average'],
+            goalComparison: $alert->goal?->comparison,
+            goalPeriod: $alert->goal?->period,
+            periodFinished: $state['period_finished'],
         );
     }
 

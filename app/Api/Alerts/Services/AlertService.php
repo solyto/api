@@ -40,7 +40,15 @@ class AlertService
      */
     public function states(User $user, Collection $alerts): array
     {
-        return $alerts->isEmpty() ? [] : $this->evaluator->evaluate($alerts, [$user->id => $this->today($user)]);
+        if ($alerts->isEmpty()) {
+            return [];
+        }
+
+        // every_period and period_finished are for the dispatcher; they aren't part of the API's state.
+        return array_map(
+            fn (array $state) => array_diff_key($state, ['every_period' => true, 'period_finished' => true]),
+            $this->evaluator->evaluate($alerts, [$user->id => $this->today($user)])
+        );
     }
 
     public function create(User $user, array $data): Alert

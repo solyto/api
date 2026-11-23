@@ -26,13 +26,21 @@ return [
     'daily_check_in_reminder_body'   => 'Have you completed your daily check-in yet?',
 
     // Alerts
-    'alert_title'                    => 'Alert',
+    'alert_title'                    => 'Check-in',
     'goal_reached_title'             => 'Goal reached',
+    'goal_kept_title'                => 'Goal kept',
     'alert_average_below'            => ':tracker: :average on average over the last :days days (below :threshold).',
     'alert_average_above'            => ':tracker: :average on average over the last :days days (above :threshold).',
     'alert_no_entry_days'            => ':tracker: nothing logged for :days days.',
     'alert_entry_days'               => ':tracker: logged :days days in a row.',
-    'alert_goal_reached'             => ':tracker: you reached your goal.',
+    'alert_goal_reached_this_week'   => ':tracker: you reached your goal for this week.',
+    'alert_goal_reached_this_month'  => ':tracker: you reached your goal for this month.',
+    'alert_goal_reached_yesterday'   => ':tracker: you reached your goal yesterday.',
+    'alert_goal_reached_last_week'   => ':tracker: you reached your goal last week.',
+    'alert_goal_reached_last_month'  => ':tracker: you reached your goal last month.',
+    'alert_goal_kept_yesterday'      => ':tracker: you stayed within your goal yesterday.',
+    'alert_goal_kept_last_week'      => ':tracker: you stayed within your goal last week.',
+    'alert_goal_kept_last_month'     => ':tracker: you stayed within your goal last month.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'Your Day Ahead',

@@ -26,13 +26,21 @@ return [
     'daily_check_in_reminder_body'   => 'Hai già fatto il check-in di oggi?',
 
     // Alerts
-    'alert_title'                    => 'Avviso',
+    'alert_title'                    => 'Check-in',
     'goal_reached_title'             => 'Obiettivo raggiunto',
+    'goal_kept_title'                => 'Obiettivo rispettato',
     'alert_average_below'            => ':tracker: :average in media negli ultimi :days giorni (sotto :threshold).',
     'alert_average_above'            => ':tracker: :average in media negli ultimi :days giorni (sopra :threshold).',
     'alert_no_entry_days'            => ':tracker: nessuna registrazione da :days giorni.',
     'alert_entry_days'               => ':tracker: registrato per :days giorni di fila.',
-    'alert_goal_reached'             => ':tracker: hai raggiunto il tuo obiettivo.',
+    'alert_goal_reached_this_week'   => ':tracker: hai raggiunto il tuo obiettivo di questa settimana.',
+    'alert_goal_reached_this_month'  => ':tracker: hai raggiunto il tuo obiettivo di questo mese.',
+    'alert_goal_reached_yesterday'   => ':tracker: hai raggiunto il tuo obiettivo ieri.',
+    'alert_goal_reached_last_week'   => ':tracker: hai raggiunto il tuo obiettivo la settimana scorsa.',
+    'alert_goal_reached_last_month'  => ':tracker: hai raggiunto il tuo obiettivo il mese scorso.',
+    'alert_goal_kept_yesterday'      => ':tracker: hai rispettato il tuo obiettivo ieri.',
+    'alert_goal_kept_last_week'      => ':tracker: hai rispettato il tuo obiettivo la settimana scorsa.',
+    'alert_goal_kept_last_month'     => ':tracker: hai rispettato il tuo obiettivo il mese scorso.',
 
     // Daily Day Reminder
     'daily_day_reminder_title'       => 'La tua giornata',

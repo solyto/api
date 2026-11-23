@@ -17,7 +17,7 @@ class CheckInService
 {
     private const string CACHE_KEY = 'checkin';
 
-    private const string VALUES_CACHE_KEY = 'checkin_values';
+    public const string VALUES_CACHE_KEY = 'checkin_values';
 
     private const int CACHE_TTL = 86400;
 

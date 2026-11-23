@@ -40,7 +40,8 @@ Schedule::job(\App\Api\Clipboard\Jobs\DeleteOverdueClipboardEntries::class)->dai
  */
 Schedule::command(\App\Api\Users\Commands\SendDailyDayRemindersCommand::class)->hourly();
 Schedule::command(\App\Api\Users\Commands\SendDailyCheckInRemindersCommand::class)->hourly();
-Schedule::command(\App\Api\Alerts\Commands\SendAlertsCommand::class)->hourly()->withoutOverlapping();
+// The lock expires after an hour (default: a day), so a crashed run doesn't hold up the next hours' alerts.
+Schedule::command(\App\Api\Alerts\Commands\SendAlertsCommand::class)->hourly()->withoutOverlapping(60);
 
 /*
  * Export

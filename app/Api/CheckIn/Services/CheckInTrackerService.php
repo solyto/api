@@ -7,6 +7,7 @@ use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
+use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 class CheckInTrackerService
 {
     public const int MAX_CUSTOM_TRACKERS = 50;
+
+    public function __construct(private readonly UserCacheService $cache) {}
 
     /** @return Collection<int, CheckInTracker> */
     public function list(User $user): Collection
@@ -104,6 +107,9 @@ class CheckInTrackerService
     public function delete(CheckInTracker $tracker): void
     {
         $tracker->delete();
+
+        // The tracker's values go with it (cascade), so the cached value list is stale now.
+        $this->cache->forget([CheckInService::VALUES_CACHE_KEY, $tracker->user_id]);
     }
 
     /** @param array<int, int> $ids */
