@@ -54,8 +54,9 @@ class UserService
     ];
 
     /**
-     * Per-user cache keys of the form [key, user id, resource id] — deleted
-     * by prefix, one key per resource the user owned.
+     * Per-user cache keys of the form [key, user id, resource id], one per
+     * resource the user owned. They carry the user's cache tag, so one tag
+     * flush drops them all; the list keeps the count of flushed families.
      */
     private const array USER_CACHE_PREFIX_KEYS = [
         'calendar_events', 'contacts_v2', 'event_attachment_notes', 'event_attachment_todos',
@@ -328,9 +329,7 @@ class UserService
             $this->cache->forget([$key, $user->id]);
         }
 
-        foreach (self::USER_CACHE_PREFIX_KEYS as $key) {
-            $this->cache->forgetByPrefix([$key, $user->id]);
-        }
+        $this->cache->flushTags([UserCacheService::userTag($user->id)]);
 
         return count(self::USER_LONGTERM_CACHE_KEYS) + count(self::USER_CACHE_KEYS) + count(self::USER_CACHE_PREFIX_KEYS);
     }

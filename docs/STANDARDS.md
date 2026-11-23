@@ -640,7 +640,14 @@ short-lived non-user data only: the Spotify client token
 (`SpotifyService.php`) and WebAuthn challenges keyed by user/ip for 60 s
 (`PasskeyService.php:25,128`); the bot's `ConversationState` has its own
 store. Keys are `private const string CACHE_KEY = 'todos'` on the service
-that owns them; TTL a `private const int`.
+that owns them; TTL a `private const int`. Entries that a write must drop
+as a group are tagged (`storeTagged`/`getTagged`/`rememberTagged`/
+`forgetTagged`): every one carries `UserCacheService::userTag()`, and the
+owning service builds the tag list in one public static method that reads,
+writes and forgets all use (`CalendarService::eventCacheTags`,
+`ContactService::contactCacheTags`), because an entry is only found with the
+tags, in the order, it was stored with. `cache:prune-stale-tags user_data`
+runs hourly (`routes/console.php`).
 
 Check: `grep -rln 'Cache::' app/Api/*/Services` → the two files above.
 
@@ -648,9 +655,12 @@ Check: `grep -rln 'Cache::' app/Api/*/Services` → the two files above.
 
 `TodoService::create/update/destroy/addSubtask/updateSubtask/destroySubtask`
 all forget both `todos` and `todos_due` because subtasks appear in the todo
-list payload. Per-calendar event caches are prefix-deleted
-(`CalendarService.php:67,127,138-139` `forgetByPrefix`). Rule 4.4 governs the
-shape of the forget block.
+list payload. Per-calendar event caches are dropped by flushing the
+calendar's tag, `flushTags([CalendarService::eventCacheTag($userId,
+$calendarId)])`, which clears that user's listings of that calendar only;
+account deletion flushes the user tag (`UserService::forgetUserCache`).
+No Redis `KEYS` or `SCAN` on a write path. Rule 4.4 governs the shape of the
+forget block.
 
 ### 8.3 `remember` reads once
 

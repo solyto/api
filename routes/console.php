@@ -48,6 +48,11 @@ Schedule::command(\App\Api\Alerts\Commands\SendAlertsCommand::class)->hourly()->
 Schedule::job(\App\Api\Export\Jobs\DeleteExpiredExports::class)->dailyAt(3);
 
 /*
+ * Cache: drop expired entries from the user_data tag sets (UserCacheService)
+ */
+Schedule::command('cache:prune-stale-tags user_data')->hourly();
+
+/*
  * Pulse: queue length for the Queue Load card (App\Shared\Pulse)
  */
 Schedule::call(function () {

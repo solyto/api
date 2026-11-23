@@ -34,7 +34,7 @@ class InvalidateSharedCalendarCache implements ShouldQueue, ShouldBeUniqueUntilP
     public function handle(DavService $dav, UserCacheService $cache): void
     {
         foreach ($dav->calendars()->sharing()->listMemberIds($this->calendarId) as $userId) {
-            $cache->forgetByPrefix([CalendarService::CACHE_KEY_EVENTS, $userId, $this->calendarId]);
+            $cache->flushTags([CalendarService::eventCacheTag($userId, $this->calendarId)]);
         }
     }
 }

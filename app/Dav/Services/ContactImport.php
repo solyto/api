@@ -2,6 +2,7 @@
 
 namespace App\Dav\Services;
 
+use App\Api\Contacts\Services\ContactService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\AddressBookDTO;
 use App\Dav\DTOs\AddressBookImportDTO;
@@ -16,7 +17,6 @@ use Illuminate\Support\Facades\Log;
 class ContactImport
 {
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
-    private const string CACHE_KEY_CONTACTS = 'contacts_v2';
 
     private AddressBooks $addressBooks;
     private VCardHelper $helper;
@@ -159,7 +159,7 @@ class ContactImport
         $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $user->id]);
 
         foreach ($this->addressBooks->list($user) as $addressBook) {
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+            $this->cache->forgetTagged(ContactService::contactCacheTags($user->id), ContactService::contactCacheKey($user->id, $addressBook->id));
         }
     }
 

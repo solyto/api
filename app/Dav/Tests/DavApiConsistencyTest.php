@@ -648,6 +648,60 @@ describe('Contacts: DAV and API agree', function () {
     });
 });
 
+describe('Event cache: DAV writes', function () {
+    beforeEach(function () {
+        $this->put = fn (\App\Api\Users\Models\User $user, string $path, string $uid, string $summary) => expect(davRequest($user, 'PUT', $path, davIcs($uid, $summary), ['Content-Type' => 'text/calendar'])->getStatus())->toBeIn([201, 204]);
+        $this->titles = fn (\App\Api\Users\Models\User $user) => apiEvents($this, $user)->pluck('title')->sort()->values()->all();
+        // An empty listing isn't cached, so the calendar starts with one event.
+        ($this->put)($this->user, $this->calendar.'seed.ics', 'seed', 'Seed');
+        expect(($this->titles)($this->user))->toBe(['Seed']);
+    });
+
+    it('shows an event created, overwritten and deleted over DAV in the cached API listing', function () {
+        ($this->put)($this->user, $this->calendar.'a.ics', 'a', 'Created');
+        expect(($this->titles)($this->user))->toBe(['Created', 'Seed']);
+
+        ($this->put)($this->user, $this->calendar.'a.ics', 'a', 'Overwritten');
+        expect(($this->titles)($this->user))->toBe(['Overwritten', 'Seed']);
+
+        expect(davRequest($this->user, 'DELETE', $this->calendar.'a.ics')->getStatus())->toBe(204);
+        expect(($this->titles)($this->user))->toBe(['Seed']);
+    });
+
+    it('shows a DAV write to a shared calendar to the other members', function () {
+        [$sharee] = shareDefaultCalendar($this->user);
+        $shareePath = 'calendars/'.$sharee->email.'/'.collect(app(\App\Dav\Services\DavService::class)->calendars()->list($sharee))->firstWhere('isShared', true)->uri.'/';
+        expect(($this->titles)($sharee))->toBe(['Seed']);
+
+        ($this->put)($this->user, $this->calendar.'owner.ics', 'owner', 'From owner');
+        expect(($this->titles)($sharee))->toBe(['From owner', 'Seed']);
+
+        ($this->put)($sharee, $shareePath.'sharee.ics', 'sharee', 'From sharee');
+        expect(($this->titles)($this->user))->toBe(['From owner', 'From sharee', 'Seed']);
+    });
+
+    it('drops a shared calendar deleted over DAV from every sharee\'s cached listing', function () {
+        [$sharee] = shareDefaultCalendar($this->user);
+        expect(($this->titles)($sharee))->toBe(['Seed']);
+
+        expect(davRequest($this->user, 'DELETE', $this->calendar)->getStatus())->toBe(204);
+
+        expect(apiEvents($this, $sharee))->toBeEmpty()
+            ->and(collect($this->actingAs($sharee, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->where('is_shared', true))->toBeEmpty();
+    });
+});
+
+describe('Contact cache: DAV writes', function () {
+    it('shows a card overwritten over DAV in the cached API listing', function () {
+        davRequest($this->user, 'PUT', $this->addressBook.'a.vcf', davVcard('a', 'Jane Doe'), ['Content-Type' => 'text/vcard']);
+        expect(apiContacts($this, $this->user)->pluck('full_name')->all())->toBe(['Jane Doe']);
+
+        davRequest($this->user, 'PUT', $this->addressBook.'a.vcf', davVcard('a', 'Jane Roe'), ['Content-Type' => 'text/vcard']);
+
+        expect(apiContacts($this, $this->user)->pluck('full_name')->all())->toBe(['Jane Roe']);
+    });
+});
+
 describe('CacheInvalidationPlugin', function () {
     beforeEach(function () {
         $this->cache = Mockery::spy(\App\Shared\Services\UserCacheService::class);
@@ -663,7 +717,7 @@ describe('CacheInvalidationPlugin', function () {
             davRequest($this->user, 'DELETE', $this->calendar.'a.ics');
         }
 
-        $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendarId])->atLeast()->once();
+        $this->cache->shouldHaveReceived('flushTags')->with([\App\Api\Calendars\Services\CalendarService::eventCacheTag($this->user->id, $this->calendarId)])->atLeast()->once();
         Queue::assertNothingPushed();
     })->with(['PUT', 'DELETE']);
 
@@ -677,7 +731,7 @@ describe('CacheInvalidationPlugin', function () {
     it('drops the cached contacts and queues nothing on a DAV card write', function () {
         davRequest($this->user, 'PUT', $this->addressBook.'a.vcf', davVcard('a'), ['Content-Type' => 'text/vcard']);
 
-        $this->cache->shouldHaveReceived('forget')->with(['contacts_v2', $this->user->id, $this->addressBookId])->once();
+        $this->cache->shouldHaveReceived('forgetTagged')->with(\App\Api\Contacts\Services\ContactService::contactCacheTags($this->user->id), \App\Api\Contacts\Services\ContactService::contactCacheKey($this->user->id, $this->addressBookId))->once();
         Queue::assertNothingPushed();
     });
 
@@ -721,7 +775,7 @@ describe('CacheInvalidationPlugin', function () {
 
         davRequest($other, 'PUT', $this->calendar.'a.ics', davIcs('a'), ['Content-Type' => 'text/calendar']);
 
-        $this->cache->shouldNotHaveReceived('forgetByPrefix');
+        $this->cache->shouldNotHaveReceived('flushTags');
         Queue::assertNothingPushed();
     });
 
@@ -732,7 +786,7 @@ describe('CacheInvalidationPlugin', function () {
 
         foreach ($sharees as $sharee) {
             $this->cache->shouldHaveReceived('forget')->with(['calendars_v2', $sharee->id])->once();
-            $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $sharee->id, $this->calendarId])->once();
+            $this->cache->shouldHaveReceived('flushTags')->with([\App\Api\Calendars\Services\CalendarService::eventCacheTag($sharee->id, $this->calendarId)])->once();
         }
     });
 
@@ -754,7 +808,7 @@ describe('CacheInvalidationPlugin', function () {
 
         foreach ($sharees as $sharee) {
             $this->cache->shouldNotHaveReceived('forget', [['calendars_v2', $sharee->id]]);
-            $this->cache->shouldNotHaveReceived('forgetByPrefix', [['calendar_events', $sharee->id, $this->calendarId]]);
+            $this->cache->shouldNotHaveReceived('flushTags', [[\App\Api\Calendars\Services\CalendarService::eventCacheTag($sharee->id, $this->calendarId)]]);
         }
     });
 });

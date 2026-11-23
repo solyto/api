@@ -3,6 +3,8 @@
 namespace App\Dav\Plugins;
 
 use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
+use App\Api\Calendars\Services\CalendarService;
+use App\Api\Contacts\Services\ContactService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -13,9 +15,7 @@ use Sabre\HTTP\RequestInterface;
 class CacheInvalidationPlugin extends ServerPlugin
 {
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
-    private const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
-    private const string CACHE_KEY_CONTACTS = 'contacts_v2';
 
     /**
      * Sharees of an owner's calendar that is about to be deleted, keyed by
@@ -145,7 +145,7 @@ class CacheInvalidationPlugin extends ServerPlugin
                 return;
             }
 
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar]);
+            $this->cache->flushTags([CalendarService::eventCacheTag($userId, $calendar)]);
 
             if ((int) $instance->access > 1 || (bool) $instance->solyto_shared) {
                 InvalidateSharedCalendarCache::dispatch($calendar)->delay(now()->addSeconds(10));
@@ -211,7 +211,7 @@ class CacheInvalidationPlugin extends ServerPlugin
         try {
             foreach ($pending['userIds'] as $userId) {
                 $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
-                $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $pending['calendarId']]);
+                $this->cache->flushTags([CalendarService::eventCacheTag($userId, $pending['calendarId'])]);
             }
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for calendar sharees', [
@@ -264,7 +264,7 @@ class CacheInvalidationPlugin extends ServerPlugin
                 return;
             }
 
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $userId, $addressBookId]);
+            $this->cache->forgetTagged(ContactService::contactCacheTags($userId), ContactService::contactCacheKey($userId, (int) $addressBookId));
         } catch (\Throwable $e) {
             Log::channel('dav')->error('DAV cache invalidation failed for contacts', [
                 'email'          => $email,

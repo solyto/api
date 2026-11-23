@@ -21,7 +21,6 @@ use Illuminate\Support\Facades\Log;
 class CalendarImport
 {
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
-    private const string CACHE_KEY_EVENTS = 'calendar_events';
 
     // A whole calendar comes in one REPORT, so the external calendar limits (5 s, 10 MB) are too tight.
     // 30 s matches the import before 1.1.3; the cap keeps a response within the queue worker's memory.
@@ -169,7 +168,7 @@ class CalendarImport
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
 
         foreach ($this->calendars->list($user) as $calendar) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([CalendarService::eventCacheTag($user->id, $calendar->calendarId)]);
         }
     }
 

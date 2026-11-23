@@ -20,7 +20,8 @@ class EventAttachmentService
 
     public function getTodoAttachments(User $user, string $eventId): Collection
     {
-        return $this->cache->remember(
+        return $this->cache->rememberTagged(
+            $this->cacheTags($user),
             [self::CACHE_KEY_TODOS, $user->id, $eventId],
             self::CACHE_TTL,
             function () use ($user, $eventId) {
@@ -37,7 +38,8 @@ class EventAttachmentService
 
     public function getNoteAttachments(User $user, string $eventId): Collection
     {
-        return $this->cache->remember(
+        return $this->cache->rememberTagged(
+            $this->cacheTags($user),
             [self::CACHE_KEY_NOTES, $user->id, $eventId],
             self::CACHE_TTL,
             function () use ($user, $eventId) {
@@ -67,7 +69,7 @@ class EventAttachmentService
             'user_id' => $user->id,
         ]);
 
-        $this->cache->forget([self::CACHE_KEY_TODOS, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
 
         return true;
     }
@@ -79,7 +81,7 @@ class EventAttachmentService
             ->where('todo_id', $todoId)
             ->delete();
 
-        $this->cache->forget([self::CACHE_KEY_TODOS, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
     }
 
     public function attachNote(User $user, string $eventId, Note $note): bool
@@ -99,7 +101,7 @@ class EventAttachmentService
             'user_id' => $user->id,
         ]);
 
-        $this->cache->forget([self::CACHE_KEY_NOTES, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
 
         return true;
     }
@@ -111,14 +113,22 @@ class EventAttachmentService
             ->where('note_id', $noteId)
             ->delete();
 
-        $this->cache->forget([self::CACHE_KEY_NOTES, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
     }
 
     public function deleteAllForEvent(User $user, string $eventId): void
     {
         CalendarEventTodo::forEvent($eventId)->delete();
         CalendarEventNote::forEvent($eventId)->delete();
-        $this->cache->forget([self::CACHE_KEY_TODOS, $user->id, $eventId]);
-        $this->cache->forget([self::CACHE_KEY_NOTES, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_TODOS, $user->id, $eventId]);
+        $this->cache->forgetTagged($this->cacheTags($user), [self::CACHE_KEY_NOTES, $user->id, $eventId]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function cacheTags(User $user): array
+    {
+        return [UserCacheService::userTag($user->id)];
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Shared\Services;
 
-use Illuminate\Cache\RedisStore;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Psr\SimpleCache\InvalidArgumentException;
@@ -110,27 +109,89 @@ class UserCacheService
         }
     }
 
-    public function forgetByPrefix(array $identifiers): void
+    /**
+     * The tag every tagged per-user entry carries, so one flush drops all of
+     * a user's tagged entries.
+     */
+    public static function userTag(string $userId): string
+    {
+        return 'user_'.$userId;
+    }
+
+    /**
+     * Tagged entries are only found with the tags, in the order, they were
+     * stored with.
+     *
+     * @param  array<int, string>  $tags
+     */
+    public function storeTagged(array $tags, array $identifiers, int $ttl, $data): bool
+    {
+        $store = Cache::store($this->storeName)->tags($tags);
+
+        // A non-positive TTL means "keep forever", as in store().
+        if ($ttl <= 0) {
+            return $store->forever($this->getKey($identifiers), $data);
+        }
+
+        return $store->put($this->getKey($identifiers), $data, $ttl);
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    public function getTagged(array $tags, array $identifiers): mixed
     {
         try {
-            $store = Cache::store($this->storeName)->getStore();
-            if (! $store instanceof RedisStore) {
-                return;
-            }
+            return Cache::store($this->storeName)->tags($tags)->get($this->getKey($identifiers)) ?: null;
+        } catch (InvalidArgumentException $e) {
+            Log::channel('cache')->warning('Cache get failed', ['key' => $this->getKey($identifiers), 'tags' => $tags, 'error' => $e->getMessage()]);
 
-            $prefix = $store->getPrefix().$this->getKey($identifiers).'_';
-            $redis = $store->connection();
-            $keys = $redis->keys($prefix.'*');
+            return null;
+        }
+    }
 
-            if (! empty($keys)) {
-                $redisPrefix = $redis->getOption(\Redis::OPT_PREFIX) ?? '';
-                if ($redisPrefix !== '') {
-                    $keys = array_map(fn ($k) => substr($k, strlen($redisPrefix)), $keys);
-                }
-                $redis->del($keys);
-            }
+    /**
+     * @param  array<int, string>  $tags
+     */
+    public function rememberTagged(array $tags, array $identifiers, int $ttl, callable $callback): mixed
+    {
+        $result = $this->getTagged($tags, $identifiers);
+
+        if ($result !== null) {
+            return $result;
+        }
+
+        $results = $callback();
+
+        $this->storeTagged($tags, $identifiers, $ttl, $results);
+
+        return $results;
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    public function forgetTagged(array $tags, array $identifiers): void
+    {
+        try {
+            Cache::store($this->storeName)->tags($tags)->forget($this->getKey($identifiers));
+        } catch (InvalidArgumentException $e) {
+            Log::channel('cache')->warning('Cache delete failed', ['key' => $this->getKey($identifiers), 'tags' => $tags, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Drops every entry stored with any of the tags. Runs after writes, so a
+     * cache failure is logged and never fails the write.
+     *
+     * @param  array<int, string>  $tags
+     */
+    public function flushTags(array $tags): void
+    {
+        try {
+            Cache::store($this->storeName)->tags($tags)->flush();
         } catch (\Throwable $e) {
-            Log::channel('cache')->warning('Cache prefix delete failed', ['prefix' => $this->getKey($identifiers), 'error' => $e->getMessage()]);
+            Log::channel('cache')->warning('Cache tag flush failed', ['tags' => $tags, 'error' => $e->getMessage()]);
         }
     }
 

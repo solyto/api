@@ -120,6 +120,35 @@ describe('Calendar import', function () {
             ->and(app(DavService::class)->calendars()->events()->list($calendar))->toHaveCount(1);
     });
 
+    it('shows the imported events in the cached listing once the import cleared the cache', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', [
+            'Personal' => [
+                'a.ics' => davIcs('a', 'Dentist', '20301015T100000Z', '20301015T110000Z'),
+                'b.ics' => davIcs('b', 'Gym', '20301016T180000Z', '20301016T190000Z'),
+            ],
+        ]);
+        $dav = app(DavService::class);
+        $import = $dav->import()->calendars();
+        $titles = fn () => collect(app(\App\Api\Calendars\Services\CalendarService::class)->listEvents($user, '2030-10'))->pluck('title')->sort()->values()->all();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
+        $import->importCalendars($user, $import->getState($user->id));
+        // An empty calendar isn't cached, so the new one gets an event before it is read.
+        $personal = $dav->calendars()->getByName($user, 'Personal');
+        $dav->calendars()->events()->create($personal, \App\Dav\DTOs\EventDTO::fromRequest([
+            'title' => 'Early', 'start_date' => '2030-10-14 10:00:00', 'end_date' => '2030-10-14 11:00:00', 'is_all_day' => false,
+        ], $personal, $user));
+        expect($titles())->toBe(['Early']);
+
+        $import->importEvents($user, $import->getState($user->id));
+        expect($titles())->toBe(['Early']);
+        $import->clearCache($user);
+
+        expect($titles())->toBe(['Dentist', 'Early', 'Gym']);
+    });
+
     it('lists the remote calendars for selection', function () {
         $user = davUser();
         fakeRemoteDav('calendars', ['Personal' => [], 'Work' => []]);
@@ -334,6 +363,30 @@ describe('Contact import', function () {
         $import->importAddressBooks($user, $import->getState($user->id));
 
         expect($import->getState($user->id)->addressBooksDone)->toBe(0);
+    });
+
+    it('shows the imported contacts in the cached listing once the import cleared the cache', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', [
+            'Friends' => ['a.vcf' => davVcard('a', 'Jane Doe'), 'b.vcf' => davVcard('b', 'John Doe')],
+        ]);
+        $dav = app(DavService::class);
+        $import = $dav->import()->addressBooks();
+        $names = fn () => collect(app(\App\Api\Contacts\Services\ContactService::class)->listContacts($user))->pluck('fullName')->sort()->values()->all();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+        $import->importAddressBooks($user, $import->getState($user->id));
+        // An empty address book isn't cached, so the new one gets a contact before it is read.
+        $friends = $dav->addressBooks()->getByName($user, 'Friends');
+        $dav->addressBooks()->contacts()->create($friends, \App\Dav\DTOs\ContactDTO::fromRequest(['first_name' => 'Early', 'last_name' => 'Bird'], $friends));
+        expect($names())->toBe(['Early Bird']);
+
+        $import->importContacts($user, $import->getState($user->id));
+        expect($names())->toBe(['Early Bird']);
+        $import->clearCache($user);
+
+        expect($names())->toBe(['Early Bird', 'Jane Doe', 'John Doe']);
     });
 
     it('imports the selected address book with its contacts', function () {

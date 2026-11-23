@@ -26,7 +26,7 @@ class CalendarService
     // _v2: lists cached before CalendarDTO gained solytoShared/isExternal/isUnavailable/isCredentialsRejected
     // unserialize with those typed properties uninitialised.
     private const string CACHE_KEY_CALENDARS = 'calendars_v2';
-    public const string CACHE_KEY_EVENTS = 'calendar_events';
+    private const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
     // Owned by AppCalendarsPDO (the remote's ctag and sync token); forgotten here with the flag.
     private const string CACHE_KEY_STATE = 'external_calendar_state';
@@ -46,6 +46,23 @@ class CalendarService
         private readonly DavService $dav,
         private readonly UserCacheService $cache
     ) {}
+
+    /**
+     * Every cached event listing carries these tags; flushing the calendar
+     * tag drops the user's listings of that calendar, flushing the user tag
+     * drops all of them.
+     *
+     * @return array<int, string>
+     */
+    public static function eventCacheTags(string $userId, int $calendarId): array
+    {
+        return [UserCacheService::userTag($userId), self::eventCacheTag($userId, $calendarId)];
+    }
+
+    public static function eventCacheTag(string $userId, int $calendarId): string
+    {
+        return self::CACHE_KEY_EVENTS.'_'.$userId.'_'.$calendarId;
+    }
 
     public function list(User $user): array
     {
@@ -103,7 +120,7 @@ class CalendarService
         $this->dav->calendars()->update($user, $instanceId, $calendar);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
         // Cached events carry the calendar's colour.
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+        $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
     }
 
     /**
@@ -139,7 +156,7 @@ class CalendarService
 
         foreach ([$user->id, ...$shareeIds] as $userId) {
             $this->cache->forget([self::CACHE_KEY_CALENDARS, $userId]);
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($userId, $calendar->calendarId)]);
         }
     }
 
@@ -223,7 +240,7 @@ class CalendarService
         $this->dav->calendars()->forgetExternal($calendarId);
         $this->cache->forget([self::CACHE_KEY_UNAVAILABLE, $userId, $calendarId]);
         $this->cache->forget([self::CACHE_KEY_STATE, $userId, $calendarId]);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $userId, $calendarId]);
+        $this->cache->flushTags([self::eventCacheTag($userId, $calendarId)]);
     }
 
     /**
@@ -246,7 +263,8 @@ class CalendarService
 
         foreach ($calendars as $calendar) {
             if (!$calendar->isExternal) {
-                $events = array_merge($events, $this->cache->remember(
+                $events = array_merge($events, $this->cache->rememberTagged(
+                    self::eventCacheTags($user->id, $calendar->calendarId),
                     [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix],
                     $ttl,
                     fn() => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)
@@ -257,11 +275,12 @@ class CalendarService
             $externalTtl = (int) config('calendars.external.cache_ttl');
             $unavailableKey = [self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId];
 
+            $eventsTags = self::eventCacheTags($user->id, $calendar->calendarId);
             $eventsKey = [self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId, ...$keySuffix];
 
             // Wrapped so an empty window is cached too: the cache treats
             // a bare [] as a miss and would ask the remote every time.
-            $cached = $this->cache->get($eventsKey);
+            $cached = $this->cache->getTagged($eventsTags, $eventsKey);
             $isCached = is_array($cached) && array_key_exists('events', $cached);
 
             $reason = $this->cache->get($unavailableKey);
@@ -276,7 +295,7 @@ class CalendarService
             try {
                 if (!$isCached) {
                     $cached = ['events' => $this->dav->calendars()->events()->listExpanded($calendar, $start, $end)];
-                    $this->cache->store($eventsKey, $externalTtl, $cached);
+                    $this->cache->storeTagged($eventsTags, $eventsKey, $externalTtl, $cached);
                 }
                 $events = array_merge($events, $cached['events']);
             } catch (ExternalCalendarUnavailableException $e) {
@@ -308,7 +327,7 @@ class CalendarService
     public function createEvent(User $user, CalendarDTO $calendar, EventDTO $dto): ?EventDTO
     {
         $event = $this->dav->calendars()->events()->create($calendar, $dto);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+        $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
         if ($event !== null) {
             $this->invalidateSharedCalendar($calendar);
         }
@@ -331,8 +350,8 @@ class CalendarService
             $this->removeMovedCopy($to, $newEvent);
             throw $e;
         } finally {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $from->calendarId]);
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $to->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $from->calendarId)]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $to->calendarId)]);
             $this->invalidateSharedCalendar($from);
             $this->invalidateSharedCalendar($to);
         }
@@ -361,7 +380,7 @@ class CalendarService
     {
         $updated = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->update($calendar, $event));
         if ($updated !== null) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
             $this->invalidateSharedCalendar($calendar);
         }
         return $updated;
@@ -371,7 +390,7 @@ class CalendarService
     {
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->delete($calendar, $event));
         if ($success) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
             $this->invalidateSharedCalendar($calendar);
         }
         return $success;
@@ -381,7 +400,7 @@ class CalendarService
     {
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->deleteOccurrence($calendar, $eventUri, $date));
         if ($success) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
             $this->invalidateSharedCalendar($calendar);
         }
         return $success;
@@ -391,7 +410,7 @@ class CalendarService
     {
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->updateOccurrence($calendar, $eventUri, $date, $dto));
         if ($success) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
             $this->invalidateSharedCalendar($calendar);
         }
         return $success;
@@ -412,7 +431,7 @@ class CalendarService
         try {
             return $write();
         } catch (ExternalCalendarPreconditionFailedException|UnreadableCalendarObjectException $e) {
-            $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+            $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
 
             throw $e;
         }
@@ -447,7 +466,7 @@ class CalendarService
         $this->dav->calendars()->sharing()->revokeShare($calendar->calendarId, $recipient);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $owner->id]);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $recipient->id]);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $recipient->id, $calendar->calendarId]);
+        $this->cache->flushTags([self::eventCacheTag($recipient->id, $calendar->calendarId)]);
     }
 
     /**
@@ -467,7 +486,7 @@ class CalendarService
         $this->dav->calendars()->delete($calendar);
         $this->forgetCalendarList($ownerId);
         $this->cache->forget([self::CACHE_KEY_CALENDARS, $user->id]);
-        $this->cache->forgetByPrefix([self::CACHE_KEY_EVENTS, $user->id, $calendar->calendarId]);
+        $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
     }
 
     public function listInvites(User $user): \Illuminate\Support\Collection

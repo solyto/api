@@ -1,7 +1,10 @@
 <?php
 
+use App\Api\Calendars\Services\CalendarService;
+use App\Api\Calendars\Services\EventAttachmentService;
 use App\Api\Contacts\Models\AddressBook;
 use App\Api\Contacts\Models\Contact;
+use App\Api\Contacts\Services\ContactService;
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
 use App\Api\DevRequests\Models\DevRequestVote;
@@ -187,6 +190,50 @@ describe('app:users:delete', function () {
             ->and($cache->has(['todos', $other->id]))->toBeTrue()
             ->and($longterm->has(['book_release_notified', $user->id]))->toBeFalse()
             ->and($longterm->has(['book_release_notified', $other->id]))->toBeTrue();
+    });
+
+    it('serves none of the deleted user\'s per-resource caches any more and keeps everyone else\'s', function () {
+        $calendars = app(CalendarService::class);
+        $contacts = app(ContactService::class);
+        $attachments = app(EventAttachmentService::class);
+        $dav = app(DavService::class);
+        [$user, $other] = [davUser(), davUser()];
+
+        $read = fn (User $u) => [
+            'events' => collect($calendars->listEvents($u, '2030-10'))->pluck('title')->sort()->values()->all(),
+            'contacts' => collect($contacts->listContacts($u))->pluck('fullName')->sort()->values()->all(),
+            'todos' => $attachments->getTodoAttachments($u, 'event-1')->pluck('title')->all(),
+            'notes' => $attachments->getNoteAttachments($u, 'event-1')->pluck('title')->all(),
+        ];
+        $seed = function (User $u) use ($dav, $attachments) {
+            davRequest($u, 'PUT', 'calendars/'.$u->email.'/my-calendar/a.ics', davIcs('a', 'Meeting'), ['Content-Type' => 'text/calendar']);
+            davRequest($u, 'PUT', 'addressbooks/'.$u->email.'/contacts/a.vcf', davVcard('a', 'Jane Doe'), ['Content-Type' => 'text/vcard']);
+            $attachments->attachTodo($u, 'event-1', Todo::factory()->forUser($u)->create(['title' => 'Todo']));
+            $attachments->attachNote($u, 'event-1', Note::factory()->forUser($u)->create(['title' => 'Note']));
+        };
+        $cached = ['events' => ['Meeting'], 'contacts' => ['Jane Doe'], 'todos' => ['Todo'], 'notes' => ['Note']];
+        foreach ([$user, $other] as $u) {
+            $seed($u);
+            expect($read($u))->toBe($cached);
+        }
+        // Lets the deleted user's event and contact caches be read again after their calendars and address books are gone.
+        $calendarList = $calendars->list($user);
+        $addressBookList = $contacts->listAddressBooks($user);
+
+        $calendar = $dav->calendars()->list($other)[0];
+        $dav->calendars()->events()->create($calendar, EventDTO::fromRequest(['title' => 'Behind the cache', 'start_date' => '2030-10-16 10:00:00', 'end_date' => '2030-10-16 11:00:00', 'is_all_day' => false], $calendar, $other));
+        $addressBook = $dav->addressBooks()->list($other)[0];
+        $dav->addressBooks()->contacts()->create($addressBook, ContactDTO::fromRequest(['first_name' => 'Behind', 'last_name' => 'Cache'], $addressBook));
+        DB::table('calendar_event_todos')->where('user_id', $other->id)->delete();
+        DB::table('calendar_event_notes')->where('user_id', $other->id)->delete();
+
+        app(UserService::class)->destroy($user);
+        $cache = app(UserCacheService::class);
+        $cache->store(['calendars_v2', $user->id], 300, $calendarList);
+        $cache->store(['address_books', $user->id], 300, $addressBookList);
+
+        expect($read($user))->toBe(['events' => [], 'contacts' => [], 'todos' => [], 'notes' => []])
+            ->and($read($other))->toBe($cached);
     });
 
     it('errors when the user is unknown', function () {

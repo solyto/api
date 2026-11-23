@@ -226,9 +226,11 @@ Limits of the setup:
 - SQLite, not PostgreSQL: the production `BYTEA` columns are not exercised
   (sabre/dav 4.7.1's `PARAM_LOB` fix is invisible here). Escaped fixtures
   still belong in the suite; they pass on SQLite either way.
-- `UserCacheService::forgetByPrefix()` needs Redis and is a silent no-op on
-  the array store, so event-cache invalidation is asserted with a
-  `UserCacheService` spy, not through a cached API listing.
+- The array store supports cache tags, so cache invalidation is asserted
+  through a cached listing: read, write, read again
+  (`CalendarCacheBehaviourTest`). Its tag implementation is not
+  `RedisTaggedCache`, so a change to how entries are tagged or flushed
+  still needs a check against a real Redis.
 - XML parsing turns CRLF into LF inside `calendar-data`/`address-data`.
 
 ### Coverage map

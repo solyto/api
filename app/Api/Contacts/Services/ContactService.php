@@ -27,6 +27,22 @@ class ContactService
         private readonly ImageTransformationService $imageTransformation
     ) {}
 
+    /**
+     * @return array<int, string>
+     */
+    public static function contactCacheTags(string $userId): array
+    {
+        return [UserCacheService::userTag($userId)];
+    }
+
+    /**
+     * @return array<int, string|int>
+     */
+    public static function contactCacheKey(string $userId, int $addressBookId): array
+    {
+        return [self::CACHE_KEY_CONTACTS, $userId, $addressBookId];
+    }
+
     public function listAddressBooks(User $user): array
     {
         return $this->cache->remember([self::CACHE_KEY_ADDRESS_BOOKS, $user->id], self::CACHE_TTL,
@@ -75,7 +91,7 @@ class ContactService
     {
         $this->dav->addressBooks()->delete($addressBook->id);
         $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $user->id]);
-        $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+        $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
     }
 
     public function listContacts(User $user): array
@@ -83,8 +99,9 @@ class ContactService
         $addressBooks = $this->listAddressBooks($user);
         $contacts = [];
         foreach ($addressBooks as $addressBook) {
-            $addressBookContacts = $this->cache->remember(
-                [self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id],
+            $addressBookContacts = $this->cache->rememberTagged(
+                self::contactCacheTags($user->id),
+                self::contactCacheKey($user->id, $addressBook->id),
                 self::CACHE_TTL,
                 fn() => $this->dav->addressBooks()->contacts()->list($addressBook)
             );
@@ -128,7 +145,7 @@ class ContactService
     public function createContact(User $user, AddressBookDTO $addressBook, array $data): ContactDTO
     {
         $contact = $this->dav->addressBooks()->contacts()->create($addressBook, ContactDTO::fromRequest($data, $addressBook));
-        $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+        $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
         return $contact;
     }
 
@@ -137,7 +154,7 @@ class ContactService
         $contact->updateFromRequest($data);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
         }
         return $updated;
     }
@@ -146,7 +163,7 @@ class ContactService
     {
         $success = $this->dav->addressBooks()->contacts()->delete($addressBook, $contact);
         if ($success) {
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
         }
         return $success;
     }
@@ -157,7 +174,7 @@ class ContactService
         $contact->updatePhoto($photo);
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
         }
         return $updated;
     }
@@ -167,7 +184,7 @@ class ContactService
         $contact->photo = null;
         $updated = $this->dav->addressBooks()->contacts()->update($addressBook, $contact);
         if ($updated !== null) {
-            $this->cache->forget([self::CACHE_KEY_CONTACTS, $user->id, $addressBook->id]);
+            $this->cache->forgetTagged(self::contactCacheTags($user->id), self::contactCacheKey($user->id, $addressBook->id));
         }
         return $updated;
     }

@@ -10,7 +10,6 @@ use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\User;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
@@ -466,6 +465,21 @@ describe('Event attachments', function () {
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
     });
+
+    it('shows an attach and a detach in the cached attachment list', function (string $kind) {
+        $user = makeUser();
+        $entry = CalendarEntry::factory()->forCalendar(Calendar::factory()->forUser($user)->create())->create();
+        $item = $kind === 'todos' ? Todo::factory()->forUser($user)->create() : Note::factory()->forUser($user)->create();
+        $url = '/api/v1/calendars/events/'.$entry->id.'/attachments/'.$kind;
+        $ids = fn () => collect($this->actingAs($user, 'sanctum')->getJson($url)->assertStatus(200)->json('data'))->pluck('id')->all();
+        expect($ids())->toBe([]);
+
+        $this->actingAs($user, 'sanctum')->postJson($url, [$kind === 'todos' ? 'todo_id' : 'note_id' => $item->id])->assertStatus(201);
+        expect($ids())->toBe([$item->id]);
+
+        $this->actingAs($user, 'sanctum')->deleteJson($url.'/'.$item->id)->assertStatus(200);
+        expect($ids())->toBe([]);
+    })->with(['todos', 'notes']);
 });
 
 describe('Calendar tenant isolation', function () {
@@ -660,24 +674,6 @@ describe('Calendar invites', function () {
 
 describe('Shared calendar cache invalidation', function () {
     beforeEach(function () {
-        // forgetByPrefix() needs Redis and is a no-op on the test array
-        // store; this double does the same prefix delete on the array store.
-        // Bound before the first request, which caches the controller.
-        $this->app->instance(UserCacheService::class, new class extends UserCacheService
-        {
-            public function forgetByPrefix(array $identifiers): void
-            {
-                $store = Cache::store('user_data');
-                $prefix = implode('_', $identifiers).'_';
-
-                foreach (array_keys($store->getStore()->all(false)) as $key) {
-                    if (str_starts_with($key, $prefix)) {
-                        $store->forget($key);
-                    }
-                }
-            }
-        });
-
         $this->owner = makeUser();
         $this->sharee = makeUser();
         Friend::factory()->forUsers($this->owner, $this->sharee)->create();
@@ -804,6 +800,41 @@ describe('Shared calendar cache invalidation', function () {
 
         ($this->storeEvent)($this->owner, $this->ownerInstance, 'From owner');
         expect(($this->monthTitles)($this->sharee))->toContain('From owner');
+    });
+
+    it('shows the owner\'s events again to a sharee who was revoked and invited back', function () {
+        ($this->accept)();
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'Seed');
+        expect(($this->monthTitles)($this->sharee))->toContain('Seed');
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.$this->ownerInstance.'/share/'.$this->sharee->id)
+            ->assertStatus(200);
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'While revoked');
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$this->ownerInstance.'/share', ['friend_id' => $this->sharee->id])
+            ->assertStatus(200);
+        ($this->accept)();
+
+        expect(($this->monthTitles)($this->sharee))->toContain('Seed')->toContain('While revoked');
+    });
+
+    it('shows the owner\'s events again to a sharee who unsubscribed and was invited back', function () {
+        ($this->accept)();
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'Seed');
+        expect(($this->monthTitles)($this->sharee))->toContain('Seed');
+
+        $this->actingAs($this->sharee, 'sanctum')
+            ->deleteJson('/api/v1/calendars/'.($this->shareeInstance)().'/unsubscribe')
+            ->assertStatus(200);
+        expect(($this->monthTitles)($this->sharee))->not->toContain('Seed');
+        ($this->storeEvent)($this->owner, $this->ownerInstance, 'While away');
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$this->ownerInstance.'/share', ['friend_id' => $this->sharee->id])
+            ->assertStatus(200);
+        ($this->accept)();
+
+        expect(($this->monthTitles)($this->sharee))->toContain('Seed')->toContain('While away');
     });
 
     it('keeps the owner\'s cached calendar list in step with accept and revoke', function () {

@@ -113,7 +113,6 @@ describe('External calendars through the API', function () {
         expect($this->remote->objects['a.ics']['data'])->toContain('Changed elsewhere');
     });
 
-    // forgetByPrefix is a no-op on the array store, so the drop is asserted on a spy (docs/TESTING.md).
     it('drops the cached events of the calendar on a remote 412 or an unreadable event', function (string $case) {
         $start = now('UTC')->addDay()->setTime(10, 0);
         $cache = Mockery::mock(new \App\Shared\Services\UserCacheService());
@@ -142,7 +141,43 @@ describe('External calendars through the API', function () {
         ]);
 
         expectApiError($response, $case === '412' ? 412 : 422);
-        $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendar->calendarId]);
+        $cache->shouldHaveReceived('flushTags')->with([\App\Api\Calendars\Services\CalendarService::eventCacheTag($this->user->id, $this->calendar->calendarId)]);
+    })->with(['412', 'unreadable']);
+
+    it('shows the remote\'s version on the next load after a remote 412 or an unreadable event', function (string $case) {
+        $start = now('UTC')->addDay()->setTime(10, 0);
+        $series = fn (string $summary, array $extra = []) => implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Remote//EN', 'BEGIN:VEVENT', 'UID:a', 'DTSTAMP:20300101T000000Z',
+            'DTSTART:'.$start->format('Ymd\THis\Z'), 'DTEND:'.$start->copy()->addHour()->format('Ymd\THis\Z'),
+            'RRULE:FREQ=DAILY;COUNT=2', "SUMMARY:{$summary}", ...$extra, 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n";
+        $titles = fn () => collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200)->json('data'))->pluck('title')->all();
+
+        $stale = $this->remote->put('a.ics', $series('Old'));
+        expect($titles())->toBe(['Old', 'Old']);
+
+        if ($case === '412') {
+            $this->remote->put('a.ics', $series('Changed elsewhere'));
+            $url = '/api/v1/calendars/'.$this->calendar->instanceId.'/events/a.ics';
+        } else {
+            $this->remote->put('a.ics', $series('Changed elsewhere', ['not a content line']));
+            $stale = $this->remote->objects['a.ics']['etag'];
+            $url = '/api/v1/calendars/'.$this->calendar->instanceId.'/events/a.ics/occurrence/'.$start->copy()->addDay()->format('Y-m-d H:i:s');
+        }
+        expect($titles())->toBe(['Old', 'Old']);
+
+        $response = $this->actingAs($this->user, 'sanctum')->putJson($url, [
+            'title' => 'Mine',
+            'start_date' => $start->copy()->addDay()->format('Y-m-d H:i:s'),
+            'end_date' => $start->copy()->addDay()->addHour()->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+            'calendar_id' => $this->calendar->instanceId,
+            'etag' => $stale,
+        ]);
+
+        expectApiError($response, $case === '412' ? 412 : 422);
+        // The listing skips an object it cannot read.
+        expect($titles())->toBe($case === '412' ? ['Changed elsewhere', 'Changed elsewhere'] : []);
     })->with(['412', 'unreadable']);
 
     it('leaves an unreachable calendar out of listings and reports it', function () {
@@ -231,8 +266,8 @@ describe('External calendars through the API', function () {
         expectApiError($response, 503);
         expect(DB::connection('pgsql')->table('calendarobjects')->where('calendarid', $native->calendarId)->count())->toBe(0)
             ->and($this->remote->objects)->toHaveKey('a.ics');
-        $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $this->calendar->calendarId]);
-        $cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $this->user->id, $native->calendarId]);
+        $cache->shouldHaveReceived('flushTags')->with([\App\Api\Calendars\Services\CalendarService::eventCacheTag($this->user->id, $this->calendar->calendarId)]);
+        $cache->shouldHaveReceived('flushTags')->with([\App\Api\Calendars\Services\CalendarService::eventCacheTag($this->user->id, $native->calendarId)]);
     });
 
     it('does not ask a remote that just failed again for the unavailable TTL', function () {
@@ -700,6 +735,22 @@ describe('Connecting external calendars', function () {
         expect($again->json('meta.unavailable_calendars'))->toBe([])
             ->and(collect($again->json('data'))->pluck('title')->all())->toBe(['Remote'])
             ->and(collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Remote')['is_unavailable'])->toBeFalse();
+    });
+
+    it('shows the remote\'s current events right away once the app password is fixed', function () {
+        $account = \App\Api\Calendars\Models\ExternalCalendarAccount::where('user_id', $this->user->id)->first();
+        $this->remote->put('a.ics', remoteEventIcs('a', 'Before', remoteEventStart(), remoteEventEnd()));
+        $titles = fn () => collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200)->json('data'))->pluck('title')->all();
+        expect($titles())->toBe(['Before']);
+
+        $this->remote->put('a.ics', remoteEventIcs('a', 'After', remoteEventStart(), remoteEventEnd()));
+        $this->remote->credentials = ['alice', 'new-password'];
+        expect($titles())->toBe(['Before']);
+
+        $this->actingAs($this->user, 'sanctum')->putJson("/api/v1/calendars/external/accounts/{$account->id}", ['password' => 'new-password'])
+            ->assertStatus(200);
+
+        expect($titles())->toBe(['After']);
     });
 
     it('removes an account with its calendars, locally only', function () {

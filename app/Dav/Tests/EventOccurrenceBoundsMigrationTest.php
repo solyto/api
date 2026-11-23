@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Dav\Services\DavService;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,30 +34,39 @@ function boundsRows(): \Illuminate\Support\Collection
         ->keyBy('uri');
 }
 
+/**
+ * The owner's calendar, shared with an accepted sharee, holds one stale
+ * override-first series among rows the migration must leave alone.
+ */
+function boundsFixture(\Tests\TestCase $test): void
+{
+    $test->owner = davUser();
+    $test->sharee = davUser();
+    $test->outsider = davUser();
+    $put = fn ($user, string $uri, string $ics) => expect(davRequest($user, 'PUT', 'calendars/'.$user->email."/my-calendar/{$uri}", $ics, ['Content-Type' => 'text/calendar'])->getStatus())->toBe(201);
+
+    $put($test->owner, 'stale.ics', boundsSeries('stale', overrideFirst: true));
+    $put($test->owner, 'fine.ics', boundsSeries('fine', overrideFirst: false));
+    $put($test->owner, 'plain.ics', davIcs('plain'));
+    $put($test->owner, 'broken.ics', boundsSeries('broken', overrideFirst: true));
+    $put($test->outsider, 'other.ics', boundsSeries('other', overrideFirst: false));
+
+    $dav = app(DavService::class);
+    $test->calendar = $dav->calendars()->list($test->owner)[0];
+    $dav->calendars()->sharing()->inviteUser($test->calendar, $test->owner, $test->sharee);
+    $dav->calendars()->sharing()->acceptInvite($test->sharee, 'mailto:'.$test->sharee->email);
+
+    $objects = DB::connection('pgsql')->table('calendarobjects');
+    // The bounds sabre stored for override-first objects before the fix.
+    $objects->clone()->where('uri', 'stale.ics')->update(['firstoccurence' => 1894618800, 'lastoccurence' => 1894622400]);
+    // Wrong too, but without an override the migration must not look at it.
+    $objects->clone()->where('uri', 'plain.ics')->update(['firstoccurence' => 1, 'lastoccurence' => 2]);
+    $objects->clone()->where('uri', 'broken.ics')->update(['calendardata' => "BEGIN:VCALENDAR\r\nRECURRENCE-ID:20300114T100000Z\r\nnot a content line\r\n"]);
+}
+
 describe('recompute_event_occurrence_bounds migration', function () {
     beforeEach(function () {
-        $this->owner = davUser();
-        $this->sharee = davUser();
-        $this->outsider = davUser();
-        $put = fn ($user, string $uri, string $ics) => expect(davRequest($user, 'PUT', 'calendars/'.$user->email."/my-calendar/{$uri}", $ics, ['Content-Type' => 'text/calendar'])->getStatus())->toBe(201);
-
-        $put($this->owner, 'stale.ics', boundsSeries('stale', overrideFirst: true));
-        $put($this->owner, 'fine.ics', boundsSeries('fine', overrideFirst: false));
-        $put($this->owner, 'plain.ics', davIcs('plain'));
-        $put($this->owner, 'broken.ics', boundsSeries('broken', overrideFirst: true));
-        $put($this->outsider, 'other.ics', boundsSeries('other', overrideFirst: false));
-
-        $dav = app(DavService::class);
-        $this->calendar = $dav->calendars()->list($this->owner)[0];
-        $dav->calendars()->sharing()->inviteUser($this->calendar, $this->owner, $this->sharee);
-        $dav->calendars()->sharing()->acceptInvite($this->sharee, 'mailto:'.$this->sharee->email);
-
-        $objects = DB::connection('pgsql')->table('calendarobjects');
-        // The bounds sabre stored for override-first objects before the fix.
-        $objects->clone()->where('uri', 'stale.ics')->update(['firstoccurence' => 1894618800, 'lastoccurence' => 1894622400]);
-        // Wrong too, but without an override the migration must not look at it.
-        $objects->clone()->where('uri', 'plain.ics')->update(['firstoccurence' => 1, 'lastoccurence' => 2]);
-        $objects->clone()->where('uri', 'broken.ics')->update(['calendardata' => "BEGIN:VCALENDAR\r\nRECURRENCE-ID:20300114T100000Z\r\nnot a content line\r\n"]);
+        boundsFixture($this);
 
         $this->before = boundsRows();
         $this->changes = DB::connection('pgsql')->table('calendarchanges')->count();
@@ -99,9 +109,25 @@ describe('recompute_event_occurrence_bounds migration', function () {
 
     it('forgets the event caches of the owner and sharees of changed calendars only', function () {
         foreach ([$this->owner, $this->sharee] as $member) {
-            $this->cache->shouldHaveReceived('forgetByPrefix')->with(['calendar_events', $member->id, $this->calendar->calendarId])->once();
+            $this->cache->shouldHaveReceived('flushTags')->with([CalendarService::eventCacheTag($member->id, $this->calendar->calendarId)])->once();
         }
 
-        $this->cache->shouldHaveReceived('forgetByPrefix')->twice();
+        $this->cache->shouldHaveReceived('flushTags')->twice();
+    });
+});
+
+describe('recompute_event_occurrence_bounds migration and the event cache', function () {
+    it('shows the repaired series to the owner and the sharee on their next load', function () {
+        boundsFixture($this);
+        Log::shouldReceive('channel')->with('dav')->andReturn(Mockery::spy());
+        // fine.ics keeps June from being empty, which would not be cached.
+        $june = fn ($user) => collect(app(CalendarService::class)->listEvents($user, '2030-06'))->pluck('uri')->unique()->sort()->values()->all();
+        expect($june($this->owner))->toBe(['fine.ics'])
+            ->and($june($this->sharee))->toBe(['fine.ics']);
+
+        (require database_path('migrations/2026_11_14_000002_recompute_event_occurrence_bounds.php'))->up();
+
+        expect($june($this->owner))->toBe(['fine.ics', 'stale.ics'])
+            ->and($june($this->sharee))->toBe(['fine.ics', 'stale.ics']);
     });
 });
