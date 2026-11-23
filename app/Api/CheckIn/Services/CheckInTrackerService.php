@@ -7,6 +7,7 @@ use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
+use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,7 @@ class CheckInTrackerService
     public function create(User $user, array $data): CheckInTracker
     {
         if (CheckInTracker::forUser($user->id)->whereNull('key')->count() >= self::MAX_CUSTOM_TRACKERS) {
-            throw ValidationException::withMessages(['name' => 'You have reached the maximum number of trackers.']);
+            throw new LimitReachedException('You have reached the maximum number of trackers.');
         }
 
         $type = CheckInTrackerType::from($data['type']);

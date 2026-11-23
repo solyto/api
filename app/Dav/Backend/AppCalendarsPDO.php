@@ -48,6 +48,9 @@ class AppCalendarsPDO extends SabreBackend
     /** The If-Match of the current DAV request, passed on to remote writes. */
     private ?string $ifMatch = null;
 
+    // Who sent the current DAV request; null outside DAV (API, jobs), which check ownership themselves.
+    private ?string $requestPrincipal = null;
+
     /**
      * Objects a calendar-query already read with their data, handed to the
      * multiget sabre runs right after it so they are not fetched twice.
@@ -84,6 +87,11 @@ class AppCalendarsPDO extends SabreBackend
         $this->ifMatch = $ifMatch !== '' ? $ifMatch : null;
     }
 
+    public function setRequestPrincipal(?string $principalUri): void
+    {
+        $this->requestPrincipal = $principalUri;
+    }
+
     public function externalCalendar(int $calendarId): ?ExternalCalendar
     {
         if (!array_key_exists($calendarId, $this->external)) {
@@ -117,7 +125,7 @@ class AppCalendarsPDO extends SabreBackend
             return $object;
         }
 
-        $object = $this->remote()->getObject($link, $objectUri);
+        $object = $this->remoteFor($link)->getObject($link, $objectUri);
 
         return $object ? $this->objectRow($link, $object) : null;
     }
@@ -129,7 +137,7 @@ class AppCalendarsPDO extends SabreBackend
             return parent::getCalendarObjects($calendarId);
         }
 
-        return array_map(fn (array $object) => $this->objectRow($link, $object), $this->remote()->listObjects($link));
+        return array_map(fn (array $object) => $this->objectRow($link, $object), $this->remoteFor($link)->listObjects($link));
     }
 
     public function getMultipleCalendarObjects($calendarId, array $uris)
@@ -150,7 +158,7 @@ class AppCalendarsPDO extends SabreBackend
             }
         }
 
-        foreach ($this->remote()->multiget($link, $missing) as $object) {
+        foreach ($this->remoteFor($link)->multiget($link, $missing) as $object) {
             $objects[] = $this->objectRow($link, $object);
         }
 
@@ -260,7 +268,7 @@ class AppCalendarsPDO extends SabreBackend
         }
 
         $uris = [];
-        foreach ($this->remote()->query($link, $component, $start, $end) as $object) {
+        foreach ($this->remoteFor($link)->query($link, $component, $start, $end) as $object) {
             $row = $this->objectRow($link, $object);
 
             try {
@@ -300,7 +308,7 @@ class AppCalendarsPDO extends SabreBackend
             }
         }
 
-        $changes = $this->remote()->syncCollection($link, $remoteToken);
+        $changes = $this->remoteFor($link)->syncCollection($link, $remoteToken);
         if ($changes === null) {
             return null;
         }
@@ -563,7 +571,7 @@ SQL
                 $event->storedData = $object['calendardata'];
 
                 return $event;
-            }, $this->remote()->query($link, null));
+            }, $this->remoteFor($link)->query($link, null));
         }
 
         $stmt = $this->pdo->prepare('SELECT id, uri, lastmodified, etag, calendarid, size, calendardata, componenttype FROM '.$this->calendarObjectTableName.' WHERE calendarid = ?');
@@ -597,7 +605,7 @@ SQL
     {
         $link = $this->externalCalendar($calendar->calendarId);
         if ($link) {
-            $objects = $this->remote()->query(
+            $objects = $this->remoteFor($link)->query(
                 $link,
                 'VEVENT',
                 \DateTime::createFromInterface($start)->modify('-1 day'),
@@ -774,7 +782,7 @@ SQL
     {
         $link = $this->externalCalendar($calendar->calendarId);
         if ($link) {
-            $object = $this->remote()->getObject($link, $uri);
+            $object = $this->remoteFor($link)->getObject($link, $uri);
             if (!$object) {
                 return null;
             }
@@ -808,7 +816,7 @@ SQL
         $uri = bin2hex(Str::random(16)) . '.ics';
 
         // An event moved here from another calendar keeps its stored data.
-        return $this->importEventCustom($calendar, $dto->toVCalForUpdate(), $uri);
+        return $this->importEventCustom($calendar, $this->vCalForUpdate($calendar, $dto), $uri);
     }
 
     public function importEventCustom(CalendarDTO $calendar, string $vCal, ?string $uri = null): ?string
@@ -827,7 +835,18 @@ SQL
 
     public function updateEventCustom(CalendarDTO $calendar, EventDTO $dto): bool
     {
-        return $this->writeExisting($calendar, $dto->uri, $dto->toVCalForUpdate(), $dto->etag);
+        return $this->writeExisting($calendar, $dto->uri, $this->vCalForUpdate($calendar, $dto), $dto->etag);
+    }
+
+    private function vCalForUpdate(CalendarDTO $calendar, EventDTO $dto): string
+    {
+        try {
+            return $dto->toVCalForUpdate();
+        } catch (UnreadableCalendarObjectException $e) {
+            $this->logSkippedObject($calendar->calendarId, (string) $dto->uri, $e->getPrevious() ?? $e);
+
+            throw $e;
+        }
     }
 
     public function deleteEventCustom(CalendarDTO $calendar, EventDTO $dto): bool
@@ -1246,7 +1265,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
     private function putRemote(ExternalCalendar $link, string $uri, string $data, bool $create, ?string $ifMatch): ?string
     {
-        $etag = $this->remote()->putObject($link, $uri, $data, $create, $ifMatch);
+        $etag = $this->remoteFor($link)->putObject($link, $uri, $data, $create, $ifMatch);
         $this->markStateStale($link);
 
         return $etag;
@@ -1254,7 +1273,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
     private function deleteRemote(ExternalCalendar $link, string $uri, ?string $ifMatch): void
     {
-        $this->remote()->deleteObject($link, $uri, $ifMatch);
+        $this->remoteFor($link)->deleteObject($link, $uri, $ifMatch);
         $this->markStateStale($link);
     }
 
@@ -1312,6 +1331,10 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         unset($calendar['{'.Plugin::NS_CALENDARSERVER.'}getctag'], $calendar['{http://sabredav.org/ns}sync-token']);
         $calendar['is-external'] = true;
 
+        if (!$this->mayReachRemote($link)) {
+            return $calendar;
+        }
+
         $state = $this->remoteState($link);
         $syncToken = $state['sync_token'] !== null ? $this->encodeSyncToken($state['sync_token']) : null;
 
@@ -1346,7 +1369,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         }
 
         try {
-            $state = $this->remote()->collectionState($link);
+            $state = $this->remoteFor($link)->collectionState($link);
         } catch (ExternalCalendarUnavailableException $e) {
             // Sabre resolves the home on every request, native calendars
             // included: remember the failure so a dead remote is asked at
@@ -1427,9 +1450,20 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         return (1 << 52) | (int) hexdec(substr(hash('sha256', $link->id.'/'.$uri), 0, 13));
     }
 
-    private function remote(): RemoteCalDavClient
+    private function remoteFor(ExternalCalendar $link): RemoteCalDavClient
     {
+        if (!$this->mayReachRemote($link)) {
+            throw new Forbidden();
+        }
+
         return app(RemoteCalDavClient::class);
+    }
+
+    // Sabre checks privileges only after loading a calendar, and loading an external one calls the remote
+    // with its owner's credentials. External calendars can't be shared, so only their owner may get that far.
+    private function mayReachRemote(ExternalCalendar $link): bool
+    {
+        return $this->requestPrincipal === null || $this->requestPrincipal === 'principals/'.$link->user->email;
     }
 
     /**

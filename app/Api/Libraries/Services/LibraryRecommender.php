@@ -123,7 +123,24 @@ class LibraryRecommender
             ? $this->getBooksMessage($favorites)
             : $this->getMusicMessage($favorites);
 
-        return $this->aiService->respondStructured($user, $prompt, $message, self::RESPONSE_SCHEMA);
+        $answer = $this->aiService->respondStructured($user, $prompt, $message, self::RESPONSE_SCHEMA);
+
+        return $answer === null ? null : ['recommendations' => $this->usableRecommendations($answer['recommendations'] ?? [])];
+    }
+
+    // Only OpenAI enforces the response schema; other providers' models may return entries that can't be shown.
+    private function usableRecommendations(mixed $recommendations): array
+    {
+        if (!is_array($recommendations)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $recommendations,
+            fn (mixed $recommendation) => is_array($recommendation)
+                && is_string($recommendation['title'] ?? null)
+                && is_string($recommendation['creator'] ?? null)
+        ));
     }
 
     private function assertType(LibraryTypeEnum $type): void

@@ -2,6 +2,7 @@
 
 use App\Api\Alerts\Enums\AlertRule;
 use App\Api\Alerts\Models\Alert;
+use App\Api\Alerts\Services\AlertService;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Goals\Models\Goal;
@@ -14,6 +15,18 @@ function alertPayload(int $trackerId, array $overrides = []): array
 }
 
 describe('POST /api/v1/alerts', function () {
+    it('refuses another alert at the limit without blaming a field', function () {
+        $user = makeUser();
+        $tracker = ownTracker($user);
+        Alert::factory()->count(AlertService::MAX_ALERTS)->forTracker($tracker)->create();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/alerts', alertPayload($tracker->id));
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'You have reached the maximum number of alerts.')
+            ->assertJsonPath('errors', ['limit_reached']);
+    });
+
     it('creates an alert with what the rule currently sees', function () {
         $user = makeUser();
         $user->settings()->update(['timezone' => 'UTC']);

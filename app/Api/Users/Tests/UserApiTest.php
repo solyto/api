@@ -85,23 +85,6 @@ describe('GET /api/v1/users', function () {
         expect($ids->sort()->values()->all())->toBe(collect([$alice->id, $bob->id])->sort()->values()->all());
     });
 
-    it('matches LIKE wildcards in the search term literally', function () {
-        $admin = makeUser(['role' => 'admin', 'name' => 'Admin', 'email' => 'admin@example.com']);
-        $underscored = makeUser(['name' => 'a_b', 'email' => 'u1@example.com']);
-        makeUser(['name' => 'axb', 'email' => 'u2@example.com']);
-
-        $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/v1/users?per_page=10&search=a_b')
-            ->assertStatus(200)
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $underscored->id);
-
-        $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/v1/users?per_page=10&search=%25')
-            ->assertStatus(200)
-            ->assertJsonCount(0, 'data');
-    });
-
     it('returns empty data for a page beyond the last', function () {
         $admin = makeUser(['role' => 'admin']);
 

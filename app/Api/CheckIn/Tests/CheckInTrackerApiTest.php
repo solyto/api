@@ -4,6 +4,7 @@ use App\Api\Alerts\Models\Alert;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Goals\Models\Goal;
 use Illuminate\Support\Facades\DB;
 
@@ -73,6 +74,17 @@ describe('GET /api/v1/check-in/trackers', function () {
 });
 
 describe('POST /api/v1/check-in/trackers', function () {
+    it('refuses another own tracker at the limit without blaming a field', function () {
+        $user = makeUser();
+        CheckInTracker::factory()->count(CheckInTrackerService::MAX_CUSTOM_TRACKERS)->forUser($user)->create();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/check-in/trackers', ['name' => 'One more', 'type' => 'yes_no', 'icon' => 'flower-2']);
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'You have reached the maximum number of trackers.')
+            ->assertJsonPath('errors', ['limit_reached']);
+    });
+
     it('creates an own tracker at the end, enabled, and scored only for a 1–5 tracker', function (string $type, bool $scored) {
         $user = makeUser();
 

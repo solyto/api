@@ -23,14 +23,9 @@ class ClientVersions extends MetricCard
         [[$versions, $rejected], $time, $runAt] = $this->remember(fn () => [
             PersonalAccessToken::query()
                 ->where('last_used_at', '>=', now()->subDays(self::ACTIVE_DAYS))
-                ->selectRaw('name, client_version, count(*) as tokens')
-                ->groupBy('name', 'client_version')
-                ->toBase()
-                ->get()
-                ->map(fn ($row) => [
-                    'key' => $this->platform($row->name).' · '.($row->client_version ?? 'unknown'),
-                    'tokens' => (int) $row->tokens,
-                ])
+                ->get(['name', 'client_version'])
+                ->countBy(fn (PersonalAccessToken $token) => $this->platform($token->name).' · '.($token->client_version ?? 'unknown'))
+                ->map(fn (int $tokens, string $key) => ['key' => $key, 'tokens' => $tokens])
                 ->sortByDesc('tokens')
                 ->values(),
             $this->merged(['count' => [PulseMetrics::CLIENT_REJECTED, 'count']], 'count'),

@@ -101,6 +101,16 @@ describe('AiService', function () {
 
         expect($result)->toBe(['recommendations' => []]);
     });
+
+    it('respondStructured gives null for an answer that is not a json object', function (string $content) {
+        $service = makeAiService(mockedOpenAiClient(fakeChatResponse($content)));
+
+        expect($service->respondStructured($this->user, 'Prompt', 'input', ['type' => 'json_schema']))->toBeNull();
+    })->with([
+        'a number' => '42',
+        'a string' => '"Sorry, I can\'t help with that."',
+        'no json' => 'Here are some books you might like.',
+    ]);
 });
 
 describe('AiService client configuration', function () {

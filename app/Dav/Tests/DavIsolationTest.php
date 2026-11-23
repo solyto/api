@@ -5,6 +5,7 @@ use App\Dav\Backend\AppCalendarsPDO;
 use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\FakeCalDavServer;
 
 uses(RefreshDatabase::class);
 
@@ -287,4 +288,42 @@ describe('DAV calendar sharing', function () {
         expect(davRequest($this->other, 'GET', $shared.'secret.ics')->getStatus())->toBe(404)
             ->and(davRequest($this->other, 'PUT', $shared.'early.ics', davIcs('early'), ['Content-Type' => 'text/calendar'])->getStatus())->toBe(404);
     });
+});
+
+describe('DAV isolation: another user\'s external calendar', function () {
+    beforeEach(function () {
+        $this->remote = (new FakeCalDavServer())->fake();
+        externalCalendar($this->owner, $this->remote);
+        $this->remote->put('a.ics', davIcs('a', 'Remote secret'));
+        $this->remote->requests = [];
+        $this->external = 'calendars/'.$this->owner->email.'/remote/';
+    });
+
+    it('never forwards another user\'s request to the remote server', function (string $method, string $object, ?string $body, array $headers) {
+        $response = davRequest($this->other, $method, $this->external.$object, $body, $headers);
+
+        expect($this->remote->requests)->toBe([])
+            ->and($response->getBodyAsString())->not->toContain('Remote secret');
+    })->with([
+        'GET an event' => ['GET', 'a.ics', null, []],
+        'PROPFIND the calendar' => ['PROPFIND', '', null, ['Depth' => '1']],
+        'REPORT on the calendar' => ['REPORT', '', '<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR"/></c:filter></c:calendar-query>', ['Depth' => '1', 'Content-Type' => 'application/xml']],
+        'PUT an event' => ['PUT', 'b.ics', davIcs('b', 'Planted'), ['Content-Type' => 'text/calendar']],
+        'PUT over an event' => ['PUT', 'a.ics', davIcs('a', 'Overwritten'), ['Content-Type' => 'text/calendar']],
+        'DELETE an event' => ['DELETE', 'a.ics', null, []],
+        'DELETE the calendar' => ['DELETE', '', null, []],
+    ]);
+
+    it('refuses another user\'s writes and leaves the remote events as they were', function (string $method, string $object, ?string $body) {
+        $response = davRequest($this->other, $method, $this->external.$object, $body, ['Content-Type' => 'text/calendar']);
+
+        expect($response->getStatus())->toBe(403)
+            ->and(array_keys($this->remote->objects))->toBe(['a.ics'])
+            ->and($this->remote->objects['a.ics']['data'])->toContain('Remote secret');
+    })->with([
+        'PUT an event' => ['PUT', 'b.ics', davIcs('b', 'Planted')],
+        'PUT over an event' => ['PUT', 'a.ics', davIcs('a', 'Overwritten')],
+        'DELETE an event' => ['DELETE', 'a.ics', null],
+        'DELETE the calendar' => ['DELETE', '', null],
+    ]);
 });

@@ -315,7 +315,7 @@ describe('External calendars over DAV', function () {
             ->and(\App\Api\Calendars\Models\ExternalCalendar::count())->toBe(0)
             ->and(app(DavService::class)->calendars()->get($this->user, $this->calendar->instanceId))->toBeNull()
             ->and($this->remote->objects)->toHaveKey('a.ics')
-            ->and(collect($this->remote->requests)->pluck('method')->filter(fn ($m) => $m === 'DELETE'))->toBeEmpty();
+            ->and(collect($this->remote->requests)->filter(fn ($r) => $r->method() === 'DELETE'))->toBeEmpty();
     });
 
     it('keeps native calendars on pgsql', function () {

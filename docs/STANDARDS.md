@@ -167,7 +167,10 @@ unnamed one would answer 401 to a widget token. Route caching is not used, so du
 runtime.
 
 Check: `grep -c 'Route::' routes/*.php` — only `api.php` and `web.php`
-exist; a new route file is a violation.
+exist; a new route file is a violation. One exception (owner decision,
+2026-11-23): `routes/ai.php` holds the MCP endpoint, because the
+`laravel/mcp` package loads that file by convention; it registers nothing
+unless `MCP_ENABLED` is set.
 
 ### 1.5 The health route follows the same rules as everything else
 
@@ -535,16 +538,28 @@ by design and is why rule 3.2 matters for the integer ones. The `@OA`
 parameter type must match: `TodoController.php:93` says `type="integer"`
 for a UUID.
 
-### 5.5 Raw SQL only when Eloquent cannot express it, and never on `pgsql` from the app
+### 5.5 No raw SQL, and never `pgsql` from the app
 
-`whereRaw('LOWER(name) = ?', …)` (`TodoService.php:73,86`) is the only raw
-fragment in services — a case-insensitive match that MariaDB does by
-collation and SQLite (tests) does not. `DB::connection('pgsql')` outside
-`app/Dav`: `StatisticsService.php:35` (read) and the two Contacts repair
-commands (write). Nothing new touches `pgsql` from `app/Api` without being
-flagged first (project hard rule).
+Application code uses Eloquent and the query builder only: no `whereRaw`,
+`selectRaw`, `orderByRaw`, `DB::raw`, `DB::select` or `DB::statement`
+(owner decision, 2026-11-23). Where the query builder can't express
+something, the query fetches plain columns and PHP does the rest: a user's
+tags are compared case-insensitively in PHP (`TodoService::sameName`), and
+client versions are counted with `countBy()` (`ClientVersions`). A search
+`like` is a plain `where(..., 'like', …)`; `%` and `_` in the term act as
+wildcards.
 
-Check: `grep -rn "connection('pgsql')" app/Api app/Shared | grep -v Tests` → the three existing files.
+The one exception is `app/Dav`: the SabreDAV backends (`AppCalendarsPDO`,
+`AppContactsPDO`, `Principals`) work through PDO statements because that is
+how Sabre's storage layer is built. Migrations are not application code and
+may use raw SQL where the schema builder can't express a change.
+
+`DB::connection('pgsql')` outside `app/Dav`: `StatisticsService.php:35`
+(read) and the two Contacts repair commands (write). Nothing new touches
+`pgsql` from `app/Api` without being flagged first (project hard rule).
+
+Check: `grep -rnE 'Raw\(|DB::(raw|select|statement)\(' app --include=*.php | grep -v -e /Tests/ -e '^app/Dav/'` → 0;
+`grep -rn "connection('pgsql')" app/Api app/Shared | grep -v Tests` → the three existing files.
 
 ## 6. Resources
 
@@ -649,7 +664,12 @@ writes and forgets all use (`CalendarService::eventCacheTags`,
 tags, in the order, it was stored with. `cache:prune-stale-tags user_data`
 runs hourly (`routes/console.php`).
 
-Check: `grep -rln 'Cache::' app/Api/*/Services` → the two files above.
+Atomic locks are not cached data and use `Cache::lock` directly (owner
+decision, 2026-11-23): `OpmlImportService` locks a user's feed import so two
+can't run at once.
+
+Check: `grep -rln 'Cache::' app/Api/*/Services` → the two files above and
+`OpmlImportService.php` (`Cache::lock` only).
 
 ### 8.2 Every write forgets every key its reads use
 
@@ -808,7 +828,8 @@ resource → `ApiResponse`. Factories are co-located and wired with
 throttled by the four named limiters in
 `app/Shared/Providers/AppServiceProvider.php:44-59`) and the
 `auth:sanctum` group for everything else. `routes/web.php` has only the
-Telegram webhook and the two DAV catch-alls. Token issuing lives in
+Telegram webhook, the two DAV catch-alls and the old clipboard image URL
+for apps up to 1.1.3 (Decisions, 2026-11-23). Token issuing lives in
 `AuthService`; passkeys in `PasskeyService`; controllers read
 `$request->user()` (212 uses) and never `auth()`.
 
@@ -882,7 +903,7 @@ What gets a test and how: `docs/TESTING.md`.
 ### 12.10 Localisation
 
 User-facing copy (notifications, mails, bot replies) comes from
-`resources/lang/{en,de,fr,es,it}` through `__()` / the `SolytoMessage` enum
+`resources/lang/{en,de,fr,es,it,ru}` through `__()` / the `SolytoMessage` enum
 (rule 9.4). API `message` strings in the envelope are English and are not
 translated (Decisions).
 

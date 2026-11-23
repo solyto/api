@@ -40,6 +40,8 @@ describe('External calendars through the API', function () {
     });
 
     it('lists remote events with a stable id and an empty unavailable list', function () {
+        // Mid-month, so tomorrow's event is listed under the current month.
+        $this->travelTo('2026-11-10 12:00:00');
         $this->remote->put('a.ics', remoteEventIcs('a', 'Remote meeting', remoteEventStart(), remoteEventEnd()));
 
         $first = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/'.now()->format('Y-m'))->assertStatus(200);
@@ -56,7 +58,7 @@ describe('External calendars through the API', function () {
         $again = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/'.now()->format('Y-m'));
 
         expect(collect($again->json('data'))->firstWhere('title', 'Remote meeting')['id'])->toBe($event['id']);
-    })->skip(fn () => now()->addDay()->format('Y-m') !== now()->format('Y-m'), 'The event must fall into the current month.');
+    });
 
     it('creates, updates and deletes an event on the remote with no local copy', function () {
         $start = now()->addDay()->setTime(10, 0);
@@ -778,4 +780,33 @@ describe('Connecting external calendars', function () {
         expectApiError($this->actingAs($other, 'sanctum')->postJson("/api/v1/calendars/external/accounts/{$account->id}/calendars", ['urls' => [$this->remote->url()]]), 403);
         expect($this->actingAs($other, 'sanctum')->getJson('/api/v1/calendars/external/accounts')->json('data'))->toBe([]);
     });
+});
+
+describe('Editing an external event the app cannot read', function () {
+    beforeEach(function () {
+        $this->remote = (new FakeCalDavServer())->fake();
+        $this->user = makeUser();
+        $this->calendar = externalCalendar($this->user, $this->remote);
+    });
+
+    it('cannot edit it and leaves the stored event as it was', function (string $stored) {
+        $etag = $this->remote->put('broken.ics', $stored);
+        $start = now()->addDay()->setTime(10, 0);
+
+        $response = $this->actingAs($this->user, 'sanctum')->putJson('/api/v1/calendars/'.$this->calendar->instanceId.'/events/broken.ics', [
+            'title' => 'Edited in solyto',
+            'start_date' => $start->format('Y-m-d H:i:s'),
+            'end_date' => $start->copy()->addHour()->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+            'calendar_id' => $this->calendar->instanceId,
+            'etag' => $etag,
+        ]);
+
+        // The API can't load it as an event; toVCalForUpdate() refuses it too (EventDTOUpdateTest), should a path ever get there.
+        expectApiError($response, 404);
+        expect($this->remote->objects['broken.ics']['data'])->toBe($stored);
+    })->with([
+        'not iCalendar' => "BEGIN:VCALENDAR\r\nthis is not iCalendar\r\n",
+        'only a changed occurrence' => "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//other//EN\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTAMP:20300101T000000Z\r\nRECURRENCE-ID:20301016T090000Z\r\nDTSTART:20301016T110000Z\r\nSUMMARY:Moved\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    ]);
 });

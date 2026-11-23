@@ -76,7 +76,9 @@ class AiService
             'response_format' => $responseFormat
         ]);
 
-        return json_decode($response->choices[0]->message->content, true);
+        $answer = json_decode($response->choices[0]->message->content ?? '', true);
+
+        return is_array($answer) ? $answer : null;
     }
 
     /**

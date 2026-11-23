@@ -1,6 +1,7 @@
 <?php
 
 use App\Dav\DTOs\EventDTO;
+use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use Sabre\VObject\Reader;
 
 covers(EventDTO::class);
@@ -19,15 +20,20 @@ function editedEvent(?string $storedData, ?string $recurrenceRule = null): Event
 }
 
 describe('EventDTO::toVCalForUpdate', function () {
-    it('builds a fresh object when there is no stored data, is no iCalendar, or has no VEVENT', function (?string $stored) {
-        $vcalendar = Reader::read(editedEvent($stored)->toVCalForUpdate());
+    it('builds a fresh object when there is no stored data', function () {
+        $vcalendar = Reader::read(editedEvent(null)->toVCalForUpdate());
 
         expect((string) $vcalendar->VEVENT->SUMMARY)->toBe('Edited')
             ->and((string) $vcalendar->PRODID)->toBe('-//Solyto//Solyto//EN');
+    });
+
+    // Rebuilding from scratch would drop what other clients stored (UID, reminders, attendees).
+    it('refuses to edit stored data it cannot read, instead of overwriting it', function (string $stored) {
+        expect(fn () => editedEvent($stored)->toVCalForUpdate())->toThrow(UnreadableCalendarObjectException::class);
     })->with([
-        'no stored data' => null,
         'not iCalendar' => 'garbage',
         'a VTODO' => "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VTODO\r\nUID:t\r\nDTSTAMP:20300101T000000Z\r\nSUMMARY:Task\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+        'only a changed occurrence' => "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTAMP:20300101T000000Z\r\nRECURRENCE-ID:20301016T090000Z\r\nDTSTART:20301016T110000Z\r\nSUMMARY:Moved\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
     ]);
 
     it('removes the repeat rule with its deleted and moved dates when the event stops recurring', function () {

@@ -10,6 +10,7 @@ use App\Api\Users\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use App\Shared\Exceptions\LimitReachedException;
 use Illuminate\Validation\ValidationException;
 
 class AlertService
@@ -168,7 +169,7 @@ class AlertService
     private function guardLimit(User $user): void
     {
         if (Alert::forUser($user->id)->count() >= self::MAX_ALERTS) {
-            throw ValidationException::withMessages(['rule' => 'You have reached the maximum number of alerts.']);
+            throw new LimitReachedException('You have reached the maximum number of alerts.');
         }
     }
 

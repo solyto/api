@@ -82,12 +82,16 @@ class TodoService
 
         if (preg_match_all('/#([\w-]+)/', $input, $matches)) {
             $parsedTagIds = [];
+            $tags = Tag::forUser($user->id)->get();
 
             foreach ($matches[1] as $tagName) {
-                $tag = Tag::forUser($user->id)
-                    ->whereRaw('LOWER(name) = ?', [strtolower($tagName)])
-                    ->first()
-                    ?? Tag::create(['name' => $tagName, 'user_id' => $user->id]);
+                $tag = $tags->first(fn (Tag $tag) => $this->sameName($tag->name, $tagName));
+
+                if (! $tag) {
+                    $tag = Tag::create(['name' => $tagName, 'user_id' => $user->id]);
+                    $tags->push($tag);
+                }
+
                 $parsedTagIds[] = $tag->id;
                 $input = trim(str_replace('#' . $tagName, '', $input));
             }
@@ -97,9 +101,8 @@ class TodoService
 
         if (!isset($data['category_id'])) {
             if (preg_match('/(?:^|\s)\/([\w\/-]+)/', $input, $match)) {
-                $category = TodoCategory::forUser($user->id)
-                    ->whereRaw('LOWER(title) = ?', [strtolower($match[1])])
-                    ->first()
+                $category = TodoCategory::forUser($user->id)->get()
+                    ->first(fn (TodoCategory $category) => $this->sameName($category->title, $match[1]))
                     ?? TodoCategory::create(['title' => $match[1], 'user_id' => $user->id]);
 
                 $data['category_id'] = $category->id;
@@ -309,5 +312,10 @@ class TodoService
     {
         $this->cache->forget([self::CACHE_KEY, $userId]);
         $this->cache->forget([self::CACHE_KEY_DUE, $userId]);
+    }
+
+    private function sameName(string $stored, string $typed): bool
+    {
+        return mb_strtolower($stored) === mb_strtolower($typed);
     }
 }

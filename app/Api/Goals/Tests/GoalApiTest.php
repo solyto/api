@@ -6,6 +6,7 @@ use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Goals\Models\Goal;
 use App\Api\Goals\Services\GoalProgressService;
+use App\Api\Goals\Services\GoalService;
 
 // Wednesday; with Monday weeks the current week is 2026-11-16 – 2026-11-22.
 beforeEach(fn () => $this->travelTo('2026-11-18 12:00:00'));
@@ -16,6 +17,19 @@ function goalPayload(int $trackerId, array $overrides = []): array
 }
 
 describe('POST /api/v1/goals', function () {
+    it('refuses another goal at the limit without blaming a field', function () {
+        $user = makeUser();
+        foreach (range(1, GoalService::MAX_GOALS) as $i) {
+            Goal::factory()->forTracker(ownTracker($user))->create();
+        }
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload(ownTracker($user)->id));
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'You have reached the maximum number of goals.')
+            ->assertJsonPath('errors', ['limit_reached']);
+    });
+
     it('creates a goal with its progress', function () {
         $user = makeUser();
         $user->settings()->update(['timezone' => 'UTC', 'week_start' => 'monday']);
@@ -54,15 +68,29 @@ describe('POST /api/v1/goals', function () {
         $user = makeUser();
         $tracker = ownTracker($user, $type);
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id, $overrides)), 422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id, $overrides));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['target']);
     })->with([
         'yes/no per day' => [CheckInTrackerType::YesNo, ['period' => 'day', 'target' => 1]],
         'more days than the week' => [CheckInTrackerType::YesNo, ['target' => 8]],
+        'more days than the month' => [CheckInTrackerType::YesNo, ['period' => 'month', 'target' => 32]],
         'part of a day' => [CheckInTrackerType::YesNo, ['target' => 2.5]],
         'scale above 5' => [CheckInTrackerType::Scale, ['target' => 6]],
         'scale below 1' => [CheckInTrackerType::Scale, ['target' => 0.5]],
         'part of a count' => [CheckInTrackerType::Count, ['target' => 1.5]],
+        'negative count' => [CheckInTrackerType::Count, ['target' => -1]],
+        'count above the maximum' => [CheckInTrackerType::Count, ['target' => CheckInTrackerType::MAX_COUNT + 1]],
     ]);
+
+    it('says which counts a count goal accepts', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/goals', goalPayload(ownTracker($user, CheckInTrackerType::Count)->id, ['target' => CheckInTrackerType::MAX_COUNT + 1]))
+            ->assertJsonPath('errors.target.0', 'The target must be a whole number from 0 to '.CheckInTrackerType::MAX_COUNT.'.');
+    });
 
     it('accepts a fractional average for 1–5 trackers', function () {
         $user = makeUser();

@@ -316,6 +316,25 @@ describe('TodoService::parse', function () {
         expect(Tag::count())->toBe(1);
     });
 
+    it('creates a tag written twice in one title once', function () {
+        $user = makeUser();
+
+        $data = app(TodoService::class)->parse($user, ['title' => 'Call #Mom and #mom']);
+
+        expect($data['tags'])->toHaveCount(1)
+            ->and(Tag::where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('reuses an existing category whatever its case', function () {
+        $user = makeUser();
+        $category = TodoCategory::factory()->forUser($user)->create(['title' => 'work']);
+
+        $data = app(TodoService::class)->parse($user, ['title' => 'Plan sprint /Work']);
+
+        expect($data['category_id'])->toBe($category->id)
+            ->and(TodoCategory::where('user_id', $user->id)->count())->toBe(1);
+    });
+
     it('extracts a /category and creates it if missing', function () {
         $user = makeUser();
 

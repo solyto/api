@@ -5,6 +5,8 @@ use App\Api\Alerts\Models\Alert;
 use App\Api\Alerts\Notifications\AlertNotification;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\Goals\Enums\GoalComparison;
+use App\Api\Goals\Enums\GoalPeriod;
 use App\Api\Goals\Models\Goal;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Facades\Notification;
@@ -298,3 +300,12 @@ it('starts an alert fresh after it or its tracker was switched off and on again'
     runAlertsOn('2026-11-20');
     Notification::assertSentToTimes($user, AlertNotification::class, 2);
 })->with(['alert', 'tracker']);
+
+it('words an at-most goal as looking back, whatever the period state says', function (GoalPeriod $period, string $when) {
+    $notification = new AlertNotification(AlertRule::GoalReached, null, 'Coffee', goalComparison: GoalComparison::AtMost, goalPeriod: $period, periodFinished: false);
+
+    expect(alertText($notification, makeUser()))->toBe(['Goal kept', "Coffee: you stayed within your goal {$when}."]);
+})->with([
+    'week' => [GoalPeriod::Week, 'last week'],
+    'month' => [GoalPeriod::Month, 'last month'],
+]);

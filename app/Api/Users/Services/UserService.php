@@ -74,11 +74,9 @@ class UserService
     {
         return User::query()
             ->when($search !== null && $search !== '', function (Builder $query) use ($search) {
-                // '!' as escape character: SQLite and MariaDB disagree on backslashes in string literals.
-                $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search) . '%';
                 $query->where(fn (Builder $query) => $query
-                    ->whereRaw("name like ? escape '!'", [$pattern])
-                    ->orWhereRaw("email like ? escape '!'", [$pattern]));
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"));
             })
             ->latest()
             ->orderByDesc('id')

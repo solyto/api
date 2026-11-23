@@ -4,6 +4,7 @@ namespace App\Dav\DTOs;
 
 use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Users\Models\User;
+use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use Illuminate\Support\Str;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Component\VEvent;
@@ -453,7 +454,10 @@ class EventDTO
      * fields applied to its master VEVENT, so the UID, VALARMs, attendees and
      * other client data survive. EXDATE, RDATE and RECURRENCE-ID exceptions
      * survive too, unless the series stops recurring or its start moves (they
-     * would no longer match). Without usable stored data this is toVCal().
+     * would no longer match). Without stored data (a new event) this is toVCal().
+     *
+     * @throws UnreadableCalendarObjectException when the stored data can't be read or has no
+     *         main event: rebuilding it would drop what other clients stored.
      */
     public function toVCalForUpdate(): string
     {
@@ -463,8 +467,8 @@ class EventDTO
 
         try {
             $vcalendar = Reader::read($this->storedData);
-        } catch (\Throwable) {
-            return $this->toVCal();
+        } catch (\Throwable $e) {
+            throw new UnreadableCalendarObjectException($e);
         }
 
         $master = null;
@@ -476,7 +480,7 @@ class EventDTO
         }
 
         if (!$vcalendar instanceof VCalendar || !$master instanceof VEvent) {
-            return $this->toVCal();
+            throw new UnreadableCalendarObjectException();
         }
 
         $dropExceptions = !$this->recurrenceRule || $this->startMovedFrom($master);

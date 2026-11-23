@@ -13,29 +13,20 @@ use App\Shared\Pulse\Cards\QueueLoad;
 use App\Shared\Pulse\Cards\RateLimits;
 use App\Shared\Pulse\Cards\ReleaseLookups;
 use App\Shared\Pulse\PulseMetrics;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
-use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pulse\Facades\Pulse;
 use Livewire\Livewire;
+use Tests\Support\PulseMetricsTestJob;
+use Tests\Support\PulseMetricsTestNotification;
 
 uses(RefreshDatabase::class);
 
-class PulseMetricsTestJob implements ShouldQueue
-{
-    use Dispatchable, Queueable;
-
-    public function handle(): void {}
-}
-
-class PulseMetricsTestNotification extends Notification {}
+covers(PulseMetrics::class);
 
 /**
  * Pulse is disabled in tests (PULSE_ENABLED=false), which stops recording;
@@ -169,12 +160,12 @@ describe('PulseMetrics', function () {
     });
 
     it('records rate limited requests per limiter and route', function () {
-        Route::middleware(['api', 'throttle:1,1'])->get('/api/pulse-metrics-test', fn () => 'ok');
+        Route::middleware(['api', 'throttle:1,1'])->get('/api/v1/pulse-metrics-test', fn () => 'ok');
 
-        $this->getJson('/api/pulse-metrics-test')->assertOk();
-        $this->getJson('/api/pulse-metrics-test')->assertStatus(429);
+        $this->getJson('/api/v1/pulse-metrics-test')->assertOk();
+        $this->getJson('/api/v1/pulse-metrics-test')->assertStatus(429);
 
-        expect(pulseEntries(PulseMetrics::RATE_LIMITED)->pluck('key')->all())->toBe(['1 · GET /api/pulse-metrics-test']);
+        expect(pulseEntries(PulseMetrics::RATE_LIMITED)->pluck('key')->all())->toBe(['1 · GET /api/v1/pulse-metrics-test']);
     });
 
     it('records release lookups and returns their result', function () {

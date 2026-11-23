@@ -11,9 +11,9 @@ use Sabre\DAV\Exception;
  */
 class UnreadableCalendarObjectException extends Exception
 {
-    public function __construct()
+    public function __construct(?\Throwable $previous = null)
     {
-        parent::__construct('The calendar object cannot be read.');
+        parent::__construct('The calendar object cannot be read.', 0, $previous);
     }
 
     public function getHTTPCode()

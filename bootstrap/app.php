@@ -7,6 +7,7 @@ use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
+use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Middleware\RecordClientVersion;
 use App\Shared\Middleware\RecordRateLimitedRequests;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -58,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
                   ExternalCalendarPreconditionFailedException::class,
                   ExternalCalendarUnavailableException::class,
                   UnreadableCalendarObjectException::class,
+                  LimitReachedException::class,
               ]);
 
               $exceptions->render(function (Throwable $e, Request $request) {
@@ -127,6 +129,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof UnreadableCalendarObjectException) {
                       return ApiResponse::error('The event cannot be read, so it cannot be changed.', 422, ['external_event_unreadable']);
+                  }
+
+                  if ($e instanceof LimitReachedException) {
+                      return ApiResponse::error($e->getMessage(), 422, ['limit_reached']);
                   }
 
                   if ($e instanceof ExternalCalendarUnavailableException) {

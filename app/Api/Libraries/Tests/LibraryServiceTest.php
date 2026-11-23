@@ -90,6 +90,27 @@ describe('LibraryRecommender', function () {
         expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBeNull();
     });
 
+    it('new() keeps only recommendations with a title and a creator', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
+        $good = ['title' => 'Children of Dune', 'creator' => 'Frank Herbert', 'genre' => 'Sci-Fi'];
+
+        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn([
+            'recommendations' => [$good, ['title' => 'No creator'], 'just a string', ['title' => 42, 'creator' => 'Someone']],
+        ]);
+
+        expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBe(['recommendations' => [$good]]);
+    });
+
+    it('new() gives no recommendations when the answer has no list of them', function () {
+        $user = makeUser();
+        LibraryBook::factory()->forUser($user)->create(['rating' => 5]);
+
+        $this->mock(AiService::class)->shouldReceive('respondStructured')->once()->andReturn(['recommendations' => 'Dune']);
+
+        expect(app(LibraryRecommender::class)->new(LibraryTypeEnum::BOOK, $user))->toBe(['recommendations' => []]);
+    });
+
     it('new() returns null without favorites', function () {
         $user = makeUser();
 

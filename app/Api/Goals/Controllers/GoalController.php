@@ -87,7 +87,7 @@ class GoalController
      *         )
      *     ),
      *
-     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     *     @OA\Response(response=422, description="Validation error (ValidationErrorResponse), or the goal limit is reached (ErrorResponse, code limit_reached)", @OA\JsonContent(oneOf={@OA\Schema(ref="#/components/schemas/ValidationErrorResponse"), @OA\Schema(ref="#/components/schemas/ErrorResponse")}))
      * )
      */
     public function store(StoreGoalRequest $request): JsonResponse

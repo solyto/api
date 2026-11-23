@@ -94,21 +94,22 @@ class AlertNotification extends BaseNotification
     }
 
     // Goals say which period they were reached in: "this week" while it runs, "last week" once it ended.
-    // At-most goals are only judged after their period, so they always look back.
     private function bodyKey(): string
     {
         if ($this->rule !== AlertRule::GoalReached) {
             return 'alert_' . $this->rule->value;
         }
 
-        $kind = $this->goalComparison === GoalComparison::AtMost ? 'kept' : 'reached';
+        $kept = $this->goalComparison === GoalComparison::AtMost;
+        // An at-most goal is only reached once its period is over, so it always looks back.
+        $lookingBack = $kept || $this->periodFinished;
         $when = match ($this->goalPeriod ?? GoalPeriod::Week) {
             GoalPeriod::Day => 'yesterday',
-            GoalPeriod::Week => $this->periodFinished ? 'last_week' : 'this_week',
-            GoalPeriod::Month => $this->periodFinished ? 'last_month' : 'this_month',
+            GoalPeriod::Week => $lookingBack ? 'last_week' : 'this_week',
+            GoalPeriod::Month => $lookingBack ? 'last_month' : 'this_month',
         };
 
-        return "alert_goal_{$kind}_{$when}";
+        return 'alert_goal_'.($kept ? 'kept' : 'reached').'_'.$when;
     }
 
     private function link(): string
