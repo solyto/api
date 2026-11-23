@@ -180,7 +180,7 @@ class CalendarService
 
     public function listWidgetEvents(User $user): array
     {
-        $today = Carbon::today($user->settings->timezone ?? 'UTC');
+        $today = Carbon::today($user->timezone());
 
         return $this->collectEvents(
             $user,
@@ -196,7 +196,7 @@ class CalendarService
      */
     public function listTodayEvents(User $user): array
     {
-        $today = Carbon::today($user->settings->timezone ?? 'UTC');
+        $today = Carbon::today($user->timezone());
 
         return $this->collectEvents(
             $user,

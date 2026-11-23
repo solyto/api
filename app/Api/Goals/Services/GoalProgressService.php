@@ -15,35 +15,33 @@ class GoalProgressService
     public const int HISTORY_PERIODS = 6;
 
     /**
-     * Progress of the current period (up to and including $today) and whether each of the
-     * previous periods was met. One values query for all goals.
-     *
-     * @param Collection<int, Goal> $goals with checkInTracker loaded
+     * @param Collection<int, Goal> $goals
      * @return array<int, array{current: float|null, met: bool, period_start: string, period_end: string, history: array<int, array{period_start: string, met: bool}>}>
      */
     public function progress(User $user, Collection $goals, ?CarbonImmutable $today = null): array
     {
-        $today ??= $this->today($user);
+        $today ??= $user->today();
         $weekStart = $user->settings?->week_start === 'sunday' ? CarbonImmutable::SUNDAY : CarbonImmutable::MONDAY;
 
         $periods = $goals->mapWithKeys(fn (Goal $goal) => [$goal->id => $this->periods($goal->period, $today, $weekStart)]);
-        $earliest = $periods->flatten(1)->min(fn (array $period) => $period[0]->toDateString());
+        $earliest = $periods->flatten(1)->min(fn (array $period) => $period['start']->toDateString());
         $values = $this->values($goals, $earliest, $today);
 
         $result = [];
         foreach ($goals as $goal) {
             $current = $periods[$goal->id][0];
             $previous = array_slice($periods[$goal->id], 1);
-            $measured = $this->measure($goal, $values[$goal->check_in_tracker_id] ?? [], $current[0], $today);
+            $goalValues = $values[$goal->check_in_tracker_id] ?? [];
+            $measured = $this->measure($goal, $goalValues, $current['start'], $today);
 
             $result[$goal->id] = [
                 'current' => $measured,
                 'met' => $this->isMet($goal, $measured),
-                'period_start' => $current[0]->toDateString(),
-                'period_end' => $current[1]->toDateString(),
+                'period_start' => $current['start']->toDateString(),
+                'period_end' => $current['end']->toDateString(),
                 'history' => array_map(fn (array $period) => [
-                    'period_start' => $period[0]->toDateString(),
-                    'met' => $this->isMet($goal, $this->measure($goal, $values[$goal->check_in_tracker_id] ?? [], $period[0], $period[1])),
+                    'period_start' => $period['start']->toDateString(),
+                    'met' => $this->isMet($goal, $this->measure($goal, $goalValues, $period['start'], $period['end'])),
                 ], $previous),
             ];
         }
@@ -51,16 +49,7 @@ class GoalProgressService
         return $result;
     }
 
-    public function today(User $user): CarbonImmutable
-    {
-        return CarbonImmutable::now($user->settings->timezone ?? 'UTC')->startOfDay();
-    }
-
-    /**
-     * What a goal counts: days with an entry for yes/no and sports, the total for counts, the average for 1–5.
-     *
-     * @param array<string, int> $values date => value
-     */
+    /** @param array<string, int> $values */
     private function measure(Goal $goal, array $values, CarbonImmutable $from, CarbonImmutable $to): ?float
     {
         $inPeriod = array_filter(
@@ -89,11 +78,7 @@ class GoalProgressService
         return $measured !== null && $goal->comparison->isMet($measured, $goal->target);
     }
 
-    /**
-     * The current period first, then the previous ones, newest first; each as [start, end].
-     *
-     * @return array<int, array{0: CarbonImmutable, 1: CarbonImmutable}>
-     */
+    /** @return array<int, array{start: CarbonImmutable, end: CarbonImmutable}> */
     private function periods(GoalPeriod $period, CarbonImmutable $today, int $weekStart): array
     {
         $start = match ($period) {
@@ -114,7 +99,7 @@ class GoalProgressService
                 GoalPeriod::Week => $periodStart->addDays(6),
                 GoalPeriod::Month => $periodStart->endOfMonth()->startOfDay(),
             };
-            $periods[] = [$periodStart, $periodEnd];
+            $periods[] = ['start' => $periodStart, 'end' => $periodEnd];
         }
 
         return $periods;
@@ -122,7 +107,7 @@ class GoalProgressService
 
     /**
      * @param Collection<int, Goal> $goals
-     * @return array<int, array<string, int>> tracker id => date => value
+     * @return array<int, array<string, int>>
      */
     private function values(Collection $goals, ?string $from, CarbonImmutable $to): array
     {

@@ -66,6 +66,11 @@ where a model is bound, calls one service method, and returns
 `ApiResponse::success(new XResource(...), 'message.'[, 201])`. No query, no
 branch on data, no loop.
 
+A read may combine a model with state a service computes for the response
+(goals with their progress, alerts with their state): the computed state is
+not part of the model, so it is passed to the resource, not stored on the
+model (`GoalController::index`).
+
 Good (`app/Api/Todos/Controllers/TodoController.php:217-224`):
 
 ```php
@@ -499,7 +504,7 @@ Check: `grep -rn 'Log::info' app` → 11 today, target 0 outside commands.
 
 ## 5. Models and queries
 
-### 5.1 A model is `$fillable`, casts, typed relations, `scopeForUser`, factory wiring — nothing else
+### 5.1 A model is `$fillable`, casts, typed relations, scopes, factory wiring — nothing else
 
 Reference `app/Api/Todos/Models/Todo.php`. All 52 models use `$fillable`
 (`$guarded`: 0). Relations declare their return type everywhere except
@@ -509,6 +514,11 @@ the first returns a query builder, which the missing type conceals).
 Business logic beyond role checks (`User::isAdmin`) and relations belongs in
 the service: `NoteCategory::getAncestors()` (`:97`) is a tree walk that
 should live in `NoteCategoryService`.
+
+A scope that names a filter on the model's own columns and relations is
+fine and gives the model a vocabulary (`scopeForUser`,
+`Alert::scopeSwitchedOff`). Anything that computes, walks, writes, or
+depends on the time or the user's settings belongs in the service.
 
 Check: `grep -rnE 'public function [a-zA-Z]+\(\)$' app/Api/*/Models` → 0.
 
@@ -655,7 +665,10 @@ short-lived non-user data only: the Spotify client token
 (`SpotifyService.php`) and WebAuthn challenges keyed by user/ip for 60 s
 (`PasskeyService.php:25,128`); the bot's `ConversationState` has its own
 store. Keys are `private const string CACHE_KEY = 'todos'` on the service
-that owns them; TTL a `private const int`. Entries that a write must drop
+that owns them; TTL a `private const int`. A key is `public` only when
+another service in the same module must drop it and can't call the owner
+without a cycle: deleting a tracker deletes its values, so
+`CheckInTrackerService` forgets `CheckInService::VALUES_CACHE_KEY`. Entries that a write must drop
 as a group are tagged (`storeTagged`/`getTagged`/`rememberTagged`/
 `forgetTagged`): every one carries `UserCacheService::userTag()`, and the
 owning service builds the tag list in one public static method that reads,
@@ -893,6 +906,13 @@ adapter; there is no shared gateway class with caller-specific methods.
 Logic that more than one caller needs lives in the owning module's service
 (`TimeTrackingService`, `TodoService`, `CheckInService`) or, when it spans
 modules, in a common `app/Shared` service such as `QuickAddService`.
+
+Exception: a module built on another module's domain may use that module's
+service, in one direction only. Goal alerts are about goals, so
+`AlertEvaluator` uses Goals' `GoalProgressService`; Goals never calls an
+Alerts service. No cycles, and no reaching into another module for
+unrelated logic. Moving a module's own logic to `app/Shared` just to satisfy
+this rule takes it away from its owner.
 
 ### 12.9 Tests
 

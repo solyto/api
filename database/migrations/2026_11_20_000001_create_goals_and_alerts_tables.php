@@ -19,7 +19,6 @@ return new class extends Migration
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->string('source', 32);
             $table->foreignId('check_in_tracker_id')->nullable()->constrained('check_in_trackers')->cascadeOnDelete();
-            $table->string('measure', 32)->nullable();
             $table->enum('period', ['day', 'week', 'month']);
             $table->enum('comparison', ['at_least', 'at_most']);
             $table->decimal('target', 12, 2);

@@ -18,7 +18,9 @@ enum CheckInBuiltInTracker: string
     case Smoking = 'smoking';
     case SocialLife = 'social_life';
 
-    public const array DEFAULT_ENABLED = ['mood', 'sports', 'water', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount'];
+    public const array DEFAULT_ENABLED = [self::Mood, self::Sports, self::Water, self::Sleep, self::Dreams, self::Work, self::FoodQuality, self::FoodAmount];
+
+    public const array DEFAULT_SPORTS = ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'];
 
     /** @return array<int, string> */
     public static function keys(): array

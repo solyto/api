@@ -228,17 +228,11 @@ function enableMcp(): void
     app('router')->getRoutes()->refreshNameLookups();
 }
 
-/**
- * A user's built-in check-in tracker (created with the user).
- */
 function builtInTracker(User $user, string $key): CheckInTracker
 {
     return CheckInTracker::forUser($user->id)->where('key', $key)->firstOrFail();
 }
 
-/**
- * A tracker of the user's own.
- */
 function ownTracker(User $user, CheckInTrackerType $type = CheckInTrackerType::YesNo): CheckInTracker
 {
     return CheckInTracker::factory()->forUser($user)->ofType($type)->create();

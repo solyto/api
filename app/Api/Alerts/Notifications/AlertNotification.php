@@ -85,12 +85,19 @@ class AlertNotification extends BaseNotification
 
     private function body(): string
     {
-        return __('notifications.' . $this->bodyKey(), [
+        $replace = [
             'tracker' => $this->trackerKey !== null ? __('widgets.tracker_' . $this->trackerKey) : $this->trackerName,
             'days' => $this->days,
             'threshold' => $this->formatNumber($this->threshold),
             'average' => $this->formatNumber($this->average),
-        ]);
+        ];
+
+        // Tracker alerts count days, so their texts have a singular and a plural.
+        if ($this->rule !== AlertRule::GoalReached) {
+            return trans_choice('notifications.' . $this->bodyKey(), $this->days, $replace);
+        }
+
+        return __('notifications.' . $this->bodyKey(), $replace);
     }
 
     // Goals say which period they were reached in: "this week" while it runs, "last week" once it ended.
@@ -109,7 +116,7 @@ class AlertNotification extends BaseNotification
             GoalPeriod::Month => $lookingBack ? 'last_month' : 'this_month',
         };
 
-        return 'alert_goal_'.($kept ? 'kept' : 'reached').'_'.$when;
+        return 'alert_goal_' . ($kept ? 'kept' : 'reached') . '_' . $when;
     }
 
     private function link(): string
@@ -119,6 +126,7 @@ class AlertNotification extends BaseNotification
 
     private function formatNumber(?float $number): string
     {
+        // Drops trailing zeros, then a trailing dot: 2.50 → 2.5, 3.00 → 3.
         return $number === null ? '' : rtrim(rtrim(number_format($number, 2, '.', ''), '0'), '.');
     }
 }

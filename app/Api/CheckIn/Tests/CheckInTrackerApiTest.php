@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\Alerts\Models\Alert;
+use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
@@ -15,7 +16,7 @@ describe('GET /api/v1/check-in/trackers', function () {
         $response = $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/trackers')
             ->assertStatus(200)
-            ->assertJsonCount(12, 'data')
+            ->assertJsonCount(count(CheckInBuiltInTracker::cases()), 'data')
             ->assertJsonPath('data.0.key', 'mood')
             ->assertJsonPath('data.0.type', 'scale')
             ->assertJsonPath('data.0.enabled', true)
@@ -47,7 +48,7 @@ describe('GET /api/v1/check-in/trackers', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/trackers')
             ->assertStatus(200)
-            ->assertJsonCount(12, 'data');
+            ->assertJsonCount(count(CheckInBuiltInTracker::cases()), 'data');
     });
 
     it('adds a newly missing built-in tracker at the end without touching the others', function () {
@@ -69,7 +70,7 @@ describe('GET /api/v1/check-in/trackers', function () {
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/trackers')
-            ->assertJsonCount(12, 'data');
+            ->assertJsonCount(count(CheckInBuiltInTracker::cases()), 'data');
     });
 });
 
@@ -97,28 +98,23 @@ describe('POST /api/v1/check-in/trackers', function () {
             ->assertJsonPath('data.icon', 'flower-2')
             ->assertJsonPath('data.enabled', true)
             ->assertJsonPath('data.scored', $scored)
-            ->assertJsonPath('data.position', 12);
+            ->assertJsonPath('data.position', count(CheckInBuiltInTracker::cases()));
     })->with([['yes_no', false], ['count', false], ['scale', true]]);
 
-    it('rejects a missing name, an unknown type, the sport type and a malformed icon', function (array $payload) {
+    it('rejects a missing or too long name, an unknown type, the sport type and a malformed icon', function (array $payload, string $field) {
         $user = makeUser();
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/check-in/trackers', $payload), 422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/check-in/trackers', $payload);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors([$field]);
     })->with([
-        'no name' => [['type' => 'yes_no']],
-        'unknown type' => [['name' => 'X', 'type' => 'percent']],
-        'sport type' => [['name' => 'X', 'type' => 'sport']],
-        'too long name' => [['name' => str_repeat('a', 51), 'type' => 'count']],
-        'bad icon' => [['name' => 'X', 'type' => 'count', 'icon' => '../evil']],
+        'no name' => [['type' => 'yes_no'], 'name'],
+        'unknown type' => [['name' => 'X', 'type' => 'percent'], 'type'],
+        'sport type' => [['name' => 'X', 'type' => 'sport'], 'type'],
+        'too long name' => [['name' => str_repeat('a', 51), 'type' => 'count'], 'name'],
+        'bad icon' => [['name' => 'X', 'type' => 'count', 'icon' => '../evil'], 'icon'],
     ]);
-
-    it('limits the number of own trackers', function () {
-        $user = makeUser();
-        CheckInTracker::factory()->forUser($user)->count(50)->create();
-
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/check-in/trackers', ['name' => 'One more', 'type' => 'count']), 422);
-    });
 });
 
 describe('PUT /api/v1/check-in/trackers/{tracker}', function () {
@@ -162,8 +158,9 @@ describe('PUT /api/v1/check-in/trackers/{tracker}', function () {
         $user = makeUser();
         $tracker = ownTracker($user, CheckInTrackerType::Count);
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson("/api/v1/check-in/trackers/{$tracker->id}", ['scored' => true]), 422);
+        $response = $this->actingAs($user, 'sanctum')->putJson("/api/v1/check-in/trackers/{$tracker->id}", ['scored' => true]);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['scored']);
 
         $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/check-in/trackers/'.builtInTracker($user, 'mood')->id, ['scored' => false])
@@ -216,7 +213,10 @@ describe('DELETE /api/v1/check-in/trackers/{tracker}', function () {
         $user = makeUser();
         $mood = builtInTracker($user, 'mood');
 
-        expectApiError($this->actingAs($user, 'sanctum')->deleteJson("/api/v1/check-in/trackers/{$mood->id}"), 422);
+        $response = $this->actingAs($user, 'sanctum')->deleteJson("/api/v1/check-in/trackers/{$mood->id}");
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'Built-in trackers can only be disabled.')->assertJsonMissingPath('errors');
         expect($mood->fresh())->not->toBeNull();
     });
 
@@ -243,7 +243,7 @@ describe('PUT /api/v1/check-in/trackers/order', function () {
             ->assertJsonPath('data.1.key', 'mood');
     });
 
-    it('rejects an order that leaves out, repeats or adds a tracker', function (string $case) {
+    it('rejects an order that leaves out, repeats or adds a tracker', function (string $case, string $field) {
         $user = makeUser();
         $ids = CheckInTracker::forUser($user->id)->pluck('id')->all();
         $foreign = ownTracker(makeUser())->id;
@@ -254,6 +254,9 @@ describe('PUT /api/v1/check-in/trackers/order', function () {
             'foreign' => [...$ids, $foreign],
         };
 
-        expectApiError($this->actingAs($user, 'sanctum')->putJson('/api/v1/check-in/trackers/order', ['ids' => $payload]), 422);
-    })->with(['missing', 'repeated', 'foreign']);
+        $response = $this->actingAs($user, 'sanctum')->putJson('/api/v1/check-in/trackers/order', ['ids' => $payload]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors([$field]);
+    })->with([['missing', 'ids'], ['repeated', 'ids.0'], ['foreign', 'ids']]);
 });

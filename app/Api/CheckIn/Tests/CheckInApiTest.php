@@ -1,6 +1,7 @@
 <?php
 
 use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\CheckIn\Services\CheckInService;
 
 describe('GET /api/v1/check-in', function () {
@@ -81,20 +82,19 @@ describe('POST /api/v1/check-in', function () {
     });
 
     it('rejects a missing date', function () {
-        $user = makeUser();
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/check-in', ['mood' => 3]);
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/check-in', ['mood' => 3])
-            ->assertStatus(422);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['date']);
     });
 });
 
 describe('GET /api/v1/check-in/marks', function () {
     it('returns check-in dates within the range', function () {
         $user = makeUser();
-        app(CheckInService::class)->saveDay($user, '2026-10-06', ['mood' => 3]);
-        app(CheckInService::class)->saveDay($user, '2026-10-08', ['water' => 2]);
-        app(CheckInService::class)->saveDay($user, '2026-11-01', ['mood' => 5]);
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'mood'))->on('2026-10-06', 3)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'water'))->on('2026-10-08', 2)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'mood'))->on('2026-11-01', 5)->create();
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
@@ -106,7 +106,7 @@ describe('GET /api/v1/check-in/marks', function () {
     it('scopes marks to the authenticated user', function () {
         $user = makeUser();
         $other = makeUser();
-        app(CheckInService::class)->saveDay($other, '2026-10-06', ['mood' => 3]);
+        CheckInValue::factory()->forTracker(builtInTracker($other, 'mood'))->on('2026-10-06', 3)->create();
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-10-31')
@@ -114,28 +114,28 @@ describe('GET /api/v1/check-in/marks', function () {
             ->assertJsonPath('data', []);
     });
 
-    it('rejects a missing or malformed range', function () {
-        $user = makeUser();
+    it('rejects a missing or malformed range', function (string $query, array $fields) {
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson("/api/v1/check-in/marks{$query}");
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/check-in/marks')
-            ->assertStatus(422);
-
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/check-in/marks?from=2026-10-01&to=2026-09-01')
-            ->assertStatus(422);
-
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/check-in/marks?from=01.10.2026&to=31.10.2026')
-            ->assertStatus(422);
-    });
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors($fields);
+    })->with([
+        'no range' => ['', ['from', 'to']],
+        'to before from' => ['?from=2026-10-01&to=2026-09-01', ['to']],
+        'wrong date format' => ['?from=01.10.2026&to=31.10.2026', ['from', 'to']],
+    ]);
 
     it('rejects a range longer than 366 days', function () {
-        $user = makeUser();
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/check-in/marks?from=2025-01-01&to=2026-10-01');
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/check-in/marks?from=2025-01-01&to=2026-10-01')
-            ->assertStatus(422);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['to' => 'The date range must not exceed 366 days.']);
+    });
+
+    it('accepts a range of exactly 366 days', function () {
+        $this->actingAs(makeUser(), 'sanctum')
+            ->getJson('/api/v1/check-in/marks?from=2025-10-01&to=2026-10-02')
+            ->assertOk();
     });
 });
 

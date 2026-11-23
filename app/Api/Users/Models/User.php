@@ -4,6 +4,7 @@ namespace App\Api\Users\Models;
 
 use App\Api\Telegram\Models\TelegramBotConnection;
 use App\Api\Users\Factories\UserFactory;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -72,6 +73,16 @@ class User extends Authenticatable
     public function isSuperAdmin(): bool
     {
         return $this->role === 'super_admin';
+    }
+
+    public function timezone(): string
+    {
+        return $this->settings->timezone ?? 'UTC';
+    }
+
+    public function today(): CarbonImmutable
+    {
+        return CarbonImmutable::now($this->timezone())->startOfDay();
     }
 
     /** @return HasOne<UserProfile, $this> */

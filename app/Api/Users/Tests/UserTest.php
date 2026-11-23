@@ -313,3 +313,30 @@ describe('VerificationToken Model', function () {
         expect($token->user)->not()->toBeNull();
     });
 });
+
+describe('User timezone', function () {
+    it('uses the timezone from the settings', function () {
+        $user = makeUser();
+        UserSettings::updateOrCreate(['user_id' => $user->id], ['timezone' => 'Asia/Tokyo']);
+
+        expect($user->fresh()->timezone())->toBe('Asia/Tokyo');
+    });
+
+    it('falls back to UTC without settings', function () {
+        $user = makeUser();
+        UserSettings::where('user_id', $user->id)->delete();
+
+        expect($user->fresh()->timezone())->toBe('UTC');
+    });
+
+    it('starts today at midnight in the user\'s timezone', function () {
+        $this->travelTo('2026-11-23 20:00:00');
+        $user = makeUser();
+        UserSettings::updateOrCreate(['user_id' => $user->id], ['timezone' => 'Asia/Tokyo']);
+
+        $today = $user->fresh()->today();
+
+        expect($today->toDateTimeString())->toBe('2026-11-24 00:00:00')
+            ->and($today->timezoneName)->toBe('Asia/Tokyo');
+    });
+});

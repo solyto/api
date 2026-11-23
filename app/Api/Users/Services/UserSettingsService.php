@@ -2,7 +2,7 @@
 
 namespace App\Api\Users\Services;
 
-use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
@@ -120,7 +120,7 @@ class UserSettingsService
 
         return [
             'enabled_trackers' => $this->checkInTrackers->enabledBuiltInKeys($user),
-            'selected_sports' => $settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS,
+            'selected_sports' => $settings->check_in_settings['selected_sports'] ?? CheckInBuiltInTracker::DEFAULT_SPORTS,
         ];
     }
 

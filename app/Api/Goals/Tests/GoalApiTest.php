@@ -106,15 +106,21 @@ describe('POST /api/v1/goals', function () {
         $tracker = ownTracker($user);
         Goal::factory()->forTracker($tracker)->create();
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id, ['period' => 'month'])), 422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id, ['period' => 'month']));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['check_in_tracker_id']);
         expect(Goal::count())->toBe(1);
     });
 
-        it('rejects another user\'s tracker', function () {
+    it('rejects another user\'s tracker', function () {
         $user = makeUser();
         $tracker = ownTracker(makeUser());
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id)), 422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/goals', goalPayload($tracker->id));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['check_in_tracker_id']);
         expect(Goal::count())->toBe(0);
     });
 });
@@ -129,6 +135,18 @@ describe('GET /api/v1/goals', function () {
             ->getJson('/api/v1/goals')
             ->assertStatus(200)
             ->assertJsonCount(1, 'data');
+    });
+
+    it('tells for each goal whether it notifies when reached', function () {
+        $user = makeUser();
+        $notifying = Goal::factory()->forTracker(ownTracker($user))->create();
+        Alert::factory()->forGoal($notifying)->create();
+        Goal::factory()->forTracker(ownTracker($user))->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/goals')
+            ->assertJsonPath('data.0.notify_when_reached', true)
+            ->assertJsonPath('data.1.notify_when_reached', false);
     });
 
     it('measures each tracker type its own way', function (CheckInTrackerType $type, array $values, float $target, ?int $current, bool $met) {
@@ -188,7 +206,6 @@ describe('PUT /api/v1/goals/{goal}', function () {
             ->assertJsonPath('data.notify_when_reached', true);
         expect($goal->reachedAlert()->count())->toBe(1);
 
-        // Switching on twice keeps one alert.
         $this->actingAs($user, 'sanctum')->putJson("/api/v1/goals/{$goal->id}", ['notify_when_reached' => true])->assertStatus(200);
         expect($goal->reachedAlert()->count())->toBe(1);
 
@@ -202,7 +219,10 @@ describe('PUT /api/v1/goals/{goal}', function () {
         $user = makeUser();
         $goal = Goal::factory()->forTracker(ownTracker($user))->create(['period' => 'month', 'target' => 20]);
 
-        expectApiError($this->actingAs($user, 'sanctum')->putJson("/api/v1/goals/{$goal->id}", ['period' => 'week']), 422);
+        $response = $this->actingAs($user, 'sanctum')->putJson("/api/v1/goals/{$goal->id}", ['period' => 'week']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['target']);
     });
 
     it('forbids updating another user\'s goal', function () {

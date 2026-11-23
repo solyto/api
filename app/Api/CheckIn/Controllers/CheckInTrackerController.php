@@ -194,10 +194,6 @@ class CheckInTrackerController
     {
         abort_unless($this->isResourceOwner($request, $tracker), 403);
 
-        if ($this->trackerService->isBuiltIn($tracker)) {
-            return ApiResponse::error('Built-in trackers can only be disabled.', 422);
-        }
-
         $this->trackerService->delete($tracker);
 
         return ApiResponse::success(null, 'Tracker deleted successfully.');

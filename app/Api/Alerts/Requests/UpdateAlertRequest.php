@@ -12,7 +12,7 @@ class UpdateAlertRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rule' => ['sometimes', Rule::in([AlertRule::AverageBelow->value, AlertRule::AverageAbove->value, AlertRule::NoEntryDays->value, AlertRule::EntryDays->value])],
+            'rule' => ['sometimes', Rule::enum(AlertRule::class)->except(AlertRule::GoalReached)],
             'threshold' => 'sometimes|nullable|numeric|min:0|max:1000000',
             'days' => 'sometimes|integer|min:1|max:'.AlertEvaluator::MAX_DAYS,
             'enabled' => 'sometimes|boolean',

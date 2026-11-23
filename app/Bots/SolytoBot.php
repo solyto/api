@@ -95,7 +95,7 @@ class SolytoBot implements BotInterface
             return;
         }
 
-        $timezone = $this->user->settings->timezone ?? 'UTC';
+        $timezone = $this->user->timezone();
         $todos = $this->todoService->due($this->user, today($timezone)->toDateString());
         $appointments = collect($this->calendarService->listTodayEvents($this->user));
 

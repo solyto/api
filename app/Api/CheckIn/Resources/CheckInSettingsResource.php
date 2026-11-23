@@ -15,8 +15,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class CheckInSettingsResource extends JsonResource
 {
-    public const DEFAULT_SPORTS = ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'];
-
     /**
      * @return array<string, mixed>
      */

@@ -46,24 +46,31 @@ describe('POST /api/v1/alerts', function () {
             ->assertJsonPath('data.state.active', true);
     });
 
-    it('rejects a rule the tracker type does not offer', function (CheckInTrackerType $type, array $overrides) {
+    it('rejects a rule the tracker type does not offer', function (CheckInTrackerType $type, array $overrides, string $field) {
         $user = makeUser();
         $tracker = ownTracker($user, $type);
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/alerts', alertPayload($tracker->id, $overrides)), 422);
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/alerts', alertPayload($tracker->id, $overrides));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors([$field]);
         expect(Alert::count())->toBe(0);
     })->with([
-        'streak on 1–5' => [CheckInTrackerType::Scale, ['rule' => 'no_entry_days']],
-        'average on yes/no' => [CheckInTrackerType::YesNo, ['rule' => 'average_below', 'threshold' => 1]],
-        'average without threshold' => [CheckInTrackerType::Count, ['rule' => 'average_above']],
-        'more than 90 days' => [CheckInTrackerType::YesNo, ['days' => 91]],
-        'a goal rule' => [CheckInTrackerType::YesNo, ['rule' => 'goal_reached']],
+        'streak on 1–5' => [CheckInTrackerType::Scale, ['rule' => 'no_entry_days'], 'rule'],
+        'average on yes/no' => [CheckInTrackerType::YesNo, ['rule' => 'average_below', 'threshold' => 1], 'rule'],
+        'average without threshold' => [CheckInTrackerType::Count, ['rule' => 'average_above'], 'threshold'],
+        'more than 90 days' => [CheckInTrackerType::YesNo, ['days' => 91], 'days'],
+        'a goal rule' => [CheckInTrackerType::YesNo, ['rule' => 'goal_reached'], 'rule'],
+        'an unknown rule' => [CheckInTrackerType::YesNo, ['rule' => 'every_full_moon'], 'rule'],
     ]);
 
     it('rejects another user\'s tracker', function () {
         $tracker = ownTracker(makeUser());
 
-        expectApiError($this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/alerts', alertPayload($tracker->id)), 422);
+        $response = $this->actingAs(makeUser(), 'sanctum')->postJson('/api/v1/alerts', alertPayload($tracker->id));
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['check_in_tracker_id']);
     });
 });
 
@@ -83,9 +90,65 @@ describe('GET /api/v1/alerts', function () {
             ->assertJsonPath('data.1.goal_id', $goal->id)
             ->assertJsonPath('data.1.check_in_tracker_id', $tracker->id);
     });
+
+    it('returns the same fields for tracker and goal alerts when listed and when changed', function () {
+        $user = makeUser();
+        $tracker = ownTracker($user);
+        $trackerAlert = Alert::factory()->forTracker($tracker)->create();
+        $goal = Goal::factory()->forTracker($tracker)->create();
+        $goalAlert = Alert::factory()->forGoal($goal)->create();
+        $goalAlertData = [
+            'id' => $goalAlert->id,
+            'source' => 'goal',
+            'check_in_tracker_id' => $tracker->id,
+            'goal_id' => $goal->id,
+            'rule' => 'goal_reached',
+            'threshold' => null,
+            'days' => null,
+            'enabled' => true,
+            'suggestion' => null,
+            'last_triggered_on' => null,
+            'state' => ['active' => false, 'average' => null, 'streak' => null, 'last_entry' => null],
+        ];
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/alerts')
+            ->assertJsonPath('data', [
+                [
+                    'id' => $trackerAlert->id,
+                    'source' => 'check_in_tracker',
+                    'check_in_tracker_id' => $tracker->id,
+                    'goal_id' => null,
+                    'rule' => 'no_entry_days',
+                    'threshold' => null,
+                    'days' => 7,
+                    'enabled' => true,
+                    'suggestion' => null,
+                    'last_triggered_on' => null,
+                    'state' => ['active' => false, 'average' => null, 'streak' => 0, 'last_entry' => null],
+                ],
+                $goalAlertData,
+            ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson("/api/v1/alerts/{$goalAlert->id}", ['enabled' => false])
+            ->assertJsonPath('data', [...$goalAlertData, 'enabled' => false]);
+    });
 });
 
 describe('PUT /api/v1/alerts/{alert}', function () {
+    it('refuses a rule a tracker alert cannot have', function (string $rule) {
+        $user = makeUser();
+        $alert = Alert::factory()->forTracker(ownTracker($user, CheckInTrackerType::Count))
+            ->rule(AlertRule::AverageBelow, 5)->create();
+
+        $response = $this->actingAs($user, 'sanctum')->putJson("/api/v1/alerts/{$alert->id}", ['rule' => $rule]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['rule']);
+        expect($alert->fresh()->rule)->toBe(AlertRule::AverageBelow);
+    })->with(['goal_reached', 'every_full_moon']);
+
     it('starts a changed rule fresh', function () {
         $user = makeUser();
         $alert = Alert::factory()->forTracker(ownTracker($user, CheckInTrackerType::Count))
@@ -129,6 +192,7 @@ describe('DELETE /api/v1/alerts/{alert}', function () {
 
         $this->actingAs($user, 'sanctum')->deleteJson("/api/v1/alerts/{$alert->id}")->assertStatus(200);
 
+        expect(Alert::find($alert->id))->toBeNull();
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/goals')
             ->assertJsonPath('data.0.notify_when_reached', false);
@@ -159,8 +223,12 @@ describe('Alert suggestions', function () {
         $keys = collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/alerts/suggestions')->json('data'))->pluck('key');
         expect($keys->all())->not->toContain('no_sport_week');
 
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/alerts/suggestions/no_sport_week'), 422);
-        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/alerts/suggestions/unknown'), 422);
+        foreach (['no_sport_week', 'unknown'] as $key) {
+            $response = $this->actingAs($user, 'sanctum')->postJson("/api/v1/alerts/suggestions/{$key}");
+
+            expectApiError($response, 422);
+            $response->assertJsonValidationErrors(['suggestion']);
+        }
         expect(Alert::forUser($user->id)->count())->toBe(1);
     });
 });

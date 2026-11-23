@@ -4,17 +4,16 @@ namespace App\Api\CheckIn\Controllers;
 
 use App\Api\ApiResponse;
 use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\CheckIn\Requests\ListCheckInMarksRequest;
 use App\Api\CheckIn\Requests\ListCheckInValuesRequest;
 use App\Api\CheckIn\Requests\SetCheckInValueRequest;
 use App\Api\CheckIn\Requests\StoreCheckInRequest;
 use App\Api\CheckIn\Resources\CheckInResource;
 use App\Api\CheckIn\Resources\CheckInValueResource;
 use App\Api\CheckIn\Services\CheckInService;
-use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class CheckInController
 {
@@ -72,21 +71,10 @@ class CheckInController
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function marks(Request $request): JsonResponse
+    public function marks(ListCheckInMarksRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from' => 'required|date_format:Y-m-d',
-            'to' => 'required|date_format:Y-m-d|after_or_equal:from',
-        ]);
-
-        if (Carbon::parse($validated['from'])->diffInDays(Carbon::parse($validated['to'])) > 366) {
-            throw ValidationException::withMessages([
-                'to' => 'The date range must not exceed 366 days.',
-            ]);
-        }
-
         return ApiResponse::success(
-            $this->checkInService->marks($request->user(), $validated['from'], $validated['to']),
+            $this->checkInService->marks($request->user(), $request->validated('from'), $request->validated('to')),
             'Check-in marks retrieved successfully.'
         );
     }
@@ -177,8 +165,10 @@ class CheckInController
      */
     public function values(ListCheckInValuesRequest $request): JsonResponse
     {
+        $values = $this->checkInService->values($request->user(), $request->validated('from'), $request->validated('to'));
+
         return ApiResponse::success(
-            CheckInValueResource::collection($this->checkInService->values($request->user(), $request->validated('from'), $request->validated('to'))),
+            CheckInValueResource::collection($values),
             'Check-in values retrieved successfully.'
         );
     }

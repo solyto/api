@@ -24,6 +24,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *         property="state",
  *         type="object",
  *         description="What the rule sees now, on completed days (up to yesterday).",
+ *
  *         @OA\Property(property="active", type="boolean"),
  *         @OA\Property(property="average", type="number", nullable=true),
  *         @OA\Property(property="streak", type="integer", nullable=true),
@@ -49,7 +50,7 @@ class AlertResource extends JsonResource
         return [
             'id' => $this->id,
             'source' => $this->source->value,
-            'check_in_tracker_id' => $this->check_in_tracker_id ?? $this->goal?->check_in_tracker_id,
+            'check_in_tracker_id' => $this->check_in_tracker_id ?? $this->whenLoaded('goal', fn () => $this->goal->check_in_tracker_id),
             'goal_id' => $this->goal_id,
             'rule' => $this->rule->value,
             'threshold' => $this->threshold,

@@ -4,6 +4,7 @@ namespace App\Api\CheckIn\Services;
 
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
+use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
@@ -40,19 +41,22 @@ class CheckInTrackerService
             return;
         }
 
-        $nextPosition = $existing === [] ? 0 : $this->nextPosition($user);
+        $hasNone = $existing === [];
+        $nextPosition = $hasNone ? 0 : $this->nextPosition($user);
 
         foreach (CheckInBuiltInTracker::cases() as $builtIn) {
             if (! in_array($builtIn->value, $missing, true)) {
                 continue;
             }
 
+            $position = $hasNone ? $builtIn->position() : $nextPosition++;
+
             CheckInTracker::firstOrCreate(
                 ['user_id' => $user->id, 'key' => $builtIn->value],
                 [
                     'type' => $builtIn->type(),
-                    'position' => $existing === [] ? $builtIn->position() : $nextPosition++,
-                    'enabled' => in_array($builtIn->value, CheckInBuiltInTracker::DEFAULT_ENABLED, true),
+                    'position' => $position,
+                    'enabled' => in_array($builtIn, CheckInBuiltInTracker::DEFAULT_ENABLED, true),
                     'scored' => $builtIn->type() === CheckInTrackerType::Scale,
                 ]
             );
@@ -100,13 +104,12 @@ class CheckInTrackerService
         return $tracker->fresh();
     }
 
-    public function isBuiltIn(CheckInTracker $tracker): bool
-    {
-        return $tracker->key !== null;
-    }
-
     public function delete(CheckInTracker $tracker): void
     {
+        if ($tracker->key !== null) {
+            throw new BuiltInTrackerException('Built-in trackers can only be disabled.');
+        }
+
         $tracker->delete();
 
         // The tracker's values go with it (cascade), so the cached value list is stale now.
@@ -123,22 +126,19 @@ class CheckInTrackerService
             throw ValidationException::withMessages(['ids' => 'The order must list each of your trackers exactly once.']);
         }
 
-        DB::transaction(function () use ($ids) {
+        DB::transaction(function () use ($user, $ids) {
             foreach (array_values($ids) as $position => $id) {
-                CheckInTracker::whereKey($id)->update(['position' => $position]);
+                CheckInTracker::forUser($user->id)->whereKey($id)->update(['position' => $position]);
             }
         });
 
         return $this->list($user);
     }
 
-    /**
-     * Applies the on/off list of an app that only knows the built-in trackers.
-     *
-     * @param array<int, string> $enabledKeys
-     */
+    /** @param array<int, string> $enabledKeys */
     public function setEnabledBuiltIns(User $user, array $enabledKeys): void
     {
+        // The on/off list of an app that only knows the built-in trackers.
         $this->provisionBuiltIns($user);
 
         foreach (CheckInBuiltInTracker::keys() as $key) {

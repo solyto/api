@@ -17,14 +17,10 @@ enum AlertRule: string
         return $this === self::AverageBelow || $this === self::AverageAbove;
     }
 
-    /**
-     * Streaks count entries, not values: for 1–5 trackers an entry includes "none" ratings,
-     * so they only get averages.
-     *
-     * @return array<int, self>
-     */
+    /** @return array<int, self> */
     public static function forTrackerType(CheckInTrackerType $type): array
     {
+        // Streaks count entries, and a 1–5 entry can be a "none" rating, so 1–5 trackers only get averages.
         return match ($type) {
             CheckInTrackerType::Scale => [self::AverageBelow, self::AverageAbove],
             CheckInTrackerType::Count => [self::AverageBelow, self::AverageAbove, self::NoEntryDays, self::EntryDays],

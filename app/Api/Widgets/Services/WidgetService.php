@@ -3,7 +3,7 @@
 namespace App\Api\Widgets\Services;
 
 use App\Api\Calendars\Services\CalendarService;
-use App\Api\CheckIn\Resources\CheckInSettingsResource;
+use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
@@ -38,7 +38,7 @@ class WidgetService
 
     public function yourDay(User $user): array
     {
-        $timezone = $user->settings->timezone ?? 'UTC';
+        $timezone = $user->timezone();
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
         $timeFormat = in_array($user->settings?->time_format, self::TIME_FORMATS, true) ? $user->settings->time_format : self::DEFAULT_TIME_FORMAT;
         $dateFormat = $user->settings?->date_format ?: self::DEFAULT_DATE_FORMAT;
@@ -107,7 +107,7 @@ class WidgetService
 
     public function timeTracking(User $user): array
     {
-        $timezone = $user->settings->timezone ?? 'UTC';
+        $timezone = $user->timezone();
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
 
         $running = $this->timeTrackingService->runningEntry($user);
@@ -154,9 +154,9 @@ class WidgetService
 
     public function checkIn(User $user): array
     {
-        $timezone = $user->settings->timezone ?? 'UTC';
+        $timezone = $user->timezone();
         $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
-        $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInSettingsResource::DEFAULT_SPORTS;
+        $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInBuiltInTracker::DEFAULT_SPORTS;
 
         $now = CarbonImmutable::now($timezone);
         $today = $now->startOfDay();
@@ -180,7 +180,7 @@ class WidgetService
 
     public function setCheckIn(User $user, string $tracker, ?int $value): void
     {
-        $this->checkInService->setBuiltInValue($user, CarbonImmutable::now($user->settings->timezone ?? 'UTC')->toDateString(), $tracker, $value);
+        $this->checkInService->setBuiltInValue($user, CarbonImmutable::now($user->timezone())->toDateString(), $tracker, $value);
     }
 
     private function checkInRow(string $tracker, ?int $value, array $selectedSports, string $locale): array

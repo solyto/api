@@ -7,17 +7,15 @@ use App\Api\Alerts\Enums\AlertSource;
 use App\Api\Alerts\Models\Alert;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
-use Carbon\CarbonImmutable;
+use App\Shared\Exceptions\LimitReachedException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use App\Shared\Exceptions\LimitReachedException;
 use Illuminate\Validation\ValidationException;
 
 class AlertService
 {
     public const int MAX_ALERTS = 50;
 
-    /** Ready-made alerts on built-in trackers, switched on with one tap. */
     public const array SUGGESTIONS = [
         'no_sport_week' => ['tracker' => 'sports', 'rule' => AlertRule::NoEntryDays, 'threshold' => null, 'days' => 7],
         'mood_trending_down' => ['tracker' => 'mood', 'rule' => AlertRule::AverageBelow, 'threshold' => 3, 'days' => 7],
@@ -25,13 +23,15 @@ class AlertService
         'drinking_more' => ['tracker' => 'alcohol', 'rule' => AlertRule::AverageBelow, 'threshold' => 4, 'days' => 7],
     ];
 
+    private const array RELATIONS = ['checkInTracker', 'goal.checkInTracker', 'user.settings'];
+
     public function __construct(private readonly AlertEvaluator $evaluator) {}
 
     /** @return Collection<int, Alert> */
     public function list(User $user): Collection
     {
         return Alert::forUser($user->id)
-            ->with(['checkInTracker', 'goal.checkInTracker', 'user.settings'])
+            ->with(self::RELATIONS)
             ->orderBy('id')
             ->get();
     }
@@ -46,7 +46,7 @@ class AlertService
             return [];
         }
 
-        $states = $this->evaluator->evaluate($alerts, [$user->id => $this->today($user)]);
+        $states = $this->evaluator->evaluate($alerts, [$user->id => $user->today()]);
 
         // Which goal period was judged only matters for sending notifications; the API's state doesn't show it.
         return array_map(fn (array $state) => Arr::except($state, ['period_start', 'period_finished']), $states);
@@ -75,7 +75,7 @@ class AlertService
     public function update(Alert $alert, array $data): Alert
     {
         if ($alert->rule === AlertRule::GoalReached) {
-            $alert->update(array_intersect_key($data, array_flip(['enabled'])));
+            $alert->update(Arr::only($data, ['enabled']));
 
             return $this->load($alert);
         }
@@ -84,12 +84,14 @@ class AlertService
         $threshold = array_key_exists('threshold', $data) ? $data['threshold'] : $alert->threshold;
         $this->validateRule($alert->checkInTracker, $rule, $threshold);
 
+        // A changed rule starts fresh: it may alert again right away if it already holds.
+        $ruleUnchanged = $rule === $alert->rule && $this->sameNumber($threshold, $alert->threshold);
+
         $alert->update([
-            ...array_intersect_key($data, array_flip(['days', 'enabled'])),
+            ...Arr::only($data, ['days', 'enabled']),
             'rule' => $rule,
             'threshold' => $rule->isAverage() ? $threshold : null,
-            // A changed rule starts fresh: it may alert again right away if it already holds.
-            'is_triggered' => $rule === $alert->rule && $this->sameNumber($threshold, $alert->threshold) ? $alert->is_triggered : false,
+            'is_triggered' => $ruleUnchanged ? $alert->is_triggered : false,
         ]);
 
         return $this->load($alert);
@@ -100,11 +102,6 @@ class AlertService
         $alert->delete();
     }
 
-    /**
-     * Suggestions whose tracker is switched on and that the user hasn't taken yet.
-     *
-     * @return array<int, array{key: string, check_in_tracker_id: int, rule: string, threshold: float|null, days: int}>
-     */
     public function suggestions(User $user): array
     {
         $taken = Alert::forUser($user->id)->whereNotNull('suggestion')->pluck('suggestion')->all();
@@ -151,19 +148,18 @@ class AlertService
         return $this->load($alert);
     }
 
-    private function today(User $user): CarbonImmutable
-    {
-        return CarbonImmutable::now($user->settings->timezone ?? 'UTC')->startOfDay();
-    }
-
     private function load(Alert $alert): Alert
     {
-        return $alert->fresh(['checkInTracker', 'goal.checkInTracker', 'user.settings']);
+        return $alert->fresh(self::RELATIONS);
     }
 
     private function sameNumber(int|float|null $a, int|float|null $b): bool
     {
-        return $a === null || $b === null ? $a === $b : (float) $a === (float) $b;
+        if ($a === null || $b === null) {
+            return $a === $b;
+        }
+
+        return (float) $a === (float) $b;
     }
 
     private function guardLimit(User $user): void

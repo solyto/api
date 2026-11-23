@@ -2,6 +2,7 @@
 
 use App\Api\ApiResponse;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
+use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
@@ -53,13 +54,14 @@ return Application::configure(basePath: dirname(__DIR__))
               __DIR__.'/../app/Plugins/Ai/Commands',
           ])
           ->withExceptions(function ($exceptions) {
-              // RemoteCalDavClient and AppCalendarsPDO already log these; a user's server being down, storing bad data or refusing the login is not an app error.
+              // RemoteCalDavClient and AppCalendarsPDO already log the calendar ones; none of these is an app error.
               $exceptions->dontReport([
                   ExternalCalendarDiscoveryException::class,
                   ExternalCalendarPreconditionFailedException::class,
                   ExternalCalendarUnavailableException::class,
                   UnreadableCalendarObjectException::class,
                   LimitReachedException::class,
+                  BuiltInTrackerException::class,
               ]);
 
               $exceptions->render(function (Throwable $e, Request $request) {
@@ -129,6 +131,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof UnreadableCalendarObjectException) {
                       return ApiResponse::error('The event cannot be read, so it cannot be changed.', 422, ['external_event_unreadable']);
+                  }
+
+                  if ($e instanceof BuiltInTrackerException) {
+                      return ApiResponse::error($e->getMessage(), 422);
                   }
 
                   if ($e instanceof LimitReachedException) {

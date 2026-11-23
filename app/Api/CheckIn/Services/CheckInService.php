@@ -26,10 +26,7 @@ class CheckInService
         private readonly CheckInTrackerService $trackers,
     ) {}
 
-    /**
-     * The built-in trackers as one row per day, the shape apps before the tracker tables read.
-     * It reads the `check_in` table, which every write below keeps in step with the values.
-     */
+    // The old one-row-per-day table, for apps before the tracker tables; every write keeps it in step.
     public function list(User $user): Collection
     {
         return $this->cache->remember(
@@ -60,16 +57,11 @@ class CheckInService
         );
 
         return $values
-            ->filter(fn (CheckInValue $value) => ($from === null || $value->date->format('Y-m-d') >= $from)
-                && ($to === null || $value->date->format('Y-m-d') <= $to))
+            ->filter(fn (CheckInValue $value) => $this->isWithin($value->date->format('Y-m-d'), $from, $to))
             ->values();
     }
 
-    /**
-     * Built-in values on one day, keyed by tracker key.
-     *
-     * @return array<string, int>
-     */
+    /** @return array<string, int> */
     public function builtInValuesOn(User $user, string $date): array
     {
         return CheckInValue::query()
@@ -82,11 +74,7 @@ class CheckInService
             ->all();
     }
 
-    /**
-     * Dates (Y-m-d) within [$from, $to] that the user has any check-in value for.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function marks(User $user, string $from, string $to): array
     {
         return CheckInValue::whereIn('check_in_tracker_id', CheckInTracker::forUser($user->id)->select('id'))
@@ -128,13 +116,10 @@ class CheckInService
         return $stored;
     }
 
-    /**
-     * Saves a day the way apps before the tracker tables send it: built-in tracker keys as fields.
-     *
-     * @param array<string, int|null> $data
-     */
+    /** @param array<string, int|null> $data */
     public function saveDay(User $user, string $date, array $data): CheckIn
     {
+        // $data is a day the way apps before the tracker tables send it: built-in tracker keys as fields.
         $date = Carbon::parse($date)->toDateString();
         $trackers = $this->trackers->list($user)->whereNotNull('key')->keyBy('key');
 
@@ -154,6 +139,14 @@ class CheckInService
         if ($tracker) {
             $this->setValue($user, $tracker, $date, $value);
         }
+    }
+
+    private function isWithin(string $date, ?string $from, ?string $to): bool
+    {
+        $afterFrom = $from === null || $date >= $from;
+        $beforeTo = $to === null || $date <= $to;
+
+        return $afterFrom && $beforeTo;
     }
 
     // Apps before the tracker tables got a row back even for a day saved without values.

@@ -26,7 +26,7 @@ class ListUpcomingEvents extends SolytoTool
         $days = (int) ($request->validate(['days' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_DAYS]])['days'] ?? self::DEFAULT_DAYS);
         $user = $this->user($request);
 
-        $from = Carbon::today($user->settings->timezone ?? 'UTC');
+        $from = Carbon::today($user->timezone());
         $until = $from->copy()->addDays($days);
 
         // listEvents covers the month three months either side, so the current month's listing spans the whole window.

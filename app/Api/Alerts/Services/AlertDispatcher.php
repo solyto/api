@@ -5,6 +5,7 @@ namespace App\Api\Alerts\Services;
 use App\Api\Alerts\Enums\AlertRule;
 use App\Api\Alerts\Models\Alert;
 use App\Api\Alerts\Notifications\AlertNotification;
+use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
 use Carbon\CarbonImmutable;
@@ -12,9 +13,9 @@ use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
-// Runs every hour; each run only looks at users whose local time has just reached CHECK_HOUR.
 class AlertDispatcher
 {
+    // Runs every hour and only checks users whose local time has just reached CHECK_HOUR.
     public const int CHECK_HOUR = 9;
 
     private const int CHUNK = 500;
@@ -44,7 +45,7 @@ class AlertDispatcher
         );
     }
 
-    // For testing: checks one user's alerts now, whatever their local time.
+    // Ignores CHECK_HOUR, for the command's --user option.
     public function sendForUser(User $user, ?CarbonImmutable $now = null): int
     {
         return $this->send(Alert::forUser($user->id), $now ?? CarbonImmutable::now());
@@ -66,14 +67,10 @@ class AlertDispatcher
         return $sent;
     }
 
-    /**
-     * A switched-off alert (or one whose tracker is off) isn't checked, so it can't see its rule stop
-     * holding. Forgetting that it notified lets it start fresh once it's switched on again.
-     *
-     * @param Builder<Alert> $query
-     */
+    /** @param Builder<Alert> $query */
     private function restartSwitchedOffAlerts(Builder $query): void
     {
+        // An alert that isn't checked can't see its rule stop holding, so it starts fresh when switched on again.
         $query->switchedOff()->where('is_triggered', true)->update(['is_triggered' => false]);
     }
 
@@ -81,14 +78,14 @@ class AlertDispatcher
     private function dispatch(Collection $alerts, CarbonImmutable $now): int
     {
         // A switched-off tracker has nothing new to judge, for its own alerts and its goal's.
-        $alerts = $alerts->filter(fn (Alert $alert) => ($alert->checkInTracker ?? $alert->goal?->checkInTracker)?->enabled);
+        $alerts = $alerts->filter(fn (Alert $alert) => $this->tracker($alert)?->enabled);
 
         if ($alerts->isEmpty()) {
             return 0;
         }
 
         $todayByUser = $alerts->pluck('user')->unique('id')->mapWithKeys(fn ($user) => [
-            $user->id => $now->setTimezone($user->settings->timezone ?? 'UTC')->startOfDay(),
+            $user->id => $now->setTimezone($user->timezone())->startOfDay(),
         ])->all();
         $states = $this->evaluator->evaluate($alerts, $todayByUser);
 
@@ -97,7 +94,6 @@ class AlertDispatcher
             $state = $states[$alert->id];
 
             if (! $this->shouldNotify($alert, $state)) {
-                // is_triggered follows whether the rule holds.
                 if ($alert->is_triggered !== $state['active']) {
                     $alert->update(['is_triggered' => $state['active']]);
                 }
@@ -119,12 +115,7 @@ class AlertDispatcher
         return $sent;
     }
 
-    /**
-     * Goal alerts notify once per period in which the goal is reached. Other alerts notify when
-     * their rule starts to hold, then stay quiet until it stops holding.
-     *
-     * @param array<string, mixed> $state
-     */
+    /** @param array<string, mixed> $state */
     private function shouldNotify(Alert $alert, array $state): bool
     {
         if (! $state['active']) {
@@ -147,7 +138,7 @@ class AlertDispatcher
     /** @param array<string, mixed> $state */
     private function notification(Alert $alert, array $state): AlertNotification
     {
-        $tracker = $alert->checkInTracker ?? $alert->goal?->checkInTracker;
+        $tracker = $this->tracker($alert);
 
         return new AlertNotification(
             rule: $alert->rule,
@@ -160,6 +151,11 @@ class AlertDispatcher
             goalPeriod: $alert->goal?->period,
             periodFinished: $state['period_finished'],
         );
+    }
+
+    private function tracker(Alert $alert): ?CheckInTracker
+    {
+        return $alert->checkInTracker ?? $alert->goal?->checkInTracker;
     }
 
     /** @return array<int, string> */

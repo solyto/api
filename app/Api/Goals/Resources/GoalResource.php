@@ -21,11 +21,22 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *         property="progress",
  *         type="object",
  *         description="The current period (up to and including today) and whether each of the previous periods was met, newest first.",
+ *
  *         @OA\Property(property="current", type="number", nullable=true, description="Days done, total or average, depending on the tracker; null for a 1–5 tracker without ratings yet."),
  *         @OA\Property(property="met", type="boolean"),
  *         @OA\Property(property="period_start", type="string", format="date"),
  *         @OA\Property(property="period_end", type="string", format="date"),
- *         @OA\Property(property="history", type="array", @OA\Items(type="object", @OA\Property(property="period_start", type="string", format="date"), @OA\Property(property="met", type="boolean")))
+ *         @OA\Property(
+ *             property="history",
+ *             type="array",
+ *
+ *             @OA\Items(
+ *                 type="object",
+ *
+ *                 @OA\Property(property="period_start", type="string", format="date"),
+ *                 @OA\Property(property="met", type="boolean")
+ *             )
+ *         )
  *     )
  * )
  *
@@ -51,7 +62,7 @@ class GoalResource extends JsonResource
             'period' => $this->period->value,
             'comparison' => $this->comparison->value,
             'target' => $this->target,
-            'notify_when_reached' => $this->reachedAlert !== null,
+            'notify_when_reached' => $this->whenExistsLoaded('reachedAlert'),
             'progress' => $this->progress,
         ];
     }

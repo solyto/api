@@ -29,7 +29,6 @@ class Goal extends Model
         'user_id',
         'source',
         'check_in_tracker_id',
-        'measure',
         'period',
         'comparison',
         'target',

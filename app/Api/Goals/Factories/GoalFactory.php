@@ -21,7 +21,6 @@ class GoalFactory extends Factory
             'user_id' => User::factory(),
             'source' => GoalSource::CheckInTracker,
             'check_in_tracker_id' => null,
-            'measure' => null,
             'period' => GoalPeriod::Week,
             'comparison' => GoalComparison::AtLeast,
             'target' => 3,

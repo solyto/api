@@ -6,11 +6,6 @@ use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Users\Models\User;
 
-function valueTracker(User $user, string $key): CheckInTracker
-{
-    return CheckInTracker::forUser($user->id)->where('key', $key)->firstOrFail();
-}
-
 function putValue($test, User $user, int $trackerId, ?int $value, string $date = '2026-10-01')
 {
     return $test->actingAs($user, 'sanctum')
@@ -38,7 +33,10 @@ describe('PUT /api/v1/check-in/values', function () {
         $user = makeUser();
         $tracker = CheckInTracker::factory()->forUser($user)->ofType(CheckInTrackerType::from($type))->create();
 
-        expectApiError(putValue($this, $user, $tracker->id, $value), 422);
+        $response = putValue($this, $user, $tracker->id, $value);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['value']);
     })->with([
         'yes/no other than 1' => ['yes_no', 2],
         'yes/no zero' => ['yes_no', 0],
@@ -51,18 +49,22 @@ describe('PUT /api/v1/check-in/values', function () {
         $user = makeUser();
         $foreign = CheckInTracker::factory()->forUser(makeUser())->create();
 
-        expectApiError(putValue($this, $user, $foreign->id, 1), 422);
+        $foreignResponse = putValue($this, $user, $foreign->id, 1);
+        expectApiError($foreignResponse, 422);
+        $foreignResponse->assertJsonValidationErrors(['tracker_id']);
         expect(CheckInValue::where('check_in_tracker_id', $foreign->id)->count())->toBe(0);
 
         $own = CheckInTracker::factory()->forUser($user)->create();
-        expectApiError(putValue($this, $user, $own->id, 1, '01.10.2026'), 422);
+        $dateResponse = putValue($this, $user, $own->id, 1, '01.10.2026');
+        expectApiError($dateResponse, 422);
+        $dateResponse->assertJsonValidationErrors(['date']);
     });
 
     it('mirrors built-in values into the old table, so old apps and a rollback see them', function () {
         $user = makeUser();
 
-        putValue($this, $user, valueTracker($user, 'mood')->id, 4)->assertStatus(200);
-        putValue($this, $user, valueTracker($user, 'sports')->id, 6)->assertStatus(200);
+        putValue($this, $user, builtInTracker($user, 'mood')->id, 4)->assertStatus(200);
+        putValue($this, $user, builtInTracker($user, 'sports')->id, 6)->assertStatus(200);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in')
@@ -71,7 +73,7 @@ describe('PUT /api/v1/check-in/values', function () {
             ->assertJsonPath('data.0.mood', 4)
             ->assertJsonPath('data.0.sports', 6);
 
-        putValue($this, $user, valueTracker($user, 'mood')->id, null);
+        putValue($this, $user, builtInTracker($user, 'mood')->id, null);
         expect(CheckIn::forUser($user->id)->sole()->mood)->toBeNull();
     });
 
@@ -90,7 +92,7 @@ describe('GET /api/v1/check-in/values', function () {
         $user = makeUser();
         $own = CheckInTracker::factory()->forUser($user)->create();
         CheckInValue::factory()->forTracker($own)->on('2026-10-02', 1)->create();
-        CheckInValue::factory()->forTracker(valueTracker($user, 'mood'))->on('2026-10-01', 3)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'mood'))->on('2026-10-01', 3)->create();
         CheckInValue::factory()->forTracker(CheckInTracker::factory()->forUser(makeUser())->create())->on('2026-10-01', 1)->create();
 
         $this->actingAs($user, 'sanctum')
@@ -126,9 +128,15 @@ describe('GET /api/v1/check-in/values', function () {
             ->and($dates('?to=2026-09-30'))->toBe(['2026-09-30']);
     });
 
-    it('rejects a broken range', function (string $query) {
-        expectApiError($this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/check-in/values'.$query), 422);
-    })->with(['?from=yesterday', '?from=2026-10-02&to=2026-10-01']);
+    it('rejects a broken range', function (string $query, string $field) {
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/check-in/values'.$query);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors([$field]);
+    })->with([
+        ['?from=yesterday', 'from'],
+        ['?from=2026-10-02&to=2026-10-01', 'to'],
+    ]);
 });
 
 describe('Check-in for apps before the tracker tables', function () {
@@ -142,8 +150,8 @@ describe('Check-in for apps before the tracker tables', function () {
             ->assertJsonPath('data.social_life', 2)
             ->assertJsonPath('data.water', null);
 
-        expect(CheckInValue::where('check_in_tracker_id', valueTracker($user, 'mood')->id)->value('value'))->toBe(4)
-            ->and(CheckInValue::where('check_in_tracker_id', valueTracker($user, 'social_life')->id)->value('value'))->toBe(2);
+        expect(CheckInValue::where('check_in_tracker_id', builtInTracker($user, 'mood')->id)->value('value'))->toBe(4)
+            ->and(CheckInValue::where('check_in_tracker_id', builtInTracker($user, 'social_life')->id)->value('value'))->toBe(2);
     });
 
     it('still answers with a row when a day is saved without values', function () {
@@ -160,7 +168,7 @@ describe('Check-in for apps before the tracker tables', function () {
         $user = makeUser();
         $own = CheckInTracker::factory()->forUser($user)->create();
         putValue($this, $user, $own->id, 1, '2026-10-02');
-        putValue($this, $user, valueTracker($user, 'mood')->id, 3, '2026-10-01');
+        putValue($this, $user, builtInTracker($user, 'mood')->id, 3, '2026-10-01');
 
         $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in')->assertJsonCount(1, 'data');
 
@@ -183,8 +191,8 @@ describe('Check-in for apps before the tracker tables', function () {
             ->assertJsonPath('data.enabled_trackers', ['mood', 'social_life'])
             ->assertJsonPath('data.selected_sports', ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga']);
 
-        expect(valueTracker($user, 'water')->enabled)->toBeFalse()
-            ->and(valueTracker($user, 'social_life')->enabled)->toBeTrue()
+        expect(builtInTracker($user, 'water')->enabled)->toBeFalse()
+            ->and(builtInTracker($user, 'social_life')->enabled)->toBeTrue()
             ->and($own->fresh()->enabled)->toBeTrue();
     });
 

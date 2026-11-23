@@ -11,8 +11,9 @@ use App\Api\Goals\Enums\GoalPeriod;
 use App\Api\Goals\Enums\GoalSource;
 use App\Api\Goals\Models\Goal;
 use App\Api\Users\Models\User;
-use Illuminate\Support\Collection;
 use App\Shared\Exceptions\LimitReachedException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class GoalService
@@ -23,7 +24,8 @@ class GoalService
     public function list(User $user): Collection
     {
         return Goal::forUser($user->id)
-            ->with(['checkInTracker', 'reachedAlert'])
+            ->with('checkInTracker')
+            ->withExists('reachedAlert')
             ->orderBy('id')
             ->get();
     }
@@ -37,7 +39,7 @@ class GoalService
         $tracker = CheckInTracker::forUser($user->id)->findOrFail($data['check_in_tracker_id']);
 
         // One goal per tracker for now; the daily page shows one progress line.
-        if (Goal::where('check_in_tracker_id', $tracker->id)->exists()) {
+        if (Goal::forUser($user->id)->where('check_in_tracker_id', $tracker->id)->exists()) {
             throw ValidationException::withMessages(['check_in_tracker_id' => 'This tracker already has a goal.']);
         }
         $this->validateTarget($tracker, GoalPeriod::from($data['period']), (float) $data['target']);
@@ -53,7 +55,7 @@ class GoalService
 
         $this->setNotifyWhenReached($goal, (bool) ($data['notify_when_reached'] ?? false));
 
-        return $goal->fresh(['checkInTracker', 'reachedAlert']);
+        return $this->load($goal);
     }
 
     public function update(Goal $goal, array $data): Goal
@@ -61,18 +63,23 @@ class GoalService
         $period = GoalPeriod::from($data['period'] ?? $goal->period->value);
         $this->validateTarget($goal->checkInTracker, $period, (float) ($data['target'] ?? $goal->target));
 
-        $goal->update(array_intersect_key($data, array_flip(['period', 'comparison', 'target'])));
+        $goal->update(Arr::only($data, ['period', 'comparison', 'target']));
 
         if (array_key_exists('notify_when_reached', $data)) {
             $this->setNotifyWhenReached($goal, (bool) $data['notify_when_reached']);
         }
 
-        return $goal->fresh(['checkInTracker', 'reachedAlert']);
+        return $this->load($goal);
     }
 
     public function delete(Goal $goal): void
     {
         $goal->delete();
+    }
+
+    private function load(Goal $goal): Goal
+    {
+        return $goal->fresh('checkInTracker')->loadExists('reachedAlert');
     }
 
     // "Notify me when reached" is an alert on the goal; the switch is on exactly when that alert exists.
