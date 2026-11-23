@@ -2,7 +2,10 @@
 
 namespace App\Api\Users\Services;
 
+use App\Api\Users\Exceptions\AlreadyVerifiedException;
 use App\Api\Users\Exceptions\PersonalAccessTokenRequiredException;
+use App\Api\Users\Exceptions\VerificationTokenExpiredException;
+use App\Api\Users\Exceptions\VerificationTokenMismatchException;
 use App\Api\Users\Exceptions\WidgetTokenConflictException;
 use App\Api\Users\Mails\UserVerification;
 use App\Api\Users\Models\User;
@@ -79,10 +82,8 @@ class AuthService
         return $this->createToken($user, $platform);
     }
 
+    // Replaces any earlier widget token of the session; it shares the session's expiry and is deleted with it (FK cascade).
     /**
-     * Issue the session's restricted widget token, replacing any earlier one.
-     * It shares the session's expiry and is deleted with it (FK cascade).
-     *
      * @return array{token: string, token_type: string, token_expires_at: ?string}
      */
     public function createWidgetToken(User $user): array
@@ -131,7 +132,7 @@ class AuthService
         }
 
         if ($user->email_verified_at !== null) {
-            throw new \RuntimeException('already_verified');
+            throw new AlreadyVerifiedException();
         }
 
         $verificationToken = VerificationToken::where('user_id', $user->id)->first();
@@ -141,11 +142,11 @@ class AuthService
         }
 
         if (!hash_equals($verificationToken->token, $data['token'])) {
-            throw new \RuntimeException('token_mismatch');
+            throw new VerificationTokenMismatchException();
         }
 
         if ($verificationToken->expires_at < now()) {
-            throw new \RuntimeException('token_expired');
+            throw new VerificationTokenExpiredException();
         }
 
         $user->update(['email_verified_at' => now()]);

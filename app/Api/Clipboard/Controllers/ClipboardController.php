@@ -18,6 +18,12 @@ class ClipboardController
 {
     use HandlesApiAuth;
 
+    // Stored files are user uploads: the browser must neither guess their type nor run anything in them.
+    private const array SANDBOX_HEADERS = [
+        'X-Content-Type-Options' => 'nosniff',
+        'Content-Security-Policy' => "default-src 'none'; sandbox",
+    ];
+
     public function __construct(private readonly ClipboardService $clipboardService) {}
 
     /**
@@ -190,26 +196,17 @@ class ClipboardController
             return ApiResponse::error('No image found.', 404);
         }
 
-        return response()->file($path, [
-            'X-Content-Type-Options' => 'nosniff',
-            'Content-Security-Policy' => "default-src 'none'; sandbox",
-        ]);
+        return response()->file($path, self::SANDBOX_HEADERS);
     }
 
-    /**
-     * A clipboard image at the public storage URL apps up to 1.1.3 load it from ({user}/clipboard/{file}).
-     * Only images: file entries came with 1.1.4, whose apps use GET clipboard/{id}/file.
-     */
+    // Apps up to 1.1.3 load clipboard images from the public storage URL ({user}/clipboard/{file}).
+    // Only images: file entries came with 1.1.4, whose apps use GET clipboard/{id}/file.
     public function legacyImage(string $user, string $file): BinaryFileResponse
     {
         $path = $this->clipboardService->getLegacyImagePath($user.'/clipboard/'.$file);
         abort_if($path === null, 404);
 
-        return response()->file($path, [
-            'X-Content-Type-Options' => 'nosniff',
-            'Content-Security-Policy' => "default-src 'none'; sandbox",
-            'Cache-Control' => 'private, max-age=86400',
-        ]);
+        return response()->file($path, self::SANDBOX_HEADERS + ['Cache-Control' => 'private, max-age=86400']);
     }
 
     /**
@@ -287,11 +284,7 @@ class ClipboardController
             return ApiResponse::error('No file found.', 404);
         }
 
-        return response()->download($path, $clipboard->file_name, [
-            'Content-Type' => $clipboard->mime_type,
-            'X-Content-Type-Options' => 'nosniff',
-            'Content-Security-Policy' => "default-src 'none'; sandbox",
-        ]);
+        return response()->download($path, $clipboard->file_name, ['Content-Type' => $clipboard->mime_type] + self::SANDBOX_HEADERS);
     }
 
     /**

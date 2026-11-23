@@ -56,9 +56,4 @@ Schedule::command('cache:prune-stale-tags user_data')->hourly();
 /*
  * Pulse: queue length for the Queue Load card (App\Shared\Pulse)
  */
-Schedule::call(function () {
-    $connection = config('queue.default');
-    $queue = config("queue.connections.{$connection}.queue", 'default');
-
-    \App\Shared\Pulse\PulseMetrics::queueSize($queue, \Illuminate\Support\Facades\Queue::connection($connection)->size($queue));
-})->everyMinute()->name('pulse-queue-size')->withoutOverlapping();
+Schedule::call(new \App\Shared\Pulse\RecordQueueSize())->everyMinute()->name('pulse-queue-size')->withoutOverlapping();

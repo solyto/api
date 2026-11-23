@@ -67,6 +67,7 @@ ask for it.
 | `makeUser(array $attributes = [])` | a verified user; 305 calls, the standard fixture |
 | `$this->actingAs($user, 'sanctum')` | the standard way to authenticate a request (314 calls) |
 | `authHeaders($user)` / `sanctumToken($user)` | only when the test is about tokens themselves (`AuthTest`) |
+| `sessionToken($user)`, `bearer($this, $token)`, `issueWidgetToken($this, $parentToken)` | requests with a real bearer token (widget tokens, token lifecycle); `bearer` resets the guard so each request resolves its own token |
 | `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; `expectApiError` is the standard for error cases, `expectApiSuccess` has no callers yet — use both |
 | `Model::factory()->forUser($user)` | every user-owned factory has this state |
 | `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()` | DAV protocol tests, see [DAV tests](#dav-tests) |

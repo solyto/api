@@ -30,9 +30,11 @@ class GetDevRequest extends SolytoTool
             return Response::error('Dev request not found.');
         }
 
+        $comments = DevRequestCommentResource::collection($this->devRequests->listComments($devRequest))->resolve(request());
+
         return Response::json([
             ...ListDevRequests::present($devRequest),
-            'comments' => collect(DevRequestCommentResource::collection($this->devRequests->listComments($devRequest))->resolve(request()))
+            'comments' => collect($comments)
                 ->map(fn (array $comment) => Arr::except($comment, self::OMITTED_COMMENT_FIELDS))
                 ->all(),
         ]);

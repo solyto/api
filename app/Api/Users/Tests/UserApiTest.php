@@ -2,6 +2,7 @@
 
 use App\Api\Users\Services\UserSettingsService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,7 @@ describe('GET /api/v1/users/me', function () {
     });
 
     it('requires authentication', function () {
-        $this->getJson('/api/v1/users/me')->assertStatus(401);
+        expectApiError($this->getJson('/api/v1/users/me'), 401);
     });
 });
 
@@ -61,13 +62,19 @@ describe('GET /api/v1/users', function () {
             ->assertJsonPath('meta.pagination.per_page', 1000);
     });
 
-    it('rejects an invalid page or per_page', function (string $query) {
+    it('rejects an invalid page or per_page', function (string $query, string $field) {
         $admin = makeUser(['role' => 'admin']);
 
-        $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/v1/users?'.$query)
-            ->assertStatus(422);
-    })->with(['per_page=0', 'per_page=101', 'per_page=abc', 'page=0']);
+        $response = $this->actingAs($admin, 'sanctum')->getJson('/api/v1/users?'.$query);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors($field);
+    })->with([
+        ['per_page=0', 'per_page'],
+        ['per_page=101', 'per_page'],
+        ['per_page=abc', 'per_page'],
+        ['page=0', 'page'],
+    ]);
 
     it('searches name or email case-insensitively before paging', function () {
         $admin = makeUser(['role' => 'admin', 'name' => 'Admin', 'email' => 'admin@example.com']);
@@ -98,9 +105,7 @@ describe('GET /api/v1/users', function () {
     it('forbids regular users from listing users', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/users')
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')->getJson('/api/v1/users'), 403);
     });
 });
 
@@ -149,15 +154,24 @@ describe('GET /api/v1/users/growth', function () {
     });
 
     it('rejects an unknown group_by', function () {
-        $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/v1/users/growth?group_by=hour')
-            ->assertStatus(422);
+        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/v1/users/growth?group_by=hour');
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('group_by');
     });
 
-    it('forbids regular users', function () {
-        $this->actingAs(makeUser(), 'sanctum')
-            ->getJson('/api/v1/users/growth?group_by=year')
-            ->assertStatus(403);
+    it('lets admins read the growth', function () {
+        expectApiSuccess($this->actingAs($this->admin, 'sanctum')->getJson('/api/v1/users/growth?group_by=year'));
+    });
+
+    it('forbids regular users with the same body as the other admin endpoints', function () {
+        $user = makeUser();
+
+        $growth = $this->actingAs($user, 'sanctum')->getJson('/api/v1/users/growth?group_by=year');
+        $statistics = $this->actingAs($user, 'sanctum')->getJson('/api/v1/statistics/overview');
+
+        expectApiError($growth, 403);
+        expect(Arr::except($growth->json(), 'timestamp'))->toBe(Arr::except($statistics->json(), 'timestamp'));
     });
 });
 
@@ -179,9 +193,7 @@ describe('PUT /api/v1/users/{user}', function () {
         $user = makeUser();
         $other = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/'.$other->id, ['name' => 'Hacked'])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')->putJson('/api/v1/users/'.$other->id, ['name' => 'Hacked']), 403);
     });
 
     it('lets an admin update another user', function () {
@@ -229,27 +241,29 @@ describe('PUT /api/v1/users/change-password', function () {
     it('rejects a wrong current password', function () {
         $user = makeUser(['password' => Hash::make('oldpassword123')]);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/users/change-password', [
                 'current_password' => 'wrong-password',
                 'new_password' => 'newpassword123',
                 'new_password_confirmation' => 'newpassword123',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('current_password');
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('current_password');
     });
 
     it('rejects reusing the current password', function () {
         $user = makeUser(['password' => Hash::make('oldpassword123')]);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/users/change-password', [
                 'current_password' => 'oldpassword123',
                 'new_password' => 'oldpassword123',
                 'new_password_confirmation' => 'oldpassword123',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('new_password');
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('new_password');
     });
 });
 
@@ -275,9 +289,7 @@ describe('POST /api/v1/users/me/profile-image', function () {
     it('returns an error without a file', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->post('/api/v1/users/me/profile-image', [])
-            ->assertStatus(400);
+        expectApiError($this->actingAs($user, 'sanctum')->post('/api/v1/users/me/profile-image', []), 400);
     });
 });
 
@@ -416,10 +428,10 @@ describe('User settings endpoints', function () {
         $user = makeUser();
         $user->settings()->update(['timezone' => 'Europe/Berlin']);
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/settings/timezone', ['timezone' => $timezone])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('timezone');
+        $response = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/settings/timezone', ['timezone' => $timezone]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('timezone');
 
         expect($user->fresh()->settings->timezone)->toBe('Europe/Berlin');
     })->with([
@@ -460,9 +472,10 @@ describe('User settings endpoints', function () {
     it('rejects an invalid week start', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/settings/week-start', ['week_start' => 'saturday'])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/settings/week-start', ['week_start' => 'saturday']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('week_start');
 
         expect($user->fresh()->settings->week_start)->toBe('monday');
     });
@@ -535,9 +548,10 @@ describe('User settings endpoints', function () {
     it('requires a boolean when updating the journal', function () {
         $user = makeUser();
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/users/me/settings/journal', [])
-            ->assertStatus(422);
+        $response = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/settings/journal', []);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('enabled');
     });
 
     it('toggles the journal calendar mark', function () {

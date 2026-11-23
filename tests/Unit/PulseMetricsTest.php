@@ -13,11 +13,13 @@ use App\Shared\Pulse\Cards\QueueLoad;
 use App\Shared\Pulse\Cards\RateLimits;
 use App\Shared\Pulse\Cards\ReleaseLookups;
 use App\Shared\Pulse\PulseMetrics;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pulse\Facades\Pulse;
 use Livewire\Livewire;
@@ -28,10 +30,7 @@ uses(RefreshDatabase::class);
 
 covers(PulseMetrics::class);
 
-/**
- * Pulse is disabled in tests (PULSE_ENABLED=false), which stops recording;
- * these tests switch it back on and ingest by hand.
- */
+// Pulse is disabled in tests (PULSE_ENABLED=false), which stops recording; these tests switch it back on and ingest by hand.
 beforeEach(function () {
     Pulse::startRecording();
 });
@@ -151,10 +150,9 @@ describe('PulseMetrics', function () {
     it('records requests refused because the client is too old', function () {
         config(['app.min_client_version' => '1.0.10']);
 
-        $this->actingAs(makeUser(), 'sanctum')
+        expectApiError($this->actingAs(makeUser(), 'sanctum')
             ->withHeaders(['X-Client-Version' => '1.0.9'])
-            ->getJson('/api/v1/users/me')
-            ->assertStatus(426);
+            ->getJson('/api/v1/users/me'), 426);
 
         expect(pulseEntries(PulseMetrics::CLIENT_REJECTED)->pluck('key')->all())->toBe(['1.0.9']);
     });
@@ -163,7 +161,7 @@ describe('PulseMetrics', function () {
         Route::middleware(['api', 'throttle:1,1'])->get('/api/v1/pulse-metrics-test', fn () => 'ok');
 
         $this->getJson('/api/v1/pulse-metrics-test')->assertOk();
-        $this->getJson('/api/v1/pulse-metrics-test')->assertStatus(429);
+        expectApiError($this->getJson('/api/v1/pulse-metrics-test'), 429);
 
         expect(pulseEntries(PulseMetrics::RATE_LIMITED)->pluck('key')->all())->toBe(['1 · GET /api/v1/pulse-metrics-test']);
     });
@@ -199,6 +197,21 @@ describe('PulseMetrics', function () {
 
         expect(pulseEntries(PulseMetrics::QUEUE_SIZE)->sole()->value)->toBe(7)
             ->and(DB::table('pulse_values')->where('type', PulseMetrics::QUEUE_SIZE)->value('value'))->toBe('7');
+    });
+
+    it('samples the size of the default queue every minute from the schedule', function () {
+        config(['queue.default' => 'redis', 'queue.connections.redis.queue' => 'jobs']);
+        Queue::fake();
+        Queue::pushOn('jobs', new PulseMetricsTestJob());
+        Queue::pushOn('jobs', new PulseMetricsTestJob());
+        Queue::pushOn('other', new PulseMetricsTestJob());
+
+        $event = collect(app(Schedule::class)->events())->firstWhere('description', 'pulse-queue-size');
+        $event->run(app());
+
+        expect($event->expression)->toBe('* * * * *')
+            ->and($event->withoutOverlapping)->toBeTrue()
+            ->and(pulseEntries(PulseMetrics::QUEUE_SIZE)->map(fn ($entry) => [$entry->key, $entry->value])->all())->toBe([['jobs', 2]]);
     });
 });
 

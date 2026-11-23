@@ -8,11 +8,7 @@ use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Lazy;
 
-/**
- * E: which app versions are in use, from the version RecordClientVersion
- * stores on each token, plus how often clients were told to update (426).
- * Counts tokens, i.e. signed-in devices, not users.
- */
+// Counts tokens (the version RecordClientVersion stores on each), i.e. signed-in devices, not users.
 #[Lazy]
 class ClientVersions extends MetricCard
 {
@@ -54,7 +50,7 @@ class ClientVersions extends MetricCard
         );
     }
 
-    /** Token names are "auth-token-{web|mobile|desktop}" and "widget-token". */
+    // Token names are "auth-token-{web|mobile|desktop}" and "widget-token".
     private function platform(string $tokenName): string
     {
         return match (true) {

@@ -21,7 +21,8 @@ class SearchNotes extends SolytoTool
 
     public function handle(Request $request): Response
     {
-        $query = mb_strtolower($request->validate(['query' => ['required', 'string', 'min:2', 'max:200']])['query']);
+        $validated = $request->validate(['query' => ['required', 'string', 'min:2', 'max:200']]);
+        $query = mb_strtolower($validated['query']);
 
         $matches = collect($this->notes->list($this->user($request)))
             ->filter(fn (array $note) => str_contains(mb_strtolower($note['title'] . ' ' . $note['content']), $query))

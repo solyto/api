@@ -378,25 +378,24 @@ describe('Passkey endpoints', function () {
             'name' => 'Other',
         ]);
 
-        $this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/auth/passkeys/'.$passkey->id, ['name' => 'Hijack'])
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/auth/passkeys/'.$passkey->id, ['name' => 'Hijack']), 403);
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/auth/passkeys/'.$passkey->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')
+            ->deleteJson('/api/v1/auth/passkeys/'.$passkey->id), 403);
     });
 
     it('rejects a registration without clientDataJSON with 422', function () {
         $user = makeUser();
         app(PasskeyService::class)->registrationOptions($user);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/auth/passkeys/register', [
                 'response' => ['id' => 'x', 'response' => ['attestationObject' => 'e30']],
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['response.response.clientDataJSON']);
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['response.response.clientDataJSON']);
     });
 
     it('signs in with a passkey through the API', function () {
@@ -440,10 +439,11 @@ describe('Passkey endpoints', function () {
     });
 
     it('rejects a passkey sign-in without signature with 422', function () {
-        $this->postJson('/api/v1/auth/passkey/authenticate', [
+        $response = $this->postJson('/api/v1/auth/passkey/authenticate', [
             'response' => ['id' => 'x', 'response' => ['clientDataJSON' => 'e30', 'authenticatorData' => 'e30']],
-        ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['response.response.signature']);
+        ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['response.response.signature']);
     });
 });

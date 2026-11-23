@@ -7,7 +7,6 @@ use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 
-/** B: remote CalDAV calls per server host, and their failures by reason. */
 #[Lazy]
 class ExternalCalendars extends MetricCard
 {

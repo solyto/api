@@ -58,12 +58,13 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         Mail::fake();
         $user = makeUser(['password' => Hash::make('secret-password')]);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'wrong-password',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('password');
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('password');
 
         Mail::assertNothingSent();
     });
@@ -72,11 +73,10 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         Mail::fake();
         $user = makeUser(['password' => Hash::make('secret-password'), 'role' => 'super_admin']);
 
-        $this->actingAs($user, 'sanctum')
+        expectApiError($this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'secret-password',
-            ])
-            ->assertStatus(403);
+            ]), 403);
 
         Mail::assertNothingSent();
     });
@@ -126,20 +126,21 @@ describe('POST /api/v1/users/me/deletion-request', function () {
         config(['auth.policy.account_deletion_confirmation' => false]);
         $user = makeUser(['password' => Hash::make('secret-password')]);
 
-        $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/users/me/deletion-request', [
                 'password' => 'wrong-password',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('password');
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('password');
 
         expect(User::find($user->id))->not->toBeNull();
     });
 
     it('requires authentication', function () {
-        $this->postJson('/api/v1/users/me/deletion-request', [
+        expectApiError($this->postJson('/api/v1/users/me/deletion-request', [
             'password' => 'secret-password',
-        ])->assertStatus(401);
+        ]), 401);
     });
 
     it('is throttled', function () {
@@ -153,10 +154,10 @@ describe('POST /api/v1/users/me/deletion-request', function () {
                 ->assertStatus(200);
         }
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password'])
-            ->assertStatus(429)
-            ->assertJsonPath('success', false);
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/users/me/deletion-request', ['password' => 'secret-password']);
+
+        expectApiError($response, 429);
     });
 });
 
@@ -190,12 +191,13 @@ describe('POST /api/v1/auth/confirm-account-deletion', function () {
         $user = makeUser(['password' => Hash::make('secret-password')]);
         requestDeletionToken($user);
 
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [
+        $response = $this->postJson('/api/v1/auth/confirm-account-deletion', [
             'token' => 'not-the-token',
             'email' => $user->email,
-        ])
-            ->assertStatus(401)
-            ->assertJsonPath('errors', ['invalid_token']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['invalid_token']);
 
         expect(User::find($user->id))->not->toBeNull();
     });
@@ -205,10 +207,10 @@ describe('POST /api/v1/auth/confirm-account-deletion', function () {
         $other = makeUser();
         $token = requestDeletionToken($user);
 
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [
+        expectApiError($this->postJson('/api/v1/auth/confirm-account-deletion', [
             'token' => $token,
             'email' => $other->email,
-        ])->assertStatus(401);
+        ]), 401);
 
         expect(User::find($user->id))->not->toBeNull()
             ->and(User::find($other->id))->not->toBeNull();
@@ -220,10 +222,10 @@ describe('POST /api/v1/auth/confirm-account-deletion', function () {
 
         $this->travel(61)->minutes();
 
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [
+        expectApiError($this->postJson('/api/v1/auth/confirm-account-deletion', [
             'token' => $token,
             'email' => $user->email,
-        ])->assertStatus(401);
+        ]), 401);
 
         expect(User::find($user->id))->not->toBeNull();
     });
@@ -233,10 +235,10 @@ describe('POST /api/v1/auth/confirm-account-deletion', function () {
         $first = requestDeletionToken($user);
         requestDeletionToken($user);
 
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [
+        expectApiError($this->postJson('/api/v1/auth/confirm-account-deletion', [
             'token' => $first,
             'email' => $user->email,
-        ])->assertStatus(401);
+        ]), 401);
 
         expect(User::find($user->id))->not->toBeNull();
     });
@@ -245,18 +247,19 @@ describe('POST /api/v1/auth/confirm-account-deletion', function () {
         $user = makeUser();
         $resetToken = Password::broker()->createToken($user);
 
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [
+        expectApiError($this->postJson('/api/v1/auth/confirm-account-deletion', [
             'token' => $resetToken,
             'email' => $user->email,
-        ])->assertStatus(401);
+        ]), 401);
 
         expect(User::find($user->id))->not->toBeNull();
     });
 
     it('validates the payload', function () {
-        $this->postJson('/api/v1/auth/confirm-account-deletion', [])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['token', 'email']);
+        $response = $this->postJson('/api/v1/auth/confirm-account-deletion', []);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['token', 'email']);
     });
 });
 

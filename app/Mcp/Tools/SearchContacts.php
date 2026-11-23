@@ -22,13 +22,12 @@ class SearchContacts extends SolytoTool
 
     public function handle(Request $request): Response
     {
-        $query = mb_strtolower($request->validate(['query' => ['required', 'string', 'min:2', 'max:200']])['query']);
+        $validated = $request->validate(['query' => ['required', 'string', 'min:2', 'max:200']]);
+        $query = mb_strtolower($validated['query']);
+        $contacts = ContactResource::collection($this->contacts->listContacts($this->user($request)))->resolve(request());
 
-        $matches = collect(ContactResource::collection($this->contacts->listContacts($this->user($request)))->resolve(request()))
-            ->filter(fn (array $contact) => str_contains(
-                mb_strtolower(implode(' ', [$contact['full_name'], $contact['organization'], ...Arr::flatten($contact['email'] ?? [])])),
-                $query
-            ))
+        $matches = collect($contacts)
+            ->filter(fn (array $contact) => str_contains($this->searchableText($contact), $query))
             ->take(self::MAX_RESULTS)
             ->map(fn (array $contact) => Arr::except($contact, self::OMITTED_FIELDS))
             ->values();
@@ -41,5 +40,12 @@ class SearchContacts extends SolytoTool
         return [
             'query' => $schema->string()->description('Text to look for in names, email addresses and organizations.')->required(),
         ];
+    }
+
+    private function searchableText(array $contact): string
+    {
+        $emails = Arr::flatten($contact['email'] ?? []);
+
+        return mb_strtolower(implode(' ', [$contact['full_name'], $contact['organization'], ...$emails]));
     }
 }

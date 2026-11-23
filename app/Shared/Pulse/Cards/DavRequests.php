@@ -7,7 +7,6 @@ use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 
-/** C: DAV requests per method and client. */
 #[Lazy]
 class DavRequests extends MetricCard
 {

@@ -3,11 +3,11 @@
 namespace App\Mcp\Tools;
 
 use App\Api\Todos\Models\Todo;
+use App\Api\Todos\Requests\UpdateTodoRequest;
 use App\Api\Todos\Resources\TodoResource;
 use App\Api\Todos\Services\TodoService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Arr;
-use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -21,24 +21,9 @@ class UpdateTodo extends SolytoTool
     {
         $user = $this->user($request);
 
-        // Same rules as App\Api\Todos\Requests\UpdateTodoRequest.
         $validated = $request->validate([
             'id' => ['required', 'uuid'],
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|nullable|string|max:1000',
-            'link' => 'sometimes|nullable|string|max:2048',
-            'priority' => 'sometimes|in:low,medium,high',
-            'due_at' => 'sometimes|nullable|string',
-            'status' => 'sometimes|in:backlog,pending,in-progress,waiting,almost-done',
-            'progress' => 'sometimes|nullable|integer|min:0|max:100',
-            'effort' => 'sometimes|nullable|in:low,medium,high',
-            'is_completed' => 'sometimes|boolean',
-            'category_id' => ['sometimes', 'nullable', Rule::exists('todo_categories', 'id')->where('user_id', $user->id)],
-            'tags' => 'sometimes|nullable|array',
-            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $user->id)],
-            'recurrence_frequency' => 'sometimes|nullable|in:daily,weekly,monthly,yearly',
-            'recurrence_interval' => 'sometimes|integer|min:1|max:365',
-            'recurrence_ends_at' => 'sometimes|nullable|string',
+            ...UpdateTodoRequest::sharedRules($user->id),
         ]);
 
         $todo = Todo::forUser($user->id)->whereKey($validated['id'])->first();

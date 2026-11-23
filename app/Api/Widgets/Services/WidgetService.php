@@ -2,7 +2,6 @@
 
 namespace App\Api\Widgets\Services;
 
-use App\Api\Calendars\DTOs\EventListingDTO;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Services\CheckInService;
@@ -13,6 +12,8 @@ use App\Api\TimeTracking\Services\TimeTrackingService;
 use App\Api\Todos\Models\Todo;
 use App\Api\Todos\Services\TodoService;
 use App\Api\Users\Models\User;
+use App\Api\Widgets\DTOs\WidgetFormatDTO;
+use App\Api\Widgets\DTOs\YourDayDTO;
 use App\Dav\DTOs\EventDTO;
 use Carbon\CarbonImmutable;
 
@@ -24,12 +25,10 @@ class WidgetService
     private const string DEFAULT_TIME_FORMAT = 'H:i';
     private const string DEFAULT_DATE_FORMAT = 'dd.mm.YYYY';
     private const string COLOR_PATTERN = '/^#[0-9A-Fa-f]{6}$/';
-    public const array CHECK_IN_SPORTS = [1 => 'dumbbell', 2 => 'bike', 3 => 'mountain', 4 => 'footprints', 5 => 'waves_ladder', 6 => 'yoga'];
+    private const array CHECK_IN_SPORTS = [1 => 'dumbbell', 2 => 'bike', 3 => 'mountain', 4 => 'footprints', 5 => 'waves_ladder', 6 => 'yoga'];
     private const array CHECK_IN_COLORS = [1 => '#EF4444', 2 => '#F97316', 3 => '#3B82F6', 4 => '#86EFAC', 5 => '#22C55E'];
     private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
     private const string CHECK_IN_MENSTRUATION_COLOR = '#FB7185';
-
-    private ?EventListingDTO $calendarListing = null;
 
     public function __construct(
         private readonly CalendarService $calendarService,
@@ -39,65 +38,45 @@ class WidgetService
         private readonly CheckInTrackerService $checkInTrackerService,
     ) {}
 
-    public function yourDay(User $user): array
+    public function yourDay(User $user): YourDayDTO
     {
-        $timezone = $user->timezone();
-        $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
-        $timeFormat = in_array($user->settings?->time_format, self::TIME_FORMATS, true) ? $user->settings->time_format : self::DEFAULT_TIME_FORMAT;
-        $dateFormat = $user->settings?->date_format ?: self::DEFAULT_DATE_FORMAT;
+        $format = $this->format($user);
+        $timezone = $format->timezone;
 
         $now = CarbonImmutable::now($timezone);
         $today = $now->startOfDay();
         $tomorrow = $today->addDay();
 
-        $this->calendarListing = $this->calendarService->listWidgetEvents($user);
-        [$todayEvents, $upcomingEvents] = collect($this->calendarListing->events)
+        $calendarListing = $this->calendarService->listWidgetEvents($user);
+        $byStartAllDayFirst = fn (EventDTO $a, EventDTO $b) => [$this->localStart($a, $timezone), !$a->isAllDay]
+            <=> [$this->localStart($b, $timezone), !$b->isAllDay];
+        [$todayEvents, $upcomingEvents] = collect($calendarListing->events)
             ->filter(fn (EventDTO $event) => $event->startDate !== null)
-            ->sort(fn (EventDTO $a, EventDTO $b) => [$this->localStart($a, $timezone), !$a->isAllDay] <=> [$this->localStart($b, $timezone), !$b->isAllDay])
+            ->sort($byStartAllDayFirst)
             ->partition(fn (EventDTO $event) => $this->localStart($event, $timezone) < $tomorrow);
 
         $sections = [
-            'today' => $todayEvents->sortBy(fn (EventDTO $event) => !$event->isAllDay)->map(fn (EventDTO $event) => $this->eventRow($event, $timezone, $today, false, $timeFormat, $dateFormat, $locale)),
+            'today' => $todayEvents
+                ->sortBy(fn (EventDTO $event) => !$event->isAllDay)
+                ->map(fn (EventDTO $event) => $this->eventRow($event, $today, false, $format)),
             'due' => $this->todoService->due($user, $today->toDateString(), self::SECTION_LIMIT)
-                ->map(fn (Todo $todo) => $this->todoRow($todo, $today, $dateFormat, $locale)),
-            'upcoming' => $upcomingEvents->map(fn (EventDTO $event) => $this->eventRow($event, $timezone, $today, true, $timeFormat, $dateFormat, $locale)),
+                ->map(fn (Todo $todo) => $this->todoRow($todo, $today, $format)),
+            'upcoming' => $upcomingEvents->map(fn (EventDTO $event) => $this->eventRow($event, $today, true, $format)),
         ];
 
-        return [
+        $widget = [
             'kind' => 'your-day',
             'schema_version' => self::SCHEMA_VERSION,
             'generated_at' => $now->toIso8601String(),
             'refresh_at' => $tomorrow->toIso8601String(),
             'labels' => [
-                'title' => __('widgets.your_day_title', [], $locale),
-                'empty' => __('widgets.your_day_empty', [], $locale),
+                'title' => __('widgets.your_day_title', [], $format->locale),
+                'empty' => __('widgets.your_day_empty', [], $format->locale),
             ],
-            'sections' => collect($sections)
-                ->filter(fn ($rows) => $rows->isNotEmpty())
-                ->map(fn ($rows, string $key) => [
-                    'key' => $key,
-                    'title' => __('widgets.section_' . $key, [], $locale),
-                    'rows' => $rows->take(self::SECTION_LIMIT)->values()->all(),
-                ])
-                ->values()
-                ->all(),
+            'sections' => $this->sections($sections, $format->locale),
         ];
-    }
 
-    /**
-     * @return array<int, int>
-     */
-    public function unavailableCalendars(): array
-    {
-        return $this->calendarListing->unavailableCalendars ?? [];
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    public function credentialsRejectedCalendars(): array
-    {
-        return $this->calendarListing->credentialsRejectedCalendars ?? [];
+        return new YourDayDTO($widget, $calendarListing->unavailableCalendars, $calendarListing->credentialsRejectedCalendars);
     }
 
     public function completeTodo(User $user, Todo $todo): void
@@ -111,13 +90,12 @@ class WidgetService
 
     public function timeTracking(User $user): array
     {
-        $timezone = $user->timezone();
-        $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
+        $format = $this->format($user);
 
         $running = $this->timeTrackingService->runningEntry($user);
 
         $sections = [
-            'running' => collect($running ? [$this->runningRow($running, $timezone)] : []),
+            'running' => collect($running ? [$this->runningRow($running, $format->timezone)] : []),
             'projects' => $this->timeTrackingService->projectsByLastUse($user, self::SECTION_LIMIT, $running?->project_id)
                 ->map(fn (TimeTrackingProject $project) => $this->projectRow($project)),
         ];
@@ -125,20 +103,12 @@ class WidgetService
         return [
             'kind' => 'time-tracking',
             'schema_version' => self::SCHEMA_VERSION,
-            'generated_at' => CarbonImmutable::now($timezone)->toIso8601String(),
+            'generated_at' => CarbonImmutable::now($format->timezone)->toIso8601String(),
             'labels' => [
-                'title' => __('widgets.time_tracking_title', [], $locale),
-                'empty' => __('widgets.time_tracking_empty', [], $locale),
+                'title' => __('widgets.time_tracking_title', [], $format->locale),
+                'empty' => __('widgets.time_tracking_empty', [], $format->locale),
             ],
-            'sections' => collect($sections)
-                ->filter(fn ($rows) => $rows->isNotEmpty())
-                ->map(fn ($rows, string $key) => [
-                    'key' => $key,
-                    'title' => __('widgets.section_' . $key, [], $locale),
-                    'rows' => $rows->values()->all(),
-                ])
-                ->values()
-                ->all(),
+            'sections' => $this->sections($sections, $format->locale),
         ];
     }
 
@@ -158,16 +128,15 @@ class WidgetService
 
     public function checkIn(User $user): array
     {
-        $timezone = $user->timezone();
-        $locale = in_array($user->settings?->language, config('app.locales'), true) ? $user->settings->language : 'en';
+        $format = $this->format($user);
         $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInBuiltInTracker::DEFAULT_SPORTS;
 
-        $now = CarbonImmutable::now($timezone);
+        $now = CarbonImmutable::now($format->timezone);
         $today = $now->startOfDay();
         $values = $this->checkInService->builtInValuesOn($user, $today->toDateString());
 
         $rows = collect($this->checkInTrackerService->enabledBuiltInKeys($user))
-            ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $locale));
+            ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $format->locale));
 
         return [
             'kind' => 'check-in',
@@ -175,8 +144,8 @@ class WidgetService
             'generated_at' => $now->toIso8601String(),
             'refresh_at' => $today->addDay()->toIso8601String(),
             'labels' => [
-                'title' => __('widgets.check_in_title', [], $locale),
-                'empty' => __('widgets.check_in_empty', [], $locale),
+                'title' => __('widgets.check_in_title', [], $format->locale),
+                'empty' => __('widgets.check_in_empty', [], $format->locale),
             ],
             'sections' => $rows->isEmpty() ? [] : [['key' => 'today', 'rows' => $rows->values()->all()]],
         ];
@@ -198,16 +167,20 @@ class WidgetService
                 'key' => 'check_in.set',
                 'value' => $value,
                 'options' => match ($tracker) {
-                    'mood' => array_map(fn (int $option) => ['value' => $option, 'icon' => 'mood_' . $option, 'color' => self::CHECK_IN_COLORS[$option]], range(1, 5)),
                     'sports' => $this->sportOptions($selectedSports, $value),
-                    default => array_map(fn (int $option) => [
-                        'value' => $option,
-                        'icon' => $tracker,
-                        'color' => $tracker === 'menstruation' ? self::CHECK_IN_MENSTRUATION_COLOR : self::CHECK_IN_COLORS[$option],
-                    ], range(1, 5)),
+                    default => $this->scaleOptions($tracker),
                 },
             ],
         ];
+    }
+
+    private function scaleOptions(string $tracker): array
+    {
+        return array_map(fn (int $option) => [
+            'value' => $option,
+            'icon' => $tracker === 'mood' ? 'mood_' . $option : $tracker,
+            'color' => $tracker === 'menstruation' ? self::CHECK_IN_MENSTRUATION_COLOR : self::CHECK_IN_COLORS[$option],
+        ], range(1, 5));
     }
 
     // Like the app: the selected sports in order, plus today's stored sport when it is no longer selected.
@@ -219,11 +192,16 @@ class WidgetService
             ->unique()
             ->values();
 
-        if ($value !== null && isset(self::CHECK_IN_SPORTS[$value]) && !$ids->contains($value)) {
+        $isStoredSportUnselected = $value !== null && isset(self::CHECK_IN_SPORTS[$value]) && !$ids->contains($value);
+        if ($isStoredSportUnselected) {
             $ids->push($value);
         }
 
-        return $ids->map(fn (int $id) => ['value' => $id, 'icon' => 'sport_' . self::CHECK_IN_SPORTS[$id], 'color' => self::CHECK_IN_SPORTS_COLOR])->all();
+        return $ids->map(fn (int $id) => [
+            'value' => $id,
+            'icon' => 'sport_' . self::CHECK_IN_SPORTS[$id],
+            'color' => self::CHECK_IN_SPORTS_COLOR,
+        ])->all();
     }
 
     private function runningRow(TimeTrackingEntry $entry, string $timezone): array
@@ -259,37 +237,52 @@ class WidgetService
         return $color !== null && preg_match(self::COLOR_PATTERN, $color) ? $color : null;
     }
 
-    private function eventRow(EventDTO $event, string $timezone, CarbonImmutable $today, bool $withDate, string $timeFormat, string $dateFormat, string $locale): array
+    private function eventRow(EventDTO $event, CarbonImmutable $today, bool $withDate, WidgetFormatDTO $format): array
     {
-        $start = $this->localStart($event, $timezone);
-        $end = $event->endDate ? $this->localDate($event->endDate, $event->isAllDay, $timezone) : null;
+        $start = $this->localStart($event, $format->timezone);
+        $end = $event->endDate ? $this->localDate($event->endDate, $event->isAllDay, $format->timezone) : null;
+        $occurrenceStart = $event->originalStartDate ?? $event->startDate;
 
         $timeLabel = match (true) {
-            $withDate => trim($this->shortDate($start, $dateFormat) . ($event->isAllDay ? '' : ' ' . $start->format($timeFormat))),
-            $event->isAllDay => __('widgets.all_day', [], $locale),
-            $start >= $today => $start->format($timeFormat),
+            $withDate => $this->dateTimeLabel($start, $event->isAllDay, $format),
+            $event->isAllDay => __('widgets.all_day', [], $format->locale),
+            $start >= $today => $start->format($format->timeFormat),
             default => null,
         };
 
         return $this->withoutNulls([
-            'id' => $event->uri . '#' . ($event->originalStartDate ?? $event->startDate)?->format('Ymd\THis'),
+            'id' => $event->uri . '#' . $occurrenceStart?->format('Ymd\THis'),
             'title' => $event->title,
             'time_label' => $timeLabel,
-            'at' => $event->isAllDay ? $start->toDateString() : $start->toIso8601String(),
-            'until' => $end ? ($event->isAllDay ? $end->toDateString() : $end->toIso8601String()) : null,
+            'at' => $this->rowDate($start, $event->isAllDay),
+            'until' => $end ? $this->rowDate($end, $event->isAllDay) : null,
             'all_day' => $event->isAllDay,
             'icon' => 'event',
         ]);
     }
 
-    private function todoRow(Todo $todo, CarbonImmutable $today, string $dateFormat, string $locale): array
+    private function dateTimeLabel(CarbonImmutable $start, bool $isAllDay, WidgetFormatDTO $format): string
+    {
+        $time = $isAllDay ? '' : ' ' . $start->format($format->timeFormat);
+
+        return trim($this->shortDate($start, $format->dateFormat) . $time);
+    }
+
+    // All-day rows carry the calendar date, timed rows the full timestamp.
+    private function rowDate(CarbonImmutable $date, bool $isAllDay): string
+    {
+        return $isAllDay ? $date->toDateString() : $date->toIso8601String();
+    }
+
+    private function todoRow(Todo $todo, CarbonImmutable $today, WidgetFormatDTO $format): array
     {
         $due = CarbonImmutable::parse($todo->due_at->toDateString(), $today->getTimezone());
+        $isOverdue = $due < $today;
 
         return $this->withoutNulls([
             'id' => $todo->id,
             'title' => $todo->title,
-            'subtitle' => $due < $today ? __('widgets.overdue', ['date' => $this->shortDate($due, $dateFormat)], $locale) : null,
+            'subtitle' => $isOverdue ? __('widgets.overdue', ['date' => $this->shortDate($due, $format->dateFormat)], $format->locale) : null,
             'at' => $due->toDateString(),
             'all_day' => true,
             'icon' => 'todo',
@@ -316,6 +309,32 @@ class WidgetService
         $formatted = str_replace(['dd', 'mm', 'YYYY', 'YY'], [$date->format('d'), $date->format('m'), '', ''], $dateFormat);
 
         return trim(str_replace('  ', ' ', $formatted), " /.-");
+    }
+
+    private function format(User $user): WidgetFormatDTO
+    {
+        $settings = $user->settings;
+
+        return new WidgetFormatDTO(
+            timezone: $user->timezone(),
+            locale: in_array($settings?->language, config('app.locales'), true) ? $settings->language : 'en',
+            timeFormat: in_array($settings?->time_format, self::TIME_FORMATS, true) ? $settings->time_format : self::DEFAULT_TIME_FORMAT,
+            dateFormat: $settings?->date_format ?: self::DEFAULT_DATE_FORMAT,
+        );
+    }
+
+    // A section holds at most SECTION_LIMIT rows; empty sections are left out.
+    private function sections(array $sections, string $locale): array
+    {
+        return collect($sections)
+            ->filter(fn ($rows) => $rows->isNotEmpty())
+            ->map(fn ($rows, string $key) => [
+                'key' => $key,
+                'title' => __('widgets.section_' . $key, [], $locale),
+                'rows' => $rows->take(self::SECTION_LIMIT)->values()->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     private function withoutNulls(array $row): array

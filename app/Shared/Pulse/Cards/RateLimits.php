@@ -6,7 +6,6 @@ use App\Shared\Pulse\PulseMetrics;
 use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 
-/** F: 429 responses per limiter and route. */
 #[Lazy]
 class RateLimits extends MetricCard
 {

@@ -3,6 +3,8 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\HandlesApiAuth;
+use App\Api\Users\Enums\AccountDeletionStatus;
 use App\Api\Users\Enums\UserGrowthPeriod;
 use App\Api\Users\Models\User;
 use App\Api\Users\Requests\ChangePasswordRequest;
@@ -21,6 +23,7 @@ use Illuminate\Http\Request;
 class UserController
 {
     use AuthorizesRequests;
+    use HandlesApiAuth;
 
     // Released frontends send no per_page and expect the whole list on one page.
     private const int LEGACY_PAGE_SIZE = 1000;
@@ -138,7 +141,7 @@ class UserController
      */
     public function growth(UserGrowthRequest $request): JsonResponse
     {
-        $this->authorize('viewAny', User::class);
+        abort_unless($this->isAdmin($request), 403);
 
         return ApiResponse::success(
             $this->userService->growth($request->enum('group_by', UserGrowthPeriod::class)),
@@ -246,9 +249,9 @@ class UserController
 
         $status = $this->userService->requestDeletion($request->user(), $request->validated('platform') ?? 'web');
 
-        return ApiResponse::success(['status' => $status], match ($status) {
-            'email_sent' => 'A confirmation link has been sent to your email address.',
-            'deleted' => 'Your account has been deleted.',
+        return ApiResponse::success(['status' => $status->value], match ($status) {
+            AccountDeletionStatus::EmailSent => 'A confirmation link has been sent to your email address.',
+            AccountDeletionStatus::Deleted => 'Your account has been deleted.',
         });
     }
 

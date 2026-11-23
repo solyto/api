@@ -42,10 +42,8 @@ class UserCacheService
         }
     }
 
+    // One round trip for several keys. Results keep the keys of $identifierLists; misses and falsy values are null, like get().
     /**
-     * One round trip for several keys. Results keep the keys of
-     * $identifierLists; misses and falsy values are null, like get().
-     *
      * @param  array<array-key, array<int, string>>  $identifierLists
      * @return array<array-key, mixed>
      */
@@ -109,19 +107,14 @@ class UserCacheService
         }
     }
 
-    /**
-     * The tag every tagged per-user entry carries, so one flush drops all of
-     * a user's tagged entries.
-     */
+    // Every tagged per-user entry carries it, so one flush drops all of a user's tagged entries.
     public static function userTag(string $userId): string
     {
         return 'user_'.$userId;
     }
 
+    // Tagged entries are only found with the tags, in the order, they were stored with.
     /**
-     * Tagged entries are only found with the tags, in the order, they were
-     * stored with.
-     *
      * @param  array<int, string>  $tags
      */
     public function storeTagged(array $tags, array $identifiers, int $ttl, $data): bool
@@ -180,10 +173,8 @@ class UserCacheService
         }
     }
 
+    // Runs after writes, so a cache failure is logged and never fails the write.
     /**
-     * Drops every entry stored with any of the tags. Runs after writes, so a
-     * cache failure is logged and never fails the write.
-     *
      * @param  array<int, string>  $tags
      */
     public function flushTags(array $tags): void

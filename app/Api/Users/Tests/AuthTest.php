@@ -5,9 +5,18 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Models\VerificationToken;
 use App\Api\Users\Services\AuthService;
 use App\Shared\Enums\AuthPlatformEnum;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+
+function verifyPayload(User $user, bool $expired = false): array
+{
+    $factory = VerificationToken::factory()->forUser($user);
+
+    return ['user_id' => $user->id, 'token' => ($expired ? $factory->expired() : $factory)->create()->token];
+}
 
 describe('POST /v1/auth/register', function () {
     it('registers a user, creates a verification token and sends a mail', function () {
@@ -43,7 +52,8 @@ describe('POST /v1/auth/register', function () {
             'password' => 'short',
         ]);
 
-        $response->assertStatus(422);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['name', 'email', 'password']);
     });
 
     it('rejects duplicate emails', function () {
@@ -56,7 +66,8 @@ describe('POST /v1/auth/register', function () {
             'password_confirmation' => 'password1234',
         ]);
 
-        $response->assertStatus(422);
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('email');
     });
 
     it('renders a registration failure through the central 500 handler', function () {
@@ -112,20 +123,22 @@ describe('POST /v1/auth/login', function () {
     it('returns 401 for wrong credentials', function () {
         makeUser(['email' => 'login@example.com', 'password' => Hash::make('password1234')]);
 
-        $this->postJson('/api/v1/auth/login', [
+        expectApiError($this->postJson('/api/v1/auth/login', [
             'email' => 'login@example.com',
             'password' => 'wrong-password',
-        ])->assertStatus(401);
+        ]), 401);
     });
 
     it('returns 401 with email_unverified for an unverified user when confirmation is required', function () {
         User::factory()->unverified()->create(['email' => 'unverified@example.com', 'password' => Hash::make('password1234')]);
 
-        $this->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'unverified@example.com',
             'password' => 'password1234',
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['email_unverified']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['email_unverified']);
     });
 
     it('returns a plain 401 for an unverified user with a wrong password', function () {
@@ -134,8 +147,9 @@ describe('POST /v1/auth/login', function () {
         $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'unverified@example.com',
             'password' => 'wrong-password',
-        ])->assertStatus(401);
+        ]);
 
+        expectApiError($response, 401);
         expect($response->json('errors') ?? [])->not->toContain('email_unverified');
     });
 
@@ -164,14 +178,13 @@ describe('POST /v1/auth/login', function () {
         $credentials = ['email' => 'throttled@example.com', 'password' => 'wrong-password'];
 
         foreach (range(1, 5) as $ignored) {
-            $this->postJson('/api/v1/auth/login', $credentials)->assertStatus(401);
+            expectApiError($this->postJson('/api/v1/auth/login', $credentials), 401);
         }
 
-        $response = $this->postJson('/api/v1/auth/login', $credentials)
-            ->assertStatus(429)
-            ->assertJsonPath('errors', ['too_many_requests'])
-            ->assertHeader('Retry-After');
+        $response = $this->postJson('/api/v1/auth/login', $credentials);
 
+        expectApiError($response, 429);
+        $response->assertJsonPath('errors', ['too_many_requests'])->assertHeader('Retry-After');
         expect($response->json('meta.retry_after'))->toBeInt()->toBeGreaterThan(0);
     });
 });
@@ -249,9 +262,8 @@ describe('Authenticated auth endpoints', function () {
         $user = makeUser();
         $token = sanctumToken($user);
 
-        $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/auth/revoke-token', ['token_id' => 999999])
-            ->assertStatus(404);
+        expectApiError($this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/auth/revoke-token', ['token_id' => 999999]), 404);
     });
 
     it('refuses to revoke the current token', function () {
@@ -259,10 +271,11 @@ describe('Authenticated auth endpoints', function () {
         $current = $user->createToken('auth-token-web');
         $token = $current->plainTextToken;
 
-        $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson('/api/v1/auth/revoke-token', ['token_id' => $current->accessToken->id])
-            ->assertStatus(400)
-            ->assertJsonPath('message', 'Cannot revoke current token. Use logout instead.');
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/auth/revoke-token', ['token_id' => $current->accessToken->id]);
+
+        expectApiError($response, 400);
+        $response->assertJsonPath('message', 'Cannot revoke current token. Use logout instead.');
     });
 });
 
@@ -286,40 +299,69 @@ describe('POST /v1/auth/verify', function () {
         $user = makeUser();
         $verificationToken = VerificationToken::factory()->forUser($user)->create();
 
-        $this->postJson('/api/v1/auth/verify', [
+        $response = $this->postJson('/api/v1/auth/verify', [
             'user_id' => $user->id,
             'token' => $verificationToken->token,
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['already_verified']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['already_verified']);
     });
 
     it('returns token_mismatch for a wrong token', function () {
         $user = User::factory()->unverified()->create();
         VerificationToken::factory()->forUser($user)->create(['token' => 'real-token']);
 
-        $this->postJson('/api/v1/auth/verify', [
+        $response = $this->postJson('/api/v1/auth/verify', [
             'user_id' => $user->id,
             'token' => 'wrong-token',
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['token_mismatch']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['token_mismatch']);
     });
 
     it('returns token_expired for an expired token', function () {
         $user = User::factory()->unverified()->create();
         VerificationToken::factory()->forUser($user)->expired()->create();
 
-        $this->postJson('/api/v1/auth/verify', [
+        $response = $this->postJson('/api/v1/auth/verify', [
             'user_id' => $user->id,
             'token' => VerificationToken::where('user_id', $user->id)->first()->token,
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['token_expired']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['token_expired']);
     });
 
     it('returns 401 for an unknown user', function () {
-        $this->postJson('/api/v1/auth/verify', [
+        expectApiError($this->postJson('/api/v1/auth/verify', [
             'user_id' => '00000000-0000-0000-0000-000000000000',
             'token' => 'whatever',
-        ])->assertStatus(401);
+        ]), 401);
+    });
+
+    it('answers each known outcome with its message and code and does not report it', function (Closure $payload, string $message, string $code) {
+        Exceptions::fake();
+
+        $response = $this->postJson('/api/v1/auth/verify', $payload());
+
+        expect(Arr::except($response->assertStatus(401)->json(), 'timestamp'))->toBe(['success' => false, 'message' => $message, 'errors' => [$code]]);
+        Exceptions::assertNothingReported();
+    })->with([
+        'already verified' => [fn () => verifyPayload(makeUser()), 'Account already verified', 'already_verified'],
+        'wrong token' => [fn () => ['token' => 'wrong-token'] + verifyPayload(User::factory()->unverified()->create()), 'No such verification token', 'token_mismatch'],
+        'expired token' => [fn () => verifyPayload(User::factory()->unverified()->create(), expired: true), 'Verification token has expired', 'token_expired'],
+    ]);
+
+    it('reports any other failure and answers like for an unknown user', function () {
+        Exceptions::fake();
+        $this->mock(AuthService::class)->shouldReceive('verify')->andThrow(new RuntimeException('database gone'));
+
+        $response = $this->postJson('/api/v1/auth/verify', ['user_id' => '00000000-0000-0000-0000-000000000000', 'token' => 'whatever']);
+
+        expect(Arr::except($response->assertStatus(401)->json(), 'timestamp'))->toBe(['success' => false, 'message' => 'Provided data do not match any user.']);
+        Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'database gone');
     });
 });
 
@@ -341,11 +383,13 @@ describe('POST /v1/auth/resend-verification', function () {
         Mail::assertQueued(UserVerification::class, 1);
         Mail::assertQueued(UserVerification::class, fn ($mail) => $mail->hasTo($user->email));
 
-        $this->postJson('/api/v1/auth/verify', [
+        $response = $this->postJson('/api/v1/auth/verify', [
             'user_id' => $user->id,
             'token' => 'old-token',
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['token_mismatch']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['token_mismatch']);
     });
 
     it('issues a token that verifies the account', function () {
@@ -407,8 +451,7 @@ describe('POST /v1/auth/resend-verification', function () {
             $this->postJson('/api/v1/auth/resend-verification', ['email' => $email])->assertOk();
         }
 
-        $this->postJson('/api/v1/auth/resend-verification', ['email' => 'someone@EXAMPLE.COM'])
-            ->assertStatus(429);
+        expectApiError($this->postJson('/api/v1/auth/resend-verification', ['email' => 'someone@EXAMPLE.COM']), 429);
     });
 });
 
@@ -483,13 +526,15 @@ describe('POST /v1/auth/reset-password', function () {
     it('rejects an invalid token', function () {
         makeUser(['email' => 'resetpw@example.com']);
 
-        $this->postJson('/api/v1/auth/reset-password', [
+        $response = $this->postJson('/api/v1/auth/reset-password', [
             'token' => 'invalid-token',
             'email' => 'resetpw@example.com',
             'password' => 'newpassword123',
             'password_confirmation' => 'newpassword123',
-        ])->assertStatus(401)
-            ->assertJsonPath('errors', ['invalid_token']);
+        ]);
+
+        expectApiError($response, 401);
+        $response->assertJsonPath('errors', ['invalid_token']);
     });
 });
 

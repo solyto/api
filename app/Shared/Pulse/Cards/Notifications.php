@@ -6,7 +6,6 @@ use App\Shared\Pulse\PulseMetrics;
 use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 
-/** D: notifications sent and failed per channel and type. */
 #[Lazy]
 class Notifications extends MetricCard
 {

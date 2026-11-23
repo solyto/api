@@ -6,7 +6,6 @@ use App\Shared\Pulse\PulseMetrics;
 use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 
-/** G: book and music release lookups, from a cache miss in a request or from the scheduled job. */
 #[Lazy]
 class ReleaseLookups extends MetricCard
 {

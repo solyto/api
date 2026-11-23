@@ -29,7 +29,7 @@ describe('MCP endpoint access', function () {
     it('lists the tools for an admin with an MCP token', function () {
         enableMcp();
 
-        $response = mcpRequest($this, mcpToken(User::factory()->admin()->create()))->assertOk();
+        $response = mcpRequest($this, mcpToken(mcpAdmin()))->assertOk();
 
         expect(collect($response->json('result.tools'))->pluck('name')->all())->toEqualCanonicalizing([
             'list-todos', 'list-todo-tags-and-categories', 'create-todo', 'update-todo', 'search-notes', 'get-note', 'list-upcoming-events', 'search-contacts', 'list-dev-requests', 'get-dev-request', 'create-dev-request',
@@ -44,7 +44,7 @@ describe('MCP endpoint access', function () {
 
     it('records when a token was last used', function () {
         enableMcp();
-        $token = mcpToken(User::factory()->admin()->create());
+        $token = mcpToken(mcpAdmin());
 
         mcpRequest($this, $token)->assertOk();
 
@@ -53,7 +53,7 @@ describe('MCP endpoint access', function () {
 
     it('does not exist while disabled', function () {
         foreach (['get', 'delete', 'post'] as $method) {
-            $this->json($method, '/mcp')->assertNotFound();
+            expectApiError($this->json($method, '/mcp'), 404);
         }
     });
 
@@ -72,12 +72,12 @@ describe('MCP endpoint access', function () {
     it('rejects a wrong token', function () {
         enableMcp();
 
-        mcpRequest($this, mcpToken(User::factory()->admin()->create()) . 'x')->assertUnauthorized();
+        mcpRequest($this, mcpToken(mcpAdmin()) . 'x')->assertUnauthorized();
     });
 
     it('rejects an expired token', function () {
         enableMcp();
-        $token = mcpToken(User::factory()->admin()->create());
+        $token = mcpToken(mcpAdmin());
         $this->travel(config('mcp.token_expiry_days') + 1)->days();
 
         mcpRequest($this, $token)->assertUnauthorized();
@@ -85,7 +85,7 @@ describe('MCP endpoint access', function () {
 
     it('rejects a revoked token immediately', function () {
         enableMcp();
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $token = mcpToken($admin);
         mcpRequest($this, $token)->assertOk();
 
@@ -102,7 +102,7 @@ describe('MCP endpoint access', function () {
 
     it('rejects an admin who was demoted after the token was issued', function () {
         enableMcp();
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $token = mcpToken($admin);
         $admin->update(['role' => 'user']);
 
@@ -112,11 +112,11 @@ describe('MCP endpoint access', function () {
     it('rejects Sanctum tokens, even an admin\'s', function () {
         enableMcp();
 
-        mcpRequest($this, sanctumToken(User::factory()->admin()->create()))->assertUnauthorized();
+        mcpRequest($this, sanctumToken(mcpAdmin()))->assertUnauthorized();
     });
 
     it('deletes a user\'s MCP tokens along with the user', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         mcpToken($admin);
 
         $admin->delete();
@@ -128,22 +128,22 @@ describe('MCP endpoint access', function () {
 describe('MCP token isolation', function () {
     it('does not work on the regular API', function () {
         enableMcp();
-        $token = mcpToken(User::factory()->admin()->create());
+        $token = mcpToken(mcpAdmin());
         app('auth')->forgetGuards();
 
-        $this->withHeader('Authorization', 'Bearer ' . $token)->getJson('/api/v1/users/me')->assertUnauthorized();
+        expectApiError($this->withHeader('Authorization', 'Bearer ' . $token)->getJson('/api/v1/users/me'), 401);
     });
 
     it('does not work on widget routes', function () {
         enableMcp();
-        $token = mcpToken(User::factory()->admin()->create());
+        $token = mcpToken(mcpAdmin());
         app('auth')->forgetGuards();
 
-        $this->withHeader('Authorization', 'Bearer ' . $token)->getJson('/api/v1/widgets/your-day')->assertUnauthorized();
+        expectApiError($this->withHeader('Authorization', 'Bearer ' . $token)->getJson('/api/v1/widgets/your-day'), 401);
     });
 
     it('is not a Sanctum token', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         mcpToken($admin);
 
         expect($admin->tokens()->count())->toBe(0);
@@ -153,7 +153,7 @@ describe('MCP token isolation', function () {
 describe('app:mcp:token', function () {
     it('issues a working token for admins', function () {
         enableMcp();
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         Artisan::call('app:mcp:token', ['email' => $admin->email]);
         $lines = array_values(array_filter(array_map('trim', explode("\n", Artisan::output()))));
@@ -163,7 +163,7 @@ describe('app:mcp:token', function () {
     });
 
     it('stores only the token hash', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $token = mcpToken($admin);
 
         expect(McpToken::sole()->token_hash)->not->toBe($token)->toHaveLength(64);
@@ -178,8 +178,8 @@ describe('app:mcp:token', function () {
     });
 
     it('revokes only that user\'s MCP tokens', function () {
-        $admin = User::factory()->admin()->create();
-        $other = User::factory()->admin()->create();
+        $admin = mcpAdmin();
+        $other = mcpAdmin();
         mcpToken($admin);
         mcpToken($admin);
         mcpToken($other);

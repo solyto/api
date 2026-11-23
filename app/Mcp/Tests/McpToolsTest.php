@@ -26,7 +26,7 @@ beforeEach(fn () => enableMcp());
 
 describe('list-todos', function () {
     it('lists only the user\'s open todos, soonest due first', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         Todo::factory()->forUser($admin)->create(['title' => 'Later', 'due_at' => now()->addWeek(), 'is_completed' => false]);
         Todo::factory()->forUser($admin)->create(['title' => 'Sooner', 'due_at' => now()->addDay(), 'is_completed' => false]);
         Todo::factory()->forUser($admin)->create(['title' => 'Done', 'is_completed' => true]);
@@ -39,7 +39,7 @@ describe('list-todos', function () {
     });
 
     it('filters by text', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         Todo::factory()->forUser($admin)->create(['title' => 'Buy milk', 'is_completed' => false]);
         Todo::factory()->forUser($admin)->create(['title' => 'Call mum', 'is_completed' => false]);
 
@@ -51,7 +51,7 @@ describe('list-todos', function () {
 
 describe('list-todo-tags-and-categories', function () {
     it('lists only the user\'s tags and categories', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         Tag::factory()->forUser($admin)->create(['name' => 'errands']);
         TodoCategory::factory()->forUser($admin)->create(['title' => 'Home']);
         Tag::factory()->forUser(makeUser())->create(['name' => 'foreign-tag']);
@@ -66,7 +66,7 @@ describe('list-todo-tags-and-categories', function () {
 
 describe('create-todo', function () {
     it('creates a todo for the user', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $category = TodoCategory::factory()->forUser($admin)->create();
         $tag = Tag::factory()->forUser($admin)->create();
 
@@ -86,7 +86,7 @@ describe('create-todo', function () {
     });
 
     it('does not create tags or categories from the title', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'Read #book /reading due:tomorrow'])->assertOk();
 
@@ -96,7 +96,7 @@ describe('create-todo', function () {
     });
 
     it('rejects other users\' categories and tags', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'A', 'category_id' => TodoCategory::factory()->forUser(makeUser())->create()->id])
             ->assertHasErrors();
@@ -107,7 +107,7 @@ describe('create-todo', function () {
     });
 
     it('rejects invalid input', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         SolytoServer::actingAs($admin)->tool(CreateTodo::class, [])->assertHasErrors();
         SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'A', 'due_at' => 'tomorrow'])->assertHasErrors();
@@ -117,7 +117,7 @@ describe('create-todo', function () {
     });
 
     it('ignores fields it does not accept', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $other = makeUser();
 
         SolytoServer::actingAs($admin)->tool(CreateTodo::class, ['title' => 'Mine', 'user_id' => $other->id, 'is_completed' => true])->assertOk();
@@ -129,7 +129,7 @@ describe('create-todo', function () {
 
 describe('update-todo', function () {
     it('updates only the given fields', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $todo = Todo::factory()->forUser($admin)->create(['title' => 'Old title', 'priority' => 'low', 'description' => 'Keep me']);
 
         SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'title' => 'New title', 'priority' => 'high'])
@@ -143,7 +143,7 @@ describe('update-todo', function () {
     });
 
     it('sets the category and replaces the tags', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $category = TodoCategory::factory()->forUser($admin)->create();
         $tag = Tag::factory()->forUser($admin)->create();
         $todo = Todo::factory()->forUser($admin)->create();
@@ -158,7 +158,7 @@ describe('update-todo', function () {
     });
 
     it('rejects other users\' categories and tags', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $todo = Todo::factory()->forUser($admin)->create();
 
         SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'category_id' => TodoCategory::factory()->forUser(makeUser())->create()->id])
@@ -168,7 +168,7 @@ describe('update-todo', function () {
     });
 
     it('does not update other users\' todos', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $todo = Todo::factory()->forUser(makeUser())->create(['title' => 'Not yours']);
 
         SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'title' => 'Hijacked'])
@@ -178,7 +178,7 @@ describe('update-todo', function () {
     });
 
     it('rejects invalid values', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $todo = Todo::factory()->forUser($admin)->create();
 
         SolytoServer::actingAs($admin)->tool(UpdateTodo::class, ['id' => $todo->id, 'status' => 'whatever'])->assertHasErrors();
@@ -188,7 +188,7 @@ describe('update-todo', function () {
 
 describe('search-notes and get-note', function () {
     it('finds the user\'s visible notes only', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $hidden = NoteCategory::factory()->forUser($admin)->hidden()->create();
         Note::factory()->forUser($admin)->create(['title' => 'Holiday plans', 'content' => 'Lisbon in spring']);
         Note::factory()->forUser($admin)->create(['title' => 'Diary', 'content' => 'Lisbon secret', 'category_id' => $hidden->id]);
@@ -201,11 +201,11 @@ describe('search-notes and get-note', function () {
     });
 
     it('requires a query', function () {
-        SolytoServer::actingAs(User::factory()->admin()->create())->tool(SearchNotes::class)->assertHasErrors();
+        SolytoServer::actingAs(mcpAdmin())->tool(SearchNotes::class)->assertHasErrors();
     });
 
     it('returns a full note', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $note = Note::factory()->forUser($admin)->create(['title' => 'Recipe', 'content' => 'Full recipe text']);
 
         SolytoServer::actingAs($admin)->tool(GetNote::class, ['id' => $note->id])
@@ -214,7 +214,7 @@ describe('search-notes and get-note', function () {
     });
 
     it('does not return other users\' notes or hidden notes', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $hidden = NoteCategory::factory()->forUser($admin)->hidden()->create();
         $hiddenNote = Note::factory()->forUser($admin)->create(['category_id' => $hidden->id]);
         $foreignNote = Note::factory()->forUser(makeUser())->create();
@@ -247,7 +247,7 @@ describe('list-upcoming-events', function () {
     });
 
     it('caps the window', function () {
-        SolytoServer::actingAs(User::factory()->admin()->create())->tool(ListUpcomingEvents::class, ['days' => 365])->assertHasErrors();
+        SolytoServer::actingAs(mcpAdmin())->tool(ListUpcomingEvents::class, ['days' => 365])->assertHasErrors();
     });
 });
 
@@ -277,7 +277,7 @@ describe('search-contacts', function () {
 
 describe('list-dev-requests and get-dev-request', function () {
     it('never reveals who wrote a dev request or comment', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $author = User::factory()->create(['name' => 'Alice Author']);
         $commenter = User::factory()->create(['name' => 'Carl Commenter']);
         $devRequest = DevRequest::factory()->create(['title' => 'Dark mode please', 'created_by_user_id' => $author->id]);
@@ -293,7 +293,7 @@ describe('list-dev-requests and get-dev-request', function () {
     });
 
     it('lists dev requests from all users with their real status', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         DevRequest::factory()->create(['title' => 'Dark mode please', 'type' => 'feature', 'status' => 'waiting-for-deployment']);
         DevRequest::factory()->create(['title' => 'Crash on login', 'type' => 'bug', 'status' => 'backlog']);
         DevRequest::factory()->create(['title' => 'Export as CSV', 'type' => 'feature', 'status' => 'waiting-for-user']);
@@ -304,7 +304,7 @@ describe('list-dev-requests and get-dev-request', function () {
     });
 
     it('filters by status, type and text', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         DevRequest::factory()->create(['title' => 'Dark mode please', 'type' => 'feature', 'status' => 'backlog']);
         DevRequest::factory()->create(['title' => 'Crash on login', 'type' => 'bug', 'status' => 'backlog']);
         DevRequest::factory()->create(['title' => 'Old crash', 'type' => 'bug', 'status' => 'completed']);
@@ -319,11 +319,11 @@ describe('list-dev-requests and get-dev-request', function () {
     });
 
     it('rejects unknown statuses', function () {
-        SolytoServer::actingAs(User::factory()->admin()->create())->tool(ListDevRequests::class, ['status' => 'whatever'])->assertHasErrors();
+        SolytoServer::actingAs(mcpAdmin())->tool(ListDevRequests::class, ['status' => 'whatever'])->assertHasErrors();
     });
 
     it('returns one dev request with its comments', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $devRequest = DevRequest::factory()->create(['title' => 'Dark mode please']);
         DevRequestComment::factory()->create(['dev_request_id' => $devRequest->id, 'content' => 'Yes, my eyes hurt']);
 
@@ -339,7 +339,7 @@ describe('create-dev-request', function () {
     beforeEach(fn () => Notification::fake());
 
     it('creates a dev request as the user', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, [
             'type' => 'bug', 'title' => 'Crash on save', 'description' => 'Saving a note crashes', 'priority' => 4,
@@ -352,7 +352,7 @@ describe('create-dev-request', function () {
     });
 
     it('rejects invalid input and ignores fields it does not accept', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
 
         SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, ['type' => 'bug', 'title' => 'No description'])->assertHasErrors();
         SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, ['type' => 'question', 'title' => 'A', 'description' => 'B'])->assertHasErrors();
@@ -367,7 +367,7 @@ describe('create-dev-request', function () {
     });
 
     it('shares the REST endpoint\'s hourly limit', function () {
-        $admin = User::factory()->admin()->create();
+        $admin = mcpAdmin();
         $payload = ['type' => 'feature', 'title' => 'Dark mode', 'description' => 'Add a dark theme'];
 
         for ($i = 0; $i < 9; $i++) {
@@ -377,7 +377,10 @@ describe('create-dev-request', function () {
         SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, $payload)->assertOk();
         SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, $payload)->assertHasErrors(['Too many dev requests, try again later.']);
         expectApiError($this->actingAs($admin, 'sanctum')->postJson('/api/v1/dev-requests', $payload), 429);
-
         expect(DevRequest::count())->toBe(10);
+
+        $this->travel(61)->minutes();
+        SolytoServer::actingAs($admin)->tool(CreateDevRequest::class, $payload)->assertOk();
+        expect(DevRequest::count())->toBe(11);
     });
 });

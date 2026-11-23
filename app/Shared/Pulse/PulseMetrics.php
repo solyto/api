@@ -4,16 +4,10 @@ namespace App\Shared\Pulse;
 
 use Laravel\Pulse\Facades\Pulse;
 
-/**
- * Custom Pulse metrics, shown by the cards in App\Shared\Pulse\Cards.
- *
- * Every method runs inside Pulse::rescue(): a failing measurement must never
- * break the request, job or notification it measures. Errors end up in the
- * log (see PulseMetricsServiceProvider).
- *
- * Keys hold feed URLs (without credentials, query or fragment), server hosts,
- * client names and versions, never user names or credentials.
- */
+// Every recording runs inside Pulse::rescue(): a failing measurement must never break the request,
+// job or notification it measures (PulseMetricsServiceProvider logs the error).
+// Pulse keeps keys for days and shows them, so they hold feed URLs (without credentials, query or
+// fragment), server hosts, client names and versions, never user names or credentials.
 final class PulseMetrics
 {
     public const string FEED_SYNC = 'feed_sync';
@@ -31,13 +25,10 @@ final class PulseMetrics
     public const string QUEUE_WAIT = 'queue_wait';
     public const string QUEUE_SIZE = 'queue_size';
 
-    /** Payload key with the time a job may start (push time plus delay), set by PulseMetricsServiceProvider. */
+    // Set by PulseMetricsServiceProvider on every queued job: the time it may start (push time plus delay).
     public const string PAYLOAD_AVAILABLE_AT = 'pulseAvailableAt';
 
-    /**
-     * User-Agent fragments of the DAV clients we want to tell apart, first
-     * match wins. Anything else counts as "Other".
-     */
+    // User-Agent fragments; the first match wins, so the order matters. Anything else counts as "Other".
     private const array DAV_CLIENTS = [
         'DAVx5' => 'DAVx5',
         'Thunderbird' => 'Thunderbird',
@@ -55,11 +46,8 @@ final class PulseMetrics
         'Windows' => 'Windows',
     ];
 
-    /**
-     * og:image page fetches in this process so far (FeedReader counts them).
-     * FeedService records the difference per sync, so a long-running queue
-     * worker doesn't need a reset.
-     */
+    // Totals for this process; FeedService records the difference per sync, so a long-running queue
+    // worker never needs a reset.
     private static int $ogImageLookups = 0;
 
     private static int $ogImageLookupMs = 0;
@@ -70,7 +58,7 @@ final class PulseMetrics
         self::$ogImageLookupMs += $ms;
     }
 
-    /** @return array{0: int, 1: int} og:image page fetches so far and their total duration in ms */
+    /** @return array{0: int, 1: int} fetches, total ms */
     public static function ogImageLookupStats(): array
     {
         return [self::$ogImageLookups, self::$ogImageLookupMs];
@@ -86,7 +74,6 @@ final class PulseMetrics
         return (int) round((hrtime(true) - $startedAt) / 1_000_000);
     }
 
-    /** A: one SyncFeed run. */
     public static function feedSync(string $feedUrl, int $ms, int $ogLookups, int $ogLookupMs, bool $failed): void
     {
         Pulse::rescue(function () use ($feedUrl, $ms, $ogLookups, $ogLookupMs, $failed) {
@@ -102,10 +89,7 @@ final class PulseMetrics
         });
     }
 
-    /**
-     * The feed URL without user info, query and fragment: private feeds often
-     * carry a token there, and Pulse keeps keys for days and shows them.
-     */
+    // Private feeds often carry a token in the user info or the query.
     public static function feedKey(string $feedUrl): string
     {
         $parts = parse_url($feedUrl);
@@ -119,7 +103,7 @@ final class PulseMetrics
             .($parts['path'] ?? '');
     }
 
-    /** B: one remote CalDAV request. $failure is null on success. */
+    // $failure is null on success.
     public static function externalCalendarCall(string $url, int $ms, ?string $failure): void
     {
         Pulse::rescue(function () use ($url, $ms, $failure) {
@@ -133,7 +117,6 @@ final class PulseMetrics
         });
     }
 
-    /** C: one request on the DAV endpoint. */
     public static function davRequest(string $method, ?string $userAgent, int $ms): void
     {
         Pulse::rescue(function () use ($method, $userAgent, $ms) {
@@ -156,7 +139,6 @@ final class PulseMetrics
         return 'Other';
     }
 
-    /** D: one notification on one channel. */
     public static function notification(string $channel, string $notification, bool $failed): void
     {
         Pulse::rescue(function () use ($channel, $notification, $failed) {
@@ -166,7 +148,6 @@ final class PulseMetrics
         });
     }
 
-    /** E: a request refused with 426 because the client is below min_client_version. */
     public static function clientRejected(?string $version): void
     {
         Pulse::rescue(function () use ($version) {
@@ -174,7 +155,6 @@ final class PulseMetrics
         });
     }
 
-    /** F: a request answered with 429. */
     public static function rateLimited(string $key): void
     {
         Pulse::rescue(function () use ($key) {
@@ -182,10 +162,7 @@ final class PulseMetrics
         });
     }
 
-    /**
-     * G: one release lookup for one user. $source is "request" (a cache miss
-     * the user waits for) or "job" (the scheduled refresh).
-     */
+    // $source tells a cache miss the user waits for ("request") from the scheduled refresh ("job").
     public static function releaseLookup(string $library, string $source, int $ms): void
     {
         Pulse::rescue(function () use ($library, $source, $ms) {
@@ -194,8 +171,6 @@ final class PulseMetrics
     }
 
     /**
-     * Runs a release lookup and records how long it took; returns its result.
-     *
      * @template T
      *
      * @param  callable(): T  $lookup
@@ -212,11 +187,7 @@ final class PulseMetrics
         }
     }
 
-    /**
-     * H1: seconds a job waited between becoming available (pushed, plus its
-     * delay) and a worker picking it up. Retries are left out: they keep the
-     * original push time and would look like long waits.
-     */
+    // Measured from when the job became available (push time plus delay), so a delayed job doesn't look stuck.
     public static function queueWait(string $queue, string $job, int $seconds): void
     {
         Pulse::rescue(function () use ($queue, $job, $seconds) {
@@ -224,7 +195,7 @@ final class PulseMetrics
         });
     }
 
-    /** H2: the number of jobs in a queue (waiting, delayed and reserved), sampled every minute. */
+    // Recorded for the chart and set for the card's current value.
     public static function queueSize(string $queue, int $size): void
     {
         Pulse::rescue(function () use ($queue, $size) {
@@ -233,7 +204,7 @@ final class PulseMetrics
         });
     }
 
-    /** When a job with this $delay (the Queueable property) may start, as a Unix timestamp. */
+    // $delay is the Queueable property, so it comes in any of its three shapes.
     public static function availableAt(mixed $delay): int
     {
         $now = time();
@@ -246,7 +217,7 @@ final class PulseMetrics
         };
     }
 
-    /** "NotificationChannels\WebPush\WebPushChannel" → "WebPush", "mail" stays "mail". */
+    // "NotificationChannels\WebPush\WebPushChannel" → "WebPush"; "mail" stays "mail".
     private static function shortName(string $class, string $suffix): string
     {
         $name = class_basename($class);

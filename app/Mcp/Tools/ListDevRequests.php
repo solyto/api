@@ -47,9 +47,8 @@ class ListDevRequests extends SolytoTool
         return Response::json($devRequests);
     }
 
+    // The resource downgrades `waiting-for-deployment` and `waiting-for-user` for clients without a recent version header, which MCP clients never send.
     /**
-     * The resource downgrades `waiting-for-deployment` and `waiting-for-user` for clients that do not send a recent version header, which MCP clients never do.
-     *
      * @return array<string, mixed>
      */
     public static function present(DevRequest $devRequest): array

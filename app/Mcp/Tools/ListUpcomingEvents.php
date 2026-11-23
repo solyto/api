@@ -23,15 +23,17 @@ class ListUpcomingEvents extends SolytoTool
 
     public function handle(Request $request): Response
     {
-        $days = (int) ($request->validate(['days' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_DAYS]])['days'] ?? self::DEFAULT_DAYS);
+        $validated = $request->validate(['days' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_DAYS]]);
+        $days = (int) ($validated['days'] ?? self::DEFAULT_DAYS);
         $user = $this->user($request);
 
         $from = Carbon::today($user->timezone());
         $until = $from->copy()->addDays($days);
+        $isInWindow = fn (EventDTO $event) => $event->startDate < $until && ($event->endDate ?? $event->startDate) >= $from;
 
         // listEvents covers the month three months either side, so the current month's listing spans the whole window.
         $events = collect($this->calendars->listEvents($user, $from->format('Y-m'))->events)
-            ->filter(fn (EventDTO $event) => $event->startDate < $until && ($event->endDate ?? $event->startDate) >= $from)
+            ->filter($isInWindow)
             ->sortBy(fn (EventDTO $event) => $event->startDate)
             ->values();
 

@@ -57,11 +57,13 @@ describe('POST /api/v1/friends/requests', function () {
     it('rejects an unknown receiver', function () {
         $sender = makeUser();
 
-        $this->actingAs($sender, 'sanctum')
+        $response = $this->actingAs($sender, 'sanctum')
             ->postJson('/api/v1/friends/requests', [
                 'receiver_id' => '00000000-0000-0000-0000-000000000000',
-            ])
-            ->assertStatus(422);
+            ]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('receiver_id');
     });
 });
 
@@ -87,9 +89,8 @@ describe('PUT /api/v1/friends/requests/{request}/accept', function () {
         $receiver = makeUser();
         $request = FriendRequest::factory()->forUsers($sender, $receiver)->create();
 
-        $this->actingAs($sender, 'sanctum')
-            ->putJson('/api/v1/friends/requests/'.$request->id.'/accept')
-            ->assertStatus(403);
+        expectApiError($this->actingAs($sender, 'sanctum')
+            ->putJson('/api/v1/friends/requests/'.$request->id.'/accept'), 403);
     });
 });
 
@@ -113,9 +114,8 @@ describe('PUT /api/v1/friends/requests/{request}/reject', function () {
         $receiver = makeUser();
         $request = FriendRequest::factory()->forUsers($sender, $receiver)->create();
 
-        $this->actingAs($sender, 'sanctum')
-            ->putJson('/api/v1/friends/requests/'.$request->id.'/reject')
-            ->assertStatus(403);
+        expectApiError($this->actingAs($sender, 'sanctum')
+            ->putJson('/api/v1/friends/requests/'.$request->id.'/reject'), 403);
     });
 });
 

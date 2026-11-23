@@ -45,9 +45,7 @@ describe('Clipboard list and store', function () {
         $other = makeUser();
         $clipboard = Clipboard::factory()->forUser($other)->create();
 
-        $this->actingAs($user, 'sanctum')
-            ->deleteJson('/api/v1/clipboard/'.$clipboard->id)
-            ->assertStatus(403);
+        expectApiError($this->actingAs($user, 'sanctum')->deleteJson('/api/v1/clipboard/'.$clipboard->id), 403);
     });
 });
 
@@ -74,7 +72,8 @@ describe('Clipboard images', function () {
         $this->actingAs($user, 'sanctum')
             ->get('/api/v1/clipboard/'.$clipboardId.'/image')
             ->assertStatus(200)
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     });
 
     it('returns 404 when the image file is missing', function () {
@@ -140,9 +139,7 @@ describe('Clipboard images', function () {
         $user = makeUser();
         $clipboard = Clipboard::factory()->forUser($user)->create(['type' => 'text']);
 
-        $this->actingAs($user, 'sanctum')
-            ->get('/api/v1/clipboard/'.$clipboard->id.'/image')
-            ->assertStatus(404);
+        expectApiError($this->actingAs($user, 'sanctum')->getJson('/api/v1/clipboard/'.$clipboard->id.'/image'), 404);
     });
 
     it('deletes the stored image file with the entry', function () {
@@ -209,10 +206,10 @@ describe('Clipboard files', function () {
             ->get('/api/v1/clipboard/'.$clipboard->id.'/file')
             ->assertStatus(200)
             ->assertHeader('Content-Type', 'application/pdf')
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
 
         expect($response->headers->get('Content-Disposition'))->toStartWith('attachment;')->toContain('Report Q3.pdf');
-        expect($response->headers->get('Content-Security-Policy'))->toContain("default-src 'none'");
     });
 
     it('accepts the allowed document types', function (string $name, string $content, string $mime) {
@@ -274,9 +271,11 @@ describe('Clipboard files', function () {
         $user = makeUser();
 
         foreach (['a.exe', 'b.exe'] as $name) {
-            $this->actingAs($user, 'sanctum')
-                ->post('/api/v1/clipboard/file', ['file' => clipboardUpload($name, 'MZ')], ['Accept' => 'application/json'])
-                ->assertStatus(422);
+            $response = $this->actingAs($user, 'sanctum')
+                ->post('/api/v1/clipboard/file', ['file' => clipboardUpload($name, 'MZ')], ['Accept' => 'application/json']);
+
+            expectApiError($response, 422);
+            $response->assertJsonValidationErrors('file');
         }
 
         $this->actingAs($user, 'sanctum')
@@ -384,8 +383,10 @@ describe('Clipboard images at the URL of apps up to 1.1.3', function () {
 
         $response = $this->get('/storage/user/'.$clipboard->file_path)
             ->assertStatus(200)
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
-        expect($response->headers->get('Content-Type'))->toStartWith('image/png')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        expect($response->headers->get('Cache-Control'))->toContain('max-age=86400')
+            ->and($response->headers->get('Content-Type'))->toStartWith('image/png')
             ->and($response->headers->getCookies())->toBe([]);
     });
 
@@ -409,8 +410,7 @@ describe('Clipboard images at the URL of apps up to 1.1.3', function () {
 
         // Other paths aren't this route's: Laravel's own signed-URL storage route refuses them (403).
         foreach (['/notes/secret.png', '/clipboard/../notes/secret.png'] as $path) {
-            $response = $this->get('/storage/user/'.$user->id.$path);
-            expect($response->status())->toBeIn([403, 404]);
+            $this->get('/storage/user/'.$user->id.$path)->assertStatus(403);
         }
     });
 });

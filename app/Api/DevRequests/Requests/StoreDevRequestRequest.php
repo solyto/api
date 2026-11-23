@@ -8,6 +8,12 @@ class StoreDevRequestRequest extends FormRequest
 {
     public function rules(): array
     {
+        return self::sharedRules();
+    }
+
+    // Also the create-dev-request MCP tool's rules, without the screenshot fields.
+    public static function sharedRules(): array
+    {
         return [
             'type' => 'required|string|in:feature,bug',
             'title' => 'required|string|max:255',

@@ -2,9 +2,9 @@
 
 namespace App\Shared\Middleware;
 
-use App\Shared\Pulse\PulseMetrics;
 use App\Api\ApiResponse;
 use App\Shared\Helpers\ClientVersionHelper;
+use App\Shared\Pulse\PulseMetrics;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;

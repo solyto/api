@@ -1,11 +1,10 @@
 <?php
 
-use App\Api\Users\Models\User;
 use Laravel\Sanctum\PersonalAccessToken;
 
 function clientVersionToken(): array
 {
-    $user = User::factory()->create();
+    $user = makeUser();
     $newToken = $user->createToken('auth-token-web');
 
     return [$newToken->plainTextToken, $newToken->accessToken];
@@ -71,9 +70,8 @@ describe('X-Client-Version header', function () {
 
         $this->app['auth']->forgetGuards();
 
-        $this->withHeaders(['Authorization' => "Bearer {$plain}"])
-            ->getJson('/api/v1/users/me')
-            ->assertUnauthorized();
+        expectApiError($this->withHeaders(['Authorization' => "Bearer {$plain}"])
+            ->getJson('/api/v1/users/me'), 401);
     });
 
     it('does not recreate the old token on refresh', function () {
@@ -87,9 +85,8 @@ describe('X-Client-Version header', function () {
 
         $this->app['auth']->forgetGuards();
 
-        $this->withHeaders(['Authorization' => "Bearer {$plain}"])
-            ->getJson('/api/v1/users/me')
-            ->assertUnauthorized();
+        expectApiError($this->withHeaders(['Authorization' => "Bearer {$plain}"])
+            ->getJson('/api/v1/users/me'), 401);
     });
 
     it('accepts the header on a public route', function () {

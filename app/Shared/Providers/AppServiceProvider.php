@@ -51,10 +51,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('viewPulse', fn (User $user): bool => $user->isSuperAdmin());
 
         // The only place restricted (non-`*`) tokens are scoped: they work on `widgets.*` routes and nowhere else.
-        Sanctum::authenticateAccessTokensUsing(
-            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid
-                && (in_array('*', $token->abilities ?? [], true) || (bool) request()->route()?->named('widgets.*'))
-        );
+        Sanctum::authenticateAccessTokensUsing(function (PersonalAccessToken $token, bool $isValid): bool {
+            $isUnrestricted = in_array('*', $token->abilities ?? [], true);
+            $isWidgetRoute = (bool) request()->route()?->named('widgets.*');
+
+            return $isValid && ($isUnrestricted || $isWidgetRoute);
+        });
 
         RateLimiter::for('auth-login', function (Request $request) {
             return Limit::perMinute(5)->by($request->email ?: $request->ip());
@@ -80,7 +82,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('account-deletion', function (Request $request) {
-            return Limit::perHour(5)->by($request->user()?->id ?: $request->ip());
+            return Limit::perHour(5)->by($this->userOrIp($request));
         });
 
         RateLimiter::for('feeds-import', function (Request $request) {
@@ -89,11 +91,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Each of these asks the user's own CalDAV server (discovery), up to a timeout per request; one connect takes about three.
         RateLimiter::for('external-calendars', function (Request $request) {
-            return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
+            return Limit::perMinute(20)->by($this->userOrIp($request));
         });
 
         RateLimiter::for('widget-token', function (Request $request) {
-            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+            return Limit::perMinute(10)->by($this->userOrIp($request));
         });
 
         // Every new dev request pushes an ntfy alert to the admins.
@@ -110,8 +112,14 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('widgets', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
+            $key = $token instanceof PersonalAccessToken ? 'token:' . $token->id : $this->userOrIp($request);
 
-            return Limit::perMinute(60)->by($token instanceof PersonalAccessToken ? 'token:' . $token->id : ($request->user()?->id ?: $request->ip()));
+            return Limit::perMinute(60)->by($key);
         });
+    }
+
+    private function userOrIp(Request $request): ?string
+    {
+        return $request->user()?->id ?: $request->ip();
     }
 }

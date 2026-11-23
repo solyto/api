@@ -1,13 +1,12 @@
 <?php
 
-use App\Api\Users\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
 function lastUsedToken(): array
 {
-    $user = User::factory()->create();
+    $user = makeUser();
     $newToken = $user->createToken('auth-token-web');
 
     return [$newToken->plainTextToken, $newToken->accessToken];

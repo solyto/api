@@ -14,6 +14,7 @@ class ClipboardService
     private const string CACHE_KEY = 'clipboard';
     private const int CACHE_TTL = 86400;
     private const int CHUNK = 100;
+    private const string UNSAFE_NAME_CHARACTERS = '/[\x00-\x1F\x7F\/\\\\"]+/u';
 
     public function __construct(
         private readonly ClipboardImageService $imageService,
@@ -89,23 +90,15 @@ class ClipboardService
 
     public function getFilePath(Clipboard $clipboard): ?string
     {
-        if ($clipboard->type !== 'file' || !$clipboard->file_path || !$this->fileService->exists($clipboard->file_path)) {
-            return null;
-        }
-
-        return $this->fileService->path($clipboard->file_path);
+        return $this->storedPath($clipboard, 'file');
     }
 
     public function getImagePath(string $userId, Clipboard $clipboard): ?string
     {
-        if ($clipboard->type !== 'image' || !$clipboard->file_path || !$this->fileService->exists($clipboard->file_path)) {
-            return null;
-        }
-
-        return $this->fileService->path($clipboard->file_path);
+        return $this->storedPath($clipboard, 'image');
     }
 
-    /** The stored image behind an old public URL, only if a clipboard image entry still points at it. */
+    // Only while a clipboard image entry still points at the file behind the old public URL.
     public function getLegacyImagePath(string $filePath): ?string
     {
         $clipboard = Clipboard::where('type', 'image')->where('file_path', $filePath)->first();
@@ -148,10 +141,17 @@ class ClipboardService
         }
     }
 
+    private function storedPath(Clipboard $clipboard, string $type): ?string
+    {
+        $isStored = $clipboard->type === $type && $clipboard->file_path && $this->fileService->exists($clipboard->file_path);
+
+        return $isStored ? $this->fileService->path($clipboard->file_path) : null;
+    }
+
     // The name is only shown and sent back in Content-Disposition; control characters, quotes and path separators go.
     private function displayName(string $original, string $extension): string
     {
-        $name = trim(preg_replace('/[\x00-\x1F\x7F\/\\\\"]+/u', '', $original) ?? '');
+        $name = trim(preg_replace(self::UNSAFE_NAME_CHARACTERS, '', $original) ?? '');
 
         return $name !== '' ? mb_substr($name, -200) : 'file.' . $extension;
     }

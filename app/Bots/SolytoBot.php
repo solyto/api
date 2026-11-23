@@ -280,7 +280,7 @@ class SolytoBot implements BotInterface
         }
 
         $lang = $user->settings->language ?? 'en';
-        app()->setLocale(in_array($lang, config('app.locales')) ? $lang : 'en');
+        app()->setLocale(in_array($lang, config('app.locales'), true) ? $lang : 'en');
 
         $this->user = $user;
 

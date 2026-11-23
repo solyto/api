@@ -68,6 +68,35 @@ function authHeaders(User $user): array
 }
 
 /**
+ * A session token with an expiry, like login issues.
+ */
+function sessionToken(User $user, ?DateTimeInterface $expiresAt = null): string
+{
+    return $user->createToken('auth-token-mobile', expiresAt: $expiresAt ?? now()->addDays(30))->plainTextToken;
+}
+
+/**
+ * Send the next request with this bearer token. Each request must resolve
+ * its own token; the guard caches the first user otherwise.
+ */
+function bearer($test, string $token)
+{
+    app('auth')->forgetGuards();
+
+    return $test->withHeader('Authorization', 'Bearer '.$token);
+}
+
+/**
+ * Issue a widget token through the API, as the app does for a session.
+ */
+function issueWidgetToken($test, string $parentToken): string
+{
+    return bearer($test, $parentToken)->postJson('/api/v1/auth/widget-token')
+        ->assertStatus(201)
+        ->json('data.token');
+}
+
+/**
  * Assert the given response is an `ApiResponse` success envelope.
  */
 function expectApiSuccess($response, int $status = 200): void
@@ -226,6 +255,43 @@ function enableMcp(): void
 
     app()->register(\Laravel\Mcp\Server\McpServiceProvider::class);
     app('router')->getRoutes()->refreshNameLookups();
+}
+
+/**
+ * Create an event in the user's default calendar through the API.
+ */
+function storeEvent($test, User $user, array $payload): void
+{
+    $instanceId = $test->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0]['id'];
+
+    $test->actingAs($user, 'sanctum')
+        ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge(['is_all_day' => false], $payload, ['calendar_id' => $instanceId]))
+        ->assertStatus(201);
+}
+
+/**
+ * Today in $timezone with a timed and an all-day event and a daily series
+ * that started yesterday (Dentist, Holiday, Standup), plus one event
+ * tomorrow that a day view must leave out.
+ */
+function storeDayEvents($test, User $user, string $timezone): void
+{
+    $today = today($timezone)->toDateString();
+    $yesterday = today($timezone)->subDay()->toDateString();
+    $tomorrow = today($timezone)->addDay()->toDateString();
+
+    storeEvent($test, $user, ['title' => 'Dentist', 'start_date' => $today.' 09:30', 'end_date' => $today.' 10:30']);
+    storeEvent($test, $user, ['title' => 'Holiday', 'start_date' => $today, 'end_date' => $today, 'is_all_day' => true]);
+    storeEvent($test, $user, ['title' => 'Standup', 'start_date' => $yesterday.' 08:00', 'end_date' => $yesterday.' 08:15', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
+    storeEvent($test, $user, ['title' => 'Tomorrow Meeting', 'start_date' => $tomorrow.' 09:00', 'end_date' => $tomorrow.' 10:00']);
+}
+
+/**
+ * A user who may hold an MCP token (MCP is admin-only).
+ */
+function mcpAdmin(): User
+{
+    return User::factory()->admin()->create();
 }
 
 function builtInTracker(User $user, string $key): CheckInTracker

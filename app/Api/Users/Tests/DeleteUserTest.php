@@ -216,9 +216,8 @@ describe('app:users:delete', function () {
             $seed($u);
             expect($read($u))->toBe($cached);
         }
-        // Lets the deleted user's event and contact caches be read again after their calendars and address books are gone.
-        $calendarList = $calendars->list($user);
-        $addressBookList = $contacts->listAddressBooks($user);
+        $calendarListBeforeDeletion = $calendars->list($user);
+        $addressBookListBeforeDeletion = $contacts->listAddressBooks($user);
 
         $calendar = $dav->calendars()->list($other)[0];
         $dav->calendars()->events()->create($calendar, EventDTO::fromRequest(['title' => 'Behind the cache', 'start_date' => '2030-10-16 10:00:00', 'end_date' => '2030-10-16 11:00:00', 'is_all_day' => false], $calendar, $other));
@@ -228,12 +227,33 @@ describe('app:users:delete', function () {
         DB::table('calendar_event_notes')->where('user_id', $other->id)->delete();
 
         app(UserService::class)->destroy($user);
+        // Lets the deleted user's event and contact caches be read again after their calendars and address books are gone.
         $cache = app(UserCacheService::class);
-        $cache->store(['calendars_v2', $user->id], 300, $calendarList);
-        $cache->store(['address_books', $user->id], 300, $addressBookList);
+        $cache->store(['calendars_v2', $user->id], 300, $calendarListBeforeDeletion);
+        $cache->store(['address_books', $user->id], 300, $addressBookListBeforeDeletion);
 
         expect($read($user))->toBe(['events' => [], 'contacts' => [], 'todos' => [], 'notes' => []])
             ->and($read($other))->toBe($cached);
+    });
+
+    it('prints the deletion summary line by line', function () {
+        $user = makeUser(['email' => 'gone@example.com', 'name' => 'Gone']);
+        $this->mock(UserService::class)->shouldReceive('destroy')->once()->andReturn([
+            'owned_calendars' => 1, 'shared_instances' => 2, 'address_books' => 3, 'calendar_subscriptions' => 4,
+            'scheduling_objects' => 5, 'principal' => true, 'dev_requests_anonymised' => 6, 'auth_tokens' => 7,
+            'notifications' => 8, 'push_subscriptions' => 9, 'verification_tokens' => 10, 'password_reset_tokens' => 11,
+            'sessions' => 12, 'user_data_files' => true, 'private_user_data_files' => false, 'cache_keys_flushed' => 13,
+        ]);
+
+        $this->artisan('app:users:delete', ['email' => $user->email])
+            ->expectsConfirmation('Permanently delete Gone and ALL their data? This cannot be undone', 'yes')
+            ->expectsOutput('DAV: deleted 1 owned calendar(s), removed 2 shared instance(s), 3 address book(s), 4 subscription(s), 5 scheduling object(s), principal: yes')
+            ->expectsOutput('App: anonymised 6 dev request(s), deleted 7 auth token(s), 8 notification(s), 9 push subscription(s), 10 verification token(s), 11 password reset token(s), 12 session(s)')
+            ->expectsOutput('User row deleted (cascades remove todos, notes, contacts, feeds, libraries, finances, time tracking, and the rest).')
+            ->expectsOutput('Files: deleted user_data directory (yes), private_user_data directory (no)')
+            ->expectsOutput('Cache: flushed 13 user-scoped key(s).')
+            ->expectsOutput('User gone@example.com deleted successfully.')
+            ->assertSuccessful();
     });
 
     it('errors when the user is unknown', function () {

@@ -17,6 +17,21 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+function deleteOverdueClipboardEntries(): void
+{
+    app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+}
+
+// A music folder with one cover, under the public user directory ScaleCovers walks.
+function musicFolderWithCover(string $storage, string $userFolder): string
+{
+    $dir = $storage.'/app/public/user/'.$userFolder.'/music';
+    File::ensureDirectoryExists($dir);
+    File::put($dir.'/cover.jpg', 'fake-jpeg');
+
+    return $dir;
+}
+
 describe('DeleteOldDevRequests', function () {
     it('deletes completed or cancelled requests older than 30 days', function () {
         $old = DevRequest::factory()->completed()->create(['created_at' => now()->subDays(31)]);
@@ -47,7 +62,7 @@ describe('DeleteOverdueClipboardEntries', function () {
         ]);
         $recent = Clipboard::factory()->create(['created_at' => now()]);
 
-        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+        deleteOverdueClipboardEntries();
 
         expect(Clipboard::find($old->id))->toBeNull();
         expect(Clipboard::find($recent->id))->not->toBeNull();
@@ -66,7 +81,7 @@ describe('DeleteOverdueClipboardEntries', function () {
         ]);
         Clipboard::factory()->create(['type' => 'file', 'file_path' => 'u/clipboard/new.pdf']);
 
-        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+        deleteOverdueClipboardEntries();
 
         expect(Clipboard::find($old->id))->toBeNull();
         Storage::disk('private_user_data')->assertMissing('u/clipboard/doc.pdf');
@@ -91,7 +106,7 @@ describe('DeleteOverdueClipboardEntries', function () {
             }
         });
 
-        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+        deleteOverdueClipboardEntries();
 
         expect(Clipboard::find($old->id))->toBeNull();
         expect(Clipboard::find($edge->id))->not->toBeNull();
@@ -111,7 +126,7 @@ describe('DeleteOverdueClipboardEntries', function () {
         Clipboard::whereKey($expiring->id)->update(['created_at' => now()->subDays(2)]);
         Clipboard::factory()->forUser($other)->create();
 
-        app()->call([app(DeleteOverdueClipboardEntries::class), 'handle']);
+        deleteOverdueClipboardEntries();
 
         expect($service->list($user)->pluck('id')->all())->toBe([$kept->id]);
         expect($service->list($other)->pluck('id')->all())->toBe([$otherEntry->id]);
@@ -166,9 +181,7 @@ describe('ScaleCovers', function () {
     });
 
     it('backs up and scales covers that lack an original sibling', function () {
-        $dir = $this->testStorage.'/app/public/user/'.Str::uuid()->toString().'/music';
-        File::ensureDirectoryExists($dir);
-        File::put($dir.'/cover.jpg', 'fake-jpeg');
+        $dir = musicFolderWithCover($this->testStorage, Str::uuid()->toString());
 
         $imageTransformation = Mockery::mock(ImageTransformationService::class);
         $imageTransformation->shouldReceive('scaleToWidth')
@@ -182,9 +195,7 @@ describe('ScaleCovers', function () {
     });
 
     it('skips covers that already have an original sibling', function () {
-        $dir = $this->testStorage.'/app/public/user/'.Str::uuid()->toString().'/music';
-        File::ensureDirectoryExists($dir);
-        File::put($dir.'/cover.jpg', 'fake-jpeg');
+        $dir = musicFolderWithCover($this->testStorage, Str::uuid()->toString());
         File::put($dir.'/cover_original.jpg', 'fake-jpeg-original');
 
         $imageTransformation = Mockery::mock(ImageTransformationService::class);
@@ -196,9 +207,7 @@ describe('ScaleCovers', function () {
     });
 
     it('ignores folders that are not user UUIDs', function () {
-        $dir = $this->testStorage.'/app/public/user/not-a-uuid/music';
-        File::ensureDirectoryExists($dir);
-        File::put($dir.'/cover.jpg', 'fake-jpeg');
+        $dir = musicFolderWithCover($this->testStorage, 'not-a-uuid');
 
         $imageTransformation = Mockery::mock(ImageTransformationService::class);
         $imageTransformation->shouldReceive('scaleToWidth')->never();

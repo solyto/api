@@ -3,9 +3,12 @@
 namespace App\Api\Users\Controllers;
 
 use App\Api\ApiResponse;
+use App\Api\Users\Exceptions\AlreadyVerifiedException;
 use App\Api\Users\Exceptions\EmailUnverifiedException;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Exceptions\PersonalAccessTokenRequiredException;
+use App\Api\Users\Exceptions\VerificationTokenExpiredException;
+use App\Api\Users\Exceptions\VerificationTokenMismatchException;
 use App\Api\Users\Exceptions\WidgetTokenConflictException;
 use App\Api\Users\Requests\ConfirmAccountDeletionRequest;
 use App\Api\Users\Requests\ForgotPasswordRequest;
@@ -289,20 +292,19 @@ class AuthController
      */
     public function verify(VerifyRequest $request): JsonResponse
     {
+        // The three known outcomes are part of the flow (e.g. a link opened twice); only anything else is reported.
         try {
             $result = $this->authService->verify($request->validated());
+        } catch (AlreadyVerifiedException) {
+            return ApiResponse::error('Account already verified', 401, ['already_verified']);
+        } catch (VerificationTokenMismatchException) {
+            return ApiResponse::error('No such verification token', 401, ['token_mismatch']);
+        } catch (VerificationTokenExpiredException) {
+            return ApiResponse::error('Verification token has expired', 401, ['token_expired']);
         } catch (\RuntimeException $e) {
-            // The known outcomes are part of the flow (e.g. a link opened twice); only report anything else.
-            if (!in_array($e->getMessage(), ['already_verified', 'token_mismatch', 'token_expired'], true)) {
-                report($e);
-            }
+            report($e);
 
-            return match ($e->getMessage()) {
-                'already_verified' => ApiResponse::error('Account already verified', 401, ['already_verified']),
-                'token_mismatch' => ApiResponse::error('No such verification token', 401, ['token_mismatch']),
-                'token_expired' => ApiResponse::error('Verification token has expired', 401, ['token_expired']),
-                default => ApiResponse::error('Provided data do not match any user.', 401),
-            };
+            return ApiResponse::error('Provided data do not match any user.', 401);
         }
 
         if (! $result) {

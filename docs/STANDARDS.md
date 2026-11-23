@@ -366,7 +366,11 @@ in the controller is the single place. Do not start a second one.
 `LoginRequest::authenticate()` (`app/Api/Users/Requests/LoginRequest.php:21-38`)
 runs `Auth::attempt` and the email-verification check — Laravel Breeze's
 pattern, the owner's code. Accepted as is (Decisions); new requests do not
-get methods beyond `rules()`, `attributes()`, `messages()`.
+get methods beyond `rules()`, `attributes()`, `messages()`. One exception
+(owner decision, 2026-11-23): when an MCP tool must accept exactly what an
+endpoint accepts, the request exposes its rules as `public static function
+sharedRules(...)`, which both `rules()` and the tool use
+(`StoreTodoRequest`, `UpdateTodoRequest`, `StoreDevRequestRequest`).
 
 Two older requests also have behaviour, not yet decided:
 `ChangePasswordRequest::withValidator()` (checks the current password,
@@ -605,6 +609,10 @@ its own line; nothing else in the repo does. One line per field.
 including deletes (`data: null`), 422/401/403/404/405/429 from the central
 map. The health route (rule 1.5) builds its body with `ApiResponse::success`
 and only adds the legacy top-level `app` and `version` keys.
+
+Exception (owner decision, 2026-11-23): the clipboard creates (`store`,
+`storeImage`, `storeFile`) return 200, not 201, because apps up to 1.1.x
+expect 200 from them.
 
 ### 7.2 Throw; do not catch what `bootstrap/app.php` already renders
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\CheckIn\Services\CheckInTrackerService;
@@ -27,15 +28,6 @@ function widgetUser(array $settings = []): User
     return $user->fresh();
 }
 
-function widgetEvent($test, User $user, array $payload): void
-{
-    $instanceId = $test->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0]['id'];
-
-    $test->actingAs($user, 'sanctum')
-        ->postJson('/api/v1/calendars/'.$instanceId.'/events', array_merge(['is_all_day' => false], $payload, ['calendar_id' => $instanceId]))
-        ->assertStatus(201);
-}
-
 function widgetTodo(User $user, string $title, ?string $dueAt, bool $completed = false, array $attributes = []): Todo
 {
     return Todo::factory()->forUser($user)->create(array_merge([
@@ -45,26 +37,9 @@ function widgetTodo(User $user, string $title, ?string $dueAt, bool $completed =
     ], $attributes));
 }
 
-/**
- * Each request must resolve its own bearer token; the guard caches the first user otherwise.
- */
-function widgetRequest($test, string $token)
-{
-    app('auth')->forgetGuards();
-
-    return $test->withHeader('Authorization', 'Bearer '.$token);
-}
-
-function widgetTokenFor($test, User $user): string
-{
-    $sessionToken = $user->createToken('auth-token-mobile', expiresAt: now()->addDays(30))->plainTextToken;
-
-    return widgetRequest($test, $sessionToken)->postJson('/api/v1/auth/widget-token')->assertStatus(201)->json('data.token');
-}
-
 function yourDay($test, User $user): array
 {
-    $response = widgetRequest($test, sanctumToken($user))->getJson('/api/v1/widgets/your-day');
+    $response = bearer($test, sanctumToken($user))->getJson('/api/v1/widgets/your-day');
     expectApiSuccess($response);
 
     return $response->json('data');
@@ -92,7 +67,7 @@ function widgetEntry(User $user, TimeTrackingProject $project, string $startedAt
 
 function timeTrackingWidget($test, User $user, ?string $token = null): array
 {
-    $response = widgetRequest($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/time-tracking');
+    $response = bearer($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/time-tracking');
     expectApiSuccess($response);
 
     return $response->json('data');
@@ -105,7 +80,7 @@ function runningEntries(User $user)
 
 function checkInWidget($test, User $user, ?string $token = null): array
 {
-    $response = widgetRequest($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/check-in');
+    $response = bearer($test, $token ?? sanctumToken($user))->getJson('/api/v1/widgets/check-in');
     expectApiSuccess($response);
 
     return $response->json('data');
@@ -123,7 +98,7 @@ function widgetCheckIn(User $user, string $date, array $values = []): CheckIn
 
 function setCheckIn($test, User $user, string $tracker, mixed $body, ?string $token = null)
 {
-    return widgetRequest($test, $token ?? sanctumToken($user))->postJson('/api/v1/widgets/actions/check_in.set/'.$tracker, $body);
+    return bearer($test, $token ?? sanctumToken($user))->postJson('/api/v1/widgets/actions/check_in.set/'.$tracker, $body);
 }
 
 function userCheckIns(User $user)
@@ -140,11 +115,11 @@ describe('GET /widgets/your-day', function () {
         Carbon::setTestNow('2026-08-14 07:00:00');
         $user = widgetUser();
 
-        widgetEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
-        widgetEvent($this, $user, ['title' => 'Holiday', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14', 'is_all_day' => true]);
-        widgetEvent($this, $user, ['title' => 'Meeting', 'start_date' => '2026-08-15 09:00', 'end_date' => '2026-08-15 10:00']);
-        widgetEvent($this, $user, ['title' => 'Trip', 'start_date' => '2026-08-15', 'end_date' => '2026-08-16', 'is_all_day' => true]);
-        widgetEvent($this, $user, ['title' => 'Far away', 'start_date' => '2026-08-18 09:00', 'end_date' => '2026-08-18 10:00']);
+        storeEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
+        storeEvent($this, $user, ['title' => 'Holiday', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14', 'is_all_day' => true]);
+        storeEvent($this, $user, ['title' => 'Meeting', 'start_date' => '2026-08-15 09:00', 'end_date' => '2026-08-15 10:00']);
+        storeEvent($this, $user, ['title' => 'Trip', 'start_date' => '2026-08-15', 'end_date' => '2026-08-16', 'is_all_day' => true]);
+        storeEvent($this, $user, ['title' => 'Far away', 'start_date' => '2026-08-18 09:00', 'end_date' => '2026-08-18 10:00']);
 
         $overdue = widgetTodo($user, 'Overdue', '2026-08-10');
         widgetTodo($user, 'Due today', '2026-08-14');
@@ -181,12 +156,33 @@ describe('GET /widgets/your-day', function () {
             ->and($upcoming[1])->not->toHaveKey('route');
     });
 
+    it('keeps the whole response body byte for byte', function () {
+        Carbon::setTestNow('2026-08-14 07:00:00');
+        $user = widgetUser(['timezone' => 'Europe/Berlin', 'language' => 'de', 'time_format' => 'g:i A', 'date_format' => 'mm/dd/YYYY']);
+        storeEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
+        storeEvent($this, $user, ['title' => 'Holiday', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14', 'is_all_day' => true]);
+        storeEvent($this, $user, ['title' => 'Trip', 'start_date' => '2026-08-15', 'end_date' => '2026-08-16', 'is_all_day' => true]);
+        storeEvent($this, $user, ['title' => 'Meeting', 'start_date' => '2026-08-15 09:00', 'end_date' => '2026-08-15 10:00']);
+        $todo = widgetTodo($user, 'Overdue', '2026-08-10');
+        $eventUris = collect(app(CalendarService::class)->listWidgetEvents($user)->events)->mapWithKeys(fn ($event) => [strtolower($event->title) => $event->uri]);
+
+        $body = bearer($this, sanctumToken($user))->getJson('/api/v1/widgets/your-day')->getContent();
+
+        expect($body)->toBe(strtr('{"success":true,"message":"Widget data retrieved successfully.","data":{"kind":"your-day","schema_version":1,"generated_at":"2026-08-14T09:00:00+02:00","refresh_at":"2026-08-15T00:00:00+02:00","labels":{"title":"Dein Tag","empty":"Heute steht nichts an."},"sections":[{"key":"today","title":"Termine","rows":[{"id":"{holiday}#20260814T000000","title":"Holiday","time_label":"ganzt\u00e4gig","at":"2026-08-14","until":"2026-08-14","all_day":true,"icon":"event"},{"id":"{dentist}#20260814T093000","title":"Dentist","time_label":"9:30 AM","at":"2026-08-14T09:30:00+02:00","until":"2026-08-14T10:30:00+02:00","all_day":false,"icon":"event"}]},{"key":"due","title":"Heute f\u00e4llig","rows":[{"id":"{todo}","title":"Overdue","subtitle":"\u00dcberf\u00e4llig \u00b7 08\/10","at":"2026-08-10","all_day":true,"icon":"todo","action":{"type":"check","key":"todo.complete","checked":false}}]},{"key":"upcoming","title":"Demn\u00e4chst","rows":[{"id":"{trip}#20260815T000000","title":"Trip","time_label":"08\/15","at":"2026-08-15","until":"2026-08-16","all_day":true,"icon":"event"},{"id":"{meeting}#20260815T090000","title":"Meeting","time_label":"08\/15 9:00 AM","at":"2026-08-15T09:00:00+02:00","until":"2026-08-15T10:00:00+02:00","all_day":false,"icon":"event"}]}]},"timestamp":"2026-08-14T07:00:00.000000Z","meta":{"unavailable_calendars":[],"credentials_rejected_calendars":[]}}', [
+            '{holiday}' => $eventUris['holiday'],
+            '{dentist}' => $eventUris['dentist'],
+            '{trip}' => $eventUris['trip'],
+            '{meeting}' => $eventUris['meeting'],
+            '{todo}' => $todo->id,
+        ]));
+    });
+
     it('sends all-day events and todos as dates and timed events as timestamps', function () {
         Carbon::setTestNow('2026-08-14 07:00:00');
         $user = widgetUser(['timezone' => 'Europe/Berlin']);
 
-        widgetEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
-        widgetEvent($this, $user, ['title' => 'Holiday', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14', 'is_all_day' => true]);
+        storeEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
+        storeEvent($this, $user, ['title' => 'Holiday', 'start_date' => '2026-08-14', 'end_date' => '2026-08-14', 'is_all_day' => true]);
 
         [$holiday, $dentist] = widgetSection(yourDay($this, $user), 'today')['rows'];
 
@@ -198,7 +194,7 @@ describe('GET /widgets/your-day', function () {
         Carbon::setTestNow('2026-08-14 07:00:00');
         $user = widgetUser();
 
-        widgetEvent($this, $user, ['title' => 'Standup', 'start_date' => '2026-08-10 08:00', 'end_date' => '2026-08-10 08:15', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
+        storeEvent($this, $user, ['title' => 'Standup', 'start_date' => '2026-08-10 08:00', 'end_date' => '2026-08-10 08:15', 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY']);
 
         $data = yourDay($this, $user);
 
@@ -210,7 +206,7 @@ describe('GET /widgets/your-day', function () {
         Carbon::setTestNow('2026-08-14 20:00:00');
         $user = widgetUser(['timezone' => $timezone]);
 
-        widgetEvent($this, $user, ['title' => 'Breakfast', 'start_date' => '2026-08-15 09:00', 'end_date' => '2026-08-15 10:00']);
+        storeEvent($this, $user, ['title' => 'Breakfast', 'start_date' => '2026-08-15 09:00', 'end_date' => '2026-08-15 10:00']);
         widgetTodo($user, 'Due 14th', '2026-08-14');
         widgetTodo($user, 'Due 15th', '2026-08-15');
 
@@ -263,8 +259,8 @@ describe('GET /widgets/your-day', function () {
         Carbon::setTestNow('2026-08-14 07:00:00');
         $user = widgetUser(['language' => 'de', 'time_format' => 'g:i A', 'date_format' => 'mm/dd/YYYY']);
 
-        widgetEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
-        widgetEvent($this, $user, ['title' => 'Dinner', 'start_date' => '2026-08-15 19:00', 'end_date' => '2026-08-15 21:00']);
+        storeEvent($this, $user, ['title' => 'Dentist', 'start_date' => '2026-08-14 09:30', 'end_date' => '2026-08-14 10:30']);
+        storeEvent($this, $user, ['title' => 'Dinner', 'start_date' => '2026-08-15 19:00', 'end_date' => '2026-08-15 21:00']);
         widgetTodo($user, 'Overdue', '2026-08-10');
 
         $data = yourDay($this, $user);
@@ -282,7 +278,7 @@ describe('POST /widgets/actions/todo.complete/{todo}', function () {
         $user = widgetUser();
         $todo = widgetTodo($user, 'Call mom', today()->toDateString());
 
-        $response = widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id);
+        $response = bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id);
 
         expectApiSuccess($response);
         $response->assertJsonPath('data', null);
@@ -293,12 +289,12 @@ describe('POST /widgets/actions/todo.complete/{todo}', function () {
     it('rejects another user\'s todo with 403', function () {
         $todo = widgetTodo(widgetUser(), 'Not yours', today()->toDateString());
 
-        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id), 403);
+        expectApiError(bearer($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id), 403);
         expect($todo->fresh()->is_completed)->toBeFalse();
     });
 
     it('answers 404 for a missing todo', function () {
-        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/todo.complete/'.Str::uuid()), 404);
+        expectApiError(bearer($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/todo.complete/'.Str::uuid()), 404);
     });
 
     it('changes nothing when the todo is already completed', function () {
@@ -310,7 +306,7 @@ describe('POST /widgets/actions/todo.complete/{todo}', function () {
             'recurrence_interval' => 1,
         ]);
 
-        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
+        expectApiSuccess(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
 
         expect($todo->fresh()->completed_at->equalTo($completedAt))->toBeTrue()
             ->and(Todo::forUser($user->id)->count())->toBe(1);
@@ -324,7 +320,7 @@ describe('POST /widgets/actions/todo.complete/{todo}', function () {
             'recurrence_interval' => 1,
         ]);
 
-        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
+        expectApiSuccess(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
 
         $next = Todo::forUser($user->id)->where('is_completed', false)->sole();
         expect($next->title)->toBe('Water plants')
@@ -335,21 +331,21 @@ describe('POST /widgets/actions/todo.complete/{todo}', function () {
 describe('Widget routes and tokens', function () {
     it('work with a widget token and with a normal token', function (string $kind) {
         $user = widgetUser();
-        $token = $kind === 'widget' ? widgetTokenFor($this, $user) : sanctumToken($user);
+        $token = $kind === 'widget' ? issueWidgetToken($this, sessionToken($user)) : sanctumToken($user);
         $todo = widgetTodo($user, 'Call mom', today()->toDateString());
 
-        expectApiSuccess(widgetRequest($this, $token)->getJson('/api/v1/widgets/your-day'));
-        expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
+        expectApiSuccess(bearer($this, $token)->getJson('/api/v1/widgets/your-day'));
+        expectApiSuccess(bearer($this, $token)->postJson('/api/v1/widgets/actions/todo.complete/'.$todo->id));
     })->with(['widget', 'normal']);
 
     it('keeps a widget token out of non-widget routes', function () {
         $user = widgetUser();
-        $token = widgetTokenFor($this, $user);
+        $token = issueWidgetToken($this, sessionToken($user));
         $todo = widgetTodo($user, 'Call mom', today()->toDateString());
 
-        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/todos'), 401);
-        expectApiError(widgetRequest($this, $token)->putJson('/api/v1/todos/'.$todo->id, ['is_completed' => true]), 401);
-        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/calendars/events/widget'), 401);
+        expectApiError(bearer($this, $token)->getJson('/api/v1/todos'), 401);
+        expectApiError(bearer($this, $token)->putJson('/api/v1/todos/'.$todo->id, ['is_completed' => true]), 401);
+        expectApiError(bearer($this, $token)->getJson('/api/v1/calendars/events/widget'), 401);
     });
 
     it('rejects requests without a token', function () {
@@ -465,7 +461,7 @@ describe('POST /widgets/actions/time_tracking.start/{project}', function () {
         $user = widgetUser();
         $project = widgetProject($user, 'Writing');
 
-        $response = widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id);
+        $response = bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id);
 
         expectApiSuccess($response);
         $response->assertJsonPath('data', null);
@@ -482,7 +478,7 @@ describe('POST /widgets/actions/time_tracking.start/{project}', function () {
         $writing = widgetProject($user, 'Writing');
         $old = widgetEntry($user, $reading, '2026-08-14 06:15:00', true);
 
-        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$writing->id));
+        expectApiSuccess(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$writing->id));
 
         $old->refresh();
         expect($old->stopped_at->toDateTimeString())->toBe('2026-08-14 07:00:00')
@@ -495,7 +491,7 @@ describe('POST /widgets/actions/time_tracking.start/{project}', function () {
         $project = widgetProject($user, 'Writing');
         $entry = widgetEntry($user, $project, now()->subHour()->toDateTimeString(), true);
 
-        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+        expectApiSuccess(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
 
         expect(runningEntries($user)->sole()->id)->toBe($entry->id)
             ->and(TimeTrackingEntry::forUser($user->id)->count())->toBe(1);
@@ -508,7 +504,7 @@ describe('POST /widgets/actions/time_tracking.start/{project}', function () {
         $writing = widgetProject($user, 'Writing');
 
         foreach ([$reading, $reading, $writing, $reading, $writing, $writing] as $project) {
-            expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+            expectApiSuccess(bearer($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
             expect(runningEntries($user))->toHaveCount(1)
                 ->and(runningEntries($user)->first()->project_id)->toBe($project->id);
         }
@@ -518,12 +514,12 @@ describe('POST /widgets/actions/time_tracking.start/{project}', function () {
         $project = widgetProject(widgetUser(), 'Not yours');
         $user = widgetUser();
 
-        expectApiError(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id), 403);
+        expectApiError(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id), 403);
         expect(TimeTrackingEntry::count())->toBe(0);
     });
 
     it('answers 404 for a missing project', function () {
-        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.start/'.Str::uuid()), 404);
+        expectApiError(bearer($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.start/'.Str::uuid()), 404);
     });
 });
 
@@ -533,7 +529,7 @@ describe('POST /widgets/actions/time_tracking.stop/{entry}', function () {
         $user = widgetUser();
         $entry = widgetEntry($user, widgetProject($user, 'Writing'), '2026-08-14 05:00:00', true);
 
-        $response = widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id);
+        $response = bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id);
 
         expectApiSuccess($response);
         $response->assertJsonPath('data', null);
@@ -547,7 +543,7 @@ describe('POST /widgets/actions/time_tracking.stop/{entry}', function () {
         $entry = widgetEntry($user, widgetProject($user, 'Writing'), '2026-08-13 10:00:00');
         $before = $entry->only(['stopped_at', 'duration_minutes']);
 
-        expectApiSuccess(widgetRequest($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id));
+        expectApiSuccess(bearer($this, sanctumToken($user))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id));
 
         expect($entry->fresh()->only(['stopped_at', 'duration_minutes']))->toEqual($before);
     });
@@ -556,35 +552,35 @@ describe('POST /widgets/actions/time_tracking.stop/{entry}', function () {
         $owner = widgetUser();
         $entry = widgetEntry($owner, widgetProject($owner, 'Not yours'), now()->subHour()->toDateTimeString(), true);
 
-        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id), 403);
+        expectApiError(bearer($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.$entry->id), 403);
         expect($entry->fresh()->stopped_at)->toBeNull();
     });
 
     it('answers 404 for a missing entry', function () {
-        expectApiError(widgetRequest($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.Str::uuid()), 404);
+        expectApiError(bearer($this, sanctumToken(widgetUser()))->postJson('/api/v1/widgets/actions/time_tracking.stop/'.Str::uuid()), 404);
     });
 });
 
 describe('Time tracking widget routes and tokens', function () {
     it('work with a widget token and with a normal token', function (string $kind) {
         $user = widgetUser();
-        $token = $kind === 'widget' ? widgetTokenFor($this, $user) : sanctumToken($user);
+        $token = $kind === 'widget' ? issueWidgetToken($this, sessionToken($user)) : sanctumToken($user);
         $project = widgetProject($user, 'Writing');
 
         timeTrackingWidget($this, $user, $token);
-        expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
-        expectApiSuccess(widgetRequest($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.stop/'.runningEntries($user)->sole()->id));
+        expectApiSuccess(bearer($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.start/'.$project->id));
+        expectApiSuccess(bearer($this, $token)->postJson('/api/v1/widgets/actions/time_tracking.stop/'.runningEntries($user)->sole()->id));
         expect(runningEntries($user))->toHaveCount(0);
     })->with(['widget', 'normal']);
 
     it('keeps a widget token out of the time tracking routes', function () {
         $user = widgetUser();
-        $token = widgetTokenFor($this, $user);
+        $token = issueWidgetToken($this, sessionToken($user));
         $project = widgetProject($user, 'Writing');
 
-        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/entries'), 401);
-        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/time-tracking/projects'), 401);
-        expectApiError(widgetRequest($this, $token)->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 401);
+        expectApiError(bearer($this, $token)->getJson('/api/v1/time-tracking/entries'), 401);
+        expectApiError(bearer($this, $token)->getJson('/api/v1/time-tracking/projects'), 401);
+        expectApiError(bearer($this, $token)->postJson('/api/v1/time-tracking/entries/start', ['project_id' => $project->id]), 401);
     });
 });
 
@@ -743,7 +739,10 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
     it('rejects invalid values with 422', function (string $tracker, array $body) {
         $user = widgetUser();
 
-        expectApiError(setCheckIn($this, $user, $tracker, $body), 422);
+        $response = setCheckIn($this, $user, $tracker, $body);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('value');
         expect(userCheckIns($user))->toHaveCount(0);
     })->with([
         '6 for mood' => ['mood', ['value' => 6]],
@@ -802,7 +801,7 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
 describe('Check-in widget routes and tokens', function () {
     it('work with a widget token and with a normal token', function (string $kind) {
         $user = widgetUser();
-        $token = $kind === 'widget' ? widgetTokenFor($this, $user) : sanctumToken($user);
+        $token = $kind === 'widget' ? issueWidgetToken($this, sessionToken($user)) : sanctumToken($user);
 
         expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 3], $token));
         expect(checkInRow(checkInWidget($this, $user, $token), 'mood')['action']['value'])->toBe(3);
@@ -810,9 +809,9 @@ describe('Check-in widget routes and tokens', function () {
 
     it('keeps a widget token out of the check-in routes', function () {
         $user = widgetUser();
-        $token = widgetTokenFor($this, $user);
+        $token = issueWidgetToken($this, sessionToken($user));
 
-        expectApiError(widgetRequest($this, $token)->getJson('/api/v1/check-in'), 401);
-        expectApiError(widgetRequest($this, $token)->postJson('/api/v1/check-in', ['date' => today()->toDateString(), 'mood' => 3]), 401);
+        expectApiError(bearer($this, $token)->getJson('/api/v1/check-in'), 401);
+        expectApiError(bearer($this, $token)->postJson('/api/v1/check-in', ['date' => today()->toDateString(), 'mood' => 3]), 401);
     });
 });

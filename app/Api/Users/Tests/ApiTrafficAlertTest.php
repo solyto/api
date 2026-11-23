@@ -5,7 +5,6 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Sanctum\Sanctum;
 use Monolog\Handler\TestHandler;
 
 function trafficLogRecords(): array
@@ -15,10 +14,8 @@ function trafficLogRecords(): array
 
 function hitApi($test, User $user, int $times): void
 {
-    Sanctum::actingAs($user);
-
     for ($i = 0; $i < $times; $i++) {
-        $test->getJson('/api/v1/users/me')->assertOk();
+        $test->actingAs($user, 'sanctum')->getJson('/api/v1/users/me')->assertOk();
     }
 }
 
@@ -35,14 +32,14 @@ describe('API traffic alert', function () {
     });
 
     it('sends nothing and logs nothing below the threshold', function () {
-        hitApi($this, User::factory()->create(), 3);
+        hitApi($this, makeUser(), 3);
 
         Http::assertNothingSent();
         expect(trafficLogRecords())->toBeEmpty();
     });
 
     it('sends exactly one alert when the threshold is crossed', function () {
-        $user = User::factory()->create();
+        $user = makeUser();
 
         hitApi($this, $user, 4);
 
@@ -66,22 +63,22 @@ describe('API traffic alert', function () {
     it('sends to the traffic topic when one is set', function () {
         config(['services.ntfy.topics.traffic' => 'solyto-traffic']);
 
-        hitApi($this, User::factory()->create(), 4);
+        hitApi($this, makeUser(), 4);
 
         Http::assertSentCount(1);
         Http::assertSent(fn (Request $request) => $request['topic'] === 'solyto-traffic');
     });
 
     it('sends no second alert while above the threshold within the cooldown', function () {
-        hitApi($this, User::factory()->create(), 10);
+        hitApi($this, makeUser(), 10);
 
         Http::assertSentCount(1);
         expect(trafficLogRecords())->toHaveCount(1);
     });
 
     it('counts and alerts two users separately', function () {
-        $first = User::factory()->create();
-        $second = User::factory()->create();
+        $first = makeUser();
+        $second = makeUser();
 
         hitApi($this, $first, 3);
         hitApi($this, $second, 3);
@@ -99,7 +96,7 @@ describe('API traffic alert', function () {
     it('sends nothing when ntfy is not configured and the request still succeeds', function () {
         config(['services.ntfy.url' => null, 'services.ntfy.topic' => null]);
 
-        hitApi($this, User::factory()->create(), 4);
+        hitApi($this, makeUser(), 4);
 
         Http::assertNothingSent();
         expect(trafficLogRecords())->toHaveCount(1);

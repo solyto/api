@@ -21,7 +21,8 @@ class CreateMcpToken extends Command
         }
 
         if ($this->option('revoke')) {
-            $this->info("Revoked {$tokens->revokeAll($user)} MCP token(s).");
+            $revoked = $tokens->revokeAll($user);
+            $this->info("Revoked {$revoked} MCP token(s).");
             return self::SUCCESS;
         }
 

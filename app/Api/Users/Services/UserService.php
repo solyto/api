@@ -3,6 +3,7 @@
 namespace App\Api\Users\Services;
 
 use App\Api\DevRequests\Models\DevRequest;
+use App\Api\Users\Enums\AccountDeletionStatus;
 use App\Api\Users\Enums\UserGrowthPeriod;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
 use App\Api\Users\Mails\AccountDeletionMail;
@@ -26,13 +27,9 @@ use Illuminate\Support\Str;
 
 class UserService
 {
-    /**
-     * Per-user cache keys of the form [key, user id] held by the module
-     * services on the user_data store. weather_forecast (keyed by location)
-     * and feed_items (keyed by feed id) are shared and deliberately absent;
-     * the *_release_notified keys live in the longterm store instead (see
-     * USER_LONGTERM_CACHE_KEYS).
-     */
+    // [key, user id] keys of the module services on the user_data store. weather_forecast (keyed by location)
+    // and feed_items (keyed by feed id) are shared and deliberately absent; the *_release_notified keys live
+    // in the longterm store instead.
     private const array USER_CACHE_KEYS = [
         'address_books', 'book_recommendations', 'book_releases', 'books', 'budgets', 'budgets_v2',
         'calendars', 'calendars_v2', 'checkin', 'checkin_values', 'clipboard', 'feed_import', 'games', 'links', 'movie_releases', 'movies',
@@ -43,21 +40,14 @@ class UserService
         'todos_due', 'tt_categories', 'tt_entries', 'tt_projects', 'tt_projects_v2', 'user_feeds', 'wealth_fields',
     ];
 
-    /**
-     * Per-user cache keys of the form [key, user id] on the longterm store:
-     * the Grab*Releases jobs keep the release-notified sets there forever so
-     * they survive deploys — forgetting them through the user_data store
-     * would be a silent no-op.
-     */
+    // [key, user id] keys on the longterm store: the Grab*Releases jobs keep the release-notified sets there
+    // forever so they survive deploys; forgetting them through the user_data store would be a silent no-op.
     private const array USER_LONGTERM_CACHE_KEYS = [
         'book_release_notified', 'movie_release_notified', 'music_release_notified',
     ];
 
-    /**
-     * Per-user cache keys of the form [key, user id, resource id], one per
-     * resource the user owned. They carry the user's cache tag, so one tag
-     * flush drops them all; the list keeps the count of flushed families.
-     */
+    // [key, user id, resource id] keys, one per resource the user owned. They carry the user's cache tag,
+    // so one tag flush drops them all; the list only gives the count of flushed families.
     private const array USER_CACHE_PREFIX_KEYS = [
         'calendar_events', 'contacts_v2', 'event_attachment_notes', 'event_attachment_todos',
     ];
@@ -111,11 +101,13 @@ class UserService
         // The week/day windows start mid-history: earlier signups are the starting total.
         $total = $periods === [] ? 0 : $signups->filter(fn (int $count, int|string $period) => (string) $period < $periods[0])->sum();
 
-        return array_map(function (string $period) use (&$total, $signups): array {
+        $growth = [];
+        foreach ($periods as $period) {
             $total += $signups->get($period, 0);
+            $growth[] = ['period' => $period, 'total' => $total];
+        }
 
-            return ['period' => $period, 'total' => $total];
-        }, $periods);
+        return $growth;
     }
 
     public function find(User $user): User
@@ -135,13 +127,11 @@ class UserService
         return $user;
     }
 
+    // Removes everything the user owns: DAV data on pgsql, the morph rows the users cascade does not cover,
+    // the user row (FK cascades take the rest), both per-user storage directories and the user-scoped cache keys.
+    // DAV goes first and the user row inside the transaction last, so an aborted run leaves the user row intact
+    // and the routine re-runnable.
     /**
-     * Removes everything the user owns: DAV data on pgsql, the morph rows
-     * the users cascade does not cover, the user row (FK cascades take the
-     * rest), both per-user storage directories and the user-scoped cache
-     * keys. DAV goes first and the user row inside the transaction last, so
-     * an aborted run leaves the user row intact and the routine re-runnable.
-     *
      * @return array<string, int|bool>
      */
     public function destroy(User $user): array
@@ -202,16 +192,10 @@ class UserService
         return [...$dav, ...$app, ...$files, 'cache_keys_flushed' => $cacheKeys];
     }
 
-    /**
-     * Self-service deletion after the password was checked. With
-     * confirmation on and mail configured it mails a link and
-     * deletes nothing until the token comes back through confirmDeletion()
-     * (a new request replaces the previous token); otherwise it deletes
-     * right away, so instances without mail still let users leave.
-     *
-     * @return 'email_sent'|'deleted'
-     */
-    public function requestDeletion(User $user, string $platform): string
+    // With confirmation on and mail configured it mails a link and deletes nothing until the token comes back
+    // through confirmDeletion() (a new request replaces the previous token); otherwise it deletes right away,
+    // so instances without mail still let users leave.
+    public function requestDeletion(User $user, string $platform): AccountDeletionStatus
     {
         if (!$this->deletionRequiresEmail()) {
             if (config('auth.policy.account_deletion_confirmation')) {
@@ -220,7 +204,7 @@ class UserService
 
             $this->destroy($user);
 
-            return 'deleted';
+            return AccountDeletionStatus::Deleted;
         }
 
         Mail::to($user->email)->send(new AccountDeletionMail(
@@ -231,7 +215,7 @@ class UserService
             language: $user->settings->language ?? 'en'
         ));
 
-        return 'email_sent';
+        return AccountDeletionStatus::EmailSent;
     }
 
     public function deletionRequiresEmail(): bool
@@ -240,7 +224,7 @@ class UserService
     }
 
     /**
-     * @throws \RuntimeException when the token is unknown, expired or not the user's
+     * @throws InvalidDeletionTokenException when the token is unknown, expired or not the user's
      */
     public function confirmDeletion(string $token, string $email): void
     {
@@ -286,11 +270,8 @@ class UserService
         return $user;
     }
 
-    /**
-     * Mailgun is the only transport the stack wires up; a self-hosted
-     * install ships without its domain and secret. Any other mailer was
-     * chosen explicitly by the operator and is trusted.
-     */
+    // Mailgun is the only transport the stack wires up; a self-hosted install ships without its domain and
+    // secret. Any other mailer was chosen explicitly by the operator and is trusted.
     private function mailConfigured(): bool
     {
         if (empty(config('mail.from.address'))) {

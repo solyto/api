@@ -21,11 +21,8 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Pulse\Facades\Pulse;
 use Livewire\Livewire;
 
-/**
- * Our own Pulse metrics: the cards on the dashboard
- * (resources/views/vendor/pulse/dashboard.blade.php) and the listeners that
- * record what no single code path can (notifications).
- */
+// The cards are placed in resources/views/vendor/pulse/dashboard.blade.php; the listeners record
+// what no single code path can (notifications, queue waits).
 class PulseMetricsServiceProvider extends ServiceProvider
 {
     public function boot(): void
@@ -44,17 +41,19 @@ class PulseMetricsServiceProvider extends ServiceProvider
             PulseMetrics::notification($event->channel, $event->notification::class, true);
         });
 
-        // H1: the payload's createdAt ignores a job's delay, so store when it may actually start.
+        // The payload's createdAt ignores a job's delay, so store when it may actually start.
         Queue::createPayloadUsing(function (?string $connection, ?string $queue, array $payload): array {
             return Pulse::rescue(function () use ($payload) {
                 $command = $payload['data']['command'] ?? null;
+                $delay = is_object($command) ? ($command->delay ?? null) : null;
 
-                return [PulseMetrics::PAYLOAD_AVAILABLE_AT => PulseMetrics::availableAt(is_object($command) ? ($command->delay ?? null) : null)];
+                return [PulseMetrics::PAYLOAD_AVAILABLE_AT => PulseMetrics::availableAt($delay)];
             }) ?? [];
         });
 
         Event::listen(JobProcessing::class, function (JobProcessing $event) {
             Pulse::rescue(function () use ($event) {
+                // A retry keeps the original push time and would look like a long wait.
                 if ($event->job->attempts() > 1) {
                     return;
                 }

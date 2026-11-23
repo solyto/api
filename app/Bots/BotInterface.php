@@ -10,9 +10,7 @@ interface BotInterface
 
     public function entrypoint(): void;
 
-    /**
-     * Run the handler for the conversation's last action event. Returns false
-     * when no handler is registered for it, so the bot falls back to entrypoint().
-     */
+    // Runs the handler for the conversation's last action event; false when none is registered,
+    // so the bot falls back to entrypoint().
     public function routeAction(string $name): bool;
 }

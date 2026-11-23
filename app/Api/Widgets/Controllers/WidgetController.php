@@ -48,12 +48,14 @@ class WidgetController
      */
     public function yourDay(Request $request): JsonResponse
     {
+        $yourDay = $this->widgetService->yourDay($request->user());
+
         return ApiResponse::success(
-            new YourDayResource($this->widgetService->yourDay($request->user())),
+            new YourDayResource($yourDay->widget),
             'Widget data retrieved successfully.',
             meta: [
-                'unavailable_calendars' => $this->widgetService->unavailableCalendars(),
-                'credentials_rejected_calendars' => $this->widgetService->credentialsRejectedCalendars(),
+                'unavailable_calendars' => $yourDay->unavailableCalendars,
+                'credentials_rejected_calendars' => $yourDay->credentialsRejectedCalendars,
             ]
         );
     }
@@ -294,7 +296,7 @@ class WidgetController
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Unknown tracker", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=422, description="Invalid value", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Invalid value", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
      *     @OA\Response(response=426, description="Client version too old", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )

@@ -8,13 +8,8 @@ use Illuminate\Http\Request;
 use Laravel\Pulse\Facades\Pulse;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Counts 429 responses for the Pulse rate limits card, keyed by limiter and
- * route. Registered as global middleware (bootstrap/app.php), so it runs
- * outside the routes' throttle middleware and sees the 429 the router renders
- * from ThrottleRequestsException (which Laravel never reports, so Pulse's
- * exception card doesn't show it either).
- */
+// Global middleware (bootstrap/app.php), so it sees the 429 the router renders from ThrottleRequestsException.
+// Laravel never reports that exception, so Pulse's exception card doesn't show rate limiting either.
 class RecordRateLimitedRequests
 {
     public function handle(Request $request, Closure $next): Response
@@ -42,6 +37,8 @@ class RecordRateLimitedRequests
             ->map(fn (string $middleware) => explode(',', substr($middleware, strlen('throttle:')))[0])
             ->implode(', ');
 
-        return ($limiters !== '' ? $limiters : 'throttle').' · '.$request->method().' /'.ltrim($route->uri(), '/');
+        $limiterLabel = $limiters !== '' ? $limiters : 'throttle';
+
+        return $limiterLabel.' · '.$request->method().' /'.ltrim($route->uri(), '/');
     }
 }

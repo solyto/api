@@ -13,7 +13,7 @@ class UserSettingsService
     // older ones read and write only a flat map of feature flags.
     public const string NESTED_NAVIGATION_SINCE = '1.1.0';
 
-    /** The navigation features of 1.0.15, the last release before the nested navigation. */
+    // The navigation features of 1.0.15, the last release before the nested navigation.
     public const array LEGACY_NAVIGATION_FEATURES = [
         'calendar', 'todos', 'notes', 'libraries', 'contacts', 'checkIn', 'finances',
         'clipboard', 'dev_requests', 'feeds', 'timeTracking',
@@ -109,9 +109,8 @@ class UserSettingsService
         $user->settings()->update(['check_in_calendar_mark' => $enabled]);
     }
 
+    // The settings shape apps before the tracker tables read: on/off of the built-in trackers and the chosen sports.
     /**
-     * The settings shape apps before the tracker tables read: on/off of the built-in trackers and the chosen sports.
-     *
      * @return array{enabled_trackers: array<int, string>, selected_sports: array<int, string>}
      */
     public function getCheckInSettings(User $user): array

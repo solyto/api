@@ -1,6 +1,5 @@
 <?php
 
-use App\Api\Users\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -8,34 +7,9 @@ use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Sanctum\TransientToken;
 
-/**
- * A session token with an expiry, like login issues.
- */
-function sessionToken(User $user, ?DateTimeInterface $expiresAt = null): string
-{
-    return $user->createToken('auth-token-mobile', expiresAt: $expiresAt ?? now()->addDays(30))->plainTextToken;
-}
-
 function tokenRecord(string $plainTextToken): PersonalAccessToken
 {
     return PersonalAccessToken::findToken($plainTextToken);
-}
-
-/**
- * Each request must resolve its own bearer token; the guard caches the first user otherwise.
- */
-function bearer($test, string $token)
-{
-    app('auth')->forgetGuards();
-
-    return $test->withHeader('Authorization', 'Bearer '.$token);
-}
-
-function issueWidgetToken($test, string $parentToken): string
-{
-    return bearer($test, $parentToken)->postJson('/api/v1/auth/widget-token')
-        ->assertStatus(201)
-        ->json('data.token');
 }
 
 function registerWidgetProbeRoute(): void
@@ -72,7 +46,7 @@ describe('Widget token scope gate', function () {
         $widgetToken = issueWidgetToken($this, sessionToken($user));
 
         bearer($this, $widgetToken)->getJson('/api/v1/widgets/probe')->assertOk()->assertJsonPath('ok', true);
-        bearer($this, $widgetToken)->getJson('/api/v1/unnamed-probe')->assertStatus(401);
+        expectApiError(bearer($this, $widgetToken)->getJson('/api/v1/unnamed-probe'), 401);
     });
 
     it('sees the resolved route when the gate runs', function () {
@@ -104,7 +78,7 @@ describe('Widget token scope gate', function () {
 
         $this->travel(2)->hours();
 
-        bearer($this, $widgetToken)->getJson('/api/v1/widgets/probe')->assertStatus(401);
+        expectApiError(bearer($this, $widgetToken)->getJson('/api/v1/widgets/probe'), 401);
     });
 });
 

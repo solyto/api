@@ -9,6 +9,12 @@ class StoreTodoRequest extends FormRequest
 {
     public function rules(): array
     {
+        return self::sharedRules($this->user()->id);
+    }
+
+    // Also the create-todo MCP tool's rules, so both accept the same todo.
+    public static function sharedRules(string $userId): array
+    {
         return [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
@@ -18,9 +24,9 @@ class StoreTodoRequest extends FormRequest
             'status' => 'sometimes|in:backlog,pending,in-progress,waiting,almost-done',
             'progress' => 'sometimes|nullable|integer|min:0|max:100',
             'effort' => 'sometimes|nullable|in:low,medium,high',
-            'category_id' => ['nullable', Rule::exists('todo_categories', 'id')->where('user_id', $this->user()->id)],
+            'category_id' => ['nullable', Rule::exists('todo_categories', 'id')->where('user_id', $userId)],
             'tags' => 'nullable|array',
-            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $this->user()->id)],
+            'tags.*' => [Rule::exists('tags', 'id')->where('user_id', $userId)],
             'recurrence_frequency' => 'nullable|in:daily,weekly,monthly,yearly',
             'recurrence_interval' => 'sometimes|integer|min:1|max:365',
             'recurrence_ends_at' => 'nullable|string',

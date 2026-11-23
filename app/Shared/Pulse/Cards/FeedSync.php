@@ -7,7 +7,6 @@ use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 
-/** A: every SyncFeed run per feed URL, with its og:image lookups and failures. */
 #[Lazy]
 class FeedSync extends MetricCard
 {

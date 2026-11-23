@@ -7,10 +7,7 @@ use Illuminate\Contracts\Support\Renderable;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 
-/**
- * H: is the queue keeping up? Queue length (sampled every minute by the
- * scheduler) and how long jobs wait before a worker starts them.
- */
+// The queue length comes from the scheduler's sample every minute (RecordQueueSize).
 #[Lazy]
 class QueueLoad extends MetricCard
 {

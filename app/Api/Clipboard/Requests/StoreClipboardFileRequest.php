@@ -16,9 +16,10 @@ class StoreClipboardFileRequest extends FormRequest
                 'required',
                 'file',
                 function (string $attribute, UploadedFile $value, Closure $fail) {
-                    $allowed = config('clipboard.file_types')[strtolower($value->getClientOriginalExtension())] ?? null;
+                    $extension = strtolower($value->getClientOriginalExtension());
+                    $allowedMimeTypes = config('clipboard.file_types')[$extension] ?? null;
 
-                    if ($allowed === null || !in_array($value->getMimeType(), $allowed, true)) {
+                    if ($allowedMimeTypes === null || !in_array($value->getMimeType(), $allowedMimeTypes, true)) {
                         $fail('The file type is not allowed.');
                     }
                 },
