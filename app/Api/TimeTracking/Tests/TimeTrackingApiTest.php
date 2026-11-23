@@ -370,7 +370,7 @@ describe('TimeTrackingService statistics', function () {
         expect($stats['by_project'][0]['color'])->toBe('#AABBCC');
     });
 
-    it('falls back to the first category color in statistics when the project has none', function () {
+    it('sends no colour for a project without one, so the chart tells projects apart', function () {
         $user = makeUser();
         $category = TimeTrackingCategory::factory()->forUser($user)->withColor('#DDEEFF')->create();
         $project = TimeTrackingProject::factory()->forUser($user)->create(['color' => null]);
@@ -384,7 +384,7 @@ describe('TimeTrackingService statistics', function () {
 
         $stats = app(TimeTrackingService::class)->getStatistics($user, now()->subWeek(), now());
 
-        expect($stats['by_project'][0]['color'])->toBe('#DDEEFF');
+        expect($stats['by_project'][0]['color'])->toBeNull();
     });
 
     it('filters statistics by category', function () {

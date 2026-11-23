@@ -159,7 +159,7 @@ class TimeTrackingService
             ->where('started_at', '>=', $from)
             ->where('started_at', '<=', $to)
             ->when($categoryIds, fn ($query) => $query->whereHas('project.categories', fn ($q) => $q->whereIn('time_tracking_categories.id', $categoryIds)))
-            ->with(['project.categories'])
+            ->with('project')
             ->get();
 
         $byProject = [];
@@ -172,8 +172,7 @@ class TimeTrackingService
                 $byProject[$projectId] = [
                     'project_id'    => $projectId,
                     'project_title' => $entry->project->title,
-                    // Projects have no colour picker in the app yet, so fall back to the first category's colour as in 1.0.15.
-                    'color'         => $entry->project->color ?? $entry->project->categories->first()?->color,
+                    'color'         => $entry->project->color,
                     'total_minutes' => 0,
                 ];
             }
