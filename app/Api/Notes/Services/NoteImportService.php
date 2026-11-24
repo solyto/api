@@ -41,7 +41,10 @@ class NoteImportService
             $note->fill(['category_id' => $categoryId]);
         }
 
-        return $note->save();
+        $saved = $note->save();
+        $this->notes->syncLinks($note);
+
+        return $saved;
     }
 
     private function importZipFile(UploadedFile $file, string $userId): bool
@@ -103,5 +106,6 @@ class NoteImportService
             'category_id' => $parentCategoryId,
         ]);
         $note->save();
+        $this->notes->syncLinks($note);
     }
 }

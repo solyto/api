@@ -54,6 +54,18 @@ class Note extends Model
             ->withTimestamps();
     }
 
+    /** @return BelongsToMany<Note, $this> */
+    public function linkedNotes(): BelongsToMany
+    {
+        return $this->belongsToMany(Note::class, 'note_links', 'source_note_id', 'target_note_id');
+    }
+
+    /** @return BelongsToMany<Note, $this> */
+    public function backlinks(): BelongsToMany
+    {
+        return $this->belongsToMany(Note::class, 'note_links', 'target_note_id', 'source_note_id');
+    }
+
     public function scopeForUser(Builder $query, string $userId)
     {
         return $query->where('user_id', $userId);

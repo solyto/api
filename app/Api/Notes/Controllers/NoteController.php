@@ -8,6 +8,7 @@ use App\Api\Notes\Models\Note;
 use App\Api\Notes\Requests\ListJournalMarksRequest;
 use App\Api\Notes\Requests\StoreNoteRequest;
 use App\Api\Notes\Requests\UpdateNoteRequest;
+use App\Api\Notes\Resources\NoteBacklinkResource;
 use App\Api\Notes\Resources\NoteResource;
 use App\Api\Notes\Services\NoteService;
 use Illuminate\Http\JsonResponse;
@@ -203,6 +204,48 @@ class NoteController
         abort_unless($this->isResourceOwner($request, $note), 403);
 
         return ApiResponse::success(new NoteResource($note), 'Note retrieved successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/notes/{note}/backlinks",
+     *     operationId="noteBacklinks",
+     *     summary="List the notes that link to a note",
+     *     tags={"Notes"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="note",
+     *         in="path",
+     *         description="Note ID",
+     *         required=true,
+     *
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Backlinks retrieved successfully, sorted by title; notes in hidden categories are left out",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/NoteBacklink"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=403, description="Forbidden", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Note not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function backlinks(Request $request, Note $note): JsonResponse
+    {
+        abort_unless($this->isResourceOwner($request, $note), 403);
+
+        return ApiResponse::success(
+            NoteBacklinkResource::collection($this->noteService->backlinks($note)),
+            'Backlinks retrieved successfully.'
+        );
     }
 
     /**

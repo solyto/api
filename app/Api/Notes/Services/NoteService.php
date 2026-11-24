@@ -24,6 +24,9 @@ class NoteService
 
     private const int CACHE_TTL = 86400;
 
+    // Matches relative and absolute links in both HTML (href) and older Markdown content.
+    private const string LINK_PATTERN = '~/notes/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})~i';
+
     public function __construct(private readonly UserCacheService $cache) {}
 
     public function list(User $user): array
@@ -144,6 +147,8 @@ class NoteService
             $note->tags()->attach($data['tags']);
         }
 
+        $this->syncLinks($note);
+
         $note->load(['user', 'category', 'tags']);
 
         $this->forgetUser($user->id);
@@ -159,6 +164,10 @@ class NoteService
             $note->tags()->sync($data['tags']);
         }
 
+        if (array_key_exists('content', $data)) {
+            $this->syncLinks($note);
+        }
+
         $note->load(['user', 'category', 'tags']);
 
         $this->forgetUser($note->user_id);
@@ -172,6 +181,29 @@ class NoteService
         $note->delete();
 
         $this->forgetUser($userId);
+    }
+
+    // Links to missing notes, other users' notes and the note itself are not stored; the content stays as written.
+    public function syncLinks(Note $note): void
+    {
+        preg_match_all(self::LINK_PATTERN, (string) $note->content, $matches);
+        $ids = array_unique(array_map('strtolower', $matches[1]));
+
+        $targetIds = $ids === [] ? [] : Note::forUser($note->user_id)
+            ->whereKey($ids)
+            ->whereKeyNot($note->id)
+            ->pluck('id')
+            ->all();
+
+        $note->linkedNotes()->sync($targetIds);
+    }
+
+    public function backlinks(Note $note): Collection
+    {
+        return $note->backlinks()
+            ->where(fn ($query) => $this->whereVisible($query, $note->user_id))
+            ->orderBy('notes.title')
+            ->get(['notes.id', 'notes.title']);
     }
 
     // Public because category writes change which notes are hidden; NoteCategoryService calls it.

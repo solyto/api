@@ -189,6 +189,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('recent', [NoteController::class, 'recent']);
         Route::get('hidden', [NoteController::class, 'hidden']);
         Route::get('journal/marks', [NoteController::class, 'journalMarks']);
+        Route::get('{note}/backlinks', [NoteController::class, 'backlinks']);
 
         Route::apiResource('/', NoteController::class)->parameters(['' => 'note']);
     });
