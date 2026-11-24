@@ -93,6 +93,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perHour(20)->by($request->user()->id);
         });
 
+        RateLimiter::for('contacts-import', function (Request $request) {
+            return Limit::perHour(20)->by($request->user()->id);
+        });
+
         // Each of these asks the user's own CalDAV server (discovery), up to a timeout per request; one connect takes about three.
         RateLimiter::for('external-calendars', function (Request $request) {
             return Limit::perMinute(20)->by($this->userOrIp($request));

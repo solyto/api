@@ -239,4 +239,57 @@ class VCardHelper
             </d:prop>
         </d:propfind>';
     }
+
+    public static function isValid(string $vCard): bool
+    {
+        try {
+            Reader::read($vCard);
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    // Forgiving parse + re-serialize: sabre's serializer produces correctly folded and escaped output and keeps
+    // UID, PHOTO and the rest as they are where possible.
+    public static function repair(string $vCard): ?string
+    {
+        try {
+            $repaired = self::dropUnreadablePhoto(Reader::read($vCard, Reader::OPTION_FORGIVING)->serialize());
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::isValid($repaired) ? $repaired : null;
+    }
+
+    // A repaired vCard can be structurally valid while its PHOTO payload is truncated or garbled (a forgiving parse
+    // silently drops a broken fold instead of failing). No photo is better than a broken one.
+    public static function dropUnreadablePhoto(string $vCard): string
+    {
+        if (!preg_match('/(^PHOTO[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*\r?\n)/m', $vCard, $matches)) {
+            return $vCard;
+        }
+
+        $photoBlock = $matches[1];
+        $colonPos = strpos($photoBlock, ':');
+        if ($colonPos === false) {
+            return $vCard;
+        }
+
+        $value = substr($photoBlock, $colonPos + 1);
+
+        if (stripos($value, 'data:') === 0 && str_contains($value, ',')) {
+            $value = substr($value, strpos($value, ',') + 1);
+        }
+
+        $base64 = trim(preg_replace('/\r?\n[ \t]/', '', $value));
+        $decoded = base64_decode($base64, true);
+
+        if ($decoded !== false && @getimagesizefromstring($decoded) !== false) {
+            return $vCard;
+        }
+
+        return str_replace($photoBlock, '', $vCard);
+    }
 }

@@ -273,6 +273,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::prefix('import')->group(function () {
             Route::post('', [AddressBookImportController::class, 'startImport']);
             Route::post('select', [AddressBookImportController::class, 'selectAddressBooks']);
+            Route::middleware('throttle:contacts-import')->post('file', [AddressBookImportController::class, 'importFile']);
             Route::get('state', [AddressBookImportController::class, 'getState']);
         });
 

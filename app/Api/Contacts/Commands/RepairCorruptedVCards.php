@@ -3,9 +3,9 @@
 namespace App\Api\Contacts\Commands;
 
 use App\Dav\DTOs\ContactDTO;
+use App\Dav\Helpers\VCardHelper;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Sabre\VObject\Reader;
 
 class RepairCorruptedVCards extends Command
 {
@@ -30,7 +30,7 @@ class RepairCorruptedVCards extends Command
             foreach ($cards as $card) {
                 $vCard = is_resource($card->carddata) ? stream_get_contents($card->carddata) : $card->carddata;
 
-                if ($this->isValid($vCard)) {
+                if (VCardHelper::isValid($vCard)) {
                     $bar->advance();
                     continue;
                 }
@@ -86,28 +86,12 @@ class RepairCorruptedVCards extends Command
         return Command::SUCCESS;
     }
 
-    private function isValid(string $vCard): bool
-    {
-        try {
-            Reader::read($vCard);
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
     private function repair(string $vCard, int $addressBookId): ?string
     {
-        // Strategy 1: forgiving parse + re-serialize. Sabre's own serializer produces
-        // correctly folded/escaped output, preserving UID/PHOTO/etc. byte-for-byte where possible.
-        try {
-            $parsed = Reader::read($vCard, Reader::OPTION_FORGIVING);
-            $reserialized = $this->dropUnreadablePhoto($parsed->serialize());
-            if ($this->isValid($reserialized)) {
-                return $reserialized;
-            }
-        } catch (\Throwable) {
-            // fall through to strategy 2
+        // Strategy 1: forgiving parse + re-serialize.
+        $repaired = VCardHelper::repair($vCard);
+        if ($repaired !== null) {
+            return $repaired;
         }
 
         // Strategy 2: best-effort field extraction via our own lenient parser, rebuilt through
@@ -140,8 +124,8 @@ class RepairCorruptedVCards extends Command
                 addressBookId: $addressBookId,
             );
 
-            $rebuilt = $this->dropUnreadablePhoto($dto->toVCard());
-            if ($this->isValid($rebuilt)) {
+            $rebuilt = VCardHelper::dropUnreadablePhoto($dto->toVCard());
+            if (VCardHelper::isValid($rebuilt)) {
                 return $rebuilt;
             }
         } catch (\Throwable) {
@@ -149,39 +133,5 @@ class RepairCorruptedVCards extends Command
         }
 
         return null;
-    }
-
-    /**
-     * A repaired vCard can be structurally valid while its PHOTO payload is truncated/garbled
-     * (e.g. a forgiving parse silently drops a broken fold instead of failing loudly). Rather
-     * than sync a corrupted image, verify it actually decodes to a real image and drop the
-     * property entirely if not — no photo is better than a broken one.
-     */
-    private function dropUnreadablePhoto(string $vCard): string
-    {
-        if (!preg_match('/(^PHOTO[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*\r?\n)/m', $vCard, $matches)) {
-            return $vCard;
-        }
-
-        $photoBlock = $matches[1];
-        $colonPos = strpos($photoBlock, ':');
-        if ($colonPos === false) {
-            return $vCard;
-        }
-
-        $value = substr($photoBlock, $colonPos + 1);
-
-        if (stripos($value, 'data:') === 0 && str_contains($value, ',')) {
-            $value = substr($value, strpos($value, ',') + 1);
-        }
-
-        $base64 = trim(preg_replace('/\r?\n[ \t]/', '', $value));
-        $decoded = base64_decode($base64, true);
-
-        if ($decoded !== false && @getimagesizefromstring($decoded) !== false) {
-            return $vCard;
-        }
-
-        return str_replace($photoBlock, '', $vCard);
     }
 }

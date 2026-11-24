@@ -450,6 +450,99 @@ describe('Contact import', function () {
             ->and($names->all())->toBe(['Jane Doe', 'John Doe']);
     });
 
+    it('checks every remote card: skips an unreadable one, repairs a missing UID and converts vCard 2.1', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', [
+            'Friends' => [
+                'a.vcf' => davVcard('a', 'Jane Doe'),
+                'broken.vcf' => "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:broken\r\nFN:Broken\r\nitem_1.EMAIL:broken@example.com\r\nEND:VCARD\r\n",
+                'no-uid.vcf' => "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:No Uid\r\nEND:VCARD\r\n",
+                'old.vcf' => "BEGIN:VCARD\r\nVERSION:2.1\r\nN:Smith;Old;;;\r\nFN:Old Smith\r\nTEL;CELL:+15550100\r\nEND:VCARD\r\n",
+            ],
+        ]);
+        $import = app(DavService::class)->import()->addressBooks();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+        $import->importAddressBooks($user, $import->getState($user->id));
+        $import->importContacts($user, $import->getState($user->id));
+
+        $addressBook = app(DavService::class)->addressBooks()->getByName($user, 'Friends');
+        $cards = collect(app(DavService::class)->addressBooks()->contacts()->listStored($addressBook))
+            ->map(fn ($contact) => \Sabre\VObject\Reader::read($contact->storedData))
+            ->keyBy(fn ($vCard) => (string) $vCard->FN);
+
+        expect($cards->keys()->sort()->values()->all())->toBe(['Jane Doe', 'No Uid', 'Old Smith'])
+            ->and((string) $cards['No Uid']->UID)->not->toBe('')
+            ->and((string) $cards['Old Smith']->VERSION)->toBe('3.0')
+            ->and($import->getState($user->id))->toMatchObject(['stage' => 'finished', 'contactsCount' => 4, 'contactsDone' => 3, 'contactsSkipped' => 1]);
+    });
+
+    it('answers 409 to a second start and to select while an import runs', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+
+        expect(fn () => $import->start($user, REMOTE, 'alice', 'app-password'))->toThrow(\App\Dav\Exceptions\ImportConflictException::class)
+            ->and(fn () => $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']))->toThrow(\App\Dav\Exceptions\ImportConflictException::class);
+    });
+
+    it('does not select address books for a file import', function () {
+        $user = davUser();
+        \Illuminate\Support\Facades\Storage::fake('local');
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->actingAs($user, 'sanctum')->post('/api/v1/address-books/import/file', [
+            'file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('friends.vcf', davVcard('a')),
+        ], ['Accept' => 'application/json'])->assertStatus(200);
+        $this->travel(6)->minutes();
+
+        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import/select', ['address_books' => ['Friends']]), 404);
+    });
+
+    it('reports the source and skipped contacts in the import state', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        app(DavService::class)->import()->addressBooks()->start($user, REMOTE, 'alice', 'app-password');
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/address-books/import/state')
+            ->assertStatus(200)
+            ->assertJsonPath('data.stage', 'select')
+            ->assertJsonPath('data.source', 'carddav')
+            ->assertJsonPath('data.contacts_skipped', 0)
+            ->assertJsonPath('data.address_books', ['Friends']);
+    });
+
+    it('marks its own import failed when the job fails and leaves another import alone', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+        $jobId = $import->getState($user->id)->jobId;
+
+        (new \App\Api\Contacts\Jobs\ImportContacts($user->id, 'an-older-job'))->failed(null);
+        expect($import->getState($user->id)->stage)->toBe('address-books');
+
+        (new \App\Api\Contacts\Jobs\ImportContacts($user->id, $jobId))->failed(null);
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
+
+    it('runs only the import it was dispatched for', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => ['a.vcf' => davVcard('a', 'Jane Doe')]]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+
+        (new \App\Api\Contacts\Jobs\ImportContacts($user->id, 'an-older-job'))->handle(app(DavService::class));
+        expect($import->getState($user->id)->stage)->toBe('address-books');
+
+        (new \App\Api\Contacts\Jobs\ImportContacts($user->id, $import->getState($user->id)->jobId))->handle(app(DavService::class));
+        expect($import->getState($user->id))->toMatchObject(['stage' => 'finished', 'contactsDone' => 1]);
+    });
+
     it('fails when the remote principal cannot be read', function () {
         $user = davUser();
         fakeRemoteDav('addressbooks', ['Friends' => []], discoveryStatus: 401);

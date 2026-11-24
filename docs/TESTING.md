@@ -278,6 +278,7 @@ Limits of the setup:
 | Real-client data (Apple, Google, Outlook, Thunderbird, DAVx5) | `DavClientFixtureTest` | `DavClientFixtureTest` | — |
 | Occurrence edits, expansion, DST | `EventOccurrenceServiceTest`, `DavClientFixtureTest` | — | — |
 | Import from a remote server | `DavImportTest` | `DavImportTest` | — |
+| Import from a file (other apps' exports, vCard 2.1/3.0/4.0, broken cards, UIDs) | `CalendarFileImportApiTest` | `ContactFileImportApiTest` | — |
 | Outbound client: redirects, weak ETags, credentials | `RemoteCalDavClientTest`, `ExternalCalendarProxyTest` | — | — |
 | Outbound client: `CURLOPT_RESOLVE` pinning, response size cap | `RemoteCalDavClientLiveTest` | — | — |
 | Service CRUD, sharing, deletion | `DavServiceTest` | `DavServiceTest` | `PrincipalsServiceTest` |

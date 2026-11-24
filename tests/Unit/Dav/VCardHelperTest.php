@@ -123,3 +123,31 @@ describe('VCardHelper xml builders', function () {
         expect($xml)->toContain('addressbook-home-set');
     });
 });
+
+describe('VCardHelper repair', function () {
+    it('accepts a card that parses strictly', function () {
+        expect(VCardHelper::isValid("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nEND:VCARD\r\n"))->toBeTrue()
+            ->and(VCardHelper::isValid("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nnot a property\r\nEND:VCARD\r\n"))->toBeFalse();
+    });
+
+    it('re-serializes a card and drops its unreadable photo, keeping the UID', function () {
+        $repaired = VCardHelper::repair("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ada-1\r\nFN:Ada\r\nPHOTO;ENCODING=b;TYPE=JPEG:bm90IGFuIGltYWdl\r\nEND:VCARD\r\n");
+
+        expect($repaired)->not->toBeNull()
+            ->and(VCardHelper::isValid($repaired))->toBeTrue()
+            ->and($repaired)->toContain('UID:ada-1')
+            ->and($repaired)->not->toContain('PHOTO');
+    });
+
+    it('returns null for a card that stays unreadable', function () {
+        expect(VCardHelper::repair("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nitem_1.EMAIL:ada@example.com\r\nEND:VCARD\r\n"))->toBeNull()
+            ->and(VCardHelper::repair('this is not a vcard'))->toBeNull();
+    });
+
+    it('keeps a photo that decodes to an image', function () {
+        $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        $vCard = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nPHOTO;ENCODING=b;TYPE=PNG:{$png}\r\nEND:VCARD\r\n";
+
+        expect(VCardHelper::dropUnreadablePhoto($vCard))->toBe($vCard);
+    });
+});

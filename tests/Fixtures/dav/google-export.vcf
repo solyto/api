@@ -1,0 +1,28 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Sam O'Neil
+N:O'Neil;Sam;;;
+EMAIL;TYPE=INTERNET;TYPE=HOME:sam@example.com
+TEL;TYPE=CELL:+1 555 0100
+item1.ORG:Initech
+item1.X-ABLabel:
+CATEGORIES:myContacts
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Priya Raman
+N:Raman;Priya;;;
+EMAIL;TYPE=INTERNET:priya@example.com
+TEL;TYPE=WORK:+44 20 7946 0000
+ADR;TYPE=WORK:;;10 Downing St;London;;SW1A 2AA;United Kingdom
+BDAY:1991-07-30
+NOTE:Met at the conference\, says hi.
+CATEGORIES:myContacts,Work
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:+49 30 1234567
+N:;;;;
+TEL;TYPE=CELL:+49 30 1234567
+CATEGORIES:myContacts
+END:VCARD
