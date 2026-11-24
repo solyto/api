@@ -3,7 +3,7 @@
 return [
     // Friend Request
     'friend_request_title'          => 'Новая заявка в друзья',
-    'friend_request_body'           => 'Пользователь :name отправил вам заявку в друзья.',
+    'friend_request_body'           => 'Новая заявка в друзья от пользователя :name.',
 
     // Music Release
     'music_release_title'           => 'Вышел новый альбом',

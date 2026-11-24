@@ -2,6 +2,7 @@
 
 use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Models\DevRequestComment;
+use App\Api\DevRequests\Models\DevRequestVote;
 use App\Api\Notes\Models\Note;
 use App\Api\Notes\Models\NoteCategory;
 use App\Api\Tags\Models\Tag;
@@ -213,6 +214,26 @@ describe('search-notes and get-note', function () {
             ->assertSee('Full recipe text');
     });
 
+    it('returns the note exactly as its resource without relations', function () {
+        $this->travelTo('2026-11-20 09:30:00');
+        $admin = mcpAdmin();
+        $category = NoteCategory::factory()->forUser($admin)->create();
+        $note = Note::factory()->forUser($admin)->create(['title' => 'Recipe', 'content' => 'Full recipe text', 'category_id' => $category->id, 'is_favorite' => true]);
+        $note->tags()->attach(Tag::factory()->forUser($admin)->create());
+
+        SolytoServer::actingAs($admin)->tool(GetNote::class, ['id' => $note->id])
+            ->assertOk()
+            ->assertSee(json_encode([
+                'id' => $note->id,
+                'title' => 'Recipe',
+                'content' => 'Full recipe text',
+                'category_id' => $category->id,
+                'is_favorite' => true,
+                'created_at' => '2026-11-20T09:30:00.000000Z',
+                'updated_at' => '2026-11-20T09:30:00.000000Z',
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    });
+
     it('does not return other users\' notes or hidden notes', function () {
         $admin = mcpAdmin();
         $hidden = NoteCategory::factory()->forUser($admin)->hidden()->create();
@@ -320,6 +341,45 @@ describe('list-dev-requests and get-dev-request', function () {
 
     it('rejects unknown statuses', function () {
         SolytoServer::actingAs(mcpAdmin())->tool(ListDevRequests::class, ['status' => 'whatever'])->assertHasErrors();
+    });
+
+    it('returns one dev request with its votes, comment count and comments in order', function () {
+        $this->travelTo('2026-11-20 09:30:00');
+        $admin = mcpAdmin();
+        $devRequest = DevRequest::factory()->create([
+            'type' => 'bug', 'status' => 'waiting-for-user', 'priority' => 3, 'title' => 'Crash on save', 'description' => 'It crashes',
+            'url' => null, 'fixed_in_version' => null, 'screenshot' => null,
+        ]);
+        DevRequestVote::factory()->forDevRequestAndUser($devRequest, makeUser())->upvote()->create();
+        DevRequestVote::factory()->forDevRequestAndUser($devRequest, makeUser())->upvote()->create();
+        DevRequestVote::factory()->forDevRequestAndUser($devRequest, $admin)->downvote()->create();
+        $first = DevRequestComment::factory()->create(['dev_request_id' => $devRequest->id, 'content' => 'First']);
+        $this->travel(1)->minutes();
+        $second = DevRequestComment::factory()->create(['dev_request_id' => $devRequest->id, 'content' => 'Second']);
+
+        SolytoServer::actingAs($admin)->tool(GetDevRequest::class, ['id' => $devRequest->id])
+            ->assertOk()
+            ->assertSee(json_encode([
+                'id' => $devRequest->id,
+                'type' => 'bug',
+                'status' => 'waiting-for-user',
+                'priority' => 3,
+                'title' => 'Crash on save',
+                'description' => 'It crashes',
+                'screenshot' => null,
+                'url' => null,
+                'fixed_in_version' => null,
+                'created_at' => '2026-11-20T09:30:00.000000Z',
+                'updated_at' => '2026-11-20T09:30:00.000000Z',
+                'upvotes' => 2,
+                'downvotes' => 1,
+                'score' => 1,
+                'comment_count' => 2,
+                'comments' => [
+                    ['id' => $first->id, 'content' => 'First', 'created_at' => '2026-11-20T09:30:00.000000Z'],
+                    ['id' => $second->id, 'content' => 'Second', 'created_at' => '2026-11-20T09:31:00.000000Z'],
+                ],
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     });
 
     it('returns one dev request with its comments', function () {

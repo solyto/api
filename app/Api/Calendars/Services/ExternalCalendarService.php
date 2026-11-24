@@ -49,7 +49,7 @@ class ExternalCalendarService
             'password' => $data['password'],
         ]);
 
-        $this->cache->store([self::CACHE_KEY_DISCOVERY, $user->id, $account->id], self::CACHE_TTL_DISCOVERY, $found);
+        $this->cache->storeTagged($this->discoveryCacheTags($user->id), [self::CACHE_KEY_DISCOVERY, $user->id, $account->id], self::CACHE_TTL_DISCOVERY, $found);
 
         return $account->load('calendars');
     }
@@ -63,7 +63,7 @@ class ExternalCalendarService
         $found = $this->discover($account->server_url, $username, $data['password']);
 
         $account->update(['username' => $username, 'password' => $data['password']]);
-        $this->cache->store([self::CACHE_KEY_DISCOVERY, $account->user_id, $account->id], self::CACHE_TTL_DISCOVERY, $found);
+        $this->cache->storeTagged($this->discoveryCacheTags($account->user_id), [self::CACHE_KEY_DISCOVERY, $account->user_id, $account->id], self::CACHE_TTL_DISCOVERY, $found);
 
         foreach ($account->calendars as $link) {
             $this->calendars->forgetRemoteState($account->user_id, $link->calendar_id);
@@ -83,7 +83,7 @@ class ExternalCalendarService
         }
 
         $account->delete();
-        $this->cache->forget([self::CACHE_KEY_DISCOVERY, $user->id, $account->id]);
+        $this->cache->forgetTagged($this->discoveryCacheTags($user->id), [self::CACHE_KEY_DISCOVERY, $user->id, $account->id]);
     }
 
     /**
@@ -93,7 +93,8 @@ class ExternalCalendarService
      */
     public function listAvailable(ExternalCalendarAccount $account): array
     {
-        $found = $this->cache->remember(
+        $found = $this->cache->rememberTagged(
+            $this->discoveryCacheTags($account->user_id),
             [self::CACHE_KEY_DISCOVERY, $account->user_id, $account->id],
             self::CACHE_TTL_DISCOVERY,
             fn () => $this->discover($account->server_url, $account->username, $account->password)
@@ -219,6 +220,12 @@ class ExternalCalendarService
                 ]);
             }
         }
+    }
+
+    /** @return array<int, string> */
+    private function discoveryCacheTags(string $userId): array
+    {
+        return [UserCacheService::userTag($userId)];
     }
 
     private function uniqueName(User $user, string $name): string

@@ -2,12 +2,12 @@
 
 namespace App\Api\Clipboard\Services;
 
+use App\Api\Clipboard\Exceptions\ClipboardFileTooLargeException;
 use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Users\Models\User;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ClipboardService
 {
@@ -61,11 +61,11 @@ class ClipboardService
         ]);
     }
 
-    /** @throws HttpException 413 when the file exceeds clipboard.max_file_kb */
+    /** @throws ClipboardFileTooLargeException when the file exceeds clipboard.max_file_kb */
     public function storeFile(User $user, UploadedFile $file): Clipboard
     {
         if ($file->getSize() > config('clipboard.max_file_kb') * 1024) {
-            throw new HttpException(413, 'The file is too large.');
+            throw new ClipboardFileTooLargeException('The file is too large.');
         }
 
         $extension = strtolower($file->getClientOriginalExtension());

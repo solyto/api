@@ -93,4 +93,14 @@ class CalendarDTO
             isShared: false,
         );
     }
+
+    public function isPendingInvite(): bool
+    {
+        return $this->inviteStatus === 'pending';
+    }
+
+    public function isAcceptedInvite(): bool
+    {
+        return $this->inviteStatus === 'accepted';
+    }
 }

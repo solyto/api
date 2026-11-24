@@ -52,10 +52,7 @@ const MIGRATION_COMPATIBILITY_ALLOWLIST = [
 
 const MIGRATION_COMPATIBILITY_BASELINE = 'tests/Fixtures/client-contract/1.0.15-migrations.txt';
 
-/**
- * Returns the source of the `up()` body without comments, or null if the
- * file has no `up()` method.
- */
+// Comments are left out; null when the file has no up().
 function migrationUpBody(string $source): ?string
 {
     $tokens = token_get_all($source);
@@ -102,11 +99,8 @@ function migrationUpBody(string $source): ?string
     return $body;
 }
 
-/**
- * Returns the short names (or aliases) of classes imported from `App\`.
- *
- * @return list<string>
- */
+// Short names, or the alias where there is one.
+/** @return list<string> */
 function migrationAppImports(string $source): array
 {
     preg_match_all('/^use\s+App\\\\([\w\\\\]+)(?:\s+as\s+(\w+))?\s*;/m', $source, $matches, PREG_SET_ORDER);
@@ -121,9 +115,7 @@ function migrationAppImports(string $source): array
     }, $matches);
 }
 
-/**
- * @return list<string> the flagged patterns found in the migration
- */
+/** @return list<string> */
 function migrationCompatibilityFindings(string $source): array
 {
     $body = migrationUpBody($source);

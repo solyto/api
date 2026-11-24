@@ -2,6 +2,7 @@
 
 namespace App\Api\Finances\Services;
 
+use App\Api\Finances\Exceptions\LastBudgetValueException;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\BudgetValue;
 use App\Api\Users\Models\User;
@@ -136,7 +137,9 @@ class BudgetService
     public function destroyValue(Budget $budget, BudgetValue $value): void
     {
         // budgets.value is non-null and read by older clients, so an item keeps at least one value.
-        abort_if($budget->values()->count() <= 1, 422, 'A budget item needs at least one value.');
+        if ($budget->values()->count() <= 1) {
+            throw new LastBudgetValueException('A budget item needs at least one value.');
+        }
 
         DB::transaction(function () use ($budget, $value) {
             $value->delete();

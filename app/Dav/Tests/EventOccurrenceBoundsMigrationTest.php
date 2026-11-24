@@ -9,24 +9,6 @@ use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
-function boundsSeries(string $uid, bool $overrideFirst): string
-{
-    $master = [
-        'BEGIN:VEVENT', "UID:{$uid}", 'DTSTAMP:20300101T000000Z', 'DTSTART:20300107T100000Z', 'DTEND:20300107T110000Z',
-        'RRULE:FREQ=WEEKLY', 'SUMMARY:Series', 'END:VEVENT',
-    ];
-    $override = [
-        'BEGIN:VEVENT', "UID:{$uid}", 'DTSTAMP:20300101T000000Z', 'RECURRENCE-ID:20300114T100000Z',
-        'DTSTART:20300114T110000Z', 'DTEND:20300114T120000Z', 'SUMMARY:Series', 'END:VEVENT',
-    ];
-
-    return implode("\r\n", [
-        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN',
-        ...($overrideFirst ? [...$override, ...$master] : [...$master, ...$override]),
-        'END:VCALENDAR',
-    ])."\r\n";
-}
-
 function boundsRows(): \Illuminate\Support\Collection
 {
     return DB::connection('pgsql')->table('calendarobjects')->orderBy('uri')
@@ -43,11 +25,11 @@ function boundsFixture(\Tests\TestCase $test): void
     $test->outsider = davUser();
     $put = fn ($user, string $uri, string $ics) => expect(davRequest($user, 'PUT', 'calendars/'.$user->email."/my-calendar/{$uri}", $ics, ['Content-Type' => 'text/calendar'])->getStatus())->toBe(201);
 
-    $put($test->owner, 'stale.ics', boundsSeries('stale', overrideFirst: true));
-    $put($test->owner, 'fine.ics', boundsSeries('fine', overrideFirst: false));
+    $put($test->owner, 'stale.ics', davSeriesWithOverride('stale', overrideFirst: true));
+    $put($test->owner, 'fine.ics', davSeriesWithOverride('fine', overrideFirst: false));
     $put($test->owner, 'plain.ics', davIcs('plain'));
-    $put($test->owner, 'broken.ics', boundsSeries('broken', overrideFirst: true));
-    $put($test->outsider, 'other.ics', boundsSeries('other', overrideFirst: false));
+    $put($test->owner, 'broken.ics', davSeriesWithOverride('broken', overrideFirst: true));
+    $put($test->outsider, 'other.ics', davSeriesWithOverride('other', overrideFirst: false));
 
     $dav = app(DavService::class);
     $test->calendar = $dav->calendars()->list($test->owner)[0];

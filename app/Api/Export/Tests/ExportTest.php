@@ -62,6 +62,18 @@ describe('Export endpoints', function () {
             ->and((int) $response->headers->get('Retry-After'))->toBe($response->json('meta.retry_after'));
     });
 
+    it('counts the retry time from the last export', function () {
+        $user = makeUser();
+        $this->freezeSecond();
+        ExportJob::create(['user_id' => $user->id, 'status' => 'completed', 'features' => ['todos']]);
+        $this->travel(3)->hours();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/export', ['features' => ['todos']]);
+
+        expect($response->json('meta.retry_after'))->toBe(21 * 3600)
+            ->and($response->headers->get('Retry-After'))->toBe('75600');
+    });
+
     it('returns 404 for downloads of unknown jobs', function () {
         $user = makeUser();
 
@@ -142,6 +154,20 @@ describe('ExportService feature services', function () {
         expect($lines[0])->toBe('Field,Date,Value');
         expect($lines)->toContain('Savings,2026-01-15,1234.5');
         expect($lines)->toHaveCount(3);
+    });
+    it('FinanceWealthExportService writes the values field by field', function () {
+        $user = makeUser();
+        $savings = WealthField::factory()->forUser($user)->withTitle('Savings')->create();
+        $stocks = WealthField::factory()->forUser($user)->withTitle('Stocks')->create();
+        WealthValue::factory()->forField($savings)->withValue(1234.5)->create(['date' => '2026-01-15']);
+        WealthValue::factory()->forField($stocks)->withValue(10.0)->create(['date' => '2026-01-20']);
+        WealthValue::factory()->forField($savings)->withValue(99.0)->create(['date' => '2026-02-15']);
+
+        $path = storage_path('app/public/user/finances_wealth.csv');
+        @unlink($path);
+        app(FinanceWealthExportService::class)->export($user, $path);
+
+        expect(file_get_contents($path))->toBe("Field,Date,Value\nSavings,2026-01-15,1234.5\nSavings,2026-02-15,99\nStocks,2026-01-20,10\n");
     });
 });
 

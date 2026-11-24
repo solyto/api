@@ -55,13 +55,20 @@ class CalendarService
         return self::CACHE_KEY_EVENTS.'_'.$userId.'_'.$calendarId;
     }
 
+    // AppCalendarsPDO reads and writes the unavailable flag with these tags too.
+    /** @return array<int, string> */
+    public static function unavailableCacheTags(string $userId): array
+    {
+        return [UserCacheService::userTag($userId)];
+    }
+
     public function list(User $user): array
     {
         $calendars = $this->cache->remember([self::CACHE_KEY_CALENDARS, $user->id], self::CACHE_TTL,
             fn() => $this->dav->calendars()->list($user));
 
         return array_map(function (CalendarDTO $calendar) use ($user) {
-            $reason = $calendar->isExternal ? $this->cache->get([self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId]) : null;
+            $reason = $calendar->isExternal ? $this->cache->getTagged(self::unavailableCacheTags($user->id), [self::CACHE_KEY_UNAVAILABLE, $user->id, $calendar->calendarId]) : null;
             if (!$reason) {
                 return $calendar;
             }
@@ -189,7 +196,7 @@ class CalendarService
     public function forgetRemoteState(string $userId, int $calendarId): void
     {
         $this->dav->calendars()->forgetExternal($calendarId);
-        $this->cache->forget([self::CACHE_KEY_UNAVAILABLE, $userId, $calendarId]);
+        $this->cache->forgetTagged(self::unavailableCacheTags($userId), [self::CACHE_KEY_UNAVAILABLE, $userId, $calendarId]);
         $this->cache->forget([self::CACHE_KEY_STATE, $userId, $calendarId]);
         $this->cache->flushTags([self::eventCacheTag($userId, $calendarId)]);
     }
@@ -197,7 +204,7 @@ class CalendarService
     /** @param  array<int, string>  $keySuffix */
     private function collectEvents(User $user, array $keySuffix, int $ttl, \DateTime $start, \DateTime $end): EventListingDTO
     {
-        $calendars = array_filter($this->list($user), fn($c) => $c->inviteStatus !== 'pending');
+        $calendars = array_filter($this->list($user), fn($c) => !$c->isPendingInvite());
         $events = [];
         $unavailable = [];
         $credentialsRejected = [];
@@ -246,7 +253,7 @@ class CalendarService
         $cached = $this->cache->getTagged($eventsTags, $eventsKey);
         $isCached = is_array($cached) && array_key_exists('events', $cached);
 
-        $reason = $this->cache->get($unavailableKey);
+        $reason = $this->cache->getTagged(self::unavailableCacheTags($user->id), $unavailableKey);
         if ($reason) {
             return ['events' => $isCached ? $cached['events'] : [], 'unavailable_reason' => $reason];
         }
@@ -259,7 +266,7 @@ class CalendarService
 
             return ['events' => $cached['events'], 'unavailable_reason' => null];
         } catch (ExternalCalendarUnavailableException $e) {
-            $this->cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
+            $this->cache->storeTagged(self::unavailableCacheTags($user->id), $unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
 
             return ['events' => [], 'unavailable_reason' => $e->reason()];
         }

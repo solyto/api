@@ -3,15 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use OpenApi\Generator as OpenApiGenerator;
 
-/**
- * Parse the l5-swagger annotations (OpenApiSpec + controllers) and assert
- * that every documented operation/path resolves to a registered route with
- * a matching HTTP verb.
- *
- * OPENAPI_KNOWN_DRIFT must match the actual drift exactly, so any new
- * mismatch between the OpenAPI spec and the route table fails this test,
- * and so does fixing one of the listed entries without removing it.
- */
+// Must match the drift exactly: a new mismatch fails, and so does fixing a listed one without removing it.
 const OPENAPI_KNOWN_DRIFT = [];
 
 it('documents a route for every OpenAPI path operation', function () {

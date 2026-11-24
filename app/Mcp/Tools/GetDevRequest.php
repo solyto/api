@@ -2,7 +2,6 @@
 
 namespace App\Mcp\Tools;
 
-use App\Api\DevRequests\Models\DevRequest;
 use App\Api\DevRequests\Resources\DevRequestCommentResource;
 use App\Api\DevRequests\Services\DevRequestService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -24,7 +23,7 @@ class GetDevRequest extends SolytoTool
     {
         $id = $request->validate(['id' => ['required', 'integer']])['id'];
 
-        $devRequest = DevRequest::with('votes')->withCount('comments')->find($id);
+        $devRequest = $this->devRequests->find($id);
 
         if (!$devRequest) {
             return Response::error('Dev request not found.');

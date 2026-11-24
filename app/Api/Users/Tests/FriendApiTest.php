@@ -2,6 +2,7 @@
 
 use App\Api\Users\Models\Friend;
 use App\Api\Users\Models\FriendRequest;
+use App\Api\Users\Models\UserProfile;
 use App\Api\Users\Notifications\FriendRequestNotification;
 use App\Api\Users\Services\FriendService;
 use Illuminate\Support\Facades\Notification;
@@ -17,6 +18,53 @@ describe('GET /api/v1/friends', function () {
             ->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonCount(1, 'data');
+    });
+});
+
+describe('GET /api/v1/friends shape', function () {
+    it('lists friends from both sides of the friendship with their profile image', function () {
+        $user = makeUser();
+        $added = makeUser(['name' => 'Added']);
+        $adder = makeUser(['name' => 'Adder']);
+        $stranger = makeUser();
+        Friend::factory()->forUsers($user, $added)->create();
+        Friend::factory()->forUsers($adder, $user)->create();
+        Friend::factory()->forUsers($adder, $stranger)->create();
+        UserProfile::updateOrCreate(['user_id' => $adder->id], ['profile_image_path' => 'user/adder.jpg']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/friends')
+            ->assertStatus(200)
+            ->assertJsonPath('data', [
+                ['id' => $added->id, 'name' => 'Added', 'profile_image_path' => $added->profile?->profile_image_path],
+                ['id' => $adder->id, 'name' => 'Adder', 'profile_image_path' => 'user/adder.jpg'],
+            ]);
+    });
+
+    it('lists sent friend requests before received ones, each with the other user', function () {
+        $this->travelTo('2026-11-20 09:30:00');
+        $user = makeUser();
+        $sender = makeUser(['name' => 'Sender']);
+        $receiver = makeUser(['name' => 'Receiver']);
+        $received = FriendRequest::factory()->forUsers($sender, $user)->pending()->create();
+        $sent = FriendRequest::factory()->forUsers($user, $receiver)->rejected()->create();
+        FriendRequest::factory()->forUsers($sender, $receiver)->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/friends/requests')
+            ->assertStatus(200)
+            ->assertJsonPath('data', [
+                [
+                    'id' => $sent->id, 'status' => 'rejected', 'direction' => 'sent',
+                    'user' => ['id' => $receiver->id, 'name' => 'Receiver', 'profile_image_path' => $receiver->profile?->profile_image_path],
+                    'created_at' => '2026-11-20T09:30:00.000000Z',
+                ],
+                [
+                    'id' => $received->id, 'status' => 'pending', 'direction' => 'received',
+                    'user' => ['id' => $sender->id, 'name' => 'Sender', 'profile_image_path' => $sender->profile?->profile_image_path],
+                    'created_at' => '2026-11-20T09:30:00.000000Z',
+                ],
+            ]);
     });
 });
 

@@ -302,6 +302,19 @@ describe('External calendars through the API', function () {
         expect(count($this->remote->requests))->toBeGreaterThan($asked);
     });
 
+    it('drops the unavailable flag with the user\'s cache tag', function () {
+        config(['calendars.external.unavailable_ttl' => 300]);
+        $this->remote->down = true;
+        $listing = fn () => $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/'.now()->format('Y-m'));
+        expect($listing()->json('meta.unavailable_calendars'))->toBe([$this->calendar->instanceId]);
+
+        app(UserCacheService::class)->flushTags([UserCacheService::userTag($this->user->id)]);
+        $this->remote->down = false;
+
+        expect($listing()->json('meta.unavailable_calendars'))->toBe([])
+            ->and(collect($this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('name', 'Remote')['is_unavailable'])->toBeFalse();
+    });
+
     it('still serves cached events of a remote flagged unavailable without asking it', function () {
         $this->remote->put('a.ics', davIcs('a', 'Cached', remoteEventStart(), remoteEventEnd()));
         $widget = fn () => $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/events/widget')->assertStatus(200);
@@ -687,6 +700,35 @@ describe('Connecting external calendars', function () {
 
         expectApiError($response, 422);
         $response->assertJsonPath('errors', ['external_credentials_rejected']);
+    });
+
+    it('reuses the discovered calendars for the discovery TTL', function () {
+        $store = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/calendars/external/accounts', [
+            'server_url' => FakeCalDavServer::ORIGIN,
+            'username' => 'alice',
+            'password' => 'app-password',
+        ])->assertStatus(201);
+        $available = fn () => $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/calendars/external/accounts/'.$store->json('data.id').'/available')->assertStatus(200);
+        $asked = count($this->remote->requests);
+
+        $available();
+        $available();
+        expect($this->remote->requests)->toHaveCount($asked);
+
+        $this->travel(601)->seconds();
+        $available();
+        expect(count($this->remote->requests))->toBeGreaterThan($asked);
+    });
+
+    it('drops the discovered calendars with the user\'s cache tag', function () {
+        $available = fn () => $this->actingAs($this->user, 'sanctum')->getJson("/api/v1/calendars/external/accounts/{$this->account->id}/available")->assertStatus(200);
+        $available();
+        $asked = count($this->remote->requests);
+
+        app(UserCacheService::class)->flushTags([UserCacheService::userTag($this->user->id)]);
+        $available();
+
+        expect(count($this->remote->requests))->toBeGreaterThan($asked);
     });
 
     it('throttles the routes that ask the server', function () {

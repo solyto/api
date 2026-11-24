@@ -134,12 +134,14 @@ describe('CalendarSharing', function () {
         $sharing->inviteUser($calendar, $owner, $recipient);
 
         $invites = $sharing->listInvites($recipient);
-        expect($invites)->toHaveCount(1);
+        expect($invites)->toHaveCount(1)
+            ->and($sharing->listAcceptedShares($recipient))->toHaveCount(0);
 
         $sharing->acceptInvite($recipient, $invites->first()->shareToken);
 
         $accepted = $sharing->listAcceptedShares($recipient);
-        expect($accepted)->toHaveCount(1);
+        expect($accepted)->toHaveCount(1)
+            ->and($sharing->listInvites($recipient))->toHaveCount(0);
     });
 });
 

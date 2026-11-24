@@ -56,8 +56,11 @@ describe('Notification endpoints', function () {
     it('rejects a non-boolean notification setting', function () {
         $user = makeUser();
 
-        expectApiError($this->actingAs($user, 'sanctum')
-            ->putJson('/api/v1/notifications/settings', ['music_release_ui' => 'yes please']), 422);
+        $response = $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/notifications/settings', ['music_release_ui' => 'yes please']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['music_release_ui']);
     });
 
     it('returns the vapid public key', function () {

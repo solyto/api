@@ -2,17 +2,9 @@
 
 use Laravel\Sanctum\PersonalAccessToken;
 
-function clientVersionToken(): array
-{
-    $user = makeUser();
-    $newToken = $user->createToken('auth-token-web');
-
-    return [$newToken->plainTextToken, $newToken->accessToken];
-}
-
 describe('X-Client-Version header', function () {
     it('records a valid version on the request token', function () {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}", 'X-Client-Version' => '1.0.16'])
             ->getJson('/api/v1/users/me')
@@ -22,7 +14,7 @@ describe('X-Client-Version header', function () {
     });
 
     it('updates the version when a newer build sends a different one', function () {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}", 'X-Client-Version' => '1.0.16'])
             ->getJson('/api/v1/users/me')
@@ -38,7 +30,7 @@ describe('X-Client-Version header', function () {
     });
 
     it('leaves the version untouched when the header is missing', function () {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
         $token->forceFill(['client_version' => '1.0.16'])->save();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])
@@ -49,7 +41,7 @@ describe('X-Client-Version header', function () {
     });
 
     it('ignores an invalid header without rejecting the request', function (string $header) {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
         $token->forceFill(['client_version' => '1.0.16'])->save();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}", 'X-Client-Version' => $header])
@@ -60,7 +52,7 @@ describe('X-Client-Version header', function () {
     })->with(['abc', '1.0', '1.0.16-beta', 'v1.0.16', '1.0.16 ', '123456.0.0', str_repeat('1', 40)]);
 
     it('does not recreate the token on logout', function () {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}", 'X-Client-Version' => '1.0.16'])
             ->postJson('/api/v1/auth/logout')
@@ -75,7 +67,7 @@ describe('X-Client-Version header', function () {
     });
 
     it('does not recreate the old token on refresh', function () {
-        [$plain, $token] = clientVersionToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}", 'X-Client-Version' => '1.0.16'])
             ->postJson('/api/v1/auth/refresh')

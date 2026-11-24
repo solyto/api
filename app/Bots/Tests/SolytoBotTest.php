@@ -251,6 +251,20 @@ describe('SolytoBot with real records', function () {
         expect(sentText())->toBe(SolytoMessage::EMPTY_DAY->trans());
     });
 
+    it('replies in the user\'s language, falling back to English', function (?string $language, string $replyLocale) {
+        $user = makeUser();
+        $language === null ? $user->settings()->delete() : $user->settings()->update(['language' => $language]);
+        TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '607', 'is_confirmed' => true]);
+
+        sendToBot(607, '/day');
+
+        expect(sentText())->toBe(__('bot.empty_day', [], $replyLocale));
+    })->with([
+        'supported' => ['de', 'de'],
+        'unsupported' => ['xx', 'en'],
+        'no settings' => [null, 'en'],
+    ]);
+
     it('adds a link for a high-confidence quick-add', function () {
         $user = makeUser();
         TelegramBotConnection::factory()->forUser($user)->create(['chat_id' => '603', 'is_confirmed' => true]);

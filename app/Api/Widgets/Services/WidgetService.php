@@ -317,7 +317,7 @@ class WidgetService
 
         return new WidgetFormatDTO(
             timezone: $user->timezone(),
-            locale: in_array($settings?->language, config('app.locales'), true) ? $settings->language : 'en',
+            locale: $user->language(),
             timeFormat: in_array($settings?->time_format, self::TIME_FORMATS, true) ? $settings->time_format : self::DEFAULT_TIME_FORMAT,
             dateFormat: $settings?->date_format ?: self::DEFAULT_DATE_FORMAT,
         );

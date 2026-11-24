@@ -23,7 +23,7 @@ class CalendarSharing
         $calendars = $this->backend->listCalendarsCustom($principalUri);
 
         return collect($calendars)->filter(function (CalendarDTO $calendar) {
-            return $calendar->inviteStatus === 'pending';
+            return $calendar->isPendingInvite();
         });
     }
 
@@ -77,7 +77,7 @@ class CalendarSharing
         $calendars = $this->backend->listCalendarsCustom($principalUri);
 
         return collect($calendars)->filter(function (CalendarDTO $calendar) {
-            return $calendar->inviteStatus === 'accepted';
+            return $calendar->isAcceptedInvite();
         });
     }
 

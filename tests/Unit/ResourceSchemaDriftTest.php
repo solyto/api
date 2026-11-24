@@ -74,7 +74,6 @@ it('keeps resource @OA\Schema properties in sync with toArray() keys', function 
         $keys = [];
         $found = false;
 
-        // Locate `function toArray`.
         for ($i = 0; $i < $count; $i++) {
             if (is_array($tokens[$i]) && $tokens[$i][0] === T_FUNCTION) {
                 $j = $i + 1;
@@ -90,7 +89,6 @@ it('keeps resource @OA\Schema properties in sync with toArray() keys', function 
             return null;
         }
 
-        // Find the body's opening brace, then walk the body.
         while ($i < $count && $tokens[$i] !== '{') {
             $i++;
         }

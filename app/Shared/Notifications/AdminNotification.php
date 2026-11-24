@@ -15,7 +15,8 @@ abstract class AdminNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        if (!filled(config('services.ntfy.url')) || !filled($notifiable->routeNotificationFor(NtfyChannel::class, $this))) {
+        $hasNtfyTarget = filled(config('services.ntfy.url')) && filled($notifiable->routeNotificationFor(NtfyChannel::class, $this));
+        if (!$hasNtfyTarget) {
             return [];
         }
 

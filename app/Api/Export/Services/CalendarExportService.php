@@ -15,14 +15,11 @@ class CalendarExportService
         private readonly DavService $davService
     ) {}
 
-    /**
-     * Writes one iCalendar file with every calendar's objects as they are
-     * stored (UIDs, exceptions, alarms, attendees, tasks), each time zone once.
-     */
+    // Objects go out as stored (UIDs, exceptions, alarms, attendees, tasks), each time zone once.
     public function export(User $user, string $path): void
     {
         // Like the calendar view: calendars from unanswered invites are not the user's yet.
-        $calendars = array_filter($this->davService->calendars()->list($user), fn ($calendar) => $calendar->inviteStatus !== 'pending');
+        $calendars = array_filter($this->davService->calendars()->list($user), fn ($calendar) => !$calendar->isPendingInvite());
 
         $header = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Solyto//Export//EN\r\nCALSCALE:GREGORIAN\r\n";
         $timezones = '';
@@ -66,10 +63,6 @@ class CalendarExportService
         file_put_contents($path, $header.$timezones.$components."END:VCALENDAR\r\n");
     }
 
-    /**
-     * The stored object, or one rebuilt from the event when there is nothing
-     * readable stored.
-     */
     private function readStored(EventDTO $event): VCalendar
     {
         try {

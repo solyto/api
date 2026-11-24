@@ -33,6 +33,11 @@ class DevRequestService
             ->values();
     }
 
+    public function find(int $id): ?DevRequest
+    {
+        return DevRequest::with('votes')->withCount('comments')->find($id);
+    }
+
     private function score(DevRequest $devRequest): int
     {
         return $devRequest->votes->where('vote_type', 'up')->count()
@@ -72,6 +77,14 @@ class DevRequestService
         $topic = config('services.ntfy.topics.dev_requests') ?: config('services.ntfy.topic');
 
         Notification::route(NtfyChannel::class, $topic)->notify(new DevRequestCreatedNotification($devRequest->title));
+    }
+
+    // Dev requests are shared community data (STANDARDS 12.3) and their creator FK has no onDelete cascade:
+    // the attribution is anonymised so the requests, with other users' comments and votes, survive the account.
+    public function anonymiseCreator(User $user): int
+    {
+        return DevRequest::where('created_by_user_id', $user->id)
+            ->update(['created_by_user_id' => null]);
     }
 
     public function update(DevRequest $devRequest, array $data): DevRequest

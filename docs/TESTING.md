@@ -11,17 +11,18 @@ or `php artisan test` / `./vendor/bin/pest` directly. Filter with
 Coverage needs a driver (`pcov` or Xdebug) that is not installed by
 default; a coverage driver was not approved (`docs/STANDARDS.md` → Decisions).
 
-Everything here was checked against `tests/TestCase.php`, `phpunit.xml`,
-`tests/Pest.php` and `pest.php` on 2026-10-13.
+Everything here was checked against `tests/TestCase.php`, `phpunit.xml`
+and `tests/Pest.php` on 2026-10-13 and again on 2026-11-23.
 
 ## Layout and suites
 
-`phpunit.xml` defines the suites below; `pest.php` (root) lists the same
-directories for Pest's own discovery:
+`phpunit.xml` defines the suites below, and Pest finds the tests through
+it. The root `pest.php` is not loaded by Pest (it boots only
+`tests/Pest.php`) and lacks `app/Plugins/Tests`:
 
 | Suite (`phpunit.xml`) | Path | What lives there |
 | --- | --- | --- |
-| `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, the OpenAPI drift test, the resource-schema drift test (`ResourceSchemaDriftTest`, rule 2.6) |
+| `Unit` | `tests/Unit/` | shared code: `ApiResponse`, enums, `DockerSecretHelper`, `UrlHelper`, DAV helpers, Pulse metrics, the OpenAPI drift test, the resource-schema drift test (`ResourceSchemaDriftTest`, rule 2.6), the client contract and migration compatibility tests (section 13) |
 | `Feature` | `tests/Feature/` | **empty** (only `.gitkeep`); keep it empty — feature tests are co-located |
 | `Dav` | `app/Dav/Tests/` | DAV service, protocol, isolation, client fixtures (see [DAV tests](#dav-tests)) |
 | `Api` | `app/Api/*/Tests/` | the module tests: `<Module>ApiTest.php` (HTTP), `<Module>Test.php` (factories/models — legacy, see below), `*ServiceTest.php`, `JobTest.php`, `CommandTest.php` |
@@ -29,9 +30,14 @@ directories for Pest's own discovery:
 | `Mcp` | `app/Mcp/Tests/` | the MCP endpoint and its tools |
 | `Plugins` | `app/Plugins/Tests/`, `app/Plugins/*/Tests/` | the plugin framework and each plugin |
 
-Fixtures: `tests/Fixtures/` (`feed.rss`, `feed.atom`, `feed_empty.rss`,
-`goodreads_book.html`), `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`) and
-`tests/Fixtures/http/` (the `php -S` router for `RemoteCalDavClientLiveTest`).
+Fixtures: `tests/Fixtures/` (feeds and pages for the feed reader and
+Goodreads, `ai-models.json`/`models-dev.json` for the AI model snapshot),
+`tests/Fixtures/client-contract/` (route and migration baselines of the
+oldest supported builds), `tests/Fixtures/dav/` (client-shaped `.ics`/`.vcf`)
+and `tests/Fixtures/http/` (the `php -S` routers for
+`RemoteCalDavClientLiveTest` and `FeedReaderLiveTest`). Test doubles that
+need a class live in `tests/Support/` (`FakeCalDavServer`, the Pulse job and
+notification).
 
 Binding: `tests/Pest.php` is the only Pest bootstrap file Pest loads
 (nested `Pest.php` files are ignored). It binds `Tests\TestCase` to every
@@ -56,25 +62,30 @@ ask for it.
   is either mocked or given an injected OpenAI client (or PSR-18 HTTP client),
   so no test reaches a real AI provider.
 - `ImageTransformationService` is bound to a no-op double (no Imagick/imgproxy).
+- `OutboundUrlGuard` resolves every host name to one public address, so no
+  test does real DNS; IP literals are still checked.
 - Consequence: do not write a test that needs MariaDB, PostgreSQL or Redis
-  features; SQLite is what runs. (`whereRaw('LOWER(...)')` in `TodoService`
-  exists because SQLite comparisons are case-sensitive.)
+  features; SQLite is what runs. (SQLite compares case-sensitively, which is
+  one reason `TodoService::sameName` compares tag names in PHP, rule 5.5.)
 
 ## Helpers (`tests/Pest.php`)
 
 | Helper | Use |
 | --- | --- |
-| `makeUser(array $attributes = [])` | a verified user; 305 calls, the standard fixture |
-| `$this->actingAs($user, 'sanctum')` | the standard way to authenticate a request (314 calls) |
+| `makeUser(array $attributes = [])` | a verified user, the standard fixture |
+| `$this->actingAs($user, 'sanctum')` | the standard way to authenticate a request |
 | `authHeaders($user)` / `sanctumToken($user)` | only when the test is about tokens themselves (`AuthTest`) |
 | `sessionToken($user)`, `bearer($this, $token)`, `issueWidgetToken($this, $parentToken)` | requests with a real bearer token (widget tokens, token lifecycle); `bearer` resets the guard so each request resolves its own token |
-| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; `expectApiError` is the standard for error cases, `expectApiSuccess` has no callers yet — use both |
-| `Model::factory()->forUser($user)` | every user-owned factory has this state |
-| `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()` | DAV protocol tests, see [DAV tests](#dav-tests) |
+| `webToken()` | a new user's web token without expiry as `[$plainText, $personalAccessToken]` (token bookkeeping: `last_used_at`, client version) |
+| `expectApiSuccess($response, 200)` / `expectApiError($response, 403)` | status + envelope flag in one line; the standard for every status assertion |
+| `Model::factory()->forUser($user)` | user-owned factories have this state; exceptions set the owner another way: `Alert` (`forTracker`/`forGoal`), `DevRequestComment`/`DevRequestVote` (`forDevRequestAndUser`), `DevRequest` (`created_by_user_id`) |
+| `storeEvent($this, $user, $payload)`, `storeDayEvents($this, $user, $timezone)` | events through the API in the user's default calendar; `storeDayEvents` is today's timed, all-day and recurring event plus one tomorrow |
+| `builtInTracker($user, $key)`, `ownTracker($user, $type)` | check-in trackers |
+| `enableMcp()`, `mcpAdmin()` | MCP tests: load `laravel/mcp` as `MCP_ENABLED` does; an admin (MCP is admin-only) |
+| `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()`, `davSeriesWithOverride()`, `externalCalendar()` | DAV protocol tests, see [DAV tests](#dav-tests) |
 
-Custom expectations `greaterThan`, `lessThan`, `toBeBoolean` alias Pest
-built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
-`toBeBool`. `toBeEmail` stays.
+A helper that a second test file needs moves to `tests/Pest.php` and gets a
+row here. The one custom expectation is `toBeEmail`.
 
 ## What gets a test
 
@@ -98,7 +109,7 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
 - **Jobs and commands** — assert the effect (rows written, notification
   sent), not that the job was dispatched.
 - **Shared contracts** in `tests/Unit` with `covers()`: `ApiResponse`,
-  `OpenApiSpecTest` (fails on any drift beyond the two kept entries in
+  `OpenApiSpecTest` (fails on any drift not listed in the empty
   `OPENAPI_KNOWN_DRIFT`, and on a listed entry that no longer drifts).
 - **`ResourceSchemaDriftTest`** (rule 2.6) reads source statically and
   compares only top-level keys. It does not see nested keys, keys inside
@@ -114,9 +125,9 @@ built-ins and are being removed; use `toBeGreaterThan`, `toBeLessThan`,
 
 Not tested, on purpose: that a factory produces what its state says, that
 `$fillable` equals `$fillable`, that casts cast, that a `belongsTo` returns
-the parent. 278 of 720 tests today are of that kind (`<Module>Test.php`
-files); they are not deleted, but no new ones are written and a touched
-file may lose them.
+the parent. Older `<Module>Test.php` files are full of that kind; they
+are not deleted, but no new ones are written and a touched file may lose
+them.
 
 ## Shape
 
@@ -208,7 +219,10 @@ isolates DAV writes.
   `addressbooks/<email>/<book>/<object>`, `principals/<email>/`.
 - `davXpath($response)` registers `d`, `cal`, `card`, `cs`, `apple`, `s`;
   `davPropfindBody(['d:displayname', …])` builds a PROPFIND body;
-  `davIcs()`/`davVcard()` build minimal objects.
+  `davIcs()`/`davVcard()` build minimal objects; `davSeriesWithOverride($uid,
+  $overrideFirst)` is a weekly series with one moved occurrence, the override
+  before or after the master. `externalCalendar($user, $server)` connects a
+  calendar of the user to a `FakeCalDavServer` collection.
 - Files: `DavAuthTest` (auth, discovery), `CalDavProtocolTest`,
   `CardDavProtocolTest`, `DavIsolationTest` (cross-user access, sharing),
   `DavApiConsistencyTest` (API ↔ DAV, `CacheInvalidationPlugin`),
@@ -268,10 +282,11 @@ Limits of the setup:
 | Outbound client: `CURLOPT_RESOLVE` pinning, response size cap | `RemoteCalDavClientLiveTest` | — | — |
 | Service CRUD, sharing, deletion | `DavServiceTest` | `DavServiceTest` | `PrincipalsServiceTest` |
 
-### Known gaps (skipped tests)
+### Known gaps
 
-Each is a `->skip('Known …')` test that states the wanted behavior; it
-turns green once the gap is fixed (remove the `skip`).
+No test is skipped today. A gap that should be fixed is a
+`->skip('Known …')` test stating the wanted behavior; one that is accepted
+is pinned by a passing test:
 
 - Calendars accept VEVENT and VTODO: `createCalendarCustom()`'s
   `components` key is not mapped by sabre (pinned in `CalDavProtocolTest`;
@@ -284,10 +299,10 @@ turns green once the gap is fixed (remove the `skip`).
 ## Caveats
 
 - Time: Carbon's `now()` is real unless the test freezes it; a test whose
-  outcome depends on "today" uses `Carbon::setTestNow()` (one file does
-  today) and resets it — never a hard-coded date that is only true once.
-- External HTTP is faked (`Http::fake()`, 8 files) and side effects are
-  caught with `Notification::fake()`/`Queue::fake()`/`Bus::fake()` (8 files).
+  outcome depends on "today" freezes it (`Carbon::setTestNow()` and a reset,
+  or `$this->travelTo()`) — never a hard-coded date that is only true once.
+- External HTTP is faked (`Http::fake()`) and side effects are caught with
+  `Notification::fake()`/`Queue::fake()`/`Bus::fake()`.
 - `Http::fake()` replaces the transport, so curl options are never applied
   there. `RemoteCalDavClientLiveTest` covers them instead: it starts
   `php -S` on a free loopback port per test (stopped in `afterEach`) and

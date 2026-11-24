@@ -4,6 +4,7 @@ use App\Api\Clipboard\Models\Clipboard;
 use App\Api\Clipboard\Services\ClipboardService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -242,13 +243,18 @@ describe('Clipboard files', function () {
     ]);
 
     it('rejects files over the size limit with 413', function () {
+        Exceptions::fake();
         config(['clipboard.max_file_kb' => 1]);
 
         $response = $this->actingAs(makeUser(), 'sanctum')
             ->post('/api/v1/clipboard/file', ['file' => clipboardUpload('big.txt', str_repeat('a', 1025))], ['Accept' => 'application/json']);
 
         expectApiError($response, 413);
+        $response->assertJsonPath('message', 'The file is too large.')
+            ->assertJsonMissingPath('errors')
+            ->assertJsonMissingPath('meta');
         expect(Clipboard::count())->toBe(0);
+        Exceptions::assertNothingReported();
     });
 
     it('limits file uploads per user and day', function () {

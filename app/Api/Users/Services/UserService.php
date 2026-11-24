@@ -2,7 +2,7 @@
 
 namespace App\Api\Users\Services;
 
-use App\Api\DevRequests\Models\DevRequest;
+use App\Api\DevRequests\Services\DevRequestService;
 use App\Api\Users\Enums\AccountDeletionStatus;
 use App\Api\Users\Enums\UserGrowthPeriod;
 use App\Api\Users\Exceptions\InvalidDeletionTokenException;
@@ -56,6 +56,7 @@ class UserService
 
     public function __construct(
         private readonly DavService $davService,
+        private readonly DevRequestService $devRequestService,
         private readonly UserCacheService $cache,
         private readonly UserProfileImageService $profileImageService
     ) {}
@@ -145,11 +146,7 @@ class UserService
         $dav = $this->davService->deleteForUser($user);
 
         $app = DB::transaction(function () use ($user): array {
-            // dev_requests is shared community data (STANDARDS 12.3) and its
-            // user FK has no onDelete cascade: the attribution is anonymised
-            // so the requests (with other users' comments and votes) survive.
-            $devRequests = DevRequest::where('created_by_user_id', $user->id)
-                ->update(['created_by_user_id' => null]);
+            $devRequests = $this->devRequestService->anonymiseCreator($user);
 
             $tokens = $user->tokens()->delete();
             $notifications = $user->notifications()->delete();

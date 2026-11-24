@@ -16,7 +16,8 @@ class NtfyChannel
         $url = config('services.ntfy.url');
         $topic = $notifiable->routeNotificationFor(NtfyChannel::class, $notification);
 
-        if (!filled($url) || !filled($topic) || !method_exists($notification, 'toNtfy')) {
+        $canPublish = filled($url) && filled($topic) && method_exists($notification, 'toNtfy');
+        if (!$canPublish) {
             return;
         }
 

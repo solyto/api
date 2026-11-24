@@ -4,14 +4,6 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
-function lastUsedToken(): array
-{
-    $user = makeUser();
-    $newToken = $user->createToken('auth-token-web');
-
-    return [$newToken->plainTextToken, $newToken->accessToken];
-}
-
 function lastUsedAt(PersonalAccessToken $token): ?string
 {
     return PersonalAccessToken::find($token->id)->last_used_at?->toDateTimeString();
@@ -23,7 +15,7 @@ describe('token last_used_at', function () {
     });
 
     it('sets a missing last_used_at on the first request', function () {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])
             ->getJson('/api/v1/users/me')
@@ -33,7 +25,7 @@ describe('token last_used_at', function () {
     });
 
     it('does not write again within five minutes', function () {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
         $firstUse = now()->toDateTimeString();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])
@@ -51,7 +43,7 @@ describe('token last_used_at', function () {
     });
 
     it('updates last_used_at after more than five minutes', function () {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])
             ->getJson('/api/v1/users/me')
@@ -68,7 +60,7 @@ describe('token last_used_at', function () {
     });
 
     it('updates a stale last_used_at without an X-Client-Version header', function () {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
         $token->forceFill(['last_used_at' => now()->subHour(), 'client_version' => '1.0.16'])->save();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])
@@ -80,7 +72,7 @@ describe('token last_used_at', function () {
     });
 
     it('writes a version change and a stale timestamp in one update', function () {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
         $token->forceFill(['last_used_at' => now()->subHour(), 'client_version' => '1.0.16'])->save();
 
         $updates = 0;
@@ -101,7 +93,7 @@ describe('token last_used_at', function () {
     });
 
     it('does not recreate a token with a stale timestamp', function (string $endpoint) {
-        [$plain, $token] = lastUsedToken();
+        [$plain, $token] = webToken();
         $token->forceFill(['last_used_at' => now()->subHour()])->save();
 
         $this->withHeaders(['Authorization' => "Bearer {$plain}"])

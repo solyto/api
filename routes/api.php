@@ -1,15 +1,14 @@
 <?php
 
+use App\Api\Alerts\Controllers\AlertController;
 use App\Api\ApiResponse;
 use App\Api\Calendars\Controllers\CalendarController;
 use App\Api\Calendars\Controllers\EventAttachmentController;
 use App\Api\Calendars\Controllers\ExternalCalendarController;
 use App\Api\Calendars\Controllers\ImportController as CalendarImportController;
-use App\Api\Alerts\Controllers\AlertController;
 use App\Api\CheckIn\Controllers\CheckInController;
-use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
-use App\Api\Goals\Controllers\GoalController;
 use App\Api\CheckIn\Controllers\CheckInTrackerController;
+use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\Clipboard\Controllers\ClipboardController;
 use App\Api\Contacts\Controllers\ContactController;
 use App\Api\Contacts\Controllers\ImportController as AddressBookImportController;
@@ -20,6 +19,7 @@ use App\Api\Feeds\Controllers\FeedController;
 use App\Api\Feeds\Controllers\FeedImportController;
 use App\Api\Finances\Controllers\BudgetController;
 use App\Api\Finances\Controllers\WealthController;
+use App\Api\Goals\Controllers\GoalController;
 use App\Api\Integrations\Controllers\IntegrationController;
 use App\Api\Libraries\Controllers\LibraryBookController;
 use App\Api\Libraries\Controllers\LibraryBookGenreController;
@@ -166,16 +166,18 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::apiResource('/', TodoController::class)->parameters(['' => 'todo']);
     });
 
-    Route::apiResource('tags', TagController::class);
-    Route::apiResource('goals', GoalController::class)->except(['show']);
+    Route::prefix('tags')->name('tags.')->group(function () {
+        Route::apiResource('/', TagController::class)->parameters(['' => 'tag']);
+    });
 
-    Route::prefix('alerts')->group(function () {
-        Route::get('', [AlertController::class, 'index']);
-        Route::post('', [AlertController::class, 'store']);
+    Route::prefix('goals')->name('goals.')->group(function () {
+        Route::apiResource('/', GoalController::class)->parameters(['' => 'goal'])->except(['show']);
+    });
+
+    Route::prefix('alerts')->name('alerts.')->group(function () {
         Route::get('suggestions', [AlertController::class, 'suggestions']);
         Route::post('suggestions/{key}', [AlertController::class, 'enableSuggestion']);
-        Route::put('{alert}', [AlertController::class, 'update']);
-        Route::delete('{alert}', [AlertController::class, 'destroy']);
+        Route::apiResource('/', AlertController::class)->parameters(['' => 'alert'])->except(['show']);
     });
 
     Route::prefix('notes')->name('notes.')->group(function () {
@@ -198,11 +200,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('values', [CheckInController::class, 'values']);
         Route::put('values', [CheckInController::class, 'setValue']);
 
-        Route::get('trackers', [CheckInTrackerController::class, 'index']);
-        Route::post('trackers', [CheckInTrackerController::class, 'store']);
-        Route::put('trackers/order', [CheckInTrackerController::class, 'reorder']);
-        Route::put('trackers/{tracker}', [CheckInTrackerController::class, 'update']);
-        Route::delete('trackers/{tracker}', [CheckInTrackerController::class, 'destroy']);
+        Route::prefix('trackers')->name('check-in.trackers.')->group(function () {
+            Route::put('order', [CheckInTrackerController::class, 'reorder']);
+            Route::apiResource('/', CheckInTrackerController::class)->parameters(['' => 'tracker'])->except(['show']);
+        });
     });
 
     Route::prefix('calendars')->group(function () {
@@ -399,10 +400,12 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
             Route::delete('{field}/values/{value}', [WealthController::class, 'destroyValue']);
         });
 
-        Route::get('budget/{budget}/values', [BudgetController::class, 'listValues']);
-        Route::post('budget/{budget}/values', [BudgetController::class, 'storeValue']);
-        Route::put('budget/{budget}/values/{value}', [BudgetController::class, 'updateValue']);
-        Route::delete('budget/{budget}/values/{value}', [BudgetController::class, 'destroyValue']);
+        Route::prefix('budget/{budget}/values')->group(function () {
+            Route::get('', [BudgetController::class, 'listValues']);
+            Route::post('', [BudgetController::class, 'storeValue']);
+            Route::put('{value}', [BudgetController::class, 'updateValue']);
+            Route::delete('{value}', [BudgetController::class, 'destroyValue']);
+        });
         Route::apiResource('budget', BudgetController::class);
     });
 

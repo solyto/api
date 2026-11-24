@@ -5,6 +5,7 @@ namespace App\Dav\DTOs;
 use App\Api\Calendars\Requests\UpdateEventRequest;
 use App\Api\Users\Models\User;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
+use App\Dav\Helpers\VEventHelper;
 use Illuminate\Support\Str;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Component\VEvent;
@@ -476,28 +477,20 @@ class EventDTO
         $dropExceptions = !$this->recurrenceRule || $this->startMovedFrom($master);
 
         $master->SUMMARY = $this->title;
-        foreach (['DESCRIPTION' => $this->description, 'LOCATION' => $this->location] as $name => $value) {
-            if ($value) {
-                $master->{$name} = $value;
-            } else {
-                $master->remove($name);
-            }
-        }
+        VEventHelper::setDescriptionAndLocation($master, $this->description, $this->location);
 
-        $master->remove('DTSTART');
-        $master->remove('DTEND');
-        $master->remove('DURATION');
+        VEventHelper::removeDates($master);
         if ($this->isAllDay) {
-            $master->add('DTSTART', $this->startDate->format('Ymd'), ['VALUE' => 'DATE']);
+            VEventHelper::addDateProperty($master, 'DTSTART', $this->startDate, true, $this->startDate->getTimezone());
             if ($this->endDate) {
                 $end = \DateTime::createFromInterface($this->endDate)->modify('+1 day'); // exclusive
-                $master->add('DTEND', $end->format('Ymd'), ['VALUE' => 'DATE']);
+                VEventHelper::addDateProperty($master, 'DTEND', $end, true, $end->getTimezone());
             }
         } else {
-            $master->add('DTSTART', $this->startDate->format('Ymd\THis'), ['TZID' => $this->startDate->getTimezone()->getName()]);
+            VEventHelper::addDateProperty($master, 'DTSTART', $this->startDate, false, $this->startDate->getTimezone());
             $this->addMissingTimeZone($vcalendar, $this->startDate);
             if ($this->endDate) {
-                $master->add('DTEND', $this->endDate->format('Ymd\THis'), ['TZID' => $this->endDate->getTimezone()->getName()]);
+                VEventHelper::addDateProperty($master, 'DTEND', $this->endDate, false, $this->endDate->getTimezone());
                 $this->addMissingTimeZone($vcalendar, $this->endDate);
             }
         }
@@ -537,11 +530,7 @@ class EventDTO
             return true;
         }
 
-        $storedStart = $master->DTSTART->getDateTime();
-
-        return $this->isAllDay
-            ? $storedStart->format('Ymd') !== $this->startDate->format('Ymd')
-            : $storedStart->getTimestamp() !== $this->startDate->getTimestamp();
+        return !VEventHelper::isSameSlot($master->DTSTART->getDateTime(), $this->startDate, $this->isAllDay);
     }
 
     private function addMissingTimeZone(VCalendar $vcalendar, \DateTimeInterface $date): void

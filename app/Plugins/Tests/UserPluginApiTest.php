@@ -196,6 +196,52 @@ describe('PUT /api/v1/users/me/plugins/{plugin}', function () {
     });
 });
 
+describe('User plugin state and api_key rules', function () {
+    it('answers every endpoint with the same full state', function () {
+        $user = makeUser();
+        $defaults = ['plugin' => 'ai', 'enabled' => false, 'has_api_key' => false, 'settings' => null, 'model_available' => false];
+
+        expect($this->actingAs($user, 'sanctum')->getJson('/api/v1/users/me/plugins')->json('data'))->toBe([$defaults])
+            ->and($this->actingAs($user, 'sanctum')->getJson('/api/v1/users/me/plugins/ai')->json('data'))->toBe($defaults);
+
+        $update = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload(['enabled' => false, 'model' => 'gpt-b']));
+
+        expectApiSuccess($update);
+        expect($update->json('data'))->toBe([
+            'plugin' => 'ai',
+            'enabled' => false,
+            'has_api_key' => true,
+            'settings' => ['provider' => 'openai', 'model' => 'gpt-b'],
+            'model_available' => true,
+        ]);
+    });
+
+    it('requires an api_key only while none is stored, and never accepts a non-string one', function () {
+        $user = makeUser();
+        $payload = aiPayload();
+        unset($payload['api_key']);
+
+        $missing = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', $payload);
+        expectApiError($missing, 422);
+        expect($missing->json('errors'))->toBe(['api_key' => ['The API key field is required.']]);
+
+        $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload());
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', $payload));
+
+        foreach ([null, 123] as $apiKey) {
+            $invalid = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload(['api_key' => $apiKey]));
+            expectApiError($invalid, 422);
+            expect($invalid->json('errors'))->toBe(['api_key' => ['The API key field must be a string.']]);
+        }
+
+        $withoutStoredKey = makeUser();
+        $invalid = $this->actingAs($withoutStoredKey, 'sanctum')->putJson('/api/v1/users/me/plugins/ai', aiPayload(['api_key' => null, 'model' => 'gpt-unknown']));
+        expectApiError($invalid, 422);
+        expect($invalid->json('errors'))->toBe(['api_key' => ['The API key field is required.'], 'model' => ['The selected model is invalid.']]);
+    });
+});
+
 describe('GET /api/v1/plugins/ai/providers', function () {
     it('lists the providers with their snapshot models', function () {
         $user = makeUser();

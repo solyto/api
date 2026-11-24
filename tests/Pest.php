@@ -1,22 +1,24 @@
 <?php
 
+use App\Api\Calendars\Models\ExternalCalendar;
+use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\CalendarDTO;
+use App\Dav\Factories\DavServerFactory;
+use App\Dav\Services\DavService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Mcp\Server\McpServiceProvider;
+use Sabre\HTTP\Request as SabreRequest;
+use Sabre\HTTP\Response as SabreResponse;
+use Sabre\HTTP\ResponseInterface as SabreResponseInterface;
+use Sabre\HTTP\Sapi;
+use Tests\Support\FakeCalDavServer;
 use Tests\TestCase;
 
 uses(TestCase::class)->in('Feature', 'Unit', '../app/Api', '../app/Bots/Tests', '../app/Dav/Tests', '../app/Plugins', '../app/Mcp/Tests');
 uses(RefreshDatabase::class)->in('../app/Api', '../app/Plugins', '../app/Mcp/Tests');
-
-/*
-|--------------------------------------------------------------------------
-| Additional Expectations
-|--------------------------------------------------------------------------
-|
-| Convenience expectations that are not part of Pest 4 out of the box.
-|
-*/
 
 expect()->extend('toBeEmail', function () {
     return $this->toBeString()
@@ -28,21 +30,7 @@ expect()->extend('toBeEmail', function () {
         });
 });
 
-/*
-|--------------------------------------------------------------------------
-| Shared helpers for authenticated API requests
-|--------------------------------------------------------------------------
-|
-| These helpers are used across all feature tests (including the tests in
-| the app/Api modules) to create a user and attach a Sanctum bearer token
-| to API requests.
-|
-*/
-
-/**
- * Create a user for API tests (verified by default so protected routes
- * that require a verified email can be exercised directly).
- */
+// Verified, so routes that require a verified email can be called directly.
 function makeUser(array $attributes = []): User
 {
     return User::factory()->create(array_merge([
@@ -50,35 +38,31 @@ function makeUser(array $attributes = []): User
     ], $attributes));
 }
 
-/**
- * Issue a fresh Sanctum personal access token for the given user and
- * return the plain-text token used in the Authorization header.
- */
 function sanctumToken(User $user): string
 {
     return $user->createToken('api-test')->plainTextToken;
 }
 
-/**
- * Build the Authorization headers for an authenticated API request.
- */
 function authHeaders(User $user): array
 {
     return ['Authorization' => 'Bearer '.sanctumToken($user)];
 }
 
-/**
- * A session token with an expiry, like login issues.
- */
+// A session token with an expiry, like login issues.
 function sessionToken(User $user, ?DateTimeInterface $expiresAt = null): string
 {
     return $user->createToken('auth-token-mobile', expiresAt: $expiresAt ?? now()->addDays(30))->plainTextToken;
 }
 
-/**
- * Send the next request with this bearer token. Each request must resolve
- * its own token; the guard caches the first user otherwise.
- */
+// A new user's web token without expiry: [plain-text token, its PersonalAccessToken].
+function webToken(): array
+{
+    $newToken = makeUser()->createToken('auth-token-web');
+
+    return [$newToken->plainTextToken, $newToken->accessToken];
+}
+
+// The guard caches the first user it resolves; forgetting it lets each request resolve its own token.
 function bearer($test, string $token)
 {
     app('auth')->forgetGuards();
@@ -86,9 +70,7 @@ function bearer($test, string $token)
     return $test->withHeader('Authorization', 'Bearer '.$token);
 }
 
-/**
- * Issue a widget token through the API, as the app does for a session.
- */
+// Issued through the API, as the app does for a session.
 function issueWidgetToken($test, string $parentToken): string
 {
     return bearer($test, $parentToken)->postJson('/api/v1/auth/widget-token')
@@ -96,59 +78,38 @@ function issueWidgetToken($test, string $parentToken): string
         ->json('data.token');
 }
 
-/**
- * Assert the given response is an `ApiResponse` success envelope.
- */
 function expectApiSuccess($response, int $status = 200): void
 {
     $response->assertStatus($status);
     $response->assertJsonPath('success', true);
 }
 
-/**
- * Assert the given response is an `ApiResponse` error envelope.
- */
 function expectApiError($response, int $status): void
 {
     $response->assertStatus($status);
     $response->assertJsonPath('success', false);
 }
 
-/*
-|--------------------------------------------------------------------------
-| DAV protocol helpers
-|--------------------------------------------------------------------------
-|
-| DavController and public/dav.php read the raw PHP request, so Laravel's
-| HTTP test helpers cannot reach them. These helpers drive the server that
-| both entry points build (DavServerFactory) with Sabre request objects and
-| capture the response instead of emitting it. The server uses the pgsql
-| connection's PDO, so the per-test transaction still isolates DAV writes.
-|
-*/
+// DAV protocol helpers. DavController and public/dav.php read the raw PHP request, which Laravel's HTTP test
+// helpers cannot reach, so these drive the server both entry points build (DavServerFactory) with Sabre objects
+// and capture the response. It runs on the pgsql connection's PDO, so the per-test transaction still isolates it.
 
-/**
- * Create a verified user with a DAV principal (users get their default
- * calendar and address book from the UserObserver, the principal is not).
- */
+// The UserObserver creates the default calendar and address book, but not the principal.
 function davUser(array $attributes = []): User
 {
     $user = makeUser($attributes);
-    app(\App\Dav\Services\DavService::class)->principals()->create($user->email);
+    app(DavService::class)->principals()->create($user->email);
 
     return $user;
 }
 
-/**
- * Send one request to the DAV server, authenticated with Basic auth as the
- * given user (factory password "password") unless $user is null.
- */
-function davRequest(?User $user, string $method, string $path, ?string $body = null, array $headers = [], string $password = 'password'): \Sabre\HTTP\Response
+// Basic auth as $user with the factory password; a null user sends no credentials.
+function davRequest(?User $user, string $method, string $path, ?string $body = null, array $headers = [], string $password = 'password'): SabreResponse
 {
-    $server = app(\App\Dav\Factories\DavServerFactory::class)->createServer();
-    $server->sapi = new class extends \Sabre\HTTP\Sapi
+    $server = app(DavServerFactory::class)->createServer();
+    $server->sapi = new class extends Sapi
     {
-        public static function sendResponse(\Sabre\HTTP\ResponseInterface $response): void {}
+        public static function sendResponse(SabreResponseInterface $response): void {}
     };
 
     if ($user !== null) {
@@ -158,18 +119,14 @@ function davRequest(?User $user, string $method, string $path, ?string $body = n
         $headers['Content-Type'] = str_starts_with(ltrim($body), '<') ? 'application/xml; charset=utf-8' : 'text/plain';
     }
 
-    $server->httpRequest = new \Sabre\HTTP\Request($method, '/'.ltrim($path, '/'), $headers, $body);
-    $server->httpResponse = new \Sabre\HTTP\Response();
+    $server->httpRequest = new SabreRequest($method, '/'.ltrim($path, '/'), $headers, $body);
+    $server->httpResponse = new SabreResponse();
     $server->exec();
 
     return $server->httpResponse;
 }
 
-/**
- * XPath over a DAV XML response with the d/cal/card/cs/apple/s prefixes
- * registered.
- */
-function davXpath(\Sabre\HTTP\Response $response): DOMXPath
+function davXpath(SabreResponse $response): DOMXPath
 {
     $dom = new DOMDocument();
     $dom->loadXML($response->getBodyAsString());
@@ -184,10 +141,6 @@ function davXpath(\Sabre\HTTP\Response $response): DOMXPath
     return $xpath;
 }
 
-/**
- * Build a PROPFIND body asking for the given properties, e.g.
- * davPropfindBody(['d:displayname', 'cs:getctag']).
- */
 function davPropfindBody(array $properties): string
 {
     $props = implode('', array_map(fn (string $p) => "<{$p}/>", $properties));
@@ -198,9 +151,6 @@ function davPropfindBody(array $properties): string
         ."<d:prop>{$props}</d:prop></d:propfind>";
 }
 
-/**
- * A minimal single-VEVENT iCalendar body; $extra lines go inside the VEVENT.
- */
 function davIcs(string $uid, string $summary = 'Event', string $start = '20301015T100000Z', string $end = '20301015T110000Z', array $extra = []): string
 {
     $lines = [
@@ -213,9 +163,6 @@ function davIcs(string $uid, string $summary = 'Event', string $start = '2030101
     return implode("\r\n", $lines)."\r\n";
 }
 
-/**
- * A minimal vCard 3.0 body; $extra lines go before END:VCARD.
- */
 function davVcard(string $uid, string $fullName = 'Jane Doe', array $extra = []): string
 {
     $lines = ['BEGIN:VCARD', 'VERSION:3.0', "UID:{$uid}", "FN:{$fullName}", 'N:Doe;Jane;;;', ...$extra, 'END:VCARD'];
@@ -223,43 +170,54 @@ function davVcard(string $uid, string $fullName = 'Jane Doe', array $extra = [])
     return implode("\r\n", $lines)."\r\n";
 }
 
-/**
- * Connect a native calendar row of the user to the fake remote collection,
- * as the connect flow does, and return it.
- */
-function externalCalendar(User $user, \Tests\Support\FakeCalDavServer $server, string $name = 'Remote', string $password = 'app-password'): \App\Dav\DTOs\CalendarDTO
+// A weekly series from Monday 2030-01-07 with the 2030-01-14 occurrence moved by an hour, the override written
+// before or after the master.
+function davSeriesWithOverride(string $uid, bool $overrideFirst): string
 {
-    $calendar = app(\App\Dav\Services\DavService::class)->calendars()->create($user, \App\Dav\DTOs\CalendarDTO::fromRequest(['name' => $name]));
-    $account = \App\Api\Calendars\Models\ExternalCalendarAccount::factory()->forUser($user)->create([
-        'server_url' => \Tests\Support\FakeCalDavServer::ORIGIN.'/',
+    $master = [
+        'BEGIN:VEVENT', "UID:{$uid}", 'DTSTAMP:20300101T000000Z', 'DTSTART:20300107T100000Z', 'DTEND:20300107T110000Z',
+        'RRULE:FREQ=WEEKLY', 'SUMMARY:Series', 'END:VEVENT',
+    ];
+    $override = [
+        'BEGIN:VEVENT', "UID:{$uid}", 'DTSTAMP:20300101T000000Z', 'RECURRENCE-ID:20300114T100000Z',
+        'DTSTART:20300114T110000Z', 'DTEND:20300114T120000Z', 'SUMMARY:Series', 'END:VEVENT',
+    ];
+
+    return implode("\r\n", [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN',
+        ...($overrideFirst ? [...$override, ...$master] : [...$master, ...$override]),
+        'END:VCALENDAR',
+    ])."\r\n";
+}
+
+// A native calendar of the user connected to the fake remote collection, as the connect flow does it.
+function externalCalendar(User $user, FakeCalDavServer $server, string $name = 'Remote', string $password = 'app-password'): CalendarDTO
+{
+    $calendar = app(DavService::class)->calendars()->create($user, CalendarDTO::fromRequest(['name' => $name]));
+    $account = ExternalCalendarAccount::factory()->forUser($user)->create([
+        'server_url' => FakeCalDavServer::ORIGIN.'/',
         'username' => 'alice',
         'password' => $password,
     ]);
-    \App\Api\Calendars\Models\ExternalCalendar::factory()->forAccount($account)->create([
+    ExternalCalendar::factory()->forAccount($account)->create([
         'remote_url' => $server->url(),
         'calendar_id' => $calendar->calendarId,
         'instance_id' => $calendar->instanceId,
     ]);
 
-    return app(\App\Dav\Services\DavService::class)->calendars()->get($user, $calendar->instanceId);
+    return app(DavService::class)->calendars()->get($user, $calendar->instanceId);
 }
 
-/**
- * Turn MCP on for the current test: load laravel/mcp (which registers
- * routes/ai.php) the way App\Mcp\Providers\McpServiceProvider does when
- * MCP_ENABLED is set.
- */
+// Loads laravel/mcp (which registers routes/ai.php) the way App\Mcp\Providers\McpServiceProvider does when
+// MCP_ENABLED is set.
 function enableMcp(): void
 {
     config(['mcp.enabled' => true]);
 
-    app()->register(\Laravel\Mcp\Server\McpServiceProvider::class);
+    app()->register(McpServiceProvider::class);
     app('router')->getRoutes()->refreshNameLookups();
 }
 
-/**
- * Create an event in the user's default calendar through the API.
- */
 function storeEvent($test, User $user, array $payload): void
 {
     $instanceId = $test->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0]['id'];
@@ -269,11 +227,8 @@ function storeEvent($test, User $user, array $payload): void
         ->assertStatus(201);
 }
 
-/**
- * Today in $timezone with a timed and an all-day event and a daily series
- * that started yesterday (Dentist, Holiday, Standup), plus one event
- * tomorrow that a day view must leave out.
- */
+// Today in $timezone: a timed and an all-day event and a daily series that started yesterday (Dentist, Holiday,
+// Standup), plus one event tomorrow that a day view must leave out.
 function storeDayEvents($test, User $user, string $timezone): void
 {
     $today = today($timezone)->toDateString();
@@ -286,9 +241,7 @@ function storeDayEvents($test, User $user, string $timezone): void
     storeEvent($test, $user, ['title' => 'Tomorrow Meeting', 'start_date' => $tomorrow.' 09:00', 'end_date' => $tomorrow.' 10:00']);
 }
 
-/**
- * A user who may hold an MCP token (MCP is admin-only).
- */
+// MCP is admin-only.
 function mcpAdmin(): User
 {
     return User::factory()->admin()->create();

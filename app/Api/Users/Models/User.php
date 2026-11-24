@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
@@ -80,6 +79,13 @@ class User extends Authenticatable
         return $this->settings->timezone ?? 'UTC';
     }
 
+    public function language(): string
+    {
+        $language = $this->settings->language ?? 'en';
+
+        return in_array($language, config('app.locales'), true) ? $language : 'en';
+    }
+
     public function today(): CarbonImmutable
     {
         return CarbonImmutable::now($this->timezone())->startOfDay();
@@ -115,19 +121,6 @@ class User extends Authenticatable
         return $this->hasMany(Passkey::class);
     }
 
-    public function friends(): Collection
-    {
-        return Friend::where('user_id_1', $this->id)
-            ->orWhere('user_id_2', $this->id)
-            ->with(['user1.profile', 'user2.profile'])
-            ->get()
-            ->map(function ($friend) {
-                return $friend->user_id_1 === $this->id
-                    ? $friend->user2
-                    : $friend->user1;
-            });
-    }
-
     /** @return HasMany<FriendRequest, $this> */
     public function sentFriendRequests(): HasMany
     {
@@ -140,18 +133,5 @@ class User extends Authenticatable
     {
         return $this->hasMany(FriendRequest::class, 'receiver_id')
             ->with(['sender.profile']);
-    }
-
-    public function allFriendRequests(): Collection
-    {
-        $sent = FriendRequest::where('sender_id', $this->id)
-            ->with(['receiver.profile'])
-            ->get();
-
-        $received = FriendRequest::where('receiver_id', $this->id)
-            ->with(['sender.profile'])
-            ->get();
-
-        return $sent->merge($received);
     }
 }

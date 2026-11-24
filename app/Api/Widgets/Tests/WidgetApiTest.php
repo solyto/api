@@ -453,6 +453,13 @@ describe('GET /widgets/time-tracking', function () {
         expect($data['labels'])->toBe(['title' => 'Zeiterfassung', 'empty' => 'Noch keine Projekte.'])
             ->and(collect($data['sections'])->pluck('title')->all())->toBe(['Läuft', 'Projekte']);
     });
+
+    it('falls back to English for a language the app does not support', function () {
+        $user = widgetUser(['language' => 'xx']);
+        widgetProject($user, 'Writing');
+
+        expect(timeTrackingWidget($this, $user)['labels'])->toBe(['title' => 'Time Tracking', 'empty' => 'No projects yet.']);
+    });
 });
 
 describe('POST /widgets/actions/time_tracking.start/{project}', function () {

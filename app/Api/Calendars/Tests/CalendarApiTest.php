@@ -696,6 +696,20 @@ describe('Calendar invites', function () {
 
         expect(($this->inviteStatus)())->toBe(2);
     });
+
+    it('keeps a pending invite out of the event listing and lists it as an invite until it is accepted', function () {
+        storeEvent($this, $this->owner, ['title' => 'Shared', 'start_date' => '2030-10-10 10:00:00', 'end_date' => '2030-10-10 11:00:00']);
+        $titles = fn () => collect($this->actingAs($this->recipient, 'sanctum')->getJson('/api/v1/calendars/events/2030-10')->assertStatus(200)->json('data'))->pluck('title')->all();
+        $invites = fn () => $this->actingAs($this->recipient, 'sanctum')->getJson('/api/v1/calendars/invites')->assertStatus(200)->json('data');
+
+        expect($titles())->toBe([])
+            ->and($invites())->toHaveCount(1);
+
+        $this->actingAs($this->recipient, 'sanctum')->putJson('/api/v1/calendars/invites/'.$this->token.'/accept')->assertStatus(200);
+
+        expect($titles())->toBe(['Shared'])
+            ->and($invites())->toBe([]);
+    });
 });
 
 describe('Shared calendar cache invalidation', function () {

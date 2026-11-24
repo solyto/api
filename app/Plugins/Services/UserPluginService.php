@@ -3,6 +3,7 @@
 namespace App\Plugins\Services;
 
 use App\Api\Users\Models\User;
+use App\Plugins\DTOs\UserPluginStateDTO;
 use App\Plugins\Ai\Enums\AiProviderEnum;
 use App\Plugins\Ai\Services\AiModelSnapshot;
 use App\Plugins\Enums\PluginEnum;
@@ -21,9 +22,7 @@ class UserPluginService
         private readonly UserCacheService $cache,
     ) {}
 
-    /**
-     * @return array<int, array{plugin: PluginEnum, enabled: bool, has_api_key: bool, settings: ?array, model_available: bool}>
-     */
+    /** @return array<int, UserPluginStateDTO> */
     public function list(User $user): array
     {
         $rows = UserPlugin::forUser($user->id)->get()->keyBy(fn (UserPlugin $row) => $row->plugin->value);
@@ -34,18 +33,12 @@ class UserPluginService
         );
     }
 
-    /**
-     * @return array{plugin: PluginEnum, enabled: bool, has_api_key: bool, settings: ?array, model_available: bool}
-     */
-    public function find(User $user, PluginEnum $plugin): array
+    public function find(User $user, PluginEnum $plugin): UserPluginStateDTO
     {
         return $this->state($plugin, $this->row($user, $plugin));
     }
 
-    /**
-     * @return array{plugin: PluginEnum, enabled: bool, has_api_key: bool, settings: ?array, model_available: bool}
-     */
-    public function update(User $user, PluginEnum $plugin, array $data): array
+    public function update(User $user, PluginEnum $plugin, array $data): UserPluginStateDTO
     {
         $row = $this->row($user, $plugin) ?? new UserPlugin(['user_id' => $user->id, 'plugin' => $plugin]);
 
@@ -122,18 +115,15 @@ class UserPluginService
         return UserPlugin::forUser($user->id)->where('plugin', $plugin->value)->first();
     }
 
-    /**
-     * @return array{plugin: PluginEnum, enabled: bool, has_api_key: bool, settings: ?array, model_available: bool}
-     */
-    private function state(PluginEnum $plugin, ?UserPlugin $row): array
+    private function state(PluginEnum $plugin, ?UserPlugin $row): UserPluginStateDTO
     {
-        return [
-            'plugin' => $plugin,
-            'enabled' => $row->enabled ?? false,
-            'has_api_key' => $this->apiKeyStored($row),
-            'settings' => $row?->settings,
-            'model_available' => $this->modelAvailable($plugin, $row),
-        ];
+        return new UserPluginStateDTO(
+            plugin: $plugin,
+            enabled: $row->enabled ?? false,
+            hasApiKey: $this->apiKeyStored($row),
+            settings: $row?->settings,
+            modelAvailable: $this->modelAvailable($plugin, $row),
+        );
     }
 
     private function apiKeyStored(?UserPlugin $row): bool

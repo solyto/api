@@ -11,12 +11,28 @@ class FriendService
 {
     public function listFriends(User $user): \Illuminate\Support\Collection
     {
-        return $user->friends();
+        return Friend::where('user_id_1', $user->id)
+            ->orWhere('user_id_2', $user->id)
+            ->with(['user1.profile', 'user2.profile'])
+            ->get()
+            ->map(function ($friend) use ($user) {
+                return $friend->user_id_1 === $user->id
+                    ? $friend->user2
+                    : $friend->user1;
+            });
     }
 
     public function listFriendRequests(User $user): \Illuminate\Support\Collection
     {
-        return $user->allFriendRequests();
+        $sent = FriendRequest::where('sender_id', $user->id)
+            ->with(['receiver.profile'])
+            ->get();
+
+        $received = FriendRequest::where('receiver_id', $user->id)
+            ->with(['sender.profile'])
+            ->get();
+
+        return $sent->merge($received);
     }
 
     public function sendFriendRequest(User $sender, array $data): FriendRequest

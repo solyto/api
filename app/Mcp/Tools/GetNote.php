@@ -2,7 +2,6 @@
 
 namespace App\Mcp\Tools;
 
-use App\Api\Notes\Models\Note;
 use App\Api\Notes\Resources\NoteResource;
 use App\Api\Notes\Services\NoteService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -20,13 +19,8 @@ class GetNote extends SolytoTool
     public function handle(Request $request): Response
     {
         $id = $request->validate(['id' => ['required', 'uuid']])['id'];
-        $user = $this->user($request);
 
-        $note = Note::forUser($user->id)
-            ->whereKey($id)
-            ->where(fn ($query) => $query->whereNull('category_id')
-                ->orWhereNotIn('category_id', $this->notes->hiddenCategoryIds($user->id)))
-            ->first();
+        $note = $this->notes->findVisible($this->user($request), $id);
 
         if (!$note) {
             return Response::error('Note not found.');

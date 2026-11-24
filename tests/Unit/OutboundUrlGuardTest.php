@@ -53,6 +53,19 @@ describe('OutboundUrlGuard', function () {
         expect($guard->check('https://ipv4-only.example.com/feed'))->toBe('ipv4-only.example.com:443:[64:ff9b::5db8:d822]');
     });
 
+    it('judges an address that embeds an IPv4 address by that IPv4 address', function (string $address, bool $isPublic) {
+        expect((new OutboundUrlGuard(fn () => []))->isPublic($address))->toBe($isPublic);
+    })->with([
+        'ipv4-mapped public, refused as reserved before the check' => ['::ffff:93.184.216.34', false],
+        'ipv4-mapped private' => ['::ffff:10.0.0.1', false],
+        'ipv4-compatible public' => ['::5db8:d822', true],
+        'ipv4-compatible private' => ['::a00:1', false],
+        'ipv4-compatible loopback' => ['::7f00:1', false],
+        'nat64 public' => ['64:ff9b::5db8:d822', true],
+        'nat64 private' => ['64:ff9b::a00:1', false],
+        'plain ipv6' => ['2606:4700::1111', true],
+    ]);
+
     it('refuses a host whose NAT64 address embeds an internal IPv4 address', function () {
         (new OutboundUrlGuard(fn () => ['64:ff9b::5db8:d822', '64:ff9b::c0a8:1']))->check('https://rebind.example.com/');
     })->throws(BlockedUrlException::class);

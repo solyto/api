@@ -37,7 +37,7 @@ not the AI's:
    (186 operations, June 2026) next to `/v1/…` + `allOf SuccessResponse`
    (82, later). Neither matched `@OA\Server(url="/api/v1")`; 80 of 268
    operations pointed at paths that did not exist. Prefixes and paths are
-   fixed; 2 operations remain, on purpose (section 2).
+   fixed; none remain (section 2).
 2. **`exists:table,id` taken as an ownership check.** 40 rules on
    2026-10-13 (scoped in `d48f7b9`); a user could link another user's
    category, tag, genre or folder to their own record and read its name
@@ -154,17 +154,17 @@ one `if`.
 `routes/api.php` only. Public group (`health`, `auth/*`, throttled by named
 limiters) and the `auth:sanctum` group. Inside: `Route::prefix('<domain>')->group()`,
 custom actions first, `Route::apiResource('/', XController::class)->parameters(['' => 'x'])`
-last so `due-date` is not swallowed by `{todo}` (`routes/api.php:121-136`).
-Sub-resources are explicit lines next to the resource (`:132-134`). Flat
-lines inside a domain block (`:275-276` `recipes/import/{service}` then
+last so `due-date` is not swallowed by `{todo}` (`routes/api.php:152-167`).
+Sub-resources are explicit lines next to the resource (`:162-164`). Flat
+lines inside a domain block (`:353-354` `recipes/import/{service}` then
 `apiResource('recipes')`) are the exception; they should be a `recipes`
 sub-block like the siblings.
 
 A group that contains `apiResource('/', …)` needs `->name('x.')`: it is
 what keeps the generated names unique (`todos.index`, `notes.index`, …;
-without it all eleven would be `index`, `store`, …). No other route or group
+without it all thirteen would be `index`, `store`, …). No other route or group
 gets a name without a caller (`grep -rn "route('" app` finds only the
-Telegram webhook name from `routes/web.php`). Today: eleven named groups,
+Telegram webhook name from `routes/web.php`). Today: thirteen named groups,
 each with one `apiResource('/', …)` (owner decision, 2026-10-14), plus the
 `widgets.` group, whose caller is the widget-token gate in
 `AppServiceProvider::boot()`: every route in it is named, because an
@@ -201,8 +201,7 @@ in addition to `data` (pinned by `tests/Unit/ClientContractTest.php`).
 The spec is generated from `@OA` docblocks on every action (268 operations)
 and `@OA\Schema` on 64 of 68 resources. `tests/Unit/OpenApiSpecTest.php`
 checks every documented path (server URL + operation path) against the
-route table and pins the 2 operations that are kept on purpose as
-`OPENAPI_KNOWN_DRIFT` (rule 2.2).
+route table; `OPENAPI_KNOWN_DRIFT` is empty and must stay empty (rule 2.2).
 
 ### 2.1 Operation paths are relative to `@OA\Server`
 
@@ -840,14 +839,14 @@ modules. There is no `app/Http`, `app/Models`, `app/Console`.
 Request flow: route → controller → FormRequest → service → model →
 resource → `ApiResponse`. Factories are co-located and wired with
 `newFactory()` (`Todo.php:19-22`), carry a `forUser(User $user)` state
-(39 of 47) and use `User::factory()` as the default owner
+(44 of 55) and use `User::factory()` as the default owner
 (`TodoFactory.php:28`).
 
 ### 12.2 One route file, Sanctum on everything but health and `auth/*`
 
-`routes/api.php`: public `v1` group (`health`, seven `auth/*` routes
-throttled by the four named limiters in
-`app/Shared/Providers/AppServiceProvider.php:44-59`) and the
+`routes/api.php`: public `v1` group (`health`, nine `auth/*` routes
+throttled by the six named limiters in
+`app/Shared/Providers/AppServiceProvider.php:61-87`) and the
 `auth:sanctum` group for everything else. `routes/web.php` has only the
 Telegram webhook, the two DAV catch-alls and the old clipboard image URL
 for apps up to 1.1.3 (Decisions, 2026-11-23). Token issuing lives in

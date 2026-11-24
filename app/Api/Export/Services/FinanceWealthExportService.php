@@ -9,6 +9,7 @@ use App\Api\Finances\Models\WealthField;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\Users\Models\User;
 use App\Shared\Helpers\CsvHelper;
+use Illuminate\Support\Collection;
 
 class FinanceWealthExportService
 {
@@ -16,10 +17,15 @@ class FinanceWealthExportService
     {
         $fields = WealthField::forUser($user->id)->with('values')->get();
 
-        CsvHelper::write($path, ['Field', 'Date', 'Value'], $fields->flatMap(fn ($field) => $field->values->map(fn ($value) => [
+        CsvHelper::write($path, ['Field', 'Date', 'Value'], $fields->flatMap(fn (WealthField $field) => $this->fieldRows($field)));
+    }
+
+    private function fieldRows(WealthField $field): Collection
+    {
+        return $field->values->map(fn ($value) => [
             $field->title,
             $value->date->format('Y-m-d'),
             $value->value,
-        ])));
+        ]);
     }
 }

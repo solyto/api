@@ -2,12 +2,14 @@
 
 use App\Api\ApiResponse;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
-use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
+use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
+use App\Api\Clipboard\Exceptions\ClipboardFileTooLargeException;
 use App\Api\Contacts\Exceptions\AddressBookAlreadyExistsException;
 use App\Api\Feeds\Exceptions\FeedImportConflictException;
 use App\Api\Feeds\Exceptions\FeedImportException;
 use App\Api\Feeds\Exceptions\FeedImportNotFoundException;
+use App\Api\Finances\Exceptions\LastBudgetValueException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\ImportException;
@@ -70,6 +72,8 @@ return Application::configure(basePath: dirname(__DIR__))
                   FeedImportException::class,
                   FeedImportConflictException::class,
                   FeedImportNotFoundException::class,
+                  ClipboardFileTooLargeException::class,
+                  LastBudgetValueException::class,
               ]);
 
               $exceptions->render(function (Throwable $e, Request $request) {
@@ -109,8 +113,9 @@ return Application::configure(basePath: dirname(__DIR__))
                   }
 
                   if ($e instanceof ThrottleRequestsException) {
-                      return ApiResponse::error('Too many requests. Please slow down.', 429, ['too_many_requests'],
-                          meta: ['retry_after' => (int) ($e->getHeaders()['Retry-After'] ?? 0) ?: null])
+                      $retryAfter = (int) ($e->getHeaders()['Retry-After'] ?? 0);
+
+                      return ApiResponse::error('Too many requests. Please slow down.', 429, ['too_many_requests'], meta: ['retry_after' => $retryAfter ?: null])
                           ->withHeaders($e->getHeaders());
                   }
 
@@ -163,6 +168,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof FeedImportNotFoundException) {
                       return ApiResponse::error($e->getMessage(), 404);
+                  }
+
+                  if ($e instanceof ClipboardFileTooLargeException) {
+                      return ApiResponse::error($e->getMessage(), 413);
+                  }
+
+                  if ($e instanceof LastBudgetValueException) {
+                      return ApiResponse::error($e->getMessage(), 422);
                   }
 
                   if ($e instanceof ExternalCalendarUnavailableException) {

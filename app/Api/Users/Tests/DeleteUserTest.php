@@ -236,6 +236,19 @@ describe('app:users:delete', function () {
             ->and($read($other))->toBe($cached);
     });
 
+    it('anonymises only the deleted user\'s dev requests and counts them', function () {
+        $user = makeUser();
+        $other = makeUser();
+        $own = DevRequest::factory()->count(2)->create(['created_by_user_id' => $user->id]);
+        $foreign = DevRequest::factory()->create(['created_by_user_id' => $other->id]);
+
+        $summary = app(UserService::class)->destroy($user);
+
+        expect($summary['dev_requests_anonymised'])->toBe(2)
+            ->and($own->map(fn (DevRequest $devRequest) => $devRequest->fresh()->created_by_user_id)->all())->toBe([null, null])
+            ->and($foreign->fresh()->created_by_user_id)->toBe($other->id);
+    });
+
     it('prints the deletion summary line by line', function () {
         $user = makeUser(['email' => 'gone@example.com', 'name' => 'Gone']);
         $this->mock(UserService::class)->shouldReceive('destroy')->once()->andReturn([

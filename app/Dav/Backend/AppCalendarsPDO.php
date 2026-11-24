@@ -3,12 +3,14 @@
 namespace App\Dav\Backend;
 
 use App\Api\Calendars\Models\ExternalCalendar;
+use App\Api\Calendars\Services\CalendarService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\EventDTO;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Dav\Helpers\DavHelper;
+use App\Dav\Helpers\VEventHelper;
 use App\Dav\Services\RemoteCalDavClient;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Facades\Log;
@@ -59,7 +61,7 @@ class AppCalendarsPDO extends SabreBackend
     public function getCalendarsForUser($principalUri)
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1 AND share_invitestatus <> ?'
+            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . ' AND share_invitestatus <> ?'
         );
         $stmt->execute([$principalUri, \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED]);
         $notAcceptedInstanceIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
@@ -319,13 +321,13 @@ class AppCalendarsPDO extends SabreBackend
         $stmt = $this->pdo->prepare(
             'SELECT ci.share_invitestatus, ci.share_href, o.principaluri AS owner_principaluri
              FROM ' . $this->calendarInstancesTableName . ' ci
-             LEFT JOIN ' . $this->calendarInstancesTableName . ' o ON o.calendarid = ci.calendarid AND o.access = 1
+             LEFT JOIN ' . $this->calendarInstancesTableName . ' o ON o.calendarid = ci.calendarid AND o.access = ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . '
              WHERE ci.id = ?'
         );
 
         // A separate query: parent::getCalendarsForUser() names its own columns, so solyto_shared can't be added there.
         $flagged = $this->pdo->prepare(
-            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access = 1 AND solyto_shared'
+            'SELECT id FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access = ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . ' AND solyto_shared'
         );
         $flagged->execute([$principalUri]);
         $sharedOwnInstances = array_map('intval', $flagged->fetchAll(\PDO::FETCH_COLUMN));
@@ -844,7 +846,7 @@ SQL
         $currentInvites = $this->getInvites($calendarId);
         [$calendarId, $instanceId] = $calendarId;
 
-        $removeStmt = $this->pdo->prepare('DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND share_href = ? AND access IN (2,3)');
+        $removeStmt = $this->pdo->prepare('DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND share_href = ? AND access IN (' . \Sabre\DAV\Sharing\Plugin::ACCESS_READ . ',' . \Sabre\DAV\Sharing\Plugin::ACCESS_READWRITE . ')');
         $updateStmt = $this->pdo->prepare('UPDATE ' . $this->calendarInstancesTableName . ' SET access = ?, share_displayname = ?, share_invitestatus = ? WHERE calendarid = ? AND share_href = ?');
         $insertStmt = $this->pdo->prepare('
 INSERT INTO ' . $this->calendarInstancesTableName . '
@@ -915,7 +917,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function acceptShare(string $principalUri, string $shareToken): ?int
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND share_invitestatus = 1'
+            'SELECT id, calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND share_invitestatus = ' . \Sabre\DAV\Sharing\Plugin::INVITE_NORESPONSE
         );
         $stmt->execute([$shareToken, $principalUri]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -925,7 +927,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         }
 
         $stmt = $this->pdo->prepare(
-            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = 2 WHERE id = ?'
+            'UPDATE ' . $this->calendarInstancesTableName . ' SET share_invitestatus = ' . \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED . ' WHERE id = ?'
         );
         $stmt->execute([$row['id']]);
 
@@ -939,7 +941,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function declineShare(string $principalUri, string $shareToken): bool
     {
         $stmt = $this->pdo->prepare(
-            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND access > 1 AND share_invitestatus = 1'
+            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE share_href = ? AND principaluri = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . ' AND share_invitestatus = ' . \Sabre\DAV\Sharing\Plugin::INVITE_NORESPONSE
         );
         $stmt->execute([$shareToken, $principalUri]);
 
@@ -950,7 +952,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     {
         $principalUri = 'principals/' . $recipientEmail;
         $stmt = $this->pdo->prepare(
-            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND principaluri = ? AND access > 1'
+            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND principaluri = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$calendarId, $principalUri]);
 
@@ -960,13 +962,13 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function deleteSharedInstancesCustom(string $principalUri): int
     {
         $stmt = $this->pdo->prepare(
-            'SELECT DISTINCT calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1'
+            'SELECT DISTINCT calendarid FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$principalUri]);
         $calendarIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
 
         $stmt = $this->pdo->prepare(
-            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > 1'
+            'DELETE FROM ' . $this->calendarInstancesTableName . ' WHERE principaluri = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$principalUri]);
         $deleted = $stmt->rowCount();
@@ -983,7 +985,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function getCalendarMemberIds(int $calendarId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND (access = 1 OR share_invitestatus = 2)'
+            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND (access = ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . ' OR share_invitestatus = ' . \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED . ')'
         );
         $stmt->execute([$calendarId]);
 
@@ -993,7 +995,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function getCalendarOwnerId(int $calendarId): ?string
     {
         $stmt = $this->pdo->prepare(
-            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND access = 1'
+            'SELECT principaluri FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND access = ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$calendarId]);
 
@@ -1003,7 +1005,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
     public function getCalendarSharees(int $calendarId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT principaluri, access, share_invitestatus FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND access > 1'
+            'SELECT principaluri, access, share_invitestatus FROM ' . $this->calendarInstancesTableName . ' WHERE calendarid = ? AND access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$calendarId]);
 
@@ -1043,7 +1045,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $tz = $masterEvent->DTSTART->getDateTime()->getTimezone();
         $slot = $this->resolveOccurrenceSlot($vCal, $masterEvent, $occurrenceDate, $isAllDay);
 
-        $this->addDateProperty($masterEvent, 'EXDATE', $slot, $isAllDay, $tz);
+        VEventHelper::addDateProperty($masterEvent, 'EXDATE', $slot, $isAllDay, $tz);
 
         $existing = $this->findException($vCal, $slot, $isAllDay);
         if ($existing) {
@@ -1077,45 +1079,24 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE'] as $name) {
                 $exceptionEvent->remove($name);
             }
-            $this->addDateProperty($exceptionEvent, 'RECURRENCE-ID', $slot, $isAllDay, $tz);
+            VEventHelper::addDateProperty($exceptionEvent, 'RECURRENCE-ID', $slot, $isAllDay, $tz);
             $vCal->add($exceptionEvent);
         }
 
         $exceptionEvent->SUMMARY = $updatedData->title;
         $exceptionEvent->DTSTAMP = gmdate('Ymd\THis\Z');
-        $exceptionEvent->remove('DTSTART');
-        $exceptionEvent->remove('DTEND');
-        $exceptionEvent->remove('DURATION');
+        VEventHelper::removeDates($exceptionEvent);
 
-        $this->addDateProperty($exceptionEvent, 'DTSTART', $updatedData->startDate, $isAllDay, $tz);
+        VEventHelper::addDateProperty($exceptionEvent, 'DTSTART', $updatedData->startDate, $isAllDay, $tz);
         if ($updatedData->endDate) {
             // An all-day DTEND is exclusive: the day after the last one.
             $end = $isAllDay ? \DateTime::createFromInterface($updatedData->endDate)->modify('+1 day') : $updatedData->endDate;
-            $this->addDateProperty($exceptionEvent, 'DTEND', $end, $isAllDay, $tz);
+            VEventHelper::addDateProperty($exceptionEvent, 'DTEND', $end, $isAllDay, $tz);
         }
 
-        foreach (['DESCRIPTION' => $updatedData->description, 'LOCATION' => $updatedData->location] as $name => $value) {
-            if ($value) {
-                $exceptionEvent->{$name} = $value;
-            } else {
-                $exceptionEvent->remove($name);
-            }
-        }
+        VEventHelper::setDescriptionAndLocation($exceptionEvent, $updatedData->description, $updatedData->location);
 
         return $this->writeExisting($calendar, $uri, $vCal->serialize(), $etag);
-    }
-
-    // All-day values are floating dates; timed ones are stored in the series' zone, while the request's are in the user's.
-    private function addDateProperty(\Sabre\VObject\Component\VEvent $event, string $name, \DateTimeInterface $date, bool $isAllDay, \DateTimeZone $tz): void
-    {
-        if ($isAllDay) {
-            $event->add($name, $date->format('Ymd'), ['VALUE' => 'DATE']);
-
-            return;
-        }
-
-        $dateInTz = \DateTime::createFromInterface($date)->setTimezone($tz);
-        $event->add($name, $dateInTz->format('Ymd\THis'), ['TZID' => $tz->getName()]);
     }
 
     /**
@@ -1144,8 +1125,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $stmt = $this->pdo->prepare(
             'UPDATE ' . $this->calendarInstancesTableName . ' SET solyto_shared = EXISTS(
                 SELECT 1 FROM ' . $this->calendarInstancesTableName . ' s
-                WHERE s.calendarid = ? AND s.access > 1 AND s.share_invitestatus = 2
-            ) WHERE calendarid = ? AND access = 1'
+                WHERE s.calendarid = ? AND s.access > ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER . ' AND s.share_invitestatus = ' . \Sabre\DAV\Sharing\Plugin::INVITE_ACCEPTED . '
+            ) WHERE calendarid = ? AND access = ' . \Sabre\DAV\Sharing\Plugin::ACCESS_SHAREDOWNER
         );
         $stmt->execute([$calendarId, $calendarId]);
     }
@@ -1302,7 +1283,8 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         }
 
         $unavailableKey = [self::CACHE_KEY_UNAVAILABLE, $link->user_id, $link->calendar_id];
-        if ($cache->get($unavailableKey)) {
+        $unavailableTags = CalendarService::unavailableCacheTags($link->user_id);
+        if ($cache->getTagged($unavailableTags, $unavailableKey)) {
             return is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
         }
 
@@ -1313,7 +1295,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             // included: remember the failure so a dead remote is asked at
             // most once per TTL.
             $state = is_array($cached) ? $cached['state'] : ['ctag' => null, 'sync_token' => null];
-            $cache->store($unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
+            $cache->storeTagged($unavailableTags, $unavailableKey, (int) config('calendars.external.unavailable_ttl'), $e->reason());
         }
 
         $cache->store($key, 0, ['fetched_at' => time(), 'state' => $state]);
@@ -1431,7 +1413,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
         $series = new \Sabre\VObject\Recur\EventIterator([$masterEvent]);
         $series->fastForward(\DateTime::createFromInterface($occurrenceDate)->modify('-1 day'));
         while ($series->valid() && $series->getDtStart() <= \DateTime::createFromInterface($occurrenceDate)->modify('+1 day')) {
-            if (self::isSameSlot($series->getDtStart(), $occurrenceDate, $isAllDay)) {
+            if (VEventHelper::isSameSlot($series->getDtStart(), $occurrenceDate, $isAllDay)) {
                 return $occurrenceDate;
             }
             $series->next();
@@ -1439,7 +1421,7 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
 
         foreach ($vCal->select('VEVENT') as $vevent) {
             $isMovedHere = isset($vevent->{'RECURRENCE-ID'}) && isset($vevent->DTSTART)
-                && self::isSameSlot($vevent->DTSTART->getDateTime(), $occurrenceDate, $isAllDay);
+                && VEventHelper::isSameSlot($vevent->DTSTART->getDateTime(), $occurrenceDate, $isAllDay);
             if ($isMovedHere) {
                 return $vevent->{'RECURRENCE-ID'}->getDateTime();
             }
@@ -1454,18 +1436,11 @@ INSERT INTO ' . $this->calendarInstancesTableName . '
             if (!isset($vevent->{'RECURRENCE-ID'})) {
                 continue;
             }
-            if (self::isSameSlot($vevent->{'RECURRENCE-ID'}->getDateTime(), $slot, $isAllDay)) {
+            if (VEventHelper::isSameSlot($vevent->{'RECURRENCE-ID'}->getDateTime(), $slot, $isAllDay)) {
                 return $vevent;
             }
         }
 
         return null;
-    }
-
-    private static function isSameSlot(\DateTimeInterface $date, \DateTimeInterface $slot, bool $isAllDay): bool
-    {
-        return $isAllDay
-            ? $date->format('Ymd') === $slot->format('Ymd')
-            : $date->getTimestamp() === $slot->getTimestamp();
     }
 }

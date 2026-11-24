@@ -79,6 +79,14 @@ class NoteService
         );
     }
 
+    public function findVisible(User $user, string $id): ?Note
+    {
+        return Note::forUser($user->id)
+            ->whereKey($id)
+            ->where(fn ($query) => $this->whereVisible($query, $user->id))
+            ->first();
+    }
+
     // Hidden and system categories stay out of the plain lists with all their descendants (docs/STANDARDS.md 13.3).
     /** @return array<int, int> */
     public function hiddenCategoryIds(string $userId): array

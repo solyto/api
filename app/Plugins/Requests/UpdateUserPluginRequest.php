@@ -22,7 +22,7 @@ class UpdateUserPluginRequest extends FormRequest
         return match ($plugin) {
             PluginEnum::AI => [
                 'enabled' => 'required|boolean',
-                'api_key' => [$keyAlreadyStored ? 'sometimes' : 'required', 'string'],
+                'api_key' => [Rule::requiredIf(! $keyAlreadyStored), 'string'],
                 'provider' => ['required', 'string', Rule::enum(AiProviderEnum::class)],
                 'model' => ['required', 'string', Rule::in($models)],
             ],

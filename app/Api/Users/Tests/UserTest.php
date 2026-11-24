@@ -7,6 +7,7 @@ use App\Api\Users\Models\UserNotificationSettings;
 use App\Api\Users\Models\UserProfile;
 use App\Api\Users\Models\UserSettings;
 use App\Api\Users\Models\VerificationToken;
+use App\Api\Users\Services\FriendService;
 
 describe('User Factory', function () {
     it('creates a valid user', function () {
@@ -96,7 +97,7 @@ describe('User Model', function () {
 
         Friend::factory()->forUsers($user1, $user2)->create();
 
-        $friends = $user1->friends();
+        $friends = app(FriendService::class)->listFriends($user1);
 
         expect($friends)->toHaveCount(1);
         expect($friends->first()->id)->toBe($user2->id);
@@ -132,7 +133,7 @@ describe('User Model', function () {
         FriendRequest::factory()->forUsers($user1, $user2)->create();
         FriendRequest::factory()->forUsers($user1, $user3)->create();
 
-        $requests = $user1->allFriendRequests();
+        $requests = app(FriendService::class)->listFriendRequests($user1);
 
         expect($requests)->toHaveCount(2);
     });
@@ -312,6 +313,21 @@ describe('VerificationToken Model', function () {
 
         expect($token->user)->not()->toBeNull();
     });
+});
+
+describe('User language', function () {
+    it('uses a supported language from the settings and English otherwise', function (?string $language, string $expected) {
+        $user = makeUser();
+        $language === null
+            ? UserSettings::where('user_id', $user->id)->delete()
+            : UserSettings::updateOrCreate(['user_id' => $user->id], ['language' => $language]);
+
+        expect($user->fresh()->language())->toBe($expected);
+    })->with([
+        'supported' => ['fr', 'fr'],
+        'unsupported' => ['xx', 'en'],
+        'no settings' => [null, 'en'],
+    ]);
 });
 
 describe('User timezone', function () {

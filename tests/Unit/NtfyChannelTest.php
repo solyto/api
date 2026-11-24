@@ -109,6 +109,32 @@ describe('NtfyChannel::send', function () {
         );
     });
 
+    it('sends nothing without a url, a topic or a toNtfy() message', function (?string $url, ?string $topic, bool $hasMessage) {
+        enableNtfy();
+        config(['services.ntfy.url' => $url]);
+        Http::fake();
+        $notification = $hasMessage ? new DevRequestCreatedNotification('x') : new \Illuminate\Notifications\Notification();
+
+        (new NtfyChannel())->send((new AnonymousNotifiable())->route(NtfyChannel::class, $topic), $notification);
+
+        Http::assertNothingSent();
+    })->with([
+        'no url' => [null, 'solyto-admin', true],
+        'empty url' => ['', 'solyto-admin', true],
+        'no topic' => ['https://ntfy.example.test', null, true],
+        'empty topic' => ['https://ntfy.example.test', '', true],
+        'no toNtfy()' => ['https://ntfy.example.test', 'solyto-admin', false],
+    ]);
+
+    it('sends when url, topic and message are there', function () {
+        enableNtfy();
+        Http::fake();
+
+        (new NtfyChannel())->send(ntfyRoute(), new DevRequestCreatedNotification('x'));
+
+        Http::assertSentCount(1);
+    });
+
     it('sends a bearer token when one is configured', function () {
         enableNtfy('secret-token');
         Http::fake();

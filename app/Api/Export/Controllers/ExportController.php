@@ -32,7 +32,8 @@ class ExportController
             ->first();
 
         if ($recentExport) {
-            $retryAfter = max(1, (int) ceil(now()->diffInSeconds($recentExport->created_at->copy()->addDay())));
+            $nextAllowedAt = $recentExport->created_at->copy()->addDay();
+            $retryAfter = max(1, (int) ceil(now()->diffInSeconds($nextAllowedAt)));
 
             // export_rate_limited stays first: clients pick the message from errors[0].
             return ApiResponse::error(

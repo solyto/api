@@ -5,14 +5,9 @@ namespace App\Shared\Services;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Exceptions\UnresolvableHostException;
 
-/**
- * Refuses outbound requests to user-supplied URLs that point at private,
- * loopback, link-local or otherwise reserved addresses. The host is
- * resolved once and every address it resolves to must be public; callers
- * pin the request to the returned address (CURLOPT_RESOLVE) so a second
- * DNS answer cannot swap in an internal one. Redirects are not followed by
- * the HTTP client; callers that follow them check every hop again.
- */
+// Every address the host resolves to must be public; callers pin the request to the returned address
+// (CURLOPT_RESOLVE) so a second DNS answer cannot swap in an internal one. Redirects are not followed by the
+// HTTP client; callers that follow them check every hop again.
 class OutboundUrlGuard
 {
     /** Ranges FILTER_FLAG_NO_PRIV_RANGE / NO_RES_RANGE do not cover. */
@@ -38,9 +33,8 @@ class OutboundUrlGuard
         $this->resolver = $resolver ?? self::resolveDns(...);
     }
 
+    // Returns the CURLOPT_RESOLVE entry ("host:port:address") the request must be pinned to.
     /**
-     * @return string the CURLOPT_RESOLVE entry ("host:port:address") the request must be pinned to
-     *
      * @throws UnresolvableHostException when the host has no address
      * @throws BlockedUrlException
      */
@@ -50,7 +44,10 @@ class OutboundUrlGuard
         $scheme = strtolower($parts['scheme'] ?? '');
         $host = $parts['host'] ?? '';
 
-        if (!in_array($scheme, ['http', 'https'], true) || $host === '' || isset($parts['user']) || isset($parts['pass'])) {
+        $isWebUrl = in_array($scheme, ['http', 'https'], true) && $host !== '';
+        $hasCredentials = isset($parts['user']) || isset($parts['pass']);
+
+        if (!$isWebUrl || $hasCredentials) {
             throw new BlockedUrlException();
         }
 
@@ -81,11 +78,7 @@ class OutboundUrlGuard
 
         $binary = inet_pton($address);
 
-        // IPv4-mapped, IPv4-compatible and NAT64 (64:ff9b::/96, what DNS64 hands an IPv6-only host
-        // for an IPv4-only name) addresses reach the IPv4 host.
-        if (strlen($binary) === 16 && (str_starts_with($binary, str_repeat("\0", 10)."\xff\xff")
-            || str_starts_with($binary, str_repeat("\0", 12))
-            || str_starts_with($binary, "\x00\x64\xff\x9b".str_repeat("\0", 8)))) {
+        if ($this->embedsIpv4($binary)) {
             return $this->isPublic(inet_ntop(substr($binary, 12)));
         }
 
@@ -96,6 +89,21 @@ class OutboundUrlGuard
         }
 
         return true;
+    }
+
+    // IPv4-mapped, IPv4-compatible and NAT64 (64:ff9b::/96, what DNS64 hands an IPv6-only host
+    // for an IPv4-only name) addresses reach the IPv4 host in their last four bytes.
+    private function embedsIpv4(string $binary): bool
+    {
+        if (strlen($binary) !== 16) {
+            return false;
+        }
+
+        $isMapped = str_starts_with($binary, str_repeat("\0", 10)."\xff\xff");
+        $isCompatible = str_starts_with($binary, str_repeat("\0", 12));
+        $isNat64 = str_starts_with($binary, "\x00\x64\xff\x9b".str_repeat("\0", 8));
+
+        return $isMapped || $isCompatible || $isNat64;
     }
 
     private function inRange(string $binary, string $range): bool
@@ -130,6 +138,7 @@ class OutboundUrlGuard
     {
         $addresses = gethostbynamel($host) ?: [];
 
+        // dns_get_record() warns when the lookup fails; no IPv6 record is a normal answer here.
         foreach (@dns_get_record($host, DNS_AAAA) ?: [] as $record) {
             if (isset($record['ipv6'])) {
                 $addresses[] = $record['ipv6'];

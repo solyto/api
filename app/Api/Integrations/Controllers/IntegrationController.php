@@ -3,11 +3,13 @@
 namespace App\Api\Integrations\Controllers;
 
 use App\Api\ApiResponse;
-use App\Shared\Enums\IntegrationEnum;
+use App\Api\Integrations\Services\IntegrationService;
 use Illuminate\Http\JsonResponse;
 
 class IntegrationController
 {
+    public function __construct(private readonly IntegrationService $integrationService) {}
+
     /**
      * @OA\Get(
      *     path="/integrations",
@@ -25,6 +27,7 @@ class IntegrationController
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
+     *
      *                 @OA\Property(property="hardcover", type="boolean"),
      *                 @OA\Property(property="tmdb", type="boolean"),
      *                 @OA\Property(property="discogs", type="boolean"),
@@ -41,9 +44,6 @@ class IntegrationController
      */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(
-            collect(IntegrationEnum::cases())->mapWithKeys(fn (IntegrationEnum $integration) => [$integration->value => $integration->isConfigured()])->all(),
-            'Integrations retrieved successfully.'
-        );
+        return ApiResponse::success($this->integrationService->configured(), 'Integrations retrieved successfully.');
     }
 }

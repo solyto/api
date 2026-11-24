@@ -2,6 +2,7 @@
 
 namespace App\Plugins\Resources;
 
+use App\Plugins\DTOs\UserPluginStateDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,17 +23,19 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     ),
  *     @OA\Property(property="model_available", type="boolean", description="Whether the stored model is in the current model snapshot")
  * )
+ *
+ * @mixin UserPluginStateDTO
  */
 class UserPluginResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
         return [
-            'plugin' => $this->resource['plugin']->value,
-            'enabled' => $this->resource['enabled'],
-            'has_api_key' => $this->resource['has_api_key'],
-            'settings' => $this->resource['settings'],
-            'model_available' => $this->resource['model_available'],
+            'plugin' => $this->plugin->value,
+            'enabled' => $this->enabled,
+            'has_api_key' => $this->hasApiKey,
+            'settings' => $this->settings,
+            'model_available' => $this->modelAvailable,
         ];
     }
 }

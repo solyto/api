@@ -4,7 +4,6 @@ namespace App\Plugins\Factories;
 
 use App\Api\Users\Models\User;
 use App\Plugins\Ai\Enums\AiProviderEnum;
-use App\Plugins\Ai\Services\AiModelSnapshot;
 use App\Plugins\Enums\PluginEnum;
 use App\Plugins\Models\UserPlugin;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -16,14 +15,13 @@ class UserPluginFactory extends Factory
 
     public function definition(): array
     {
-        $model = app(AiModelSnapshot::class)->models(AiProviderEnum::OPENAI)[0]['id'] ?? null;
-
         return [
             'user_id' => User::factory(),
             'plugin' => PluginEnum::AI,
             'enabled' => true,
             'credentials' => ['api_key' => 'sk-'.$this->faker->bothify('????????????????')],
-            'settings' => ['provider' => AiProviderEnum::OPENAI->value, 'model' => $model],
+            // The first OpenAI model of tests/Fixtures/ai-models.json, the snapshot the plugin tests bind.
+            'settings' => ['provider' => AiProviderEnum::OPENAI->value, 'model' => 'gpt-a'],
         ];
     }
 

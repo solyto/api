@@ -151,3 +151,80 @@ describe('Expanding events for a window', function () {
         expect(occurrenceStarts($this->calendar, '2030-10-01', '2030-12-31'))->toHaveCount(4);
     });
 });
+
+// Byte for byte apart from the write time: what DAV clients get back after single-occurrence edits in the app.
+describe('Single-occurrence edits output', function () {
+    it('writes the exceptions and EXDATEs of a timed series in its own zone exactly as before', function () {
+        $utc = new \DateTimeZone('UTC');
+        davRequest($this->user, 'PUT', $this->path.'berlin.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN',
+            'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin', 'BEGIN:STANDARD', 'DTSTART:19701025T030000', 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+            'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100', 'END:STANDARD', 'BEGIN:DAYLIGHT', 'DTSTART:19700329T020000',
+            'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU', 'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0200', 'END:DAYLIGHT', 'END:VTIMEZONE',
+            'BEGIN:VEVENT', 'UID:berlin', 'DTSTAMP:20300101T000000Z', 'DTSTART;TZID=Europe/Berlin:20301014T090000',
+            'DURATION:PT30M', 'RRULE:FREQ=DAILY;COUNT=5', 'SUMMARY:Standup', 'LOCATION:Room 1', 'DESCRIPTION:Daily',
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT5M', 'DESCRIPTION:Soon', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+        $update = fn (string $title, string $start, string $end, ?string $description, ?string $location) => new EventDTO(
+            id: null, title: $title, description: $description, startDate: new \DateTime($start, $utc), endDate: new \DateTime($end, $utc),
+            isAllDay: false, location: $location, recurrenceRule: null, recurrenceEnd: null, timezone: 'UTC', uri: null, etag: null,
+            calendarId: null, calendarName: null,
+        );
+
+        $this->events->updateOccurrence($this->calendar, 'berlin.ics', new \DateTime('2030-10-15 07:00:00', $utc), $update('Late', '2030-10-15 10:00:00', '2030-10-15 10:45:00', 'Moved by the app', null));
+        $this->events->updateOccurrence($this->calendar, 'berlin.ics', new \DateTime('2030-10-16 07:00:00', $utc), $update('Other', '2030-10-16 07:00:00', '2030-10-16 07:30:00', null, 'Room 3'));
+        $this->events->updateOccurrence($this->calendar, 'berlin.ics', new \DateTime('2030-10-15 10:00:00', $utc), $update('Later', '2030-10-15 11:00:00', '2030-10-15 11:45:00', '', 'Room 2'));
+        $this->events->deleteOccurrence($this->calendar, 'berlin.ics', new \DateTime('2030-10-16 07:00:00', $utc));
+        $this->events->deleteOccurrence($this->calendar, 'berlin.ics', new \DateTime('2030-10-17 07:00:00', $utc));
+        $stored = davRequest($this->user, 'GET', $this->path.'berlin.ics')->getBodyAsString();
+
+        expect(preg_replace('/DTSTAMP:(?!20300101T000000Z)\d{8}T\d{6}Z/', 'DTSTAMP:written', $stored))->toBe(implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin',
+            'BEGIN:STANDARD', 'DTSTART:19701025T030000', 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'TZOFFSETFROM:+0200',
+            'TZOFFSETTO:+0100', 'END:STANDARD', 'BEGIN:DAYLIGHT', 'DTSTART:19700329T020000',
+            'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU', 'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0200', 'END:DAYLIGHT',
+            'END:VTIMEZONE', 'BEGIN:VEVENT', 'UID:berlin', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=Europe/Berlin:20301014T090000', 'DURATION:PT30M', 'RRULE:FREQ=DAILY;COUNT=5',
+            'SUMMARY:Standup', 'LOCATION:Room 1', 'DESCRIPTION:Daily', 'EXDATE;TZID=Europe/Berlin:20301016T090000',
+            'EXDATE;TZID=Europe/Berlin:20301017T090000', 'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT5M',
+            'DESCRIPTION:Soon', 'END:VALARM', 'END:VEVENT', 'BEGIN:VEVENT', 'UID:berlin',
+            'RECURRENCE-ID;TZID=Europe/Berlin:20301015T090000', 'SUMMARY:Later', 'DTSTAMP:written',
+            'DTSTART;TZID=Europe/Berlin:20301015T130000', 'DTEND;TZID=Europe/Berlin:20301015T134500', 'LOCATION:Room 2',
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT5M', 'DESCRIPTION:Soon', 'END:VALARM', 'END:VEVENT',
+            'END:VCALENDAR',
+        ])."\r\n");
+    });
+
+    it('writes the exception and EXDATEs of an all-day series as floating dates exactly as before', function () {
+        $utc = new \DateTimeZone('UTC');
+        davRequest($this->user, 'PUT', $this->path.'weekly.ics', implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:weekly', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;VALUE=DATE:20301007', 'DTEND;VALUE=DATE:20301008', 'RRULE:FREQ=WEEKLY;COUNT=4', 'SUMMARY:Bin day', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n", ['Content-Type' => 'text/calendar']);
+        $stored = fn () => preg_replace('/DTSTAMP:(?!20300101T000000Z)\d{8}T\d{6}Z/', 'DTSTAMP:written', davRequest($this->user, 'GET', $this->path.'weekly.ics')->getBodyAsString());
+
+        $this->events->updateOccurrence($this->calendar, 'weekly.ics', new \DateTime('2030-10-14 00:00:00', $utc), new EventDTO(
+            id: null, title: 'Late bins', description: 'Street', startDate: new \DateTime('2030-10-15 00:00:00', $utc),
+            endDate: new \DateTime('2030-10-16 00:00:00', $utc), isAllDay: true, location: null, recurrenceRule: null, recurrenceEnd: null,
+            timezone: 'UTC', uri: null, etag: null, calendarId: null, calendarName: null,
+        ));
+
+        expect($stored())->toBe(implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:weekly',
+            'DTSTAMP:20300101T000000Z', 'DTSTART;VALUE=DATE:20301007', 'DTEND;VALUE=DATE:20301008',
+            'RRULE:FREQ=WEEKLY;COUNT=4', 'SUMMARY:Bin day', 'END:VEVENT', 'BEGIN:VEVENT', 'UID:weekly',
+            'RECURRENCE-ID;VALUE=DATE:20301014', 'SUMMARY:Late bins', 'DTSTAMP:written', 'DTSTART;VALUE=DATE:20301015',
+            'DTEND;VALUE=DATE:20301017', 'DESCRIPTION:Street', 'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n");
+
+        $this->events->deleteOccurrence($this->calendar, 'weekly.ics', new \DateTime('2030-10-21 00:00:00', $utc));
+        $this->events->deleteOccurrence($this->calendar, 'weekly.ics', new \DateTime('2030-10-15 00:00:00', $utc));
+
+        expect($stored())->toBe(implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Solyto//Tests//EN', 'BEGIN:VEVENT', 'UID:weekly',
+            'DTSTAMP:20300101T000000Z', 'DTSTART;VALUE=DATE:20301007', 'DTEND;VALUE=DATE:20301008',
+            'RRULE:FREQ=WEEKLY;COUNT=4', 'SUMMARY:Bin day', 'EXDATE;VALUE=DATE:20301021', 'EXDATE;VALUE=DATE:20301014',
+            'END:VEVENT', 'END:VCALENDAR',
+        ])."\r\n");
+    });
+});

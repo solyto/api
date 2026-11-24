@@ -6,6 +6,7 @@ use App\Api\Finances\Models\WealthField;
 use App\Api\Finances\Models\WealthValue;
 use App\Api\Tags\Models\Tag;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 
 describe('Budget CRUD', function () {
     it('lists, stores, shows, updates and deletes budgets', function () {
@@ -644,6 +645,7 @@ describe('Budget values', function () {
     });
 
     it('refuses to delete the last value of a budget item', function () {
+        Exceptions::fake();
         $user = makeUser();
         $budget = Budget::factory()->forUser($user)->withValue(100)->create();
         $value = BudgetValue::factory()->forBudget($budget)->withValue(100)->create();
@@ -652,10 +654,12 @@ describe('Budget values', function () {
             ->deleteJson('/api/v1/finances/budget/'.$budget->id.'/values/'.$value->id);
         expectApiError($response, 422);
         $response->assertJsonPath('message', 'A budget item needs at least one value.')
-            ->assertJsonMissingPath('errors');
+            ->assertJsonMissingPath('errors')
+            ->assertJsonMissingPath('meta');
 
         expect(BudgetValue::count())->toBe(1);
         expect($budget->fresh()->value)->toBe(100.0);
+        Exceptions::assertNothingReported();
     });
 
     it('lists the values ordered by date', function () {
