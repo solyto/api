@@ -938,3 +938,77 @@ describe('Shared calendar cache invalidation', function () {
             ->and($cache->has(['calendars_v2', $this->sharee->id]))->toBeTrue();
     });
 });
+
+describe('Read-only shared calendars', function () {
+    beforeEach(function () {
+        $this->owner = makeUser();
+        $this->sharee = makeUser();
+        Friend::factory()->forUsers($this->owner, $this->sharee)->create();
+        $ownerInstance = $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/calendars/'.$ownerInstance.'/share', ['friend_id' => $this->sharee->id])->assertStatus(200);
+        $this->actingAs($this->sharee, 'sanctum')->putJson('/api/v1/calendars/invites/'.rawurlencode('mailto:'.$this->sharee->email).'/accept')->assertStatus(200);
+
+        $start = now()->addDay()->startOfDay();
+        $this->payload = fn (int $instanceId, string $title) => [
+            'title' => $title,
+            'start_date' => $start->format('Y-m-d H:i:s'),
+            'end_date' => $start->copy()->addHour()->format('Y-m-d H:i:s'),
+            'is_all_day' => false,
+            'calendar_id' => $instanceId,
+        ];
+        $this->event = $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$ownerInstance.'/events', [...($this->payload)($ownerInstance, 'Owner event'), 'is_recurring' => true, 'recurrence_rule' => 'FREQ=DAILY;COUNT=2'])
+            ->assertStatus(201)->json('data');
+        $this->occurrenceDate = $start->format('Y-m-d');
+
+        // Shares made through the API are read-write; a DAV client (or the owner's other apps) can make them read-only.
+        $this->shareeInstance = DB::connection('pgsql')->table('calendarinstances')
+            ->where('principaluri', 'principals/'.$this->sharee->email)->where('access', '>', 1)->value('id');
+        DB::connection('pgsql')->table('calendarinstances')->where('id', $this->shareeInstance)->update(['access' => 2]);
+        app(UserCacheService::class)->flushTags([UserCacheService::userTag($this->sharee->id)]);
+        $this->ownerTitles = fn () => collect($this->actingAs($this->owner, 'sanctum')
+            ->getJson('/api/v1/calendars/events/'.now()->addDay()->format('Y-m'))->assertStatus(200)->json('data'))->pluck('title')->unique()->values()->all();
+    });
+
+    it('lists the calendar as read-only to the sharee only', function () {
+        $listed = collect($this->actingAs($this->sharee, 'sanctum')->getJson('/api/v1/calendars')->json('data'))->firstWhere('id', $this->shareeInstance);
+        $own = $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/calendars')->json('data.0');
+
+        expect($listed['is_read_only'])->toBeTrue()
+            ->and($own['is_read_only'])->toBeFalse();
+    });
+
+    it('refuses to create, change or delete its events through the API', function () {
+        $calendar = '/api/v1/calendars/'.$this->shareeInstance;
+        $change = [...($this->payload)($this->shareeInstance, 'Changed'), 'etag' => $this->event['etag']];
+
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->postJson($calendar.'/events', ($this->payload)($this->shareeInstance, 'Added')), 403);
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->putJson($calendar.'/events/'.$this->event['uri'], $change), 403);
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->deleteJson($calendar.'/events/'.$this->event['uri']), 403);
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->putJson($calendar.'/events/'.$this->event['uri'].'/occurrence/'.$this->occurrenceDate, $change), 403);
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->deleteJson($calendar.'/events/'.$this->event['uri'].'/occurrence/'.$this->occurrenceDate), 403);
+
+        expect(($this->ownerTitles)())->toBe(['Owner event']);
+    });
+
+    it('refuses to move an event into or out of it', function () {
+        $ownInstance = $this->actingAs($this->sharee, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $ownEvent = $this->actingAs($this->sharee, 'sanctum')
+            ->postJson('/api/v1/calendars/'.$ownInstance.'/events', ($this->payload)($ownInstance, 'Sharee event'))
+            ->assertStatus(201)->json('data');
+
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->putJson('/api/v1/calendars/'.$ownInstance.'/events/'.$ownEvent['uri'],
+            [...($this->payload)($this->shareeInstance, 'Sharee event'), 'etag' => $ownEvent['etag']]), 403);
+        expectApiError($this->actingAs($this->sharee, 'sanctum')->putJson('/api/v1/calendars/'.$this->shareeInstance.'/events/'.$this->event['uri'],
+            [...($this->payload)($ownInstance, 'Owner event'), 'etag' => $this->event['etag']]), 403);
+
+        expect(($this->ownerTitles)())->toBe(['Owner event']);
+    });
+
+    it('still lets a read-write sharee change its events', function () {
+        DB::connection('pgsql')->table('calendarinstances')->where('id', $this->shareeInstance)->update(['access' => 3]);
+        app(UserCacheService::class)->flushTags([UserCacheService::userTag($this->sharee->id)]);
+
+        expectApiSuccess($this->actingAs($this->sharee, 'sanctum')->postJson('/api/v1/calendars/'.$this->shareeInstance.'/events', ($this->payload)($this->shareeInstance, 'Added')), 201);
+    });
+});

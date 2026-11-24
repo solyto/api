@@ -92,27 +92,6 @@ class EventDTO
     }
 
 
-    public static function fromImport(array $parsed, CalendarDTO $calendar): self
-    {
-        return new self(
-            id: null,
-            title: $parsed['title'] ?? '',
-            description: $parsed['description'] ?? null,
-            startDate: $parsed['start'] ?? null,
-            endDate: $parsed['end'] ?? null,
-            isAllDay: $parsed['all_day'] ?? false,
-            location: $parsed['location'] ?? null,
-            recurrenceRule: $parsed['recurrence_rule'] ?? null,
-            recurrenceEnd: $parsed['recurrence_end'] ?? null,
-            timezone: $parsed['timezone'] ?? null,
-            uri: null,
-            etag: null,
-            calendarId: $calendar->instanceId,
-            calendarName: $calendar->displayName,
-            calendarColor: $calendar->color
-        );
-    }
-
     public function updateFromRequest(UpdateEventRequest $request, User $user): void
     {
         $data = $request->validated();

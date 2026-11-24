@@ -40,6 +40,11 @@ class Events
         return $uri ? $this->backend->getEventByUriCustom($calendar, $uri) : null;
     }
 
+    public function import(CalendarDTO $calendar, string $vCal): ?string
+    {
+        return $this->backend->importEventCustom($calendar, $vCal);
+    }
+
     public function update(CalendarDTO $calendar, EventDTO $dto): ?EventDTO
     {
         return $this->backend->updateEventCustom($calendar, $dto) ?

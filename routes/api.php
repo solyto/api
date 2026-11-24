@@ -213,6 +213,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::prefix('import')->group(function () {
             Route::post('', [CalendarImportController::class, 'startImport']);
             Route::post('select', [CalendarImportController::class, 'selectCalendars']);
+            Route::middleware('throttle:calendars-import')->post('file', [CalendarImportController::class, 'importFile']);
             Route::get('state', [CalendarImportController::class, 'getState']);
         });
 

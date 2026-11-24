@@ -279,6 +279,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="The calendar is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
      *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
@@ -352,7 +353,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=403, description="Unable to update event", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="Unable to update event, or the calendar (or the target calendar of a move) is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(
@@ -442,6 +443,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="The calendar is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=503, description="External calendar: its server is unavailable; errors: [external_server_unavailable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
@@ -513,6 +515,7 @@ class CalendarController
      *
      *     @OA\Response(response=400, description="Event is not recurring", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="The calendar is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=422, description="An event of an external calendar that cannot be read; errors: [external_event_unreadable]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
@@ -609,6 +612,7 @@ class CalendarController
      *
      *     @OA\Response(response=400, description="Event is not recurring", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="The calendar is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(

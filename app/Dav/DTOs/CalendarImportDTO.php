@@ -6,9 +6,11 @@ class CalendarImportDTO
 {
     public string $jobId;
     public string $userEmail;
-    public string $url;
-    public string $username;
-    public string $secret;
+    public string $source = 'caldav';
+    public ?string $url = null;
+    public ?string $username = null;
+    public ?string $secret = null;
+    public ?int $targetInstanceId = null;
     public string $stage = 'started' | 'select' | 'calendars' | 'events' | 'finished';
     public ?array $calendars = null;
     public ?array $selectedCalendars = null;
@@ -17,4 +19,6 @@ class CalendarImportDTO
     public ?string $currentCalendar = null;
     public int $eventsCount = 0;
     public int $eventsDone = 0;
+    public int $eventsSkipped = 0;
+    public ?int $updatedAt = null;
 }

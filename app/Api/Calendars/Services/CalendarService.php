@@ -6,6 +6,7 @@ use App\Api\Calendars\DTOs\EventListingDTO;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
 use App\Api\Calendars\Exceptions\CalendarInviteNotFoundException;
 use App\Api\Calendars\Exceptions\CalendarNotFoundException;
+use App\Api\Calendars\Exceptions\CalendarReadOnlyException;
 use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Notifications\CalendarShareNotification;
 use App\Api\Users\Models\User;
@@ -279,6 +280,7 @@ class CalendarService
 
     public function createEvent(User $user, CalendarDTO $calendar, EventDTO $dto): ?EventDTO
     {
+        $this->assertWritable($calendar);
         $event = $this->dav->calendars()->events()->create($calendar, $dto);
         $this->cache->flushTags([self::eventCacheTag($user->id, $calendar->calendarId)]);
         if ($event !== null) {
@@ -289,6 +291,7 @@ class CalendarService
 
     public function moveEvent(User $user, CalendarDTO $from, CalendarDTO $to, EventDTO $event): ?EventDTO
     {
+        $this->assertWritable($from, $to);
         $newEvent = $this->dav->calendars()->events()->create($to, $event);
         if ($newEvent === null) {
             return null;
@@ -313,6 +316,19 @@ class CalendarService
         return $newEvent;
     }
 
+    // DAV clients are stopped by sabre's ACL; the API writes through the backend directly, so it checks here.
+    /**
+     * @throws CalendarReadOnlyException
+     */
+    private function assertWritable(CalendarDTO ...$calendars): void
+    {
+        foreach ($calendars as $calendar) {
+            if ($calendar->isReadOnly) {
+                throw new CalendarReadOnlyException();
+            }
+        }
+    }
+
     // A failure here is only logged: the caller rethrows the delete's error, which is the one the user needs to see.
     private function removeMovedCopy(CalendarDTO $to, EventDTO $copy): void
     {
@@ -329,6 +345,7 @@ class CalendarService
 
     public function updateEvent(User $user, CalendarDTO $calendar, EventDTO $event): ?EventDTO
     {
+        $this->assertWritable($calendar);
         $updated = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->update($calendar, $event));
         if ($updated !== null) {
             $this->forgetEvents($user, $calendar);
@@ -338,6 +355,7 @@ class CalendarService
 
     public function destroyEvent(User $user, CalendarDTO $calendar, EventDTO $event): bool
     {
+        $this->assertWritable($calendar);
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->delete($calendar, $event));
         if ($success) {
             $this->forgetEvents($user, $calendar);
@@ -347,6 +365,7 @@ class CalendarService
 
     public function destroyEventOccurrence(User $user, CalendarDTO $calendar, string $eventUri, \DateTime $date): bool
     {
+        $this->assertWritable($calendar);
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->deleteOccurrence($calendar, $eventUri, $date));
         if ($success) {
             $this->forgetEvents($user, $calendar);
@@ -356,6 +375,7 @@ class CalendarService
 
     public function updateEventOccurrence(User $user, CalendarDTO $calendar, string $eventUri, \DateTime $date, EventDTO $dto): bool
     {
+        $this->assertWritable($calendar);
         $success = $this->forgettingStaleEvents($user, $calendar, fn () => $this->dav->calendars()->events()->updateOccurrence($calendar, $eventUri, $date, $dto));
         if ($success) {
             $this->forgetEvents($user, $calendar);

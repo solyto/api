@@ -3,6 +3,7 @@
 namespace App\Dav\DTOs;
 
 use App\Dav\Models\CalendarInstance;
+use Sabre\DAV\Sharing\Plugin as SharingPlugin;
 
 class CalendarDTO
 {
@@ -25,6 +26,7 @@ class CalendarDTO
         public bool $isExternal = false,
         public bool $isUnavailable = false,
         public bool $isCredentialsRejected = false,
+        public bool $isReadOnly = false,
     ) {}
 
     public static function fromSabre(array $data): self
@@ -56,6 +58,7 @@ class CalendarDTO
             shareToken: $data['share-href'] ?? null,
             solytoShared: $data['solyto-shared'] ?? false,
             isExternal: !empty($data['is-external']),
+            isReadOnly: (int) ($data['share-access'] ?? 0) === SharingPlugin::ACCESS_READ,
         );
     }
 

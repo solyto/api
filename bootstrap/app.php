@@ -12,7 +12,9 @@ use App\Api\Feeds\Exceptions\FeedImportNotFoundException;
 use App\Api\Finances\Exceptions\LastBudgetValueException;
 use App\Dav\Exceptions\ExternalCalendarPreconditionFailedException;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\ImportConflictException;
 use App\Dav\Exceptions\ImportException;
+use App\Dav\Exceptions\ImportFileException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Middleware\RecordClientVersion;
@@ -66,6 +68,8 @@ return Application::configure(basePath: dirname(__DIR__))
                   ExternalCalendarPreconditionFailedException::class,
                   ExternalCalendarUnavailableException::class,
                   ImportException::class,
+                  ImportConflictException::class,
+                  ImportFileException::class,
                   UnreadableCalendarObjectException::class,
                   LimitReachedException::class,
                   BuiltInTrackerException::class,
@@ -144,6 +148,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof ImportException) {
                       return ApiResponse::error($e->getMessage(), 404);
+                  }
+
+                  if ($e instanceof ImportConflictException) {
+                      return ApiResponse::error($e->getMessage(), 409);
+                  }
+
+                  if ($e instanceof ImportFileException) {
+                      return ApiResponse::error($e->getMessage(), 422);
                   }
 
                   if ($e instanceof UnreadableCalendarObjectException) {

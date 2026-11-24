@@ -96,6 +96,47 @@ describe('Calendar import', function () {
             ->and(app(DavService::class)->calendars()->getByName($user, 'Work'))->toBeNull();
     });
 
+    it('stores the remote events as they are and skips the ones it cannot store', function () {
+        $user = davUser();
+        $series = implode("\r\n", [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Nextcloud//EN', 'METHOD:PUBLISH',
+            'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin',
+            'BEGIN:STANDARD', 'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100', 'DTSTART:19701025T030000', 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'END:STANDARD',
+            'BEGIN:DAYLIGHT', 'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0200', 'DTSTART:19700329T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU', 'END:DAYLIGHT',
+            'END:VTIMEZONE',
+            'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'DTSTART;TZID=Europe/Berlin:20301014T090000', 'DTEND;TZID=Europe/Berlin:20301014T091500',
+            'RRULE:FREQ=DAILY;COUNT=5', 'EXDATE;TZID=Europe/Berlin:20301015T090000', 'SUMMARY:Standup', 'ATTENDEE;CN=Jane:mailto:jane@example.org',
+            'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', 'TRIGGER:-PT10M', 'END:VALARM', 'END:VEVENT',
+            'BEGIN:VEVENT', 'UID:series', 'DTSTAMP:20300101T000000Z', 'RECURRENCE-ID;TZID=Europe/Berlin:20301016T090000',
+            'DTSTART;TZID=Europe/Berlin:20301016T110000', 'DTEND;TZID=Europe/Berlin:20301016T111500', 'SUMMARY:Standup (moved)', 'END:VEVENT',
+            'END:VCALENDAR',
+        ])."\r\n";
+        fakeRemoteDav('calendars', ['Personal' => [
+            'series.ics' => $series,
+            'broken.ics' => "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:broken\r\nSUMMARY:No start\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+            'garbage.ics' => 'not a calendar',
+        ]]);
+        $import = app(DavService::class)->import()->calendars();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal']);
+        $import->importCalendars($user, $import->getState($user->id));
+        $import->importEvents($user, $import->getState($user->id));
+
+        $calendar = app(DavService::class)->calendars()->getByName($user, 'Personal');
+        $stored = DB::connection('pgsql')->table('calendarobjects')->where('calendarid', $calendar->calendarId)->pluck('calendardata')
+            ->map(fn ($data) => is_resource($data) ? stream_get_contents($data) : $data);
+        $state = $import->getState($user->id);
+
+        expect($state->eventsCount)->toBe(3)
+            ->and($state->eventsDone)->toBe(1)
+            ->and($state->eventsSkipped)->toBe(2)
+            ->and($stored)->toHaveCount(1)
+            ->and($stored[0])->toContain('DTSTART;TZID=Europe/Berlin:20301014T090000', 'BEGIN:VTIMEZONE', 'EXDATE;TZID=Europe/Berlin:20301015T090000')
+            ->toContain('RECURRENCE-ID;TZID=Europe/Berlin:20301016T090000', 'BEGIN:VALARM', 'ATTENDEE;CN=Jane:mailto:jane@example.org')
+            ->not->toContain('METHOD:');
+    });
+
     it('loads events with its own limits, not the tighter external calendar ones', function () {
         // Small enough to refuse the REPORT below, large enough for the discovery responses.
         config(['calendars.external.max_response_bytes' => 2000]);

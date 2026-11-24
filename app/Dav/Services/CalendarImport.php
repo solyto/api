@@ -2,20 +2,30 @@
 
 namespace App\Dav\Services;
 
+use App\Api\Calendars\Jobs\InvalidateSharedCalendarCache;
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\DTOs\CalendarImportDTO;
-use App\Dav\DTOs\EventDTO;
 use App\Dav\Exceptions\ExternalCalendarUnavailableException;
+use App\Dav\Exceptions\ImportConflictException;
 use App\Dav\Exceptions\ImportException;
+use App\Dav\Exceptions\ImportFileException;
 use App\Dav\Helpers\ICalendarHelper;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Sabre\VObject\Component\VCalendar;
+use Sabre\VObject\InvalidDataException;
+use Sabre\VObject\Node;
+use Sabre\VObject\ParseException;
+use Sabre\VObject\Reader;
 
 class CalendarImport
 {
@@ -25,6 +35,18 @@ class CalendarImport
     // 30 s matches the import before 1.1.3; the cap keeps a response within the queue worker's memory.
     private const int EVENTS_TIMEOUT = 30;
     private const int EVENTS_MAX_BYTES = 50 * 1024 * 1024;
+
+    public const int MAX_FILE_OBJECTS = 5000;
+
+    private const string LOCK_KEY = 'calendar-import-lock-';
+    private const int LOCK_TTL = 10;
+    // A running import that has saved no progress for this long has lost its worker. Both imports save after
+    // every event; the longest gap is one CalDAV REPORT (EVENTS_TIMEOUT), so only a job still waiting in the
+    // queue can be mistaken for a dead one.
+    private const int STALE_AFTER = 300;
+    private const string FILE_DISK = 'local';
+    private const string FILE_DIRECTORY = 'calendar-imports';
+    private const string UNREADABLE_FILE_MESSAGE = 'This file could not be read as an iCalendar file.';
 
     private Calendars $calendars;
     private ICalendarHelper $helper;
@@ -49,12 +71,24 @@ class CalendarImport
         // The state sits in the cache for the queued import; never in plaintext.
         $dto->secret = Crypt::encryptString($secret);
 
-        $this->saveState($user->id, $dto);
+        $this->claim($user->id, $dto);
         $this->getAvailableCalendars($user, $dto);
     }
 
+    /**
+     * @throws ImportException
+     * @throws ImportConflictException
+     */
     public function selectCalendars(User $user, CalendarImportDTO $dto, array $calendars): void
     {
+        if ($dto->source !== 'caldav') {
+            throw new ImportException('Import state not found');
+        }
+
+        if ($this->isRunning($dto)) {
+            throw new ImportConflictException('A calendar import is already running.');
+        }
+
         $dto->selectedCalendars = [];
 
         foreach ($dto->calendars as $calendar) {
@@ -131,35 +165,134 @@ class CalendarImport
             $dto->currentCalendar = $calendar['name'];
             $dto->eventsCount = 0;
             $dto->eventsDone = 0;
+            $dto->eventsSkipped = 0;
             $this->saveState($user->id, $dto);
 
-            $events = $this->getEvents($dto, $calendar['url'], $calendar['name']);
-            $dto->eventsCount = count($events);
+            $objects = $this->getEvents($dto, $calendar['url']);
+            $dto->eventsCount = count($objects);
             $this->saveState($user->id, $dto);
 
-            foreach ($events as $event) {
-                $dto->currentCalendar = $calendar['name'];
-                $this->saveState($user->id, $dto);
-
-                try {
-                    $this->calendars->events()->create($c, EventDTO::fromImport($event, $c));
-                } catch (\Exception $e) {
-                    Log::channel('dav')->warning('Calendar import skipped an event', [
-                        'user_id'  => $user->id,
-                        'calendar' => $calendar['name'],
-                        'event'    => $event['uid'] ?? null,
-                        'error'    => $e->getMessage(),
-                    ]);
-                    continue;
+            foreach ($objects as $object) {
+                if ($object && $this->storeObject($user, $c, $object)) {
+                    $dto->eventsDone++;
+                } else {
+                    $dto->eventsSkipped++;
                 }
 
-                $dto->eventsDone++;
                 $this->saveState($user->id, $dto);
             }
         }
 
         $dto->stage = 'finished';
         $this->saveState($user->id, $dto);
+    }
+
+    /**
+     * @throws ImportFileException
+     * @throws ImportConflictException
+     */
+    public function startFile(User $user, UploadedFile $file, ?CalendarDTO $target, ?string $name, ?string $color): CalendarImportDTO
+    {
+        $content = (string) $file->get();
+        [$objects, $fileCalendarName] = $this->splitFile($content);
+
+        $dto = new CalendarImportDTO();
+        $dto->jobId = (string) Str::uuid();
+        $dto->userEmail = $user->email;
+        $dto->source = 'file';
+        $dto->eventsCount = count($objects);
+
+        if ($target) {
+            $dto->targetInstanceId = $target->instanceId;
+            $dto->currentCalendar = $target->displayName;
+            $dto->stage = 'events';
+        } else {
+            $calendarName = $this->uniqueName($user, $name ?: $fileCalendarName ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME) ?: 'Imported');
+            $dto->selectedCalendars = [['name' => $calendarName, 'color' => $color]];
+            $dto->currentCalendar = $calendarName;
+            $dto->calendarsCount = 1;
+            $dto->stage = 'calendars';
+        }
+
+        Storage::disk(self::FILE_DISK)->put($this->filePath($dto->jobId), $content);
+
+        try {
+            $this->claim($user->id, $dto);
+        } catch (ImportConflictException $e) {
+            $this->deleteFile($dto->jobId);
+
+            throw $e;
+        }
+
+        return $dto;
+    }
+
+    // A job that waited in the queue past STALE_AFTER may find a newer import's state; the job id keeps it off.
+    /**
+     * @throws ImportFileException
+     */
+    public function importFile(string $userId, string $jobId): void
+    {
+        $user = User::find($userId);
+        $dto = $this->getState($userId);
+
+        if (!$user || !$dto || $dto->jobId !== $jobId || !in_array($dto->stage, ['calendars', 'events'], true)) {
+            $this->deleteFile($jobId);
+
+            return;
+        }
+
+        try {
+            $content = Storage::disk(self::FILE_DISK)->get($this->filePath($jobId));
+            [$objects] = $this->splitFile($content ?? throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE));
+
+            if ($dto->targetInstanceId === null) {
+                $dto->targetInstanceId = $this->calendars->create($user, CalendarDTO::fromRequest($dto->selectedCalendars[0]))->instanceId;
+                $dto->calendarsDone = 1;
+            }
+
+            $calendar = $this->calendars->get($user, $dto->targetInstanceId);
+
+            if (!$calendar || $calendar->isShared || $calendar->isExternal) {
+                throw new ImportFileException('The calendar to import into is not available.');
+            }
+
+            $dto->stage = 'events';
+            $this->saveState($userId, $dto);
+
+            foreach ($objects as $object) {
+                if ($this->storeObject($user, $calendar, $object)) {
+                    $dto->eventsDone++;
+                } else {
+                    $dto->eventsSkipped++;
+                }
+
+                $this->saveState($userId, $dto);
+            }
+
+            $dto->stage = 'finished';
+            $this->saveState($userId, $dto);
+
+            if ($calendar->solytoShared) {
+                InvalidateSharedCalendarCache::dispatch($calendar->calendarId);
+            }
+        } finally {
+            $this->deleteFile($jobId);
+            $this->clearCache($user);
+        }
+    }
+
+    public function fail(string $userId, string $jobId): void
+    {
+        $this->deleteFile($jobId);
+        $dto = $this->getState($userId);
+
+        if (!$dto || $dto->jobId !== $jobId) {
+            return;
+        }
+
+        $dto->stage = 'failed';
+        $this->saveState($userId, $dto);
     }
 
     public function clearCache(User $user): void
@@ -202,7 +335,10 @@ class CalendarImport
         return new ImportException('Could not grab calendars');
     }
 
-    private function getEvents(CalendarImportDTO $dto, string $calendarUrl, string $calendarName): array
+    // One entry per object stored on the remote, split per UID; null stands for an entry that can't be read, so it
+    // is counted as skipped.
+    /** @return array<int, ?VCalendar> */
+    private function getEvents(CalendarImportDTO $dto, string $calendarUrl): array
     {
         try {
             $response = $this->remote->send(
@@ -227,7 +363,19 @@ class CalendarImport
             return [];
         }
 
-        return $this->helper->parseEntriesFromXml($response->body(), $calendarName);
+        $objects = [];
+
+        foreach ($this->helper->calendarDataFromXml($response->body()) as $data) {
+            try {
+                $vCal = Reader::read($data, Reader::OPTION_FORGIVING);
+            } catch (ParseException|InvalidDataException) {
+                $vCal = null;
+            }
+
+            array_push($objects, ...($vCal instanceof VCalendar ? $this->splitCalendar($vCal) : [null]));
+        }
+
+        return $objects;
     }
 
     private function logUnreadable(string $calendarUrl, ?int $status): void
@@ -238,8 +386,175 @@ class CalendarImport
         ]);
     }
 
+    /**
+     * @return array{0: array<int, VCalendar>, 1: ?string}
+     *
+     * @throws ImportFileException
+     */
+    private function splitFile(string $content): array
+    {
+        try {
+            $vCal = Reader::read($content, Reader::OPTION_FORGIVING);
+        } catch (ParseException|InvalidDataException) {
+            throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE);
+        }
+
+        if (!$vCal instanceof VCalendar) {
+            throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE);
+        }
+
+        $objects = $this->splitCalendar($vCal);
+
+        if (!array_filter($objects, fn (VCalendar $object) => isset($object->VEVENT))) {
+            throw new ImportFileException('This file contains no events.');
+        }
+
+        if (count($objects) > self::MAX_FILE_OBJECTS) {
+            throw new ImportFileException(sprintf('This file contains more than %d events.', self::MAX_FILE_OBJECTS));
+        }
+
+        $calendarName = trim((string) $vCal->{'X-WR-CALNAME'});
+        $vCal->destroy();
+
+        return [$objects, $calendarName !== '' ? $calendarName : null];
+    }
+
+    // Same UID grouping as Sabre\VObject\Splitter\ICalendar, but a missing UID gets a UUID: the splitter's
+    // sha1(microtime()) can repeat within one file and merge unrelated events into one object. Calendar-level
+    // properties such as METHOD stay behind; a CalDAV object must not carry them.
+    /** @return array<int, VCalendar> */
+    private function splitCalendar(VCalendar $vCal): array
+    {
+        $timezones = [];
+        $objects = [];
+
+        foreach ($vCal->getComponents() as $component) {
+            if ($component->name === 'VTIMEZONE') {
+                $timezones[] = $component;
+                continue;
+            }
+
+            $uid = (string) $component->UID;
+
+            if ($uid === '') {
+                $uid = (string) Str::uuid();
+                $component->UID = $uid;
+            }
+
+            $objects[$uid] ??= new VCalendar();
+            $objects[$uid]->add(clone $component);
+        }
+
+        foreach ($objects as $object) {
+            foreach ($timezones as $timezone) {
+                $object->add(clone $timezone);
+            }
+        }
+
+        return array_values($objects);
+    }
+
+    // Checked like a CalDAV client's PUT (Sabre\CalDAV\Plugin::validateICalendar), so the import stores
+    // nothing a sync client could not have written.
+    private function storeObject(User $user, CalendarDTO $calendar, VCalendar $object): bool
+    {
+        if (!isset($object->VEVENT)) {
+            return false;
+        }
+
+        $uid = (string) $object->VEVENT->UID;
+
+        foreach ($object->VEVENT as $event) {
+            if (!isset($event->DTSTART)) {
+                $this->logSkippedEvent($user, $uid, 'No DTSTART');
+
+                return false;
+            }
+        }
+
+        foreach ($object->validate(Node::PROFILE_CALDAV | Node::REPAIR) as $message) {
+            if ($message['level'] >= 3) {
+                $this->logSkippedEvent($user, $uid, $message['message']);
+
+                return false;
+            }
+        }
+
+        // The backend raises whatever sabre or the database throws for one bad object; it must not end the import.
+        try {
+            return $this->calendars->events()->import($calendar, $object->serialize()) !== null;
+        } catch (\Exception $e) {
+            $this->logSkippedEvent($user, $uid, $e->getMessage());
+
+            return false;
+        }
+    }
+
+    private function logSkippedEvent(User $user, string $uid, string $error): void
+    {
+        Log::channel('dav')->warning('Calendar file import skipped an event', [
+            'user_id' => $user->id,
+            'event'   => $uid,
+            'error'   => $error,
+        ]);
+    }
+
+    private function uniqueName(User $user, string $name): string
+    {
+        $name = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH);
+        $candidate = $name;
+        $i = 1;
+
+        while ($this->calendars->getByName($user, $candidate)) {
+            $suffix = ' (' . $i++ . ')';
+            $candidate = mb_substr($name, 0, CalendarService::MAX_NAME_LENGTH - mb_strlen($suffix)) . $suffix;
+        }
+
+        return $candidate;
+    }
+
+    private function filePath(string $jobId): string
+    {
+        return self::FILE_DIRECTORY . '/' . $jobId . '.ics';
+    }
+
+    private function deleteFile(string $jobId): void
+    {
+        Storage::disk(self::FILE_DISK)->delete($this->filePath($jobId));
+    }
+
+    private function isRunning(?CalendarImportDTO $dto): bool
+    {
+        return in_array($dto?->stage, ['calendars', 'events'], true)
+            && ($dto->updatedAt === null || $dto->updatedAt > now()->getTimestamp() - self::STALE_AFTER);
+    }
+
+    // The lock keeps two requests from both passing the running check before either saves.
+    /**
+     * @throws ImportConflictException
+     */
+    private function claim(string $userId, CalendarImportDTO $dto): void
+    {
+        $lock = Cache::lock(self::LOCK_KEY . $userId, self::LOCK_TTL);
+
+        if (!$lock->get()) {
+            throw new ImportConflictException('A calendar import is already running.');
+        }
+
+        try {
+            if ($this->isRunning($this->getState($userId))) {
+                throw new ImportConflictException('A calendar import is already running.');
+            }
+
+            $this->saveState($userId, $dto);
+        } finally {
+            $lock->release();
+        }
+    }
+
     private function saveState(string $userId, CalendarImportDTO $dto): void
     {
+        $dto->updatedAt = now()->getTimestamp();
         Cache::set('calendar-import-' . $userId, $dto, now()->addMinutes(60));
     }
 
@@ -253,7 +568,9 @@ class CalendarImport
         }
 
         try {
-            Crypt::decryptString($dto->secret);
+            if ($dto->secret !== null) {
+                Crypt::decryptString($dto->secret);
+            }
         } catch (DecryptException) {
             Cache::forget('calendar-import-' . $userId);
 

@@ -10,13 +10,15 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @OA\Schema(
  *     schema="CalendarImportState",
  *
- *     @OA\Property(property="stage", type="string"),
+ *     @OA\Property(property="stage", type="string", enum={"started", "select", "calendars", "events", "finished", "failed"}, description="failed: only a file import"),
+ *     @OA\Property(property="source", type="string", enum={"caldav", "file"}),
  *     @OA\Property(property="calendars", type="array", @OA\Items(type="string"), nullable=true),
  *     @OA\Property(property="calendars_count", type="integer"),
  *     @OA\Property(property="calendars_done", type="integer"),
  *     @OA\Property(property="calendars_current", type="string", nullable=true),
  *     @OA\Property(property="events_count", type="integer"),
- *     @OA\Property(property="events_done", type="integer")
+ *     @OA\Property(property="events_done", type="integer"),
+ *     @OA\Property(property="events_skipped", type="integer")
  * )
  *
  * @mixin CalendarImportDTO
@@ -27,12 +29,14 @@ class ImportStateResource extends JsonResource
     {
         return [
             'stage' => $this->stage,
+            'source' => $this->source,
             'calendars' => $this->calendars ? array_map(fn ($c) => $c['name'], $this->calendars) : null,
             'calendars_count' => $this->calendarsCount,
             'calendars_done' => $this->calendarsDone,
             'calendars_current' => $this->currentCalendar,
             'events_count' => $this->eventsCount,
             'events_done' => $this->eventsDone,
+            'events_skipped' => $this->eventsSkipped,
         ];
     }
 }
