@@ -132,6 +132,24 @@ class AppContactsPDO extends SabrePDO
         return $contacts;
     }
 
+    // For the export: one card at a time, photos included, with the stored card kept as it is.
+    public function getStoredContactsCustom(AddressBookDTO $addressBook): \Generator
+    {
+        $stmt = $this->pdo->prepare('SELECT id, uri, carddata FROM '.$this->cardsTableName.' WHERE addressbookid = ?');
+        $stmt->execute([$addressBook->id]);
+
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            if (is_resource($row['carddata'])) {
+                $row['carddata'] = stream_get_contents($row['carddata']);
+            }
+
+            $contact = ContactDTO::fromSabre($row, $addressBook);
+            $contact->storedData = $row['carddata'] ?: null;
+
+            yield $contact;
+        }
+    }
+
     public function getContactCustom(AddressBookDTO $addressBook, string $cardUri): ?ContactDTO
     {
         $card = parent::getCard($addressBook->id, $cardUri);

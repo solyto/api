@@ -13,6 +13,9 @@ class ContactDTO
     // on LF-normalized input. Possessive so a 200 KB photo does not backtrack.
     private const string PHOTO_PROPERTY_PATTERN = '/^(?:[A-Za-z0-9-]+\\.)?PHOTO[;:][^\\n]*+(?:\\n[ \\t][^\\n]*+)*+\\n?/mi';
 
+    // Set only by the export read (AppContactsPDO::getStoredContactsCustom()); listings and caches never carry it.
+    public ?string $storedData = null;
+
     public function __construct(
         public ?string $uid,
         public string $firstName,

@@ -21,6 +21,11 @@ class Contacts
         return $this->backend->getContactsCustom($addressBook);
     }
 
+    public function listStored(AddressBookDTO $addressBook): \Generator
+    {
+        return $this->backend->getStoredContactsCustom($addressBook);
+    }
+
     public function get(AddressBookDTO $addressBook, string $uri): ?ContactDTO
     {
         return $this->backend->getContactCustom($addressBook, $uri);
