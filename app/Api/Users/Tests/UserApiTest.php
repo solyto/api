@@ -489,6 +489,37 @@ describe('User settings endpoints', function () {
             ->assertJsonPath('data.settings.week_start', 'monday');
     });
 
+    it('updates currency', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/users/me/settings/currency', ['currency' => 'USD'])
+            ->assertStatus(200);
+
+        expect($user->fresh()->settings->currency)->toBe('USD');
+    });
+
+    it('rejects an invalid currency', function () {
+        $user = makeUser();
+        $user->settings()->update(['currency' => 'GBP']);
+
+        $response = $this->actingAs($user, 'sanctum')->putJson('/api/v1/users/me/settings/currency', ['currency' => 'MXN']);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors('currency');
+
+        expect($user->fresh()->settings->currency)->toBe('GBP');
+    });
+
+    it('returns eur as the default currency', function () {
+        $user = makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/users/me')
+            ->assertStatus(200)
+            ->assertJsonPath('data.settings.currency', 'EUR');
+    });
+
     it('updates weather city', function () {
         $user = makeUser();
 

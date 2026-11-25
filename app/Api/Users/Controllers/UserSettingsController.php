@@ -6,6 +6,7 @@ use App\Api\ApiResponse;
 use App\Api\CheckIn\Requests\UpdateCheckInSettingsRequest;
 use App\Api\CheckIn\Resources\CheckInSettingsResource;
 use App\Api\Users\Requests\UpdateCheckInCalendarMarkRequest;
+use App\Api\Users\Requests\UpdateCurrencyRequest;
 use App\Api\Users\Requests\UpdateDateFormatRequest;
 use App\Api\Users\Requests\UpdateJournalCalendarMarkRequest;
 use App\Api\Users\Requests\UpdateJournalRequest;
@@ -252,6 +253,43 @@ class UserSettingsController
         $this->userSettingsService->updateWeekStart($request->user(), $request->validated('week_start'));
 
         return ApiResponse::success(null, 'Week start updated successfully.');
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/users/me/settings/currency",
+     *     operationId="userSettingsUpdateCurrency",
+     *     summary="Update currency setting",
+     *     tags={"User Settings"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"currency"},
+     *
+     *             @OA\Property(property="currency", type="string", enum={"EUR","USD","GBP","CHF","CAD","AUD","RUB"})
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Currency updated successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", nullable=true)
+     *         )
+     *     )
+     * )
+     */
+    public function updateCurrency(UpdateCurrencyRequest $request): JsonResponse
+    {
+        $this->userSettingsService->updateCurrency($request->user(), $request->validated('currency'));
+
+        return ApiResponse::success(null, 'Currency updated successfully.');
     }
 
     /**

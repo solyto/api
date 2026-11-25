@@ -73,6 +73,11 @@ class UserSettingsService
         $user->settings()->update(['week_start' => $weekStart]);
     }
 
+    public function updateCurrency(User $user, string $currency): void
+    {
+        $user->settings()->update(['currency' => $currency]);
+    }
+
     public function updateWeatherCity(User $user, array $data): void
     {
         $user->settings()->update([

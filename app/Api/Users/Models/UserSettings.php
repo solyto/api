@@ -25,6 +25,7 @@ class UserSettings extends Model
         'date_format',
         'time_format',
         'week_start',
+        'currency',
         'language',
         'first_visit',
         'check_in_settings',
