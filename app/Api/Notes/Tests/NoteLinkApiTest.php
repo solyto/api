@@ -129,6 +129,31 @@ describe('Note links on save', function () {
         expect(linkedIds(Note::find($source)))->toBe(collect([$valid->id, $query->id])->sort()->values()->all());
     });
 
+    it('counts links with a trailing slash, a query or a fragment', function () {
+        $user = makeUser();
+        $slash = Note::factory()->forUser($user)->create();
+        $slashFragment = Note::factory()->forUser($user)->create();
+        $slashQuery = Note::factory()->forUser($user)->create();
+        $fragment = Note::factory()->forUser($user)->create();
+        $markdown = Note::factory()->forUser($user)->create();
+        $doubleSlash = Note::factory()->forUser($user)->create();
+
+        $content = '<a href="/notes/'.$slash->id.'/">a</a>'
+            .'<a href="/notes/'.$slashFragment->id.'/#heading">b</a>'
+            .'<a href="https://solyto.example.org/notes/'.$slashQuery->id.'/?x=1">c</a>'
+            .'<a href="/notes/'.$fragment->id.'#heading">d</a>'
+            ."\n[md](/notes/{$markdown->id}/)"
+            .'<a href="/notes/'.$doubleSlash->id.'//">e</a>';
+
+        $source = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Source', 'content' => $content])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(linkedIds(Note::find($source)))
+            ->toBe(collect([$slash->id, $slashFragment->id, $slashQuery->id, $fragment->id, $markdown->id])->sort()->values()->all());
+    });
+
     it('drops the link row but keeps the source text when the target is deleted', function () {
         $user = makeUser();
         $target = Note::factory()->forUser($user)->create();

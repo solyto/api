@@ -31,12 +31,16 @@ class ContactExportService
         }
     }
 
+    // The stored text is written as it is: re-serialising through sabre escapes commas in URI values (a vCard 4
+    // PHOTO data URI, URL), and for URL that backslash is never unescaped again.
     private function serialize(ContactDTO $contact): string
     {
         try {
             $vcard = $contact->storedData ? Reader::read($contact->storedData) : null;
             if ($vcard instanceof VCard) {
-                return $vcard->serialize();
+                $vcard->destroy();
+
+                return preg_replace('/\r\n|\r|\n/', "\r\n", rtrim($contact->storedData, "\r\n"))."\r\n";
             }
         } catch (\Throwable) {
             // Unreadable stored card: rebuilt from the contact below.

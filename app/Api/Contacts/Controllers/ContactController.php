@@ -114,7 +114,7 @@ class ContactController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="color", type="string", maxLength=255, example="#FF5733")
+     *             @OA\Property(property="color", type="string", pattern="^(#[0-9A-Fa-f]{6}|var\(--color-c-neutral-2\))$", description="Hex colour; the CSS variable is what app builds up to 1.1.4 send for an address book without a colour and changes nothing", example="#FF5733")
      *         )
      *     ),
      *
@@ -138,8 +138,7 @@ class ContactController
     {
         $addressBook = $this->contactService->getAddressBookOrFail($request->user(), $addressBookId);
 
-        $addressBook->color = $request->validated('color');
-        $this->contactService->updateAddressBook($request->user(), $addressBook);
+        $addressBook = $this->contactService->updateAddressBookColor($request->user(), $addressBook, $request->validated('color'));
 
         return ApiResponse::success(new AddressBookResource($addressBook), 'Address book updated successfully.');
     }

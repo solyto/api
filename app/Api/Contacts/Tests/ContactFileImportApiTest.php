@@ -3,10 +3,12 @@
 use App\Api\Contacts\Jobs\ImportContactsFile;
 use App\Api\Export\Services\ContactExportService;
 use App\Api\Users\Models\User;
+use App\Dav\DTOs\AddressBookImportDTO;
 use App\Dav\Exceptions\ImportFileException;
 use App\Dav\Services\ContactImport;
 use App\Dav\Services\DavService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -287,6 +289,42 @@ describe('Contacts file import card checks', function () {
         $stored = cardsByName(addressBookNamed($this, $user, 'apple-export')['id']);
         expect(Reader::read($stored['Dr. Jürgen Müller'])->PHOTO)->not->toBeNull();
     });
+
+    it('passes every imported card through the photo processor', function () {
+        $user = makeUser();
+        $spy = photoProcessorSpy();
+
+        importVcf($this, $user, vcfFile([davVcard('a', 'Jane Doe'), davVcard('b', 'John Doe')]))->assertStatus(200);
+
+        expect($spy->cards)->toHaveCount(2)
+            ->and($spy->cards[0])->toContain('FN:Jane Doe')
+            ->and($spy->cards[1])->toContain('FN:John Doe');
+    });
+
+    it('stores a card that needs no change as written, commas in URI values included', function () {
+        $user = makeUser();
+        photoProcessorSpy();
+        $card = davVcard4('v4', 'Jane Comma', ['PHOTO:data:image/png;base64,iVBORw0KGgo=', 'URL:https://example.org/a,b']);
+
+        importVcf($this, $user, vcfFile([$card]))->assertStatus(200);
+
+        $stored = storedCards(addressBookNamed($this, $user, 'friends')['id']);
+        expect($stored)->toBe([$card])
+            ->and((string) Reader::read($stored[0])->URL)->toBe('https://example.org/a,b');
+    });
+
+    it('re-serialises a card it had to change', function () {
+        $user = makeUser();
+        photoProcessorSpy();
+        $card = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:No Uid\r\nURL:https://example.org/a,b\r\nEND:VCARD\r\n";
+
+        importVcf($this, $user, vcfFile([$card]))->assertStatus(200);
+
+        $stored = storedCards(addressBookNamed($this, $user, 'friends')['id']);
+        expect($stored)->toHaveCount(1)
+            ->and($stored[0])->not->toBe($card)
+            ->and((string) Reader::read($stored[0])->UID)->not->toBe('');
+    });
 });
 
 describe('Contacts file import from other apps', function () {
@@ -400,6 +438,18 @@ describe('Contacts file import while another import runs', function () {
         $this->travel(6)->minutes();
 
         expectApiSuccess(importVcf($this, $user, vcfFile([davVcard('b')], 'other.vcf')), 200);
+    });
+
+    it('does not count a state saved before import progress was timestamped as running', function () {
+        $user = makeUser();
+        Cache::set('contact-import-'.$user->id, tap(new AddressBookImportDTO(), function ($dto) use ($user) {
+            $dto->jobId = 'old-job';
+            $dto->userEmail = $user->email;
+            $dto->source = 'file';
+            $dto->stage = 'contacts';
+        }));
+
+        expectApiSuccess(importVcf($this, $user, vcfFile([davVcard('a')])), 200);
     });
 
     it('does not count a finished import as running', function () {

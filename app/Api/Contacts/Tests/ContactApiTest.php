@@ -1,5 +1,6 @@
 <?php
 
+use App\Api\Contacts\Services\ContactService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -58,6 +59,21 @@ describe('Address books (DAV-backed)', function () {
             ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#FF0000AA'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('color');
+    });
+
+    // App builds up to 1.1.4 send this for an address book without a colour on every click outside its row.
+    it('accepts the old builds\' no-colour value and keeps the colour', function () {
+        $user = makeUser();
+
+        $addressBookId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
+            ->json('data.id');
+        $before = collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/address-books')->json('data'))->firstWhere('id', $addressBookId)['color'];
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => ContactService::LEGACY_NO_COLOR]), 200);
+
+        expect(collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/address-books')->json('data'))->firstWhere('id', $addressBookId)['color'])->toBe($before);
     });
 
     it('caps a generated address book uri and keeps it unique', function () {

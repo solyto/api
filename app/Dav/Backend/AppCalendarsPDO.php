@@ -468,7 +468,8 @@ SQL
         return CalendarDTO::fromSabre($calendar);
     }
 
-    public function createCalendarCustom(string $principalUri, CalendarDTO $dto)
+    /** @return array{0: string, 1: string} [calendarId, instanceId], as sabre returns them */
+    public function createCalendarCustom(string $principalUri, CalendarDTO $dto): array
     {
         $calendar = [
             '{DAV:}displayname'  => $dto->displayName,
@@ -480,7 +481,7 @@ SQL
             'timezone' => $dto->timezone,
         ];
 
-        parent::createCalendar($principalUri, $this->uniqueUri($principalUri, $dto->displayName), $calendar);
+        return parent::createCalendar($principalUri, $this->uniqueUri($principalUri, $dto->displayName), $calendar);
     }
 
     // (principaluri, uri) is unique, but different display names can slug alike ("Work" and "work!") or to nothing
@@ -571,6 +572,15 @@ SQL
         }
 
         return $events;
+    }
+
+    /** @return array<int, string> */
+    public function getObjectUidsCustom(CalendarDTO $calendar): array
+    {
+        $stmt = $this->pdo->prepare('SELECT uid FROM '.$this->calendarObjectTableName.' WHERE calendarid = ? AND uid IS NOT NULL');
+        $stmt->execute([$calendar->calendarId]);
+
+        return array_map('strval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
     // Floating all-day dates pad the bounds by a day; the caller's occurrence loop is the exact filter.

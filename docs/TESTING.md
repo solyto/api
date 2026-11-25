@@ -82,7 +82,8 @@ ask for it.
 | `storeEvent($this, $user, $payload)`, `storeDayEvents($this, $user, $timezone)` | events through the API in the user's default calendar; `storeDayEvents` is today's timed, all-day and recurring event plus one tomorrow |
 | `builtInTracker($user, $key)`, `ownTracker($user, $type)` | check-in trackers |
 | `enableMcp()`, `mcpAdmin()` | MCP tests: load `laravel/mcp` as `MCP_ENABLED` does; an admin (MCP is admin-only) |
-| `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()`, `davSeriesWithOverride()`, `externalCalendar()` | DAV protocol tests, see [DAV tests](#dav-tests) |
+| `davUser()`, `davRequest()`, `davXpath()`, `davPropfindBody()`, `davIcs()`, `davVcard()`, `davVcard4()`, `davSeriesWithOverride()`, `externalCalendar()` | DAV protocol tests, see [DAV tests](#dav-tests) |
+| `photoProcessorSpy()` | binds a `VCardPhotoProcessor` that records each card it gets (`->cards`) and returns it unchanged; for "goes through the photo processor" and for cards whose photo the no-op image double would rewrite (vCard 4 data URIs) |
 
 A helper that a second test file needs moves to `tests/Pest.php` and gets a
 row here. The one custom expectation is `toBeEmail`.

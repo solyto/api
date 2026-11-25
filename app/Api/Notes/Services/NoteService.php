@@ -25,8 +25,9 @@ class NoteService
     private const int CACHE_TTL = 86400;
 
     // Matches relative and absolute links in both HTML (href) and older Markdown content, but only when the
-    // uuid is the whole /notes path segment (as the app's NoteLinkService requires).
-    private const string LINK_PATTERN = '~(?:^|[\s"\'<>(=\[])(?:[a-z][a-z\d+.-]*://[^/\s"\'<>]+)?/notes/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=[\s"\'<>)\]]|/?$|[?#])~i';
+    // uuid is the whole /notes path segment, optionally followed by one slash, a query or a fragment (as the
+    // app's NoteLinkService requires).
+    private const string LINK_PATTERN = '~(?:^|[\s"\'<>(=\[])(?:[a-z][a-z\d+.-]*://[^/\s"\'<>]+)?/notes/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=/?(?:[\s"\'<>)\]?#]|$))~i';
 
     public function __construct(private readonly UserCacheService $cache) {}
 

@@ -136,7 +136,7 @@ class ImportController
      *                 @OA\Property(property="file", type="string", format="binary", description="iCalendar file (.ics), at most 10 MB and 5000 events"),
      *                 @OA\Property(property="calendar_id", type="integer", nullable=true, description="Own calendar to import into; without it a new calendar is created"),
      *                 @OA\Property(property="name", type="string", maxLength=100, nullable=true, description="New calendar only; defaults to the file's X-WR-CALNAME, then the file name"),
-     *                 @OA\Property(property="color", type="string", maxLength=255, nullable=true, description="New calendar only", example="#0088CC")
+     *                 @OA\Property(property="color", type="string", pattern="^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", nullable=true, description="New calendar only", example="#0088CC")
      *             )
      *         )
      *     ),
@@ -170,7 +170,6 @@ class ImportController
     {
         $calendarId = $request->validated('calendar_id');
         $calendar = $calendarId !== null ? $this->calendarService->getOrFail($request->user(), (int) $calendarId) : null;
-        abort_if($calendar && ($calendar->isShared || $calendar->isExternal), 403, 'You can only import into your own calendars.');
 
         $dto = $this->dav->import()->calendars()->startFile(
             $request->user(),

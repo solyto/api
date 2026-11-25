@@ -11,6 +11,7 @@ use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\ImportConflictException;
 use App\Dav\Exceptions\ImportException;
 use App\Dav\Exceptions\ImportFileException;
+use App\Dav\Exceptions\ImportTargetForbiddenException;
 use App\Dav\Helpers\ICalendarHelper;
 use App\Shared\Exceptions\BlockedUrlException;
 use App\Shared\Services\UserCacheService;
@@ -39,6 +40,10 @@ class CalendarImport
     private const int EVENTS_MAX_BYTES = 50 * 1024 * 1024;
 
     public const int MAX_FILE_OBJECTS = 5000;
+    // Every stored event carries its own copy of the time zones it uses (a CalDAV object must be complete), so a
+    // small file with one huge VTIMEZONE used by every event would write gigabytes. 50 MB is 5000 events with a
+    // 10 KB zone each; real zones are a few KB.
+    private const int MAX_TIMEZONE_COPY_BYTES = 50 * 1024 * 1024;
 
     private const string LOCK_KEY = 'calendar-import-lock-';
     private const int LOCK_TTL = 10;
@@ -185,8 +190,8 @@ class CalendarImport
             $dto->eventsCount = count($objects);
             $this->saveState($user->id, $dto);
 
-            foreach ($objects as $object) {
-                if ($object && $this->storeObject($user, $c, $object)) {
+            foreach ($objects as $group) {
+                if ($group && $this->storeGroup($user, $c, $group)) {
                     $dto->eventsDone++;
                     $doneTotal++;
                 } else {
@@ -208,17 +213,24 @@ class CalendarImport
     /**
      * @throws ImportFileException
      * @throws ImportConflictException
+     * @throws ImportTargetForbiddenException
      */
     public function startFile(User $user, UploadedFile $file, ?CalendarDTO $target, ?string $name, ?string $color): CalendarImportDTO
     {
+        if ($target && ($target->isShared || $target->isExternal)) {
+            throw new ImportTargetForbiddenException('You can only import into your own calendars.');
+        }
+
         $content = (string) $file->get();
-        [$objects, $fileCalendarName] = $this->splitFile($content);
+        [$vCal, $groups] = $this->splitFile($content);
+        $fileCalendarName = trim((string) $vCal->{'X-WR-CALNAME'});
+        $vCal->destroy();
 
         $dto = new CalendarImportDTO();
         $dto->jobId = (string) Str::uuid();
         $dto->userEmail = $user->email;
         $dto->source = 'file';
-        $dto->eventsCount = count($objects);
+        $dto->eventsCount = count($groups);
 
         if ($target) {
             $dto->targetInstanceId = $target->instanceId;
@@ -260,11 +272,17 @@ class CalendarImport
             return;
         }
 
+        $vCal = null;
+
         try {
             $content = Storage::disk(self::FILE_DISK)->get($this->filePath($jobId));
-            [$objects] = $this->splitFile($content ?? throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE));
+            [$vCal, $groups] = $this->splitFile($content ?? throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE));
+            unset($content);
 
+            // The name was free at upload; a calendar created since then must not receive the events.
             if ($dto->targetInstanceId === null) {
+                $dto->selectedCalendars[0]['name'] = $this->uniqueName($user, $dto->selectedCalendars[0]['name']);
+                $dto->currentCalendar = $dto->selectedCalendars[0]['name'];
                 $dto->targetInstanceId = $this->calendars->create($user, CalendarDTO::fromRequest($dto->selectedCalendars[0]))->instanceId;
                 $dto->calendarsDone = 1;
             }
@@ -277,14 +295,18 @@ class CalendarImport
 
             $dto->stage = 'events';
             $this->saveState($userId, $dto);
+            $storedUids = array_fill_keys($this->calendars->events()->uids($calendar), true);
 
-            foreach ($objects as $object) {
-                if ($this->storeObject($user, $calendar, $object)) {
+            foreach ($groups as $uid => $group) {
+                if (isset($storedUids[$uid])) {
+                    $dto->eventsSkipped++;
+                } else if ($this->storeGroup($user, $calendar, $group)) {
                     $dto->eventsDone++;
                 } else {
                     $dto->eventsSkipped++;
                 }
 
+                unset($groups[$uid]);
                 $this->saveState($userId, $dto);
             }
 
@@ -295,6 +317,7 @@ class CalendarImport
                 InvalidateSharedCalendarCache::dispatch($calendar->calendarId);
             }
         } finally {
+            $vCal?->destroy();
             $this->deleteFile($jobId);
             $this->clearCache($user);
         }
@@ -359,7 +382,7 @@ class CalendarImport
 
     // One entry per object stored on the remote, split per UID; null stands for an entry that can't be read, so it
     // is counted as skipped.
-    /** @return array<int, ?VCalendar> */
+    /** @return array<int, ?array{components: array<int, Component>, timezones: array<int, Component>}> */
     private function getEvents(CalendarImportDTO $dto, string $calendarUrl): array
     {
         try {
@@ -394,7 +417,7 @@ class CalendarImport
                 $vCal = null;
             }
 
-            array_push($objects, ...($vCal instanceof VCalendar ? $this->splitCalendar($vCal) : [null]));
+            array_push($objects, ...($vCal instanceof VCalendar ? array_values($this->splitCalendar($vCal)) : [null]));
         }
 
         return $objects;
@@ -408,8 +431,9 @@ class CalendarImport
         ]);
     }
 
+    // The groups point into the returned calendar; the caller destroys it once it is done with them.
     /**
-     * @return array{0: array<int, VCalendar>, 1: ?string}
+     * @return array{0: VCalendar, 1: array<string, array{components: array<int, Component>, timezones: array<int, Component>}>}
      *
      * @throws ImportFileException
      */
@@ -425,34 +449,39 @@ class CalendarImport
             throw new ImportFileException(self::UNREADABLE_FILE_MESSAGE);
         }
 
-        $objects = $this->splitCalendar($vCal);
+        try {
+            $groups = $this->splitCalendar($vCal);
 
-        if (!array_filter($objects, fn (VCalendar $object) => isset($object->VEVENT))) {
-            throw new ImportFileException('This file contains no events.');
+            if (!isset($vCal->VEVENT)) {
+                throw new ImportFileException('This file contains no events.');
+            }
+
+            if ($this->timezoneCopyBytes($groups) > self::MAX_TIMEZONE_COPY_BYTES) {
+                throw new ImportFileException('The time zones in this file are too large to import.');
+            }
+        } catch (ImportFileException $e) {
+            $vCal->destroy();
+
+            throw $e;
         }
 
-        if (count($objects) > self::MAX_FILE_OBJECTS) {
-            throw new ImportFileException(sprintf('This file contains more than %d events.', self::MAX_FILE_OBJECTS));
-        }
-
-        $calendarName = trim((string) $vCal->{'X-WR-CALNAME'});
-        $vCal->destroy();
-
-        return [$objects, $calendarName !== '' ? $calendarName : null];
+        return [$vCal, $groups];
     }
 
     // Same UID grouping as Sabre\VObject\Splitter\ICalendar, but a missing UID gets a UUID: the splitter's
     // sha1(microtime()) can repeat within one file and merge unrelated events into one object. Calendar-level
     // properties such as METHOD stay behind; a CalDAV object must not carry them.
+    // A group only points into the parsed calendar; buildObject() copies one group at a time, so a timezone that
+    // many events use is not held once per event.
     /**
-     * @return array<int, VCalendar>
+     * @return array<string, array{components: array<int, Component>, timezones: array<int, Component>}>
      *
      * @throws ImportFileException
      */
     private function splitCalendar(VCalendar $vCal): array
     {
         $timezones = [];
-        $objects = [];
+        $groups = [];
         $usedTimezones = [];
         $count = 0;
 
@@ -473,22 +502,44 @@ class CalendarImport
                 $component->UID = $uid;
             }
 
-            $objects[$uid] ??= new VCalendar();
-            $objects[$uid]->add(clone $component);
+            $groups[$uid]['components'][] = $component;
 
             $usedTimezones[$uid] ??= [];
             $this->collectTimezones($component, $usedTimezones[$uid]);
         }
 
-        foreach ($objects as $uid => $object) {
-            foreach (array_keys($usedTimezones[$uid] ?? []) as $tzid) {
-                if (isset($timezones[$tzid])) {
-                    $object->add(clone $timezones[$tzid]);
-                }
+        foreach ($groups as $uid => $group) {
+            $groups[$uid]['timezones'] = array_values(array_intersect_key($timezones, $usedTimezones[$uid]));
+        }
+
+        return $groups;
+    }
+
+    /** @param array<string, array{components: array<int, Component>, timezones: array<int, Component>}> $groups */
+    private function timezoneCopyBytes(array $groups): int
+    {
+        $sizes = [];
+        $total = 0;
+
+        foreach ($groups as $group) {
+            foreach ($group['timezones'] as $timezone) {
+                $total += $sizes[spl_object_id($timezone)] ??= strlen($timezone->serialize());
             }
         }
 
-        return array_values($objects);
+        return $total;
+    }
+
+    /** @param array{components: array<int, Component>, timezones: array<int, Component>} $group */
+    private function buildObject(array $group): VCalendar
+    {
+        $object = new VCalendar();
+
+        foreach ([...$group['components'], ...$group['timezones']] as $component) {
+            $object->add(clone $component);
+        }
+
+        return $object;
     }
 
     /** @param array<string, true> $tzids */
@@ -502,6 +553,18 @@ class CalendarImport
             } else if ($child instanceof Component) {
                 $this->collectTimezones($child, $tzids);
             }
+        }
+    }
+
+    /** @param array{components: array<int, Component>, timezones: array<int, Component>} $group */
+    private function storeGroup(User $user, CalendarDTO $calendar, array $group): bool
+    {
+        $object = $this->buildObject($group);
+
+        try {
+            return $this->storeObject($user, $calendar, $object);
+        } finally {
+            $object->destroy();
         }
     }
 
@@ -576,8 +639,9 @@ class CalendarImport
 
     private function isRunning(?CalendarImportDTO $dto): bool
     {
+        // A state saved before updatedAt existed is from before a deploy; its worker is gone.
         return in_array($dto?->stage, ['calendars', 'events'], true)
-            && ($dto->updatedAt === null || $dto->updatedAt > now()->getTimestamp() - self::STALE_AFTER);
+            && $dto->updatedAt !== null && $dto->updatedAt > now()->getTimestamp() - self::STALE_AFTER;
     }
 
     // The lock keeps two requests from both passing the running check before either saves.

@@ -118,6 +118,34 @@ describe('Calendar file import', function () {
             ->and(importState($this, $user))->toMatchArray(['stage' => 'finished', 'calendars_count' => 0, 'events_done' => 1]);
     });
 
+    it('skips events whose UID is already in the calendar and counts them as skipped', function () {
+        $user = makeUser();
+        $calendar = $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data')[0];
+        importIcs($this, $user, icsFile([icsEvent('a', 'First'), icsEvent('b')]), ['calendar_id' => $calendar['id']])->assertStatus(200);
+
+        importIcs($this, $user, icsFile([icsEvent('a', 'Second'), icsEvent('c')]), ['calendar_id' => $calendar['id']])->assertStatus(200);
+
+        $objects = storedObjects($user, $calendar['id']);
+        expect($objects)->toHaveCount(3)
+            ->and(collect($objects)->filter(fn (string $object) => str_contains($object, 'SUMMARY:Second')))->toBeEmpty()
+            ->and(importState($this, $user))->toMatchArray(['stage' => 'finished', 'events_count' => 2, 'events_done' => 1, 'events_skipped' => 1]);
+    });
+
+    it('creates its own calendar when the reserved name was taken before the job ran', function () {
+        Queue::fake();
+        $user = makeUser();
+        importIcs($this, $user, icsFile([icsEvent('a')], ['X-WR-CALNAME:Team']))->assertStatus(200);
+        $taken = $this->actingAs($user, 'sanctum')->postJson('/api/v1/calendars', ['name' => 'Team'])->assertStatus(201)->json('data');
+
+        (new ImportCalendarFile($user->id, app(DavService::class)->import()->calendars()->getState($user->id)->jobId))->handle(app(DavService::class));
+
+        $created = calendarNamed($user, 'Team (1)');
+        expect($created)->not->toBeNull()
+            ->and(storedObjects($user, $created['id']))->toHaveCount(1)
+            ->and(storedObjects($user, $taken['id']))->toBe([])
+            ->and(importState($this, $user))->toMatchArray(['stage' => 'finished', 'calendars_current' => 'Team (1)']);
+    });
+
     it('keeps the uploaded file only until the import is done', function () {
         $user = makeUser();
 
@@ -158,6 +186,17 @@ describe('Calendar file import targets', function () {
 
         expectApiError(importIcs($this, $user, icsFile([icsEvent('a')]), ['calendar_id' => $calendar->instanceId]), 403);
     });
+
+    it('explains the refusal and starts no import', function () {
+        $user = makeUser();
+        $calendar = externalCalendar($user, (new FakeCalDavServer())->fake());
+
+        importIcs($this, $user, icsFile([icsEvent('a')]), ['calendar_id' => $calendar->instanceId])
+            ->assertJsonPath('message', 'You can only import into your own calendars.');
+
+        expect(Storage::disk('local')->allFiles())->toBe([]);
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars/import/state')->assertStatus(404);
+    });
 });
 
 describe('Calendar file import validation', function () {
@@ -171,6 +210,26 @@ describe('Calendar file import validation', function () {
             ->assertStatus(422)->assertJsonValidationErrors(['file']);
         importIcs($this, $user, icsFile([icsEvent('a')]), ['calendar_id' => $calendarId, 'name' => 'New'])
             ->assertStatus(422)->assertJsonValidationErrors(['calendar_id']);
+    });
+
+    it('rejects a color that is not #RRGGBB or #RRGGBBAA', function (string $color) {
+        $user = makeUser();
+
+        importIcs($this, $user, icsFile([icsEvent('a')]), ['color' => $color])
+            ->assertStatus(422)->assertJsonValidationErrors(['color']);
+    })->with([
+        'name' => ['red'],
+        'CSS variable' => ['var(--color-c-neutral-2)'],
+        'three digits' => ['#F00'],
+        'style injection' => ['#FF0000;background:url(x)'],
+    ]);
+
+    it('accepts a color with an alpha channel', function () {
+        $user = makeUser();
+
+        expectApiSuccess(importIcs($this, $user, icsFile([icsEvent('a')], ['X-WR-CALNAME:Tinted']), ['color' => '#FF000080']), 200);
+
+        expect(calendarNamed($user, 'Tinted')['color'])->toBe('#FF000080');
     });
 
     it('rejects a file that is not iCalendar', function (string $content) {
@@ -212,6 +271,23 @@ describe('Calendar file import validation', function () {
 
         expect(calendarNamed($user, 'holidays'))->toBeNull();
     });
+
+    it('rejects a small file whose time zone copies would be too large to store', function () {
+        $user = makeUser();
+        $zone = ['BEGIN:VTIMEZONE', 'TZID:Big'];
+        foreach (range(1, 600) as $year) {
+            $zone = [...$zone, 'BEGIN:STANDARD', 'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0100', sprintf('DTSTART:%04d0101T000000', 1400 + $year), 'TZNAME:BIG', 'END:STANDARD'];
+        }
+        $zone[] = 'END:VTIMEZONE';
+        $events = array_map(fn ($i) => icsEvent("e{$i}", start: 'DTSTART;TZID=Big:20301015T100000'), range(1, 1000));
+
+        $response = importIcs($this, $user, icsFile([$zone, ...$events]));
+
+        expectApiError($response, 422);
+        $response->assertJsonPath('message', 'The time zones in this file are too large to import.');
+
+        expect(calendarNamed($user, 'holidays'))->toBeNull();
+    });
 });
 
 describe('Calendar file import fidelity', function () {
@@ -247,6 +323,29 @@ describe('Calendar file import fidelity', function () {
         $standups = collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars/events/2030-10')->json('data'))
             ->filter(fn (array $event) => str_starts_with($event['title'], 'Standup'));
         expect($standups->pluck('title')->filter(fn ($title) => $title === 'Standup (moved)'))->toHaveCount(1);
+    });
+
+    it('gives every event the timezone it uses', function () {
+        $user = makeUser();
+        $berlin = [
+            'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin',
+            'BEGIN:STANDARD', 'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100', 'DTSTART:19701025T030000', 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'END:STANDARD',
+            'END:VTIMEZONE',
+        ];
+        $event = fn (string $uid) => [
+            'BEGIN:VEVENT', "UID:{$uid}", 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=Europe/Berlin:20301014T090000', 'DTEND;TZID=Europe/Berlin:20301014T100000',
+            'SUMMARY:Berlin', 'END:VEVENT',
+        ];
+
+        importIcs($this, $user, icsFile([$berlin, $event('one'), $event('two'), $event('three')], ['X-WR-CALNAME:Shared Zone']))->assertStatus(200);
+
+        $objects = storedObjects($user, calendarNamed($user, 'Shared Zone')['id']);
+        expect($objects)->toHaveCount(3);
+        foreach ($objects as $object) {
+            expect(substr_count($object, 'BEGIN:VTIMEZONE'))->toBe(1)
+                ->and($object)->toContain('TZID:Europe/Berlin');
+        }
     });
 
     it('keeps only the timezones its events use', function () {
@@ -414,6 +513,17 @@ describe('Calendar import concurrency', function () {
         (new ImportCalendars($user->id, 'caldav-job'))->handle(app(DavService::class));
 
         expect(importState($this, $user)['stage'])->toBe('finished');
+    });
+
+    it('does not count a state saved before import progress was timestamped as running', function () {
+        $user = makeUser();
+        Cache::set('calendar-import-'.$user->id, tap(new CalendarImportDTO(), function ($dto) {
+            $dto->jobId = 'old-job';
+            $dto->source = 'file';
+            $dto->stage = 'events';
+        }));
+
+        expectApiSuccess(importIcs($this, $user, icsFile([icsEvent('a')])), 200);
     });
 
     it('does not let a CalDAV import waiting for its selection block a file import', function () {

@@ -136,7 +136,7 @@ class ImportController
      *                 @OA\Property(property="file", type="string", format="binary", description="vCard file (.vcf), at most 25 MB and 10000 contacts"),
      *                 @OA\Property(property="address_book_id", type="integer", nullable=true, description="Own address book to import into; without it a new address book is created"),
      *                 @OA\Property(property="name", type="string", maxLength=255, nullable=true, description="New address book only; defaults to the file name"),
-     *                 @OA\Property(property="color", type="string", maxLength=255, nullable=true, description="New address book only", example="#0088CC")
+     *                 @OA\Property(property="color", type="string", pattern="^#[0-9A-Fa-f]{6}$", nullable=true, description="New address book only", example="#0088CC")
      *             )
      *         )
      *     ),

@@ -40,6 +40,12 @@ class Events
         return $uri ? $this->backend->getEventByUriCustom($calendar, $uri) : null;
     }
 
+    /** @return array<int, string> */
+    public function uids(CalendarDTO $calendar): array
+    {
+        return $this->backend->getObjectUidsCustom($calendar);
+    }
+
     public function import(CalendarDTO $calendar, string $vCal): ?string
     {
         return $this->backend->importEventCustom($calendar, $vCal);

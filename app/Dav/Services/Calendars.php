@@ -47,9 +47,9 @@ class Calendars
 
     public function create(User $user, CalendarDTO $dto): CalendarDTO
     {
-        $this->backend->createCalendarCustom(DavHelper::getPrincipalUri($user), $dto);
+        [, $instanceId] = $this->backend->createCalendarCustom(DavHelper::getPrincipalUri($user), $dto);
 
-        return $this->getByName($user, $dto->displayName);
+        return $this->get($user, (int) $instanceId);
     }
 
     public function createDefaultCalendar(User $user): CalendarDTO

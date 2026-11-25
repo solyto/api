@@ -16,6 +16,7 @@ use App\Dav\Exceptions\ExternalCalendarUnavailableException;
 use App\Dav\Exceptions\ImportConflictException;
 use App\Dav\Exceptions\ImportException;
 use App\Dav\Exceptions\ImportFileException;
+use App\Dav\Exceptions\ImportTargetForbiddenException;
 use App\Dav\Exceptions\UnreadableCalendarObjectException;
 use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Middleware\RecordClientVersion;
@@ -71,6 +72,7 @@ return Application::configure(basePath: dirname(__DIR__))
                   ImportException::class,
                   ImportConflictException::class,
                   ImportFileException::class,
+                  ImportTargetForbiddenException::class,
                   UnreadableCalendarObjectException::class,
                   LimitReachedException::class,
                   BuiltInTrackerException::class,
@@ -161,6 +163,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                   if ($e instanceof ImportFileException) {
                       return ApiResponse::error($e->getMessage(), 422);
+                  }
+
+                  if ($e instanceof ImportTargetForbiddenException) {
+                      return ApiResponse::error($e->getMessage(), 403);
                   }
 
                   if ($e instanceof UnreadableCalendarObjectException) {

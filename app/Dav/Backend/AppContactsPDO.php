@@ -194,7 +194,7 @@ class AppContactsPDO extends SabrePDO
     {
         $cardUri = bin2hex(Str::random(16)) . '.vcf';
 
-        parent::createCard($addressBook->id, $cardUri, $cardData);
+        $this->createCard($addressBook->id, $cardUri, $cardData);
 
         return $cardUri;
     }

@@ -8,6 +8,8 @@ use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\Factories\DavServerFactory;
 use App\Dav\Services\DavService;
+use App\Dav\Services\VCardPhotoProcessor;
+use App\Shared\Services\Images\ImageTransformationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Mcp\Server\McpServiceProvider;
 use Sabre\HTTP\Request as SabreRequest;
@@ -168,6 +170,34 @@ function davVcard(string $uid, string $fullName = 'Jane Doe', array $extra = [])
     $lines = ['BEGIN:VCARD', 'VERSION:3.0', "UID:{$uid}", "FN:{$fullName}", 'N:Doe;Jane;;;', ...$extra, 'END:VCARD'];
 
     return implode("\r\n", $lines)."\r\n";
+}
+
+function davVcard4(string $uid, string $fullName = 'Jane Doe', array $extra = []): string
+{
+    $lines = ['BEGIN:VCARD', 'VERSION:4.0', "UID:{$uid}", "FN:{$fullName}", ...$extra, 'END:VCARD'];
+
+    return implode("\r\n", $lines)."\r\n";
+}
+
+// Records every card handed to the photo processor and returns it unchanged, like the real processor does with a
+// photo it can't decode (the no-op image double would rewrite it).
+function photoProcessorSpy(): VCardPhotoProcessor
+{
+    $spy = new class(app(ImageTransformationService::class)) extends VCardPhotoProcessor
+    {
+        /** @var array<int, string> */
+        public array $cards = [];
+
+        public function process(string $vCard): string
+        {
+            $this->cards[] = $vCard;
+
+            return $vCard;
+        }
+    };
+    app()->instance(VCardPhotoProcessor::class, $spy);
+
+    return $spy;
 }
 
 // A weekly series from Monday 2030-01-07 with the 2030-01-14 occurrence moved by an hour, the override written

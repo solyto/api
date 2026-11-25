@@ -11,9 +11,11 @@ use App\Dav\Exceptions\ImportException;
 use App\Dav\Exceptions\ImportFileException;
 use App\Dav\Helpers\VCardHelper;
 use App\Shared\Services\UserCacheService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -56,7 +58,8 @@ class ContactImport
         $dto->stage = 'started';
         $dto->url = rtrim($url, '/') . '/';
         $dto->username = $username;
-        $dto->secret = $secret;
+        // The state sits in the cache for the queued import; never in plaintext.
+        $dto->secret = Crypt::encryptString($secret);
 
         $this->claim($user->id, $dto);
 
@@ -76,12 +79,40 @@ class ContactImport
      */
     public function selectAddressBooks(User $user, AddressBookImportDTO $dto, array $addressBooks): void
     {
-        if ($dto->source !== 'carddav') {
+        $lock = Cache::lock(self::LOCK_KEY . $user->id, self::LOCK_TTL);
+
+        if (!$lock->get()) {
+            throw new ImportConflictException('A contacts import is already running.');
+        }
+
+        try {
+            $this->select($user, $dto, $addressBooks);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    // Runs under the import lock and re-reads the state, so a second or replayed select can't import again.
+    /**
+     * @throws ImportException
+     * @throws ImportConflictException
+     */
+    private function select(User $user, AddressBookImportDTO $dto, array $addressBooks): void
+    {
+        $state = $this->getState($user->id);
+
+        if ($dto->source !== 'carddav' || $state?->source !== 'carddav' || $state->jobId !== $dto->jobId) {
             throw new ImportException('Import state not found');
         }
 
-        if ($this->isRunning($dto)) {
+        $dto = $state;
+
+        if (in_array($dto->stage, ['started', 'address-books', 'contacts'], true)) {
             throw new ImportConflictException('A contacts import is already running.');
+        }
+
+        if ($dto->stage !== 'select' || $dto->addressBooks === null) {
+            throw new ImportException('Import state not found');
         }
 
         $dto->selectedAddressBooks = [];
@@ -203,14 +234,14 @@ class ContactImport
     public function startFile(User $user, UploadedFile $file, ?AddressBookDTO $target, ?string $name, ?string $color): AddressBookImportDTO
     {
         $content = (string) $file->get();
-        $cards = $this->splitFile($content);
+        $count = iterator_count($this->splitFile($content));
 
         $dto = new AddressBookImportDTO();
         $dto->jobId = (string) Str::uuid();
         $dto->userEmail = $user->email;
         $dto->source = 'file';
         $dto->stage = 'started';
-        $dto->contactsCount = count($cards);
+        $dto->contactsCount = $count;
 
         if ($target) {
             $dto->targetAddressBookId = $target->id;
@@ -266,7 +297,7 @@ class ContactImport
             $this->saveState($userId, $dto);
             $uids = $this->storedUids($addressBook);
 
-            foreach ($cards as $index => $card) {
+            foreach ($cards as $card) {
                 if ($this->storeCard($user, $addressBook, $card, $uids)) {
                     $dto->contactsDone++;
                 } else {
@@ -274,8 +305,6 @@ class ContactImport
                 }
 
                 $this->saveState($userId, $dto);
-
-                unset($cards[$index]);
             }
 
             $dto->stage = 'finished';
@@ -388,25 +417,32 @@ class ContactImport
     // others with it. A BEGIN:VCARD right after an AGENT line is a vCard 2.1 agent card inside its owner; any other
     // BEGIN:VCARD inside a card means that card never ended. It is closed there, like one cut off at the end of
     // the file, and read on its own: imported if it parses, otherwise skipped and counted.
+    // The file is walked line by line and one card is built at a time; splitting it into an array of lines took
+    // about 60 times its size.
     /**
-     * @return array<int, string>
+     * @return \Generator<int, string>
      *
      * @throws ImportFileException
      */
-    private function splitFile(string $content): array
+    private function splitFile(string $content): \Generator
     {
-        $cards = [];
-        $lines = [];
+        $count = 0;
+        $card = '';
         $depth = 0;
         $previous = '';
+        $length = strlen($content);
+        $offset = str_starts_with($content, "\xEF\xBB\xBF") ? 3 : 0;
 
-        foreach (preg_split('/\r\n|\r|\n/', preg_replace('/^\xEF\xBB\xBF/', '', $content)) as $line) {
+        while ($offset <= $length) {
+            $end = $offset + strcspn($content, "\r\n", $offset);
+            $line = substr($content, $offset, $end - $offset);
+            $offset = $end + (substr($content, $end, 2) === "\r\n" ? 2 : 1);
             $marker = strtoupper(trim($line));
 
             if ($marker === 'BEGIN:VCARD') {
                 if ($depth > 0 && !preg_match('/^AGENT[;:]/i', $previous)) {
-                    $this->addCard($cards, $lines);
-                    $lines = [];
+                    yield $this->countCard($count, $card);
+                    $card = '';
                     $depth = 0;
                 }
 
@@ -417,49 +453,47 @@ class ContactImport
                 continue;
             }
 
-            $lines[] = $line;
+            $card .= $line . "\r\n";
             $previous = $line;
 
             if ($marker === 'END:VCARD' && --$depth === 0) {
-                $this->addCard($cards, $lines);
-                $lines = [];
+                yield $this->countCard($count, $card);
+                $card = '';
             }
         }
 
-        if ($lines) {
-            $this->addCard($cards, $lines);
+        if ($card !== '') {
+            yield $this->countCard($count, $card);
         }
 
-        if (!$cards) {
+        if ($count === 0) {
             throw new ImportFileException('This file contains no contacts.');
         }
-
-        return $cards;
     }
 
     /**
-     * @param array<int, string> $cards
-     * @param array<int, string> $lines
-     *
      * @throws ImportFileException
      */
-    private function addCard(array &$cards, array $lines): void
+    private function countCard(int &$count, string $card): string
     {
-        $cards[] = implode("\r\n", $lines) . "\r\n";
-
-        if (count($cards) > self::MAX_FILE_CONTACTS) {
+        if (++$count > self::MAX_FILE_CONTACTS) {
             throw new ImportFileException(sprintf('This file contains more than %d contacts.', self::MAX_FILE_CONTACTS));
         }
+
+        return $card;
     }
 
     // Checked like a CardDAV client's PUT (Sabre\CardDAV\Plugin::validateVCard), so the import stores nothing a
     // sync client could not have written: a card that doesn't parse breaks addressbook-multiget for every client.
+    // A card that needs no change is stored as written: sabre's serializer escapes commas in URI values (a vCard 4
+    // PHOTO data URI, URL) and does not unescape them in URL on read, so every round trip would add a backslash.
     /**
      * @param array<string, true> $uids
      */
     private function storeCard(User $user, AddressBookDTO $addressBook, string $data, array &$uids): bool
     {
-        $vCard = $this->readCard($data);
+        $readable = VCardHelper::isValid($data) ? $data : VCardHelper::repair($data);
+        $vCard = $readable === null ? null : $this->readCard($readable);
 
         if (!$vCard) {
             $this->logSkippedContact($user, null, 'Unreadable vCard');
@@ -467,12 +501,15 @@ class ContactImport
             return false;
         }
 
+        $changed = $readable !== $data;
+
         try {
             // CardDAV servers must not store vCard 2.1; sabre reads a card without a known VERSION as 2.1 too.
             if (in_array($vCard->getDocumentType(), [Document::VCARD21, Document::UNKNOWN], true)) {
                 $vCard->VERSION = '2.1';
                 $vCard = $vCard->convert(Document::VCARD30);
                 $this->dropVCard21Parameters($vCard);
+                $changed = true;
             }
 
             foreach ($vCard->validate(Node::PROFILE_CARDDAV | Node::REPAIR) as $message) {
@@ -481,16 +518,20 @@ class ContactImport
 
                     return false;
                 }
+
+                $changed = true;
             }
 
             // Two cards with one UID in an address book confuse sync clients; the copy gets a UID of its own.
             if (isset($uids[(string) $vCard->UID])) {
                 $vCard->UID = (string) Str::uuid();
+                $changed = true;
             }
 
             $uid = (string) $vCard->UID;
+            $card = $changed ? $vCard->serialize() : preg_replace('/\r\n|\r|\n/', "\r\n", trim($data)) . "\r\n";
 
-            if (!$this->addressBooks->contacts()->import($addressBook, $vCard->serialize())) {
+            if (!$this->addressBooks->contacts()->import($addressBook, $card)) {
                 return false;
             }
         } catch (\Exception $e) {
@@ -524,12 +565,6 @@ class ContactImport
 
     private function readCard(string $data): ?VCard
     {
-        $data = VCardHelper::isValid($data) ? $data : VCardHelper::repair($data);
-
-        if ($data === null) {
-            return null;
-        }
-
         $vCard = Reader::read($data);
 
         return $vCard instanceof VCard ? $vCard : null;
@@ -594,8 +629,9 @@ class ContactImport
     {
         $stages = $dto?->source === 'file' ? ['started', 'contacts'] : ['address-books', 'contacts'];
 
+        // A state saved before updatedAt existed is from before a deploy; its worker is gone.
         return in_array($dto?->stage, $stages, true)
-            && ($dto->updatedAt === null || $dto->updatedAt > now()->getTimestamp() - self::STALE_AFTER);
+            && $dto->updatedAt !== null && $dto->updatedAt > now()->getTimestamp() - self::STALE_AFTER;
     }
 
     // The lock keeps two requests from both passing the running check before either saves.
@@ -623,7 +659,7 @@ class ContactImport
 
     private function getBasicRequest(AddressBookImportDTO $dto): PendingRequest
     {
-        return Http::withBasicAuth($dto->username, $dto->secret)
+        return Http::withBasicAuth($dto->username, Crypt::decryptString($dto->secret))
                    ->withHeaders([
                        'Content-Type' => 'application/xml',
                        'Depth' => '1',
@@ -636,8 +672,28 @@ class ContactImport
         Cache::set('contact-import-' . $userId, $dto, now()->addMinutes(60));
     }
 
+    // A CardDAV import started before the secret was encrypted holds it in plaintext. The secret is dropped and an
+    // import that still needs it is marked failed, so it can be started again.
     public function getState(string $userId): ?AddressBookImportDTO
     {
-        return Cache::get('contact-import-' . $userId);
+        $dto = Cache::get('contact-import-' . $userId);
+
+        if ($dto?->secret === null) {
+            return $dto;
+        }
+
+        try {
+            Crypt::decryptString($dto->secret);
+        } catch (DecryptException) {
+            $dto->secret = null;
+
+            if (!in_array($dto->stage, ['finished', 'failed'], true)) {
+                $dto->stage = 'failed';
+            }
+
+            $this->saveState($userId, $dto);
+        }
+
+        return $dto;
     }
 }

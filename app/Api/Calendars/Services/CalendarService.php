@@ -26,6 +26,10 @@ class CalendarService
 {
     // calendarinstances.displayname is VARCHAR(100) on pgsql.
     public const int MAX_NAME_LENGTH = 100;
+    // Every app build up to 1.1.4 sends this CSS variable as the colour of a calendar without one, on every click
+    // outside its row. It is accepted so those builds keep working, and changes nothing.
+    public const string LEGACY_NO_COLOR = 'var(--color-c-neutral-2)';
+    public const string COLOR_PATTERN = '/^(#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?|var\(--color-c-neutral-2\))$/';
     // _v3: lists cached before CalendarDTO gained isReadOnly (on top of _v2's solytoShared/isExternal/
     // isUnavailable/isCredentialsRejected) would unserialize with those typed properties uninitialised.
     private const string CACHE_KEY_CALENDARS = 'calendars_v3';
@@ -107,6 +111,18 @@ class CalendarService
 
         $calendar = $this->dav->calendars()->create($user, CalendarDTO::fromRequest($data));
         $this->forgetCalendarList($user->id);
+        return $calendar;
+    }
+
+    public function updateColor(User $user, int $instanceId, CalendarDTO $calendar, ?string $color): CalendarDTO
+    {
+        if ($color === self::LEGACY_NO_COLOR) {
+            return $calendar;
+        }
+
+        $calendar->color = $color;
+        $this->update($user, $instanceId, $calendar);
+
         return $calendar;
     }
 

@@ -589,6 +589,93 @@ describe('Contact import', function () {
             ->and(fn () => $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']))->toThrow(\App\Dav\Exceptions\ImportConflictException::class);
     });
 
+    it('stores a remote card that needs no change as written, commas in URI values included', function () {
+        $user = davUser();
+        photoProcessorSpy();
+        $card = davVcard4('v4', 'Jane Comma', ['PHOTO:data:image/png;base64,iVBORw0KGgo=', 'URL:https://example.org/a,b']);
+        fakeRemoteDav('addressbooks', ['Friends' => ['v4.vcf' => $card]]);
+        $import = app(DavService::class)->import()->addressBooks();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
+        $import->importAddressBooks($user, $import->getState($user->id));
+        $import->importContacts($user, $import->getState($user->id));
+
+        $addressBook = app(DavService::class)->addressBooks()->getByName($user, 'Friends');
+        $stored = collect(app(DavService::class)->addressBooks()->contacts()->listStored($addressBook))->pluck('storedData')->all();
+        expect($stored)->toBe([$card]);
+    });
+
+    it('keeps the app password out of the cached contact import state in plaintext', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = app(DavService::class)->import()->addressBooks();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+
+        expect(serialize(Cache::get('contact-import-'.$user->id)))->not->toContain('app-password');
+        Http::assertSent(fn (Request $request) => $request->hasHeader('Authorization', 'Basic '.base64_encode('alice:app-password')));
+    });
+
+    it('fails an import whose state still holds the secret in plaintext, and drops the secret', function (string $stage) {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => ['a.vcf' => davVcard('a', 'Jane Doe')]]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $state = $import->getState($user->id);
+        $import->selectAddressBooks($user, $state, ['Friends']);
+        $state = $import->getState($user->id);
+        $state->stage = $stage;
+        $state->secret = 'app-password';
+        Cache::set('contact-import-'.$user->id, $state, now()->addMinutes(60));
+
+        (new \App\Api\Contacts\Jobs\ImportContacts($user->id, $state->jobId))->handle(app(DavService::class));
+
+        expect($import->getState($user->id))->toMatchObject(['stage' => 'failed', 'secret' => null, 'contactsDone' => 0])
+            ->and(serialize(Cache::get('contact-import-'.$user->id)))->not->toContain('app-password');
+    })->with(['address-books', 'contacts']);
+
+    it('answers 404 to a select once the import has finished', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => ['a.vcf' => davVcard('a', 'Jane Doe')]]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import/select', ['address_books' => ['Friends']])->assertStatus(200);
+
+        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import/select', ['address_books' => ['Friends']]), 404);
+
+        $addressBooks = collect(app(DavService::class)->addressBooks()->list($user))->pluck('displayName')->all();
+        expect($addressBooks)->toContain('Friends')
+            ->not->toContain('Friends (1)');
+    });
+
+    it('answers 404 to a select after a failed start', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []], discoveryStatus: 401);
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import', [
+            'url' => REMOTE, 'username' => 'alice', 'secret' => 'wrong',
+        ])->assertStatus(404);
+
+        expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import/select', ['address_books' => ['Friends']]), 404);
+    });
+
+    it('answers 409 to a select while another request holds the import lock', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = app(DavService::class)->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $lock = Cache::lock('contact-import-lock-'.$user->id, 10);
+        $lock->get();
+
+        try {
+            expectApiError($this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books/import/select', ['address_books' => ['Friends']]), 409);
+        } finally {
+            $lock->release();
+        }
+
+        expect($import->getState($user->id)->stage)->toBe('select');
+    });
+
     it('does not select address books for a file import', function () {
         $user = davUser();
         \Illuminate\Support\Facades\Storage::fake('local');

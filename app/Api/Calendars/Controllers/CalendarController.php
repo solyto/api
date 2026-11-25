@@ -120,7 +120,7 @@ class CalendarController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="color", type="string", maxLength=255, example="#FF5733")
+     *             @OA\Property(property="color", type="string", pattern="^(#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?|var\(--color-c-neutral-2\))$", description="Hex colour; the CSS variable is what app builds up to 1.1.4 send for a calendar without a colour and changes nothing", example="#FF5733")
      *         )
      *     ),
      *
@@ -144,9 +144,7 @@ class CalendarController
     {
         $calendar = $this->calendarService->getOrFail($request->user(), $instanceId);
 
-        $calendar->color = $request->validated('color');
-
-        $this->calendarService->update($request->user(), $instanceId, $calendar);
+        $calendar = $this->calendarService->updateColor($request->user(), $instanceId, $calendar, $request->validated('color'));
 
         return ApiResponse::success(new CalendarResource($calendar), 'Calendar updated successfully.');
     }

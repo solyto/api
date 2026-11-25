@@ -20,6 +20,10 @@ class ContactService
     private const string CACHE_KEY_CONTACTS = 'contacts_v2';
     private const int CACHE_TTL = 86400;
     public const int PHOTO_MAX_BYTES = 200 * 1024;
+    // Every app build up to 1.1.4 sends this CSS variable as the colour of an address book without one, on every
+    // click outside its row. It is accepted so those builds keep working, and changes nothing.
+    public const string LEGACY_NO_COLOR = 'var(--color-c-neutral-2)';
+    public const string ADDRESS_BOOK_COLOR_PATTERN = '/^(#[0-9A-Fa-f]{6}|var\(--color-c-neutral-2\))$/';
 
     public function __construct(
         private readonly DavService $dav,
@@ -78,6 +82,18 @@ class ContactService
 
         $addressBook = $this->dav->addressBooks()->create($user, AddressBookDTO::fromRequest($data));
         $this->cache->forget([self::CACHE_KEY_ADDRESS_BOOKS, $user->id]);
+        return $addressBook;
+    }
+
+    public function updateAddressBookColor(User $user, AddressBookDTO $addressBook, ?string $color): AddressBookDTO
+    {
+        if ($color === self::LEGACY_NO_COLOR) {
+            return $addressBook;
+        }
+
+        $addressBook->color = $color;
+        $this->updateAddressBook($user, $addressBook);
+
         return $addressBook;
     }
 

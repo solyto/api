@@ -86,6 +86,17 @@ describe('Contact export', function () {
             ->and(base64_encode($card->PHOTO->getValue()))->toBe($photo);
     });
 
+    it('writes the stored card as it is, commas in URI values included, ending in CRLF', function () {
+        $card = davVcard4('v4', 'Jane Comma', ['PHOTO:data:image/png;base64,iVBORw0KGgo=', 'URL:https://example.org/a,b']);
+        DB::connection('pgsql')->table('cards')->insert([
+            'addressbookid' => app(ContactService::class)->listAddressBooks($this->user)[0]->id, 'uri' => 'v4.vcf',
+            'lastmodified' => time(), 'etag' => md5($card), 'size' => strlen($card), 'carddata' => rtrim($card, "\r\n"),
+        ]);
+
+        expect(exportContactsFile($this->user))->toBe($card)
+            ->and((string) exportContacts($this->user)['Jane Comma']->URL)->toBe('https://example.org/a,b');
+    });
+
     it('exports the rebuilt card when the stored one is unreadable', function () {
         $bookId = app(ContactService::class)->listAddressBooks($this->user)[0]->id;
         DB::connection('pgsql')->table('cards')->insert([

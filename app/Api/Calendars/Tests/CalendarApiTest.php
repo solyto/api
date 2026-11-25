@@ -1022,3 +1022,34 @@ describe('Read-only shared calendars', function () {
         expectApiSuccess($this->actingAs($this->sharee, 'sanctum')->postJson('/api/v1/calendars/'.$this->shareeInstance.'/events', ($this->payload)($this->shareeInstance, 'Added')), 201);
     });
 });
+
+describe('Calendar colour', function () {
+    it('stores a six or eight digit hex colour', function (string $color) {
+        $user = makeUser();
+        $instance = $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->putJson('/api/v1/calendars/'.$instance, ['color' => $color]), 200);
+
+        expect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.color'))->toBe($color);
+    })->with(['#12AB9F', '#12AB9F80']);
+
+    it('rejects a colour that is not a hex value', function (string $color) {
+        $user = makeUser();
+        $instance = $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/calendars/'.$instance, ['color' => $color])
+            ->assertJsonValidationErrors('color');
+    })->with(['red;background-image:url(https://example.com/x)', 'red', '#12AB9', 'var(--color-c-primary)']);
+
+    // App builds up to 1.1.4 send this for a calendar without a colour on every click outside its row.
+    it('accepts the old builds\' no-colour value and keeps the colour', function () {
+        $user = makeUser();
+        $instance = $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.id');
+        $before = $this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.color');
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->putJson('/api/v1/calendars/'.$instance, ['color' => CalendarService::LEGACY_NO_COLOR]), 200);
+
+        expect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars')->json('data.0.color'))->toBe($before);
+    });
+});
