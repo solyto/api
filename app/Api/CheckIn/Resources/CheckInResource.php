@@ -2,7 +2,7 @@
 
 namespace App\Api\CheckIn\Resources;
 
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\DTOs\CheckInDayDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +28,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
  *
- * @mixin CheckIn
+ * @property CheckInDayDTO $resource
  */
 class CheckInResource extends JsonResource
 {
@@ -40,22 +40,22 @@ class CheckInResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'date' => $this->date->format('Y-m-d'),
-            'mood' => $this->mood,
-            'water' => $this->water,
-            'sports' => $this->sports,
-            'sleep' => $this->sleep,
-            'dreams' => $this->dreams,
-            'work' => $this->work,
-            'food_quality' => $this->food_quality,
-            'food_amount' => $this->food_amount,
-            'menstruation' => $this->menstruation,
-            'alcohol' => $this->alcohol,
-            'smoking' => $this->smoking,
-            'social_life' => $this->social_life,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'id' => $this->resource->id(),
+            'date' => $this->resource->date,
+            'mood' => $this->resource->values['mood'] ?? null,
+            'water' => $this->resource->values['water'] ?? null,
+            'sports' => $this->resource->values['sports'] ?? null,
+            'sleep' => $this->resource->values['sleep'] ?? null,
+            'dreams' => $this->resource->values['dreams'] ?? null,
+            'work' => $this->resource->values['work'] ?? null,
+            'food_quality' => $this->resource->values['food_quality'] ?? null,
+            'food_amount' => $this->resource->values['food_amount'] ?? null,
+            'menstruation' => $this->resource->values['menstruation'] ?? null,
+            'alcohol' => $this->resource->values['alcohol'] ?? null,
+            'smoking' => $this->resource->values['smoking'] ?? null,
+            'social_life' => $this->resource->values['social_life'] ?? null,
+            'created_at' => $this->resource->createdAt,
+            'updated_at' => $this->resource->updatedAt,
         ];
     }
 }

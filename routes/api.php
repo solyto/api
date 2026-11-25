@@ -200,7 +200,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::get('marks', [CheckInController::class, 'marks']);
         Route::post('', [CheckInController::class, 'store']);
         Route::get('values', [CheckInController::class, 'values']);
-        Route::put('values', [CheckInController::class, 'setValue']);
+        Route::put('values', [CheckInController::class, 'setValues']);
 
         Route::prefix('trackers')->name('check-in.trackers.')->group(function () {
             Route::put('order', [CheckInTrackerController::class, 'reorder']);

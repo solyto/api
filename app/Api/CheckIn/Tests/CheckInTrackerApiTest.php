@@ -141,7 +141,7 @@ describe('PUT /api/v1/check-in/trackers/{tracker}', function () {
             ->assertJsonPath('data.enabled', false);
     });
 
-    it('keeps the old settings in step when a built-in tracker is turned off', function () {
+    it('shows a built-in tracker turned off to apps before the tracker tables', function () {
         $user = makeUser();
 
         $this->actingAs($user, 'sanctum')
@@ -151,7 +151,6 @@ describe('PUT /api/v1/check-in/trackers/{tracker}', function () {
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/users/me/settings/check-in')
             ->assertJsonPath('data.enabled_trackers', ['mood', 'dreams', 'food_quality', 'food_amount', 'water', 'sports', 'work']);
-        expect($user->fresh()->settings->check_in_settings['enabled_trackers'])->not->toContain('sleep');
     });
 
     it('only lets 1–5 trackers count towards the score', function () {

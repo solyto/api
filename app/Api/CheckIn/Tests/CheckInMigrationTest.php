@@ -5,6 +5,7 @@ use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\Users\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 // Users made by the factory already get trackers through the observer;
 // this turns one back into a user from before the tracker tables.
@@ -29,6 +30,16 @@ function legacyCheckInRow(User $user, string $date, array $values): void
         ...$values,
     ]);
 }
+
+function checkInTableDropMigration(): object
+{
+    return require database_path('migrations/2026_11_25_000002_drop_check_in_table.php');
+}
+
+// The old table is gone after all migrations; these tests need it as it was before the upgrade.
+beforeEach(function () {
+    checkInTableDropMigration()->down();
+});
 
 function runCheckInMigration(): void
 {
@@ -159,5 +170,22 @@ describe('Check-in data migration', function () {
 
         expect(CheckInTracker::count())->toBe(User::count() * 12);
         $users->each(fn (User $user) => expect(CheckInTracker::forUser($user->id)->count())->toBe(12));
+    });
+});
+
+describe('Dropping the old check-in table', function () {
+    it('drops the table and keeps only the chosen sports in the settings', function () {
+        $user = legacyCheckInUser(['enabled_trackers' => ['mood'], 'selected_sports' => ['yoga', 'bike', 'mountain', 'footprints', 'dumbbell']]);
+        $untouched = legacyCheckInUser(['selected_sports' => ['bike', 'yoga', 'mountain', 'footprints', 'dumbbell']]);
+        $empty = legacyCheckInUser();
+
+        checkInTableDropMigration()->up();
+
+        expect(Schema::hasTable('check_in'))->toBeFalse()
+            ->and(json_decode(DB::table('user_settings')->where('user_id', $user->id)->value('check_in_settings'), true))
+            ->toBe(['selected_sports' => ['yoga', 'bike', 'mountain', 'footprints', 'dumbbell']])
+            ->and(json_decode(DB::table('user_settings')->where('user_id', $untouched->id)->value('check_in_settings'), true))
+            ->toBe(['selected_sports' => ['bike', 'yoga', 'mountain', 'footprints', 'dumbbell']])
+            ->and(DB::table('user_settings')->where('user_id', $empty->id)->value('check_in_settings'))->toBeNull();
     });
 });

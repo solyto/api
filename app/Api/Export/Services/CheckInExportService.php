@@ -2,9 +2,10 @@
 
 namespace App\Api\Export\Services;
 
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\DTOs\CheckInDayDTO;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
+use App\Api\CheckIn\Services\CheckInService;
 use App\Api\Users\Models\User;
 use App\Shared\Helpers\CsvHelper;
 
@@ -12,27 +13,21 @@ class CheckInExportService
 {
     public const string OWN_TRACKERS_FILE = 'check_in_own_trackers.csv';
 
+    private const array BUILT_IN_COLUMNS = [
+        'mood', 'water', 'sports', 'sleep', 'dreams', 'work', 'food_quality', 'food_amount',
+        'menstruation', 'alcohol', 'smoking', 'social_life',
+    ];
+
+    public function __construct(private readonly CheckInService $checkIns) {}
+
     public function export(User $user, string $path): void
     {
-        $checkIns = CheckIn::forUser($user->id)->orderBy('date')->get();
-
         CsvHelper::write($path, [
             'Date', 'Mood', 'Water', 'Sports', 'Sleep', 'Dreams',
             'Work', 'Food Quality', 'Food Amount', 'Menstruation', 'Alcohol', 'Smoking', 'Social Life',
-        ], $checkIns->map(fn ($checkIn) => [
-            $checkIn->date->format('Y-m-d'),
-            $checkIn->mood,
-            $checkIn->water,
-            $checkIn->sports,
-            $checkIn->sleep,
-            $checkIn->dreams,
-            $checkIn->work,
-            $checkIn->food_quality,
-            $checkIn->food_amount,
-            $checkIn->menstruation,
-            $checkIn->alcohol,
-            $checkIn->smoking,
-            $checkIn->social_life,
+        ], $this->checkIns->days($user)->map(fn (CheckInDayDTO $day) => [
+            $day->date,
+            ...array_map(fn (string $key) => $day->values[$key] ?? null, self::BUILT_IN_COLUMNS),
         ]));
 
         $this->exportOwnTrackers($user, dirname($path).'/'.self::OWN_TRACKERS_FILE);

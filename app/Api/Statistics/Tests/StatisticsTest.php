@@ -1,5 +1,7 @@
 <?php
 
+use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Statistics\Services\StatisticsService;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
@@ -52,5 +54,16 @@ describe('StatisticsService', function () {
         // shared DAV database.
         expect($stats['calendars'])->toBeGreaterThanOrEqual(1);
         expect($stats['address_books'])->toBeGreaterThanOrEqual(1);
+    });
+
+    it('counts check-in days per user, whatever the trackers', function () {
+        $user = makeUser();
+        $other = makeUser();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'mood'))->on('2026-10-01', 3)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'water'))->on('2026-10-01', 2)->create();
+        CheckInValue::factory()->forTracker(CheckInTracker::factory()->forUser($user)->create())->on('2026-10-02', 1)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($other, 'mood'))->on('2026-10-01', 4)->create();
+
+        expect(app(StatisticsService::class)->overview()['check_in_entries'])->toBe(3);
     });
 });

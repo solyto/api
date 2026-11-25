@@ -7,7 +7,6 @@ use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
-use App\Api\Users\Models\UserSettings;
 use App\Shared\Exceptions\LimitReachedException;
 use App\Shared\Services\UserCacheService;
 use Illuminate\Support\Collection;
@@ -97,10 +96,6 @@ class CheckInTrackerService
 
         $tracker->update($data);
 
-        if ($tracker->key !== null && array_key_exists('enabled', $data)) {
-            $this->mirrorEnabledSetting($tracker->user()->firstOrFail());
-        }
-
         return $tracker->fresh();
     }
 
@@ -144,8 +139,6 @@ class CheckInTrackerService
         foreach (CheckInBuiltInTracker::keys() as $key) {
             CheckInTracker::forUser($user->id)->where('key', $key)->update(['enabled' => in_array($key, $enabledKeys, true)]);
         }
-
-        $this->mirrorEnabledSetting($user);
     }
 
     /** @return array<int, string> */
@@ -161,24 +154,5 @@ class CheckInTrackerService
     private function nextPosition(User $user): int
     {
         return (int) CheckInTracker::forUser($user->id)->max('position') + 1;
-    }
-
-    // Keeps the old settings JSON current, so a rollback to the previous release keeps the on/off state.
-    private function mirrorEnabledSetting(User $user): void
-    {
-        $settings = UserSettings::firstWhere('user_id', $user->id);
-
-        if (! $settings) {
-            return;
-        }
-
-        $enabled = CheckInTracker::forUser($user->id)
-            ->whereNotNull('key')
-            ->where('enabled', true)
-            ->orderBy('position')
-            ->pluck('key')
-            ->all();
-
-        $settings->update(['check_in_settings' => [...($settings->check_in_settings ?? []), 'enabled_trackers' => $enabled]]);
     }
 }

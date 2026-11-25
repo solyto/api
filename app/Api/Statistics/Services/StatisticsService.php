@@ -2,7 +2,7 @@
 
 namespace App\Api\Statistics\Services;
 
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\Finances\Models\WealthValue;
@@ -64,7 +64,13 @@ class StatisticsService
             'feed_subscriptions' => FeedSubscription::count(),
             'income_entries' => Budget::count(),
             'wealth_entries' => WealthValue::count(),
-            'check_in_entries' => CheckIn::count(),
+            'check_in_entries' => DB::query()->fromSub(
+                CheckInValue::query()
+                    ->join('check_in_trackers', 'check_in_trackers.id', '=', 'check_in_values.check_in_tracker_id')
+                    ->select('check_in_trackers.user_id', 'check_in_values.date')
+                    ->distinct(),
+                'days'
+            )->count(),
             'ui_notifications' => DB::table('notifications')->count(),
         ];
     }

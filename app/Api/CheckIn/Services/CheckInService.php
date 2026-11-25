@@ -2,8 +2,8 @@
 
 namespace App\Api\CheckIn\Services;
 
+use App\Api\CheckIn\DTOs\CheckInDayDTO;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Users\Models\User;
@@ -11,12 +11,11 @@ use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CheckInService
 {
-    private const string CACHE_KEY = 'checkin';
-
     public const string VALUES_CACHE_KEY = 'checkin_values';
 
     private const int CACHE_TTL = 86400;
@@ -26,21 +25,21 @@ class CheckInService
         private readonly CheckInTrackerService $trackers,
     ) {}
 
-    // The old one-row-per-day table, for apps before the tracker tables; every write keeps it in step.
-    public function list(User $user): Collection
+    /** @return Collection<int, CheckInDayDTO> the days with built-in values, oldest first */
+    public function days(User $user): Collection
     {
-        return $this->cache->remember(
-            [self::CACHE_KEY, $user->id],
-            self::CACHE_TTL,
-            function () use ($user) {
-                return CheckIn::forUser($user->id)->get();
-            }
-        );
-    }
+        $keys = CheckInTracker::forUser($user->id)->whereNotNull('key')->pluck('key', 'id');
 
-    public function find(User $user, string $date): ?CheckIn
-    {
-        return CheckIn::forUser($user->id)->where('date', $date.' 00:00:00')->first();
+        return $this->values($user)
+            ->filter(fn (CheckInValue $value) => $keys->has($value->check_in_tracker_id))
+            ->groupBy(fn (CheckInValue $value) => $value->date->format('Y-m-d'))
+            ->map(fn (Collection $values, string $date) => new CheckInDayDTO(
+                $date,
+                $values->mapWithKeys(fn (CheckInValue $value) => [$keys[$value->check_in_tracker_id] => $value->value])->all(),
+                $values->min('created_at'),
+                $values->max('updated_at'),
+            ))
+            ->values();
     }
 
     /** @return Collection<int, CheckInValue> */
@@ -94,22 +93,30 @@ class CheckInService
             throw ValidationException::withMessages(['value' => 'The value does not fit this tracker.']);
         }
 
-        $date = Carbon::parse($date)->toDateString();
-        $existing = CheckInValue::where('check_in_tracker_id', $tracker->id)->whereDate('date', $date)->first();
+        $stored = $this->storeValue($tracker, $date, $value);
+        $this->forgetCache($user);
 
-        if ($value === null) {
-            $existing?->delete();
-            $stored = null;
-        } elseif ($existing) {
-            $existing->update(['value' => $value]);
-            $stored = $existing;
-        } else {
-            $stored = $this->createValue($tracker, $date, $value);
+        return $stored;
+    }
+
+    /**
+     * @param  array<int, array{tracker_id: int, value: int|null}>  $values
+     * @return Collection<int, CheckInValue>
+     */
+    public function setValues(User $user, string $date, array $values): Collection
+    {
+        $trackers = CheckInTracker::forUser($user->id)->whereIn('id', array_column($values, 'tracker_id'))->get()->keyBy('id');
+
+        foreach ($values as $index => $entry) {
+            if ($entry['value'] !== null && ! $trackers[$entry['tracker_id']]->type->accepts($entry['value'])) {
+                throw ValidationException::withMessages(["values.{$index}.value" => 'The value does not fit this tracker.']);
+            }
         }
 
-        if ($tracker->key !== null) {
-            $this->mirrorToCheckInTable($user, $date, $tracker->key, $value);
-        }
+        $stored = DB::transaction(fn () => collect($values)
+            ->map(fn (array $entry) => $this->storeValue($trackers[$entry['tracker_id']], $date, $entry['value']))
+            ->filter()
+            ->values());
 
         $this->forgetCache($user);
 
@@ -117,7 +124,7 @@ class CheckInService
     }
 
     /** @param array<string, int|null> $data */
-    public function saveDay(User $user, string $date, array $data): CheckIn
+    public function saveDay(User $user, string $date, array $data): CheckInDayDTO
     {
         // $data is a day the way apps before the tracker tables send it: built-in tracker keys as fields.
         $date = Carbon::parse($date)->toDateString();
@@ -129,7 +136,7 @@ class CheckInService
             }
         }
 
-        return $this->find($user, $date) ?? $this->createEmptyDay($user, $date);
+        return $this->days($user)->firstWhere('date', $date) ?? new CheckInDayDTO($date, [], now(), now());
     }
 
     public function setBuiltInValue(User $user, string $date, string $key, ?int $value): void
@@ -149,18 +156,22 @@ class CheckInService
         return $afterFrom && $beforeTo;
     }
 
-    // Apps before the tracker tables got a row back even for a day saved without values.
-    private function createEmptyDay(User $user, string $date): CheckIn
+    private function storeValue(CheckInTracker $tracker, string $date, ?int $value): ?CheckInValue
     {
-        try {
-            $checkIn = CheckIn::create(['user_id' => $user->id, 'date' => $date]);
-        } catch (UniqueConstraintViolationException) {
-            $checkIn = $this->find($user, $date);
+        $date = Carbon::parse($date)->toDateString();
+        $existing = CheckInValue::where('check_in_tracker_id', $tracker->id)->whereDate('date', $date)->first();
+
+        if ($value === null) {
+            $existing?->delete();
+            $stored = null;
+        } elseif ($existing) {
+            $existing->update(['value' => $value]);
+            $stored = $existing;
+        } else {
+            $stored = $this->createValue($tracker, $date, $value);
         }
 
-        $this->forgetCache($user);
-
-        return $checkIn;
+        return $stored;
     }
 
     private function createValue(CheckInTracker $tracker, string $date, int $value): CheckInValue
@@ -176,31 +187,8 @@ class CheckInService
         }
     }
 
-    // Keeps the old one-row-per-day table in step, for apps that still read it and for a rollback.
-    private function mirrorToCheckInTable(User $user, string $date, string $key, ?int $value): void
-    {
-        $checkIn = $this->find($user, $date);
-
-        if ($checkIn) {
-            $checkIn->update([$key => $value]);
-
-            return;
-        }
-
-        if ($value === null) {
-            return;
-        }
-
-        try {
-            CheckIn::create(['user_id' => $user->id, 'date' => $date, $key => $value]);
-        } catch (UniqueConstraintViolationException) {
-            $this->find($user, $date)?->update([$key => $value]);
-        }
-    }
-
     private function forgetCache(User $user): void
     {
-        $this->cache->forget([self::CACHE_KEY, $user->id]);
         $this->cache->forget([self::VALUES_CACHE_KEY, $user->id]);
     }
 }

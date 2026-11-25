@@ -1,15 +1,22 @@
 <?php
 
 use App\Api\CheckIn\Enums\CheckInTrackerType;
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\Users\Models\User;
 
+/** @param array<int, int|null> $values tracker id => value */
+function putValues($test, User $user, array $values, string $date = '2026-10-01')
+{
+    $entries = collect($values)->map(fn (?int $value, int $trackerId) => ['tracker_id' => $trackerId, 'value' => $value])->values()->all();
+
+    return $test->actingAs($user, 'sanctum')
+        ->putJson('/api/v1/check-in/values', ['date' => $date, 'values' => $entries]);
+}
+
 function putValue($test, User $user, int $trackerId, ?int $value, string $date = '2026-10-01')
 {
-    return $test->actingAs($user, 'sanctum')
-        ->putJson('/api/v1/check-in/values', ['tracker_id' => $trackerId, 'date' => $date, 'value' => $value]);
+    return putValues($test, $user, [$trackerId => $value], $date);
 }
 
 describe('PUT /api/v1/check-in/values', function () {
@@ -19,14 +26,40 @@ describe('PUT /api/v1/check-in/values', function () {
 
         putValue($this, $user, $tracker->id, 3)
             ->assertStatus(200)
-            ->assertJsonPath('data', ['tracker_id' => $tracker->id, 'date' => '2026-10-01', 'value' => 3]);
-        putValue($this, $user, $tracker->id, 53)->assertJsonPath('data.value', 53);
+            ->assertJsonPath('data', [['tracker_id' => $tracker->id, 'date' => '2026-10-01', 'value' => 3]]);
+        putValue($this, $user, $tracker->id, 53)->assertJsonPath('data.0.value', 53);
         expect(CheckInValue::where('check_in_tracker_id', $tracker->id)->count())->toBe(1);
 
         putValue($this, $user, $tracker->id, null)
             ->assertStatus(200)
-            ->assertJsonPath('data', null);
+            ->assertJsonPath('data', []);
         expect(CheckInValue::where('check_in_tracker_id', $tracker->id)->count())->toBe(0);
+    });
+
+    it('saves all values of a day in one request', function () {
+        $user = makeUser();
+        $water = CheckInTracker::factory()->forUser($user)->ofType(CheckInTrackerType::Count)->create();
+        $mood = builtInTracker($user, 'mood');
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'sleep'))->on('2026-10-01', 3)->create();
+
+        putValues($this, $user, [$water->id => 2, $mood->id => 4, builtInTracker($user, 'sleep')->id => null])
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+
+        expect(CheckInValue::whereDate('date', '2026-10-01')->pluck('value', 'check_in_tracker_id')->all())
+            ->toEqual([$water->id => 2, $mood->id => 4]);
+    });
+
+    it('saves nothing when one value does not fit its tracker', function () {
+        $user = makeUser();
+        $water = CheckInTracker::factory()->forUser($user)->ofType(CheckInTrackerType::Count)->create();
+        $mood = builtInTracker($user, 'mood');
+
+        $response = putValues($this, $user, [$water->id => 2, $mood->id => 9]);
+
+        expectApiError($response, 422);
+        $response->assertJsonValidationErrors(['values.1.value']);
+        expect(CheckInValue::count())->toBe(0);
     });
 
     it('rejects a value that does not fit the tracker type', function (string $type, int $value) {
@@ -36,7 +69,7 @@ describe('PUT /api/v1/check-in/values', function () {
         $response = putValue($this, $user, $tracker->id, $value);
 
         expectApiError($response, 422);
-        $response->assertJsonValidationErrors(['value']);
+        $response->assertJsonValidationErrors(['values.0.value']);
     })->with([
         'yes/no other than 1' => ['yes_no', 2],
         'yes/no zero' => ['yes_no', 0],
@@ -51,7 +84,7 @@ describe('PUT /api/v1/check-in/values', function () {
 
         $foreignResponse = putValue($this, $user, $foreign->id, 1);
         expectApiError($foreignResponse, 422);
-        $foreignResponse->assertJsonValidationErrors(['tracker_id']);
+        $foreignResponse->assertJsonValidationErrors(['values.0.tracker_id']);
         expect(CheckInValue::where('check_in_tracker_id', $foreign->id)->count())->toBe(0);
 
         $own = CheckInTracker::factory()->forUser($user)->create();
@@ -60,11 +93,26 @@ describe('PUT /api/v1/check-in/values', function () {
         $dateResponse->assertJsonValidationErrors(['date']);
     });
 
-    it('mirrors built-in values into the old table, so old apps and a rollback see them', function () {
+    it('rejects an empty list and the same tracker twice', function () {
+        $user = makeUser();
+        $tracker = CheckInTracker::factory()->forUser($user)->create();
+
+        $empty = $this->actingAs($user, 'sanctum')->putJson('/api/v1/check-in/values', ['date' => '2026-10-01', 'values' => []]);
+        expectApiError($empty, 422);
+        $empty->assertJsonValidationErrors(['values']);
+
+        $twice = $this->actingAs($user, 'sanctum')->putJson('/api/v1/check-in/values', ['date' => '2026-10-01', 'values' => [
+            ['tracker_id' => $tracker->id, 'value' => 1],
+            ['tracker_id' => $tracker->id, 'value' => null],
+        ]]);
+        expectApiError($twice, 422);
+        $twice->assertJsonValidationErrors(['values.0.tracker_id']);
+    });
+
+    it('shows built-in values to apps before the tracker tables', function () {
         $user = makeUser();
 
-        putValue($this, $user, builtInTracker($user, 'mood')->id, 4)->assertStatus(200);
-        putValue($this, $user, builtInTracker($user, 'sports')->id, 6)->assertStatus(200);
+        putValues($this, $user, [builtInTracker($user, 'mood')->id => 4, builtInTracker($user, 'sports')->id => 6])->assertStatus(200);
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in')
@@ -74,16 +122,20 @@ describe('PUT /api/v1/check-in/values', function () {
             ->assertJsonPath('data.0.sports', 6);
 
         putValue($this, $user, builtInTracker($user, 'mood')->id, null);
-        expect(CheckIn::forUser($user->id)->sole()->mood)->toBeNull();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/check-in')
+            ->assertJsonPath('data.0.mood', null)
+            ->assertJsonPath('data.0.sports', 6);
     });
 
-    it('does not put own trackers into the old table', function () {
+    it('does not show own trackers to apps before the tracker tables', function () {
         $user = makeUser();
         $tracker = CheckInTracker::factory()->forUser($user)->create();
 
         putValue($this, $user, $tracker->id, 1)->assertStatus(200);
 
-        expect(CheckIn::forUser($user->id)->count())->toBe(0);
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in')->assertJsonCount(0, 'data');
     });
 });
 
@@ -191,7 +243,8 @@ describe('Check-in for apps before the tracker tables', function () {
             ->assertJsonPath('data.enabled_trackers', ['mood', 'social_life'])
             ->assertJsonPath('data.selected_sports', ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga']);
 
-        expect(builtInTracker($user, 'water')->enabled)->toBeFalse()
+        expect($user->settings->fresh()->check_in_settings)->toBe(['selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga']])
+            ->and(builtInTracker($user, 'water')->enabled)->toBeFalse()
             ->and(builtInTracker($user, 'social_life')->enabled)->toBeTrue()
             ->and($own->fresh()->enabled)->toBeTrue();
     });

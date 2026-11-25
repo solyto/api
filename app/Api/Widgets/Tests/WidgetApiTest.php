@@ -1,19 +1,20 @@
 <?php
 
 use App\Api\Calendars\Services\CalendarService;
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\DTOs\CheckInDayDTO;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
 use App\Api\Users\Models\User;
-use App\Shared\Services\UserCacheService;
 use Carbon\Carbon;
 
 function widgetUser(array $settings = []): User
 {
     $user = makeUser();
+    $enabledTrackers = $settings['check_in_settings']['enabled_trackers'] ?? null;
+    unset($settings['check_in_settings']['enabled_trackers']);
     $user->settings()->update(array_merge([
         'timezone' => 'UTC',
         'language' => 'en',
@@ -21,8 +22,8 @@ function widgetUser(array $settings = []): User
         'time_format' => 'H:i',
     ], $settings));
 
-    if (isset($settings['check_in_settings']['enabled_trackers'])) {
-        app(CheckInTrackerService::class)->setEnabledBuiltIns($user, $settings['check_in_settings']['enabled_trackers']);
+    if ($enabledTrackers !== null) {
+        app(CheckInTrackerService::class)->setEnabledBuiltIns($user, $enabledTrackers);
     }
 
     return $user->fresh();
@@ -91,7 +92,7 @@ function checkInRow(array $data, string $tracker): ?array
     return collect(widgetSection($data, 'today')['rows'] ?? [])->firstWhere('id', $tracker);
 }
 
-function widgetCheckIn(User $user, string $date, array $values = []): CheckIn
+function widgetCheckIn(User $user, string $date, array $values = []): CheckInDayDTO
 {
     return app(CheckInService::class)->saveDay($user, $date, $values);
 }
@@ -103,7 +104,7 @@ function setCheckIn($test, User $user, string $tracker, mixed $body, ?string $to
 
 function userCheckIns(User $user)
 {
-    return CheckIn::forUser($user->id)->get();
+    return app(CheckInService::class)->days($user);
 }
 
 afterEach(function () {
@@ -709,8 +710,8 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
         expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 4]));
 
         $checkIn = userCheckIns($user)->sole();
-        expect($checkIn->date->toDateString())->toBe('2026-08-15')
-            ->and((int) $checkIn->mood)->toBe(4);
+        expect($checkIn->date)->toBe('2026-08-15')
+            ->and($checkIn->values['mood'])->toBe(4);
     });
 
     it('updates today\'s check-in and keeps the other trackers', function () {
@@ -720,10 +721,7 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
         expectApiSuccess(setCheckIn($this, $user, 'sports', ['value' => 6]));
         expectApiSuccess(setCheckIn($this, $user, 'sports', ['value' => 6]));
 
-        $checkIn = userCheckIns($user)->sole();
-        expect((int) $checkIn->sports)->toBe(6)
-            ->and((int) $checkIn->mood)->toBe(2)
-            ->and((int) $checkIn->water)->toBe(3);
+        expect(userCheckIns($user)->sole()->values)->toEqual(['mood' => 2, 'water' => 3, 'sports' => 6]);
     });
 
     it('clears a tracker with null', function () {
@@ -732,7 +730,7 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
 
         expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => null]));
 
-        expect(userCheckIns($user)->sole()->mood)->toBeNull();
+        expect(userCheckIns($user))->toHaveCount(0);
     });
 
     it('creates no check-in when clearing without one', function () {
@@ -765,34 +763,6 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
         expectApiError(setCheckIn($this, $user, 'coffee', ['value' => 3]), 404);
     });
 
-    it('applies the value when a concurrent request created today\'s check-in first', function () {
-        $user = widgetUser();
-        widgetCheckIn($user, today()->toDateString(), ['mood' => 2]);
-
-        // The first lookup misses the existing row, as if it was created right after it.
-        $this->app->instance(CheckInService::class, new class(app(UserCacheService::class), app(CheckInTrackerService::class)) extends CheckInService
-        {
-            private bool $missed = false;
-
-            public function find(User $user, string $date): ?CheckIn
-            {
-                if (!$this->missed) {
-                    $this->missed = true;
-
-                    return null;
-                }
-
-                return parent::find($user, $date);
-            }
-        });
-
-        expectApiSuccess(setCheckIn($this, $user, 'water', ['value' => 4]));
-
-        $checkIn = userCheckIns($user)->sole();
-        expect((int) $checkIn->water)->toBe(4)
-            ->and((int) $checkIn->mood)->toBe(2);
-    });
-
     it('never touches another user\'s check-in', function () {
         $user = widgetUser();
         $other = widgetUser();
@@ -800,8 +770,8 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
 
         expectApiSuccess(setCheckIn($this, $user, 'mood', ['value' => 5]));
 
-        expect((int) userCheckIns($other)->sole()->mood)->toBe(1)
-            ->and((int) userCheckIns($user)->sole()->mood)->toBe(5);
+        expect(userCheckIns($other)->sole()->values['mood'])->toBe(1)
+            ->and(userCheckIns($user)->sole()->values['mood'])->toBe(5);
     });
 });
 

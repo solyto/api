@@ -48,6 +48,15 @@ class UserSettingsService
         return json_encode((object) array_intersect_key($decoded['visible'], array_flip(self::LEGACY_NAVIGATION_FEATURES)));
     }
 
+    // A feature is on unless the client stored it as off, in either navigation format.
+    public static function featureEnabled(?string $navigation, string $feature): bool
+    {
+        $decoded = json_decode($navigation ?? 'null', true);
+        $visible = is_array($decoded['visible'] ?? null) ? $decoded['visible'] : $decoded;
+
+        return !is_array($visible) || ($visible[$feature] ?? true) !== false;
+    }
+
     public function updateLanguage(User $user, string $language): void
     {
         $user->settings()->update(['language' => $language]);
@@ -136,7 +145,6 @@ class UserSettingsService
         $settings = UserSettings::firstOrCreate(['user_id' => $user->id], []);
         $settings->update(['check_in_settings' => [
             ...($settings->check_in_settings ?? []),
-            'enabled_trackers' => $data['enabled_trackers'],
             'selected_sports' => $data['selected_sports'],
         ]]);
 

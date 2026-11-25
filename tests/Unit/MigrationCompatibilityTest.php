@@ -49,6 +49,7 @@ const MIGRATION_COMPATIBILITY_ALLOWLIST = [
     '2026_11_16_120000_add_file_type_to_clipboards.php' => 'job `pdf-clipboards`: only widens the clipboards.type enum and adds nullable columns; existing rows are untouched, and GET clipboard returns the new `file` entries only with include_files, which no released build sends (rule 13.3)',
     '2026_11_19_000002_add_waiting_for_user_status_to_dev_requests.php' => 'only widens the dev_requests.status enum; existing rows are untouched, and clients below 1.1.5 get the new value as pending (DevRequestService::WAITING_FOR_USER_SINCE, owner, 2026-11-19)',
     '2026_11_24_000002_backfill_note_links.php' => 'job `sell` (backlog `notes-cross-references-and-backlinks`, decision 9): only fills the new note_links table, which no released build reads; note rows are not changed (owner, 2026-11-24)',
+    '2026_11_25_000002_drop_check_in_table.php' => 'no released build reads `check_in` directly: GET/POST check-in and the check-in settings answer from the tracker tables in the old shape (ClientContractTest); only `enabled_trackers` is removed from user_settings.check_in_settings, which nothing reads since the trackers hold the on/off state. A rollback restores the pre-upgrade backup (owner, 2026-11-25)',
 ];
 
 const MIGRATION_COMPATIBILITY_BASELINE = 'tests/Fixtures/client-contract/1.0.15-migrations.txt';

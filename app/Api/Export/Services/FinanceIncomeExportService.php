@@ -2,7 +2,6 @@
 
 namespace App\Api\Export\Services;
 
-use App\Api\CheckIn\Models\CheckIn;
 use App\Api\Feeds\Models\FeedSubscription;
 use App\Api\Finances\Models\Budget;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;

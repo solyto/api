@@ -8,6 +8,7 @@ use App\Api\Alerts\Notifications\AlertNotification;
 use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserSettings;
+use App\Api\Users\Services\UserSettingsService;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,8 +78,9 @@ class AlertDispatcher
     /** @param Collection<int, Alert> $alerts */
     private function dispatch(Collection $alerts, CarbonImmutable $now): int
     {
-        // A switched-off tracker has nothing new to judge, for its own alerts and its goal's.
-        $alerts = $alerts->filter(fn (Alert $alert) => $this->tracker($alert)?->enabled);
+        // A switched-off tracker or check-in has nothing new to judge, for its own alerts and its goal's.
+        $alerts = $alerts->filter(fn (Alert $alert) => $this->tracker($alert)?->enabled
+            && UserSettingsService::featureEnabled($alert->user->settings?->navigation, 'checkIn'));
 
         if ($alerts->isEmpty()) {
             return 0;

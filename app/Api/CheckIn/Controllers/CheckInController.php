@@ -3,10 +3,9 @@
 namespace App\Api\CheckIn\Controllers;
 
 use App\Api\ApiResponse;
-use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Requests\ListCheckInMarksRequest;
 use App\Api\CheckIn\Requests\ListCheckInValuesRequest;
-use App\Api\CheckIn\Requests\SetCheckInValueRequest;
+use App\Api\CheckIn\Requests\SetCheckInValuesRequest;
 use App\Api\CheckIn\Requests\StoreCheckInRequest;
 use App\Api\CheckIn\Resources\CheckInResource;
 use App\Api\CheckIn\Resources\CheckInValueResource;
@@ -41,7 +40,7 @@ class CheckInController
     public function index(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            CheckInResource::collection($this->checkInService->list($request->user())),
+            CheckInResource::collection($this->checkInService->days($request->user())),
             'Check-in data retrieved successfully.'
         );
     }
@@ -177,7 +176,8 @@ class CheckInController
      * @OA\Put(
      *     path="/check-in/values",
      *     operationId="checkInValuesSet",
-     *     summary="Set or clear one tracker's value on one day",
+     *     summary="Set or clear the values of one day in one go",
+     *     description="All values are saved together or not at all.",
      *     tags={"Check-in"},
      *     security={{"sanctum": {}}},
      *
@@ -185,37 +185,46 @@ class CheckInController
      *         required=true,
      *
      *         @OA\JsonContent(
-     *             required={"tracker_id", "date", "value"},
+     *             required={"date", "values"},
      *
-     *             @OA\Property(property="tracker_id", type="integer"),
      *             @OA\Property(property="date", type="string", format="date"),
-     *             @OA\Property(property="value", type="integer", nullable=true, description="null clears the value")
+     *             @OA\Property(
+     *                 property="values",
+     *                 type="array",
+     *                 minItems=1,
+     *                 maxItems=100,
+     *
+     *                 @OA\Items(
+     *                     required={"tracker_id", "value"},
+     *
+     *                     @OA\Property(property="tracker_id", type="integer", description="Each tracker at most once"),
+     *                     @OA\Property(property="value", type="integer", nullable=true, description="null clears the value")
+     *                 )
+     *             )
      *         )
      *     ),
      *
      *     @OA\Response(
      *         response=200,
-     *         description="Check-in value saved successfully",
+     *         description="Check-in values saved successfully",
      *
      *         @OA\JsonContent(
      *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
      *
-     *             @OA\Property(property="data", ref="#/components/schemas/CheckInValue", nullable=true)
+     *             @OA\Property(property="data", type="array", description="The stored values; cleared ones are left out", @OA\Items(ref="#/components/schemas/CheckInValue"))
      *         )
      *     ),
      *
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
      * )
      */
-    public function setValue(SetCheckInValueRequest $request): JsonResponse
+    public function setValues(SetCheckInValuesRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $tracker = CheckInTracker::forUser($request->user()->id)->findOrFail($data['tracker_id']);
-        $value = $this->checkInService->setValue($request->user(), $tracker, $data['date'], $data['value']);
+        $values = $this->checkInService->setValues($request->user(), $request->validated('date'), $request->validated('values'));
 
         return ApiResponse::success(
-            $value ? new CheckInValueResource($value) : null,
-            'Check-in value saved successfully.'
+            CheckInValueResource::collection($values),
+            'Check-in values saved successfully.'
         );
     }
 }

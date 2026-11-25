@@ -1,24 +1,33 @@
 <?php
 
-use App\Api\CheckIn\Models\CheckIn;
+use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\CheckIn\Services\CheckInService;
 
 describe('GET /api/v1/check-in', function () {
-    it('lists the users check-ins', function () {
+    it('lists the user\'s days with built-in values in the old shape, oldest first', function () {
         $user = makeUser();
-        CheckIn::factory()->forUser($user)->count(3)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'mood'))->on('2026-10-02', 4)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'water'))->on('2026-10-02', 3)->create();
+        CheckInValue::factory()->forTracker(builtInTracker($user, 'sleep'))->on('2026-10-01', 2)->create();
+        CheckInValue::factory()->forTracker(CheckInTracker::factory()->forUser($user)->create())->on('2026-10-03', 1)->create();
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in')
             ->assertStatus(200)
-            ->assertJsonCount(3, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', 20261001)
+            ->assertJsonPath('data.0.date', '2026-10-01')
+            ->assertJsonPath('data.0.sleep', 2)
+            ->assertJsonPath('data.0.mood', null)
+            ->assertJsonPath('data.1.date', '2026-10-02')
+            ->assertJsonPath('data.1.mood', 4)
+            ->assertJsonPath('data.1.water', 3);
     });
 
     it('does not list another user\'s check-ins', function () {
         $user = makeUser();
-        $other = makeUser();
-        CheckIn::factory()->forUser($other)->count(2)->create();
+        CheckInValue::factory()->forTracker(builtInTracker(makeUser(), 'mood'))->on('2026-10-01', 3)->create();
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/check-in')
@@ -28,57 +37,43 @@ describe('GET /api/v1/check-in', function () {
 });
 
 describe('POST /api/v1/check-in', function () {
-    it('creates a check-in for a new date', function () {
+    it('saves a day and answers with it', function () {
         $user = makeUser();
 
         $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/check-in', [
-                'date' => now()->toDateString(),
-                'mood' => 4,
-                'water' => 3,
-            ])
+            ->postJson('/api/v1/check-in', ['date' => '2026-10-01', 'mood' => 4, 'water' => 3])
             ->assertStatus(201)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.mood', 4);
+            ->assertJsonPath('data.date', '2026-10-01')
+            ->assertJsonPath('data.mood', 4)
+            ->assertJsonPath('data.water', 3);
 
-        expect(CheckIn::where('user_id', $user->id)->count())->toBe(1);
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in')->assertJsonCount(1, 'data');
     });
 
-    it('updates the existing check-in for the same date', function () {
+    it('changes the sent fields of an existing day and keeps the others', function () {
         $user = makeUser();
-        CheckIn::factory()->forUser($user)->create([
-            'date' => now()->toDateString(),
-            'mood' => 2,
-        ]);
+        app(CheckInService::class)->saveDay($user, '2026-10-01', ['mood' => 2, 'water' => 3]);
 
         $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/check-in', [
-                'date' => now()->toDateString(),
-                'mood' => 5,
-            ])
+            ->postJson('/api/v1/check-in', ['date' => '2026-10-01', 'mood' => 5])
             ->assertStatus(201)
-            ->assertJsonPath('data.mood', 5);
+            ->assertJsonPath('data.mood', 5)
+            ->assertJsonPath('data.water', 3);
 
-        expect(CheckIn::where('user_id', $user->id)->count())->toBe(1);
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/check-in')->assertJsonCount(1, 'data');
     });
 
-    it('does not touch another user\'s check-in for the same date', function () {
+    it('does not touch another user\'s day', function () {
         $user = makeUser();
         $other = makeUser();
-        $otherCheckIn = CheckIn::factory()->forUser($other)->create([
-            'date' => now()->toDateString(),
-            'mood' => 2,
-        ]);
+        app(CheckInService::class)->saveDay($other, '2026-10-01', ['mood' => 2]);
 
         $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/check-in', [
-                'date' => now()->toDateString(),
-                'mood' => 5,
-            ])
+            ->postJson('/api/v1/check-in', ['date' => '2026-10-01', 'mood' => 5])
             ->assertStatus(201);
 
-        expect($otherCheckIn->fresh()->mood)->toBe(2);
-        expect(CheckIn::where('user_id', $user->id)->count())->toBe(1);
+        $this->actingAs($other, 'sanctum')->getJson('/api/v1/check-in')->assertJsonPath('data.0.mood', 2);
     });
 
     it('rejects a missing date', function () {
@@ -140,27 +135,21 @@ describe('GET /api/v1/check-in/marks', function () {
 });
 
 describe('CheckInService', function () {
-    it('find returns null for a date without a check-in', function () {
+    it('saveDay answers with the day in the old shape', function () {
         $user = makeUser();
 
-        expect(app(CheckInService::class)->find($user, now()->toDateString()))->toBeNull();
+        $day = app(CheckInService::class)->saveDay($user, '2026-10-01', ['mood' => 1]);
+
+        expect($day->date)->toBe('2026-10-01')
+            ->and($day->values)->toBe(['mood' => 1]);
     });
 
-    it('find returns the check-in for the date', function () {
-        $user = makeUser();
-        $checkIn = CheckIn::factory()->forUser($user)->create(['date' => now()->toDateString()]);
-
-        $found = app(CheckInService::class)->find($user, now()->toDateString());
-
-        expect($found->id)->toBe($checkIn->id);
-    });
-
-    it('saveDay persists the day in the old shape', function () {
+    it('saveDay answers with an empty day when nothing is left on it', function () {
         $user = makeUser();
 
-        $checkIn = app(CheckInService::class)->saveDay($user, now()->toDateString(), ['mood' => 1]);
+        $day = app(CheckInService::class)->saveDay($user, '2026-10-01', ['mood' => null]);
 
-        expect($checkIn->user_id)->toBe($user->id);
-        expect($checkIn->mood)->toBe(1);
+        expect($day->date)->toBe('2026-10-01')
+            ->and($day->values)->toBe([]);
     });
 });

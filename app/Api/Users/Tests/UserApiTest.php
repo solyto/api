@@ -649,9 +649,10 @@ describe('User settings endpoints', function () {
             ->assertJsonPath('data.enabled_trackers', ['mood', 'water']);
 
         expect($user->fresh()->settings->check_in_settings)->toBe([
-            'enabled_trackers' => ['mood', 'water'],
             'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'waves_ladder'],
-        ]);
+        ])
+            ->and(builtInTracker($user, 'water')->enabled)->toBeTrue()
+            ->and(builtInTracker($user, 'sleep')->enabled)->toBeFalse();
     });
 });
 
@@ -683,6 +684,8 @@ describe('UserSettingsService', function () {
             'enabled_trackers' => ['mood'],
             'selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga'],
         ]);
-        expect($user->fresh()->settings->check_in_settings['enabled_trackers'])->toBe(['mood']);
+        expect($user->fresh()->settings->check_in_settings)->toBe(['selected_sports' => ['dumbbell', 'bike', 'mountain', 'footprints', 'yoga']])
+            ->and(builtInTracker($user, 'mood')->enabled)->toBeTrue()
+            ->and(builtInTracker($user, 'water')->enabled)->toBeFalse();
     });
 });

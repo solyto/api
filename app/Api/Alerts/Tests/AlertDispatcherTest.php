@@ -114,6 +114,17 @@ describe('app:send-alerts', function () {
         Notification::assertNothingSent();
     });
 
+    it('skips users who switched check-in off', function (array $navigation) {
+        sportsAlertFor(berlinUser(['navigation' => json_encode($navigation)]));
+
+        $this->artisan('app:send-alerts');
+
+        Notification::assertNothingSent();
+    })->with([
+        'current format' => [['visible' => ['checkIn' => false], 'desktop' => null, 'mobile' => null]],
+        'format before 1.1.0' => [['checkIn' => false]],
+    ]);
+
     it('tells when a goal was reached on the completed days', function () {
         $user = berlinUser(['week_start' => 'monday']);
         $tracker = ownTracker($user);
