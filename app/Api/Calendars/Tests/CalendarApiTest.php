@@ -933,9 +933,9 @@ describe('Shared calendar cache invalidation', function () {
 
         $this->actingAs($loner, 'sanctum')->deleteJson('/api/v1/calendars/'.$instance)->assertStatus(200);
 
-        expect($cache->has(['calendars_v2', $loner->id]))->toBeFalse()
-            ->and($cache->has(['calendars_v2', $this->owner->id]))->toBeTrue()
-            ->and($cache->has(['calendars_v2', $this->sharee->id]))->toBeTrue();
+        expect($cache->has(['calendars_v3', $loner->id]))->toBeFalse()
+            ->and($cache->has(['calendars_v3', $this->owner->id]))->toBeTrue()
+            ->and($cache->has(['calendars_v3', $this->sharee->id]))->toBeTrue();
     });
 });
 
@@ -989,6 +989,16 @@ describe('Read-only shared calendars', function () {
         expectApiError($this->actingAs($this->sharee, 'sanctum')->deleteJson($calendar.'/events/'.$this->event['uri'].'/occurrence/'.$this->occurrenceDate), 403);
 
         expect(($this->ownerTitles)())->toBe(['Owner event']);
+    });
+
+    it('marks a read-only refusal with the calendar_read_only code', function () {
+        $calendar = '/api/v1/calendars/'.$this->shareeInstance;
+        $change = [...($this->payload)($this->shareeInstance, 'Changed'), 'etag' => $this->event['etag']];
+
+        $this->actingAs($this->sharee, 'sanctum')
+            ->putJson($calendar.'/events/'.$this->event['uri'], $change)
+            ->assertStatus(403)
+            ->assertJsonPath('errors.0', 'calendar_read_only');
     });
 
     it('refuses to move an event into or out of it', function () {

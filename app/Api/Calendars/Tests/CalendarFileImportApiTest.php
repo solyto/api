@@ -203,6 +203,15 @@ describe('Calendar file import validation', function () {
 
         expect(calendarNamed($user, 'holidays'))->toBeNull();
     });
+
+    it('rejects a file with more events than the limit even when they share a UID', function () {
+        $user = makeUser();
+        $events = array_map(fn () => icsEvent('same-uid'), range(0, CalendarImport::MAX_FILE_OBJECTS));
+
+        expectApiError(importIcs($this, $user, icsFile($events)), 422);
+
+        expect(calendarNamed($user, 'holidays'))->toBeNull();
+    });
 });
 
 describe('Calendar file import fidelity', function () {
@@ -238,6 +247,34 @@ describe('Calendar file import fidelity', function () {
         $standups = collect($this->actingAs($user, 'sanctum')->getJson('/api/v1/calendars/events/2030-10')->json('data'))
             ->filter(fn (array $event) => str_starts_with($event['title'], 'Standup'));
         expect($standups->pluck('title')->filter(fn ($title) => $title === 'Standup (moved)'))->toHaveCount(1);
+    });
+
+    it('keeps only the timezones its events use', function () {
+        $user = makeUser();
+        $berlin = [
+            'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin',
+            'BEGIN:DAYLIGHT', 'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0200', 'DTSTART:19700329T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU', 'END:DAYLIGHT',
+            'BEGIN:STANDARD', 'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100', 'DTSTART:19701025T030000', 'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'END:STANDARD',
+            'END:VTIMEZONE',
+        ];
+        $newYork = [
+            'BEGIN:VTIMEZONE', 'TZID:America/New_York',
+            'BEGIN:DAYLIGHT', 'TZOFFSETFROM:-0500', 'TZOFFSETTO:-0400', 'DTSTART:19700308T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU', 'END:DAYLIGHT',
+            'BEGIN:STANDARD', 'TZOFFSETFROM:-0400', 'TZOFFSETTO:-0500', 'DTSTART:19701101T020000', 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU', 'END:STANDARD',
+            'END:VTIMEZONE',
+        ];
+        $event = [
+            'BEGIN:VEVENT', 'UID:berlin', 'DTSTAMP:20300101T000000Z',
+            'DTSTART;TZID=Europe/Berlin:20301014T090000', 'DTEND;TZID=Europe/Berlin:20301014T100000',
+            'SUMMARY:Berlin', 'END:VEVENT',
+        ];
+
+        importIcs($this, $user, icsFile([$berlin, $newYork, $event], ['X-WR-CALNAME:Zones']))->assertStatus(200);
+
+        $objects = storedObjects($user, calendarNamed($user, 'Zones')['id']);
+        expect($objects)->toHaveCount(1)
+            ->and($objects[0])->toContain('TZID:Europe/Berlin')
+            ->not->toContain('TZID:America/New_York');
     });
 
     it('skips what it cannot store and imports the rest', function () {

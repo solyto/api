@@ -96,6 +96,30 @@ describe('Calendar import', function () {
             ->and(app(DavService::class)->calendars()->getByName($user, 'Work'))->toBeNull();
     });
 
+    it('reports the totals of a multi-calendar import', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', [
+            'Personal' => [
+                'a.ics' => davIcs('a', 'Dentist', '20301015T100000Z', '20301015T110000Z'),
+                'b.ics' => davIcs('b', 'Gym', '20301016T180000Z', '20301016T190000Z'),
+            ],
+            'Work' => ['c.ics' => davIcs('c', 'Review')],
+        ]);
+        $import = app(DavService::class)->import()->calendars();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectCalendars($user, $import->getState($user->id), ['Personal', 'Work']);
+        $import->importCalendars($user, $import->getState($user->id));
+        $import->importEvents($user, $import->getState($user->id));
+
+        $state = $import->getState($user->id);
+
+        expect($state->stage)->toBe('finished')
+            ->and($state->eventsCount)->toBe(3)
+            ->and($state->eventsDone)->toBe(3)
+            ->and($state->eventsSkipped)->toBe(0);
+    });
+
     it('stores the remote events as they are and skips the ones it cannot store', function () {
         $user = davUser();
         $series = implode("\r\n", [
@@ -378,18 +402,50 @@ describe('Calendar discovery', function () {
         'link-local' => 'http://169.254.169.254/latest/',
         'ipv6 loopback' => 'http://[::1]/dav/',
     ])->throws(ImportException::class);
+
+    it('marks a calendar import failed when the remote principal cannot be read', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', ['Personal' => []], discoveryStatus: 401);
+        $import = app(DavService::class)->import()->calendars();
+
+        expect(fn () => $import->start($user, REMOTE, 'alice', 'wrong'))->toThrow(ImportException::class);
+
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
+
+    it('marks a calendar import failed when the account has no calendars', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', [], 207);
+        $import = app(DavService::class)->import()->calendars();
+
+        expect(fn () => $import->start($user, REMOTE, 'alice', 'app-password'))->toThrow(ImportException::class);
+
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
+
+    it('marks a calendar job failed when it fails', function () {
+        $user = davUser();
+        fakeRemoteDav('calendars', ['Personal' => []]);
+        $import = app(DavService::class)->import()->calendars();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $jobId = $import->getState($user->id)->jobId;
+
+        (new \App\Api\Calendars\Jobs\ImportCalendars($user->id, $jobId))->failed(new \RuntimeException('boom'));
+
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
 });
 
 describe('Contact import', function () {
     it('logs an address book it has to skip', function () {
         $user = davUser();
         fakeRemoteDav('addressbooks', ['Friends' => []]);
-        $import = app(DavService::class)->import()->addressBooks();
+        $books = Mockery::mock(app(DavService::class)->addressBooks());
+        $books->shouldReceive('create')->andThrow(new \RuntimeException('Address book is broken'));
+        $import = new \App\Dav\Services\ContactImport($books, app(\App\Shared\Services\UserCacheService::class));
+
         $import->start($user, REMOTE, 'alice', 'app-password');
         $import->selectAddressBooks($user, $import->getState($user->id), ['Friends']);
-        app(DavService::class)->addressBooks()->create($user, new \App\Dav\DTOs\AddressBookDTO(
-            id: 0, principalUri: 'principals/'.$user->email, uri: 'friends', displayName: 'Friends', description: null, color: null,
-        ));
 
         Log::shouldReceive('channel')->with('dav')->andReturnSelf();
         Log::shouldReceive('warning')->once()->with('Contact import skipped an address book', Mockery::on(
@@ -399,6 +455,26 @@ describe('Contact import', function () {
         $import->importAddressBooks($user, $import->getState($user->id));
 
         expect($import->getState($user->id)->addressBooksDone)->toBe(0);
+    });
+
+    it('clears the contact cache when the import fails', function () {
+        $user = davUser();
+        $dav = app(DavService::class);
+        fakeRemoteDav('addressbooks', ['Friends' => []]);
+        $import = $dav->import()->addressBooks();
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $jobId = $import->getState($user->id)->jobId;
+
+        $book = $dav->addressBooks()->create($user, new \App\Dav\DTOs\AddressBookDTO(
+            id: 0, principalUri: 'principals/'.$user->email, uri: 'friends', displayName: 'Friends', description: null, color: null,
+        ));
+        $contacts = app(\App\Api\Contacts\Services\ContactService::class);
+        expect($contacts->listContacts($user))->toBe([]);
+        $dav->addressBooks()->contacts()->create($book, \App\Dav\DTOs\ContactDTO::fromRequest(['first_name' => 'Partial', 'last_name' => 'Contact'], $book));
+
+        $import->fail($user->id, $jobId);
+
+        expect(collect($contacts->listContacts($user))->pluck('fullName')->all())->toBe(['Partial Contact']);
     });
 
     it('shows the imported contacts in the cached listing once the import cleared the cache', function () {
@@ -448,6 +524,30 @@ describe('Contact import', function () {
             ->and($state->contactsCount)->toBe(2)
             ->and($state->contactsDone)->toBe(2)
             ->and($names->all())->toBe(['Jane Doe', 'John Doe']);
+    });
+
+    it('reports the totals of a multi-book import', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', [
+            'Friends' => [
+                'a.vcf' => davVcard('a', 'Jane Doe'),
+                'b.vcf' => davVcard('b', 'John Doe'),
+            ],
+            'Work' => ['c.vcf' => davVcard('c', 'Boss')],
+        ]);
+        $import = app(DavService::class)->import()->addressBooks();
+
+        $import->start($user, REMOTE, 'alice', 'app-password');
+        $import->selectAddressBooks($user, $import->getState($user->id), ['Friends', 'Work']);
+        $import->importAddressBooks($user, $import->getState($user->id));
+        $import->importContacts($user, $import->getState($user->id));
+
+        $state = $import->getState($user->id);
+
+        expect($state->stage)->toBe('finished')
+            ->and($state->contactsCount)->toBe(3)
+            ->and($state->contactsDone)->toBe(3)
+            ->and($state->contactsSkipped)->toBe(0);
     });
 
     it('checks every remote card: skips an unreadable one, repairs a missing UID and converts vCard 2.1', function () {
@@ -543,12 +643,25 @@ describe('Contact import', function () {
         expect($import->getState($user->id))->toMatchObject(['stage' => 'finished', 'contactsDone' => 1]);
     });
 
-    it('fails when the remote principal cannot be read', function () {
+    it('fails and leaves the import failed when the remote principal cannot be read', function () {
         $user = davUser();
         fakeRemoteDav('addressbooks', ['Friends' => []], discoveryStatus: 401);
+        $import = app(DavService::class)->import()->addressBooks();
 
-        app(DavService::class)->import()->addressBooks()->start($user, REMOTE, 'alice', 'wrong');
-    })->throws(ImportException::class);
+        expect(fn () => $import->start($user, REMOTE, 'alice', 'wrong'))->toThrow(ImportException::class);
+
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
+
+    it('fails and leaves the import failed when the account has no address books', function () {
+        $user = davUser();
+        fakeRemoteDav('addressbooks', [], 207);
+        $import = app(DavService::class)->import()->addressBooks();
+
+        expect(fn () => $import->start($user, REMOTE, 'alice', 'app-password'))->toThrow(ImportException::class);
+
+        expect($import->getState($user->id)->stage)->toBe('failed');
+    });
 });
 
 describe('Starting an import that cannot read the remote account', function () {

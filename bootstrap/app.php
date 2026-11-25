@@ -2,6 +2,7 @@
 
 use App\Api\ApiResponse;
 use App\Api\Calendars\Exceptions\CalendarAlreadyExistsException;
+use App\Api\Calendars\Exceptions\CalendarReadOnlyException;
 use App\Api\Calendars\Exceptions\ExternalCalendarDiscoveryException;
 use App\Api\CheckIn\Exceptions\BuiltInTrackerException;
 use App\Api\Clipboard\Exceptions\ClipboardFileTooLargeException;
@@ -121,6 +122,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
                       return ApiResponse::error('Too many requests. Please slow down.', 429, ['too_many_requests'], meta: ['retry_after' => $retryAfter ?: null])
                           ->withHeaders($e->getHeaders());
+                  }
+
+                  if ($e instanceof CalendarReadOnlyException) {
+                      return ApiResponse::error($e->getMessage(), 403, ['calendar_read_only']);
                   }
 
                   if ($e instanceof HttpException) {

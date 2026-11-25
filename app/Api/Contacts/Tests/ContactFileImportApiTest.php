@@ -177,6 +177,8 @@ describe('Contacts file import validation', function () {
         'address book and name' => [['address_book_id' => 1, 'name' => 'Friends'], 'address_book_id'],
         'address book and color' => [['address_book_id' => 1, 'color' => '#FF0000'], 'address_book_id'],
         'address book not a number' => [['address_book_id' => 'abc'], 'address_book_id'],
+        'color over seven characters' => [['color' => '#FF0000AA'], 'color'],
+        'color not a hex value' => [['color' => 'red'], 'color'],
     ]);
 
     it('rejects a file without contacts without field errors', function (string $content) {

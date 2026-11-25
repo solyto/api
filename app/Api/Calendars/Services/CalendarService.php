@@ -26,9 +26,9 @@ class CalendarService
 {
     // calendarinstances.displayname is VARCHAR(100) on pgsql.
     public const int MAX_NAME_LENGTH = 100;
-    // _v2: lists cached before CalendarDTO gained solytoShared/isExternal/isUnavailable/isCredentialsRejected
-    // unserialize with those typed properties uninitialised.
-    private const string CACHE_KEY_CALENDARS = 'calendars_v2';
+    // _v3: lists cached before CalendarDTO gained isReadOnly (on top of _v2's solytoShared/isExternal/
+    // isUnavailable/isCredentialsRejected) would unserialize with those typed properties uninitialised.
+    private const string CACHE_KEY_CALENDARS = 'calendars_v3';
     private const string CACHE_KEY_EVENTS = 'calendar_events';
     private const string CACHE_KEY_UNAVAILABLE = 'external_calendar_unavailable';
     // Owned by AppCalendarsPDO (the remote's ctag and sync token); forgotten here with the flag.

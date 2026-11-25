@@ -10,6 +10,9 @@ use Sabre\CardDAV\Backend\PDO as SabrePDO;
 
 class AppContactsPDO extends SabrePDO
 {
+    // addressbooks.uri is VARCHAR(200); the rest is for uniqueUri()'s "-n" suffix.
+    private const int MAX_URI_BASE_LENGTH = 190;
+
     public function listAddressBooksCustom(string $principalUri): array
     {
         $stmt = $this->pdo->prepare('SELECT id, uri, displayname, color, principaluri, description, synctoken FROM '.$this->addressBooksTableName.' WHERE principaluri = ?');
@@ -49,7 +52,7 @@ class AppContactsPDO extends SabrePDO
             'description' => $dto->description,
             'color' => $dto->color,
             'principaluri' => $principalUri,
-            'uri' => Str::slug($dto->displayName),
+            'uri' => $this->uniqueUri($principalUri, $dto->displayName),
         ];
 
         $query = 'INSERT INTO '.$this->addressBooksTableName.' (uri, displayname, description, color, principaluri, synctoken) VALUES (:uri, :displayname, :description, :color, :principaluri, 1)';
@@ -59,6 +62,36 @@ class AppContactsPDO extends SabrePDO
         return $this->pdo->lastInsertId(
             $this->addressBooksTableName.'_id_seq'
         );
+    }
+
+    // (principaluri, uri) is unique, but different display names can slug alike ("Work" and "work!") or to nothing
+    // (emoji-only names). Transliteration can make the slug longer than the name (one Cyrillic letter can become
+    // three), so it is cut to leave room for a "-n" suffix in uri's VARCHAR(200).
+    private function uniqueUri(string $principalUri, string $displayName): string
+    {
+        $base = rtrim(substr(Str::slug($displayName), 0, self::MAX_URI_BASE_LENGTH), '-');
+        if ($base === '') {
+            return Str::uuid()->toString();
+        }
+
+        $candidate = $base;
+        $i = 1;
+        while ($this->uriTaken($principalUri, $candidate)) {
+            $candidate = $base.'-'.$i;
+            $i++;
+        }
+
+        return $candidate;
+    }
+
+    private function uriTaken(string $principalUri, string $uri): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM '.$this->addressBooksTableName.' WHERE principaluri = ? AND uri = ?'
+        );
+        $stmt->execute([$principalUri, $uri]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     public function updateAddressBookCustom(AddressBookDTO $dto): bool

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ImportCalendars implements ShouldQueue
 {
@@ -39,6 +40,13 @@ class ImportCalendars implements ShouldQueue
 
             $dav->import()->calendars()->clearCache($user);
             $state = $dav->import()->calendars()->getState($user->id);
+        }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        if ($this->jobId !== null) {
+            app(DavService::class)->import()->calendars()->fail($this->userId, $this->jobId);
         }
     }
 

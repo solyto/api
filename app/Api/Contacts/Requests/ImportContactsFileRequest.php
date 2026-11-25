@@ -14,7 +14,7 @@ class ImportContactsFileRequest extends FormRequest
             'file' => 'required|file|max:'.self::MAX_FILE_KILOBYTES.'|extensions:vcf,vcard',
             'address_book_id' => 'nullable|integer|prohibits:name,color',
             'name' => 'nullable|string|max:255',
-            'color' => 'nullable|string|max:255',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ];
     }
 }

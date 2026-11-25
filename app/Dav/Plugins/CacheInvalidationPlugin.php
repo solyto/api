@@ -14,7 +14,7 @@ use Sabre\HTTP\RequestInterface;
 
 class CacheInvalidationPlugin extends ServerPlugin
 {
-    private const string CACHE_KEY_CALENDARS = 'calendars_v2';
+    private const string CACHE_KEY_CALENDARS = 'calendars_v3';
     private const string CACHE_KEY_ADDRESS_BOOKS = 'address_books';
     // The job is unique until it runs, so a client syncing a burst of writes causes one run, not one per write.
     private const int SHARED_INVALIDATION_DELAY_SECONDS = 10;

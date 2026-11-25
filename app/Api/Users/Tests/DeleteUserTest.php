@@ -229,7 +229,7 @@ describe('app:users:delete', function () {
         app(UserService::class)->destroy($user);
         // Lets the deleted user's event and contact caches be read again after their calendars and address books are gone.
         $cache = app(UserCacheService::class);
-        $cache->store(['calendars_v2', $user->id], 300, $calendarListBeforeDeletion);
+        $cache->store(['calendars_v3', $user->id], 300, $calendarListBeforeDeletion);
         $cache->store(['address_books', $user->id], 300, $addressBookListBeforeDeletion);
 
         expect($read($user))->toBe(['events' => [], 'contacts' => [], 'todos' => [], 'notes' => []])

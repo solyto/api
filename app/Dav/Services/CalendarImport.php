@@ -21,15 +21,17 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Sabre\VObject\Component;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\InvalidDataException;
 use Sabre\VObject\Node;
 use Sabre\VObject\ParseException;
+use Sabre\VObject\Property;
 use Sabre\VObject\Reader;
 
 class CalendarImport
 {
-    private const string CACHE_KEY_CALENDARS = 'calendars_v2';
+    private const string CACHE_KEY_CALENDARS = 'calendars_v3';
 
     // A whole calendar comes in one REPORT, so the external calendar limits (5 s, 10 MB) are too tight.
     // 30 s matches the import before 1.1.3; the cap keeps a response within the queue worker's memory.
@@ -72,7 +74,15 @@ class CalendarImport
         $dto->secret = Crypt::encryptString($secret);
 
         $this->claim($user->id, $dto);
-        $this->getAvailableCalendars($user, $dto);
+
+        try {
+            $this->getAvailableCalendars($user, $dto);
+        } catch (\Throwable $e) {
+            $dto->stage = 'failed';
+            $this->saveState($user->id, $dto);
+
+            throw $e;
+        }
     }
 
     /**
@@ -155,6 +165,9 @@ class CalendarImport
         $dto->stage = 'events';
         $this->saveState($user->id, $dto);
 
+        $doneTotal = 0;
+        $skippedTotal = 0;
+
         foreach ($dto->selectedCalendars as $calendar) {
             $c = $this->calendars->getByName($user, $calendar['name']);
 
@@ -175,14 +188,19 @@ class CalendarImport
             foreach ($objects as $object) {
                 if ($object && $this->storeObject($user, $c, $object)) {
                     $dto->eventsDone++;
+                    $doneTotal++;
                 } else {
                     $dto->eventsSkipped++;
+                    $skippedTotal++;
                 }
 
                 $this->saveState($user->id, $dto);
             }
         }
 
+        $dto->eventsCount = $doneTotal + $skippedTotal;
+        $dto->eventsDone = $doneTotal;
+        $dto->eventsSkipped = $skippedTotal;
         $dto->stage = 'finished';
         $this->saveState($user->id, $dto);
     }
@@ -293,6 +311,10 @@ class CalendarImport
 
         $dto->stage = 'failed';
         $this->saveState($userId, $dto);
+
+        if ($user = User::find($userId)) {
+            $this->clearCache($user);
+        }
     }
 
     public function clearCache(User $user): void
@@ -315,14 +337,14 @@ class CalendarImport
             throw $this->unreachable($dto);
         }
 
+        if (!$calendars) {
+            throw $this->unreachable($dto);
+        }
+
         $dto->stage = 'select';
         $dto->calendars = $calendars;
         $dto->calendarsCount = count($calendars);
         $this->saveState($user->id, $dto);
-
-        if (!$calendars) {
-            throw $this->unreachable($dto);
-        }
     }
 
     // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.
@@ -422,16 +444,26 @@ class CalendarImport
     // Same UID grouping as Sabre\VObject\Splitter\ICalendar, but a missing UID gets a UUID: the splitter's
     // sha1(microtime()) can repeat within one file and merge unrelated events into one object. Calendar-level
     // properties such as METHOD stay behind; a CalDAV object must not carry them.
-    /** @return array<int, VCalendar> */
+    /**
+     * @return array<int, VCalendar>
+     *
+     * @throws ImportFileException
+     */
     private function splitCalendar(VCalendar $vCal): array
     {
         $timezones = [];
         $objects = [];
+        $usedTimezones = [];
+        $count = 0;
 
         foreach ($vCal->getComponents() as $component) {
             if ($component->name === 'VTIMEZONE') {
-                $timezones[] = $component;
+                $timezones[(string) $component->TZID] = $component;
                 continue;
+            }
+
+            if (++$count > self::MAX_FILE_OBJECTS) {
+                throw new ImportFileException(sprintf('This file contains more than %d events.', self::MAX_FILE_OBJECTS));
             }
 
             $uid = (string) $component->UID;
@@ -443,15 +475,34 @@ class CalendarImport
 
             $objects[$uid] ??= new VCalendar();
             $objects[$uid]->add(clone $component);
+
+            $usedTimezones[$uid] ??= [];
+            $this->collectTimezones($component, $usedTimezones[$uid]);
         }
 
-        foreach ($objects as $object) {
-            foreach ($timezones as $timezone) {
-                $object->add(clone $timezone);
+        foreach ($objects as $uid => $object) {
+            foreach (array_keys($usedTimezones[$uid] ?? []) as $tzid) {
+                if (isset($timezones[$tzid])) {
+                    $object->add(clone $timezones[$tzid]);
+                }
             }
         }
 
         return array_values($objects);
+    }
+
+    /** @param array<string, true> $tzids */
+    private function collectTimezones(Node $node, array &$tzids): void
+    {
+        foreach ($node->children() as $child) {
+            if ($child instanceof Property) {
+                if (isset($child['TZID'])) {
+                    $tzids[(string) $child['TZID']] = true;
+                }
+            } else if ($child instanceof Component) {
+                $this->collectTimezones($child, $tzids);
+            }
+        }
     }
 
     // Checked like a CalDAV client's PUT (Sabre\CalDAV\Plugin::validateICalendar), so the import stores

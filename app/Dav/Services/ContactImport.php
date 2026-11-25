@@ -59,7 +59,15 @@ class ContactImport
         $dto->secret = $secret;
 
         $this->claim($user->id, $dto);
-        $this->getAvailableAddressBooks($user, $dto);
+
+        try {
+            $this->getAvailableAddressBooks($user, $dto);
+        } catch (\Throwable $e) {
+            $dto->stage = 'failed';
+            $this->saveState($user->id, $dto);
+
+            throw $e;
+        }
     }
 
     /**
@@ -141,6 +149,9 @@ class ContactImport
         $dto->stage = 'contacts';
         $this->saveState($user->id, $dto);
 
+        $doneTotal = 0;
+        $skippedTotal = 0;
+
         foreach ($dto->selectedAddressBooks as $addressBook) {
             $a = $this->addressBooks->getByName($user, $addressBook['display_name']);
 
@@ -162,8 +173,10 @@ class ContactImport
             foreach ($contacts as $index => $contact) {
                 if ($this->storeCard($user, $a, $contact, $uids)) {
                     $dto->contactsDone++;
+                    $doneTotal++;
                 } else {
                     $dto->contactsSkipped++;
+                    $skippedTotal++;
                 }
 
                 $this->saveState($user->id, $dto);
@@ -176,6 +189,9 @@ class ContactImport
             }
         }
 
+        $dto->contactsCount = $doneTotal + $skippedTotal;
+        $dto->contactsDone = $doneTotal;
+        $dto->contactsSkipped = $skippedTotal;
         $dto->stage = 'finished';
         $this->saveState($user->id, $dto);
     }
@@ -281,6 +297,10 @@ class ContactImport
 
         $dto->stage = 'failed';
         $this->saveState($userId, $dto);
+
+        if ($user = User::find($userId)) {
+            $this->clearCache($user);
+        }
     }
 
     public function clearCache(User $user): void
@@ -297,14 +317,14 @@ class ContactImport
         $homeSet = $this->discoverAddressBookHome($dto);
         $books = $this->getAddressBooks($dto, $homeSet);
 
+        if (!$books) {
+            throw $this->unreachable($dto);
+        }
+
         $dto->stage = 'select';
         $dto->addressBooks = $books;
         $dto->addressBooksCount = count($books);
         $this->saveState($user->id, $dto);
-
-        if (!$books) {
-            throw $this->unreachable($dto);
-        }
     }
 
     // An unreachable server or wrong credentials is user input, not an app error: log it, don't report it.

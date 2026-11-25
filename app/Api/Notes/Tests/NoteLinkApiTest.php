@@ -103,6 +103,32 @@ describe('Note links on save', function () {
         expect(linkedIds($source))->toBe([]);
     });
 
+    it('counts only links whose uuid is a whole /notes path segment', function () {
+        $user = makeUser();
+        $valid = Note::factory()->forUser($user)->create();
+        $query = Note::factory()->forUser($user)->create();
+        $proto = Note::factory()->forUser($user)->create();
+        $dash = Note::factory()->forUser($user)->create();
+        $suffix = Note::factory()->forUser($user)->create();
+        $extra = Note::factory()->forUser($user)->create();
+        $api = Note::factory()->forUser($user)->create();
+
+        $content = noteLink($valid)
+            ."\nSee /notes/{$query->id}?x=1"
+            ."\n//host/notes/{$proto->id}"
+            ."\n[bad](/notes/{$dash->id}-draft)"
+            ."\n[bad](/notes/{$suffix->id}suffix)"
+            ."\n[bad](/notes/{$extra->id}/extra)"
+            ."\n/api/v1/notes/{$api->id}";
+
+        $source = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/notes', ['title' => 'Source', 'content' => $content])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        expect(linkedIds(Note::find($source)))->toBe(collect([$valid->id, $query->id])->sort()->values()->all());
+    });
+
     it('drops the link row but keeps the source text when the target is deleted', function () {
         $user = makeUser();
         $target = Note::factory()->forUser($user)->create();

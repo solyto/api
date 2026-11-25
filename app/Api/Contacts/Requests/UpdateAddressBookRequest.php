@@ -9,7 +9,7 @@ class UpdateAddressBookRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'color' => 'sometimes|string|max:255',
+            'color' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ];
     }
 }

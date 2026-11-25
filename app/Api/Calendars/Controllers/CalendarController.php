@@ -353,7 +353,7 @@ class CalendarController
      *     ),
      *
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
-     *     @OA\Response(response=403, description="Unable to update event, or the calendar (or the target calendar of a move) is shared with the user read-only", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=403, description="The calendar (or the target calendar of a move) is shared with the user read-only; errors: [calendar_read_only]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=404, description="Calendar or Event not found", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(response=412, description="External calendar: the event was changed on its server; errors: [external_event_changed]", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
      *     @OA\Response(
@@ -400,7 +400,7 @@ class CalendarController
         $event = $this->calendarService->updateEvent($request->user(), $calendar, $event);
 
         if ($event === null) {
-            return ApiResponse::error('Unable to update event', 403);
+            return ApiResponse::error('Unable to update event', 500);
         }
 
         return ApiResponse::success(new EventResource($event), 'Event updated successfully.');

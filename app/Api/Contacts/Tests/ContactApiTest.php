@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 function expectAddressBookNotFound($response): void
 {
@@ -43,6 +44,57 @@ describe('Address books (DAV-backed)', function () {
         $this->actingAs($user, 'sanctum')
             ->deleteJson('/api/v1/address-books/'.$addressBookId)
             ->assertStatus(200);
+    });
+
+    it('rejects an address book color that cannot be stored', function () {
+        $user = makeUser();
+
+        $addressBookId = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => 'Personal'])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/v1/address-books/'.$addressBookId, ['color' => '#FF0000AA'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('color');
+    });
+
+    it('caps a generated address book uri and keeps it unique', function () {
+        $user = makeUser();
+        $principal = 'principals/'.$user->email;
+        $longName = str_repeat('a', 240);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/address-books', ['name' => $longName])
+            ->assertStatus(201);
+
+        $longUri = DB::connection('pgsql')->table('addressbooks')
+            ->where('principaluri', $principal)
+            ->where('displayname', $longName)
+            ->value('uri');
+
+        expect($longUri)->not->toBeNull()
+            ->and(strlen($longUri))->toBeLessThanOrEqual(200);
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books', ['name' => '😀'])->assertStatus(201);
+
+        expect(DB::connection('pgsql')->table('addressbooks')
+            ->where('principaluri', $principal)
+            ->where('displayname', '😀')
+            ->value('uri'))->toMatch('/^[0-9a-f-]{36}$/');
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books', ['name' => 'Work'])->assertStatus(201);
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/address-books', ['name' => 'work!'])->assertStatus(201);
+
+        $uris = DB::connection('pgsql')->table('addressbooks')
+            ->where('principaluri', $principal)
+            ->whereIn('displayname', ['Work', 'work!'])
+            ->pluck('uri')
+            ->all();
+
+        expect($uris)->toHaveCount(2)
+            ->and(array_unique($uris))->toHaveCount(2);
     });
 
     it('rejects an address book with an existing name with 409', function () {
