@@ -17,8 +17,6 @@ return [
     // Check-in widget
     'check_in_title'       => 'Check-in',
     'check_in_empty'       => 'Keine Tracker aktiviert.',
-    'check_in_section_today' => 'Bewertungen',
-    'check_in_section_own'   => 'Eigene Tracker',
     'tracker_mood'         => 'Stimmung',
     'tracker_sleep'        => 'Schlaf',
     'tracker_dreams'       => 'Träume',

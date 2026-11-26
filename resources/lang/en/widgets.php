@@ -17,8 +17,6 @@ return [
     // Check-in widget
     'check_in_title'       => 'Check-in',
     'check_in_empty'       => 'No trackers enabled.',
-    'check_in_section_today' => 'Ratings',
-    'check_in_section_own'   => 'Own trackers',
     'tracker_mood'         => 'Mood',
     'tracker_sleep'        => 'Sleep',
     'tracker_dreams'       => 'Dreams',

@@ -68,7 +68,9 @@ class NotificationService
             ->limit(self::DEVICE_NOTIFICATION_LIMIT)
             ->get();
 
-        return ['items' => $items, 'cursor' => max($after, $items->max('id') ?? $this->latestDeviceNotificationId($user))];
+        // Without new items the cursor stays: entries skipped as read are filtered again next time,
+        // and one inserted after the query above isn't jumped over.
+        return ['items' => $items, 'cursor' => max($after, $items->max('id') ?? $after)];
     }
 
     public function deleteOldDeviceNotifications(): void

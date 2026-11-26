@@ -834,8 +834,8 @@ describe('Own trackers in the check-in widget', function () {
         $own = widgetSection($data, 'own');
 
         expect(array_column($data['sections'], 'key'))->toBe(['today', 'own'])
-            ->and($today['title'])->toBe('Ratings')
-            ->and($own['title'])->toBe('Own trackers')
+            ->and($today)->not->toHaveKey('title')
+            ->and($own)->not->toHaveKey('title')
             ->and(array_column($today['rows'], 'id'))->toBe(['mood', 'own_'.$focus->id])
             ->and($today['rows'][1])->toMatchArray(['title' => 'Focus', 'icon' => 'lucide:droplet'])
             ->and($today['rows'][1]['action'])->toMatchArray(['type' => 'scale', 'key' => 'check_in.set', 'value' => 4])
@@ -878,7 +878,7 @@ describe('Own trackers in the check-in widget', function () {
         expect(trackerValueToday($other))->toBeNull();
     });
 
-    it('counts a count tracker up and down, never below 0', function () {
+    it('counts a count tracker up and down, never below 0, and clears it at 0', function () {
         $user = widgetUser();
         $water = ownWidgetTracker($user, CheckInTrackerType::Count, 'Glasses of water', 200);
 
@@ -892,7 +892,7 @@ describe('Own trackers in the check-in widget', function () {
         expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
         expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
         expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
-        expect(trackerValueToday($water))->toBe(0);
+        expect(trackerValueToday($water))->toBeNull();
     });
 
     it('only counts count trackers, by one', function () {

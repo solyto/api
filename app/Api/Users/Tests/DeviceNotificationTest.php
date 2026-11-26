@@ -7,6 +7,7 @@ use App\Api\Users\Models\User;
 use App\Api\Users\Notifications\FriendRequestNotification;
 use App\Api\Users\Services\NotificationService;
 use App\Shared\Notifications\Channels\DeviceChannel;
+use App\Shared\Notifications\TestNotification;
 use Illuminate\Support\Facades\Exceptions;
 use NotificationChannels\WebPush\WebPushChannel;
 
@@ -45,6 +46,15 @@ describe('Notification channels with a registered phone', function () {
         app(NotificationService::class)->registerDevice($user, 'phone-1');
 
         expect((new FriendRequestNotification('Alex'))->via($user))->toBe(['database', WebPushChannel::class, DeviceChannel::class]);
+    });
+
+    it('sends the test notification to a registered phone as well', function () {
+        $user = phoneUser();
+        expect((new TestNotification)->via($user))->not->toContain(DeviceChannel::class);
+
+        app(NotificationService::class)->registerDevice($user, 'phone-1');
+
+        expect((new TestNotification)->via($user))->toBe(['database', 'mail', WebPushChannel::class, DeviceChannel::class]);
     });
 
     it('adds no device channel when push is off for the type', function () {
@@ -118,6 +128,18 @@ describe('Polling notifications from a phone', function () {
         $items = pollPhone($this, $user, $cursor)->json('data.items');
 
         expect($items)->toHaveCount(1)->and($items[0]['body'])->toContain('Push only');
+    });
+
+    it('keeps the cursor when only notifications already read are new', function () {
+        $user = phoneUser();
+        $cursor = registerPhone($this, $user)->json('data.cursor');
+        $user->notify(new FriendRequestNotification('Alex'));
+        $user->unreadNotifications()->update(['read_at' => now()]);
+
+        $response = pollPhone($this, $user, $cursor);
+
+        expect($response->json('data.items'))->toBe([])
+            ->and($response->json('data.cursor'))->toBe($cursor);
     });
 
     it('only returns the user\'s own notifications', function () {

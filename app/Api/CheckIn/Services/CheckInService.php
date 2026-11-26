@@ -151,8 +151,13 @@ class CheckInService
         DB::transaction(function () use ($tracker, $date, $step) {
             $existing = CheckInValue::where('check_in_tracker_id', $tracker->id)->whereDate('date', $date)->lockForUpdate()->first();
 
-            if ($existing) {
-                $existing->update(['value' => min(max(0, $existing->value + $step), CheckInTrackerType::MAX_COUNT)]);
+            $value = $existing ? min(max(0, $existing->value + $step), CheckInTrackerType::MAX_COUNT) : null;
+
+            // A count of 0 is stored as no value, as the daily page does.
+            if ($value === 0) {
+                $existing->delete();
+            } elseif ($existing) {
+                $existing->update(['value' => $value]);
             } elseif ($step > 0) {
                 $this->createValue($tracker, $date, $step);
             }

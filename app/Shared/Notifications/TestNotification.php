@@ -2,6 +2,7 @@
 
 namespace App\Shared\Notifications;
 
+use App\Shared\Notifications\Channels\DeviceChannel;
 use App\Shared\Notifications\Channels\TelegramChannel;
 use App\Shared\Notifications\Channels\TelegramMessage;
 use Illuminate\Bus\Queueable;
@@ -21,6 +22,10 @@ class TestNotification extends Notification
         $connection = $notifiable->telegramConnection;
         if ($connection && $connection->is_confirmed) {
             $channels[] = TelegramChannel::class;
+        }
+
+        if ($notifiable->notificationDevices()->active()->exists()) {
+            $channels[] = DeviceChannel::class;
         }
 
         return $channels;

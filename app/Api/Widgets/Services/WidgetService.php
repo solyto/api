@@ -193,11 +193,7 @@ class WidgetService
             'own' => $logs->map(fn (CheckInTracker $tracker) => $this->ownLogRow($tracker, $values[$tracker->id] ?? null)),
         ])
             ->filter(fn ($rows) => $rows->isNotEmpty())
-            ->map(fn ($rows, string $key) => [
-                'key' => $key,
-                'title' => __('widgets.check_in_section_' . $key, [], $locale),
-                'rows' => $rows->values()->all(),
-            ])
+            ->map(fn ($rows, string $key) => ['key' => $key, 'rows' => $rows->values()->all()])
             ->values()
             ->all();
     }
