@@ -33,6 +33,14 @@ class DevRequestService
             ->values();
     }
 
+    public function notice(): ?string
+    {
+        $path = config('app.dev_request_notice');
+        $text = is_file($path) ? trim((string) file_get_contents($path)) : '';
+
+        return $text === '' ? null : $text;
+    }
+
     public function find(int $id): ?DevRequest
     {
         return DevRequest::with('votes')->withCount('comments')->find($id);

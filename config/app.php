@@ -42,6 +42,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dev Request Notice
+    |--------------------------------------------------------------------------
+    |
+    | A plain-text notice shown above the dev requests (e.g. a break). The
+    | file lives in storage, so it can be added, edited or removed on the
+    | server without a deploy. No file, or an empty one, means no notice.
+    |
+    */
+
+    'dev_request_notice' => storage_path('app/dev-request-notice.txt'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Minimum Client Version
     |--------------------------------------------------------------------------
     |

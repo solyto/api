@@ -49,6 +49,34 @@ class DevRequestController
     }
 
     /**
+     * @OA\Get(
+     *     path="/dev-requests/notice",
+     *     operationId="devRequestNotice",
+     *     tags={"Dev Requests"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Dev request notice retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="text", type="string", nullable=true, description="Plain text; null when there is no notice.")
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function notice(): JsonResponse
+    {
+        return ApiResponse::success(['text' => $this->devRequestService->notice()], 'Dev request notice retrieved successfully.');
+    }
+
+    /**
      * @OA\Post(
      *     path="/dev-requests",
      *     operationId="devRequestStore",

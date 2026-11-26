@@ -61,6 +61,42 @@ describe('DevRequest CRUD', function () {
     });
 });
 
+describe('DevRequest notice', function () {
+    beforeEach(function () {
+        $this->noticeFile = sys_get_temp_dir().'/dev-request-notice-'.uniqid().'.txt';
+        config(['app.dev_request_notice' => $this->noticeFile]);
+    });
+
+    afterEach(function () {
+        @unlink($this->noticeFile);
+    });
+
+    it('returns the notice file as plain text', function () {
+        file_put_contents($this->noticeFile, "\nTaking a break until January.\nRequests are answered after that.\n");
+
+        $response = $this->actingAs(makeUser(), 'sanctum')->getJson('/api/v1/dev-requests/notice');
+
+        expectApiSuccess($response);
+        $response->assertJsonPath('data.text', "Taking a break until January.\nRequests are answered after that.");
+    });
+
+    it('returns no notice without a file or with an empty one', function () {
+        $user = makeUser();
+        $withoutFile = $this->actingAs($user, 'sanctum')->getJson('/api/v1/dev-requests/notice');
+
+        expectApiSuccess($withoutFile);
+        $withoutFile->assertJsonPath('data.text', null);
+
+        file_put_contents($this->noticeFile, "  \n ");
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/v1/dev-requests/notice')->assertJsonPath('data.text', null);
+    });
+
+    it('needs a login', function () {
+        expectApiError($this->getJson('/api/v1/dev-requests/notice'), 401);
+    });
+});
+
 describe('DevRequest fixed_in_version', function () {
     it('lets an admin set fixed_in_version', function () {
         $admin = makeUser(['role' => 'admin']);

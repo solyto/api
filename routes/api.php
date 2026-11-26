@@ -379,6 +379,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
 
     Route::prefix('dev-requests')->group(function () {
         Route::get('', [DevRequestController::class, 'index']);
+        Route::get('notice', [DevRequestController::class, 'notice']);
         Route::middleware('throttle:dev-requests')->post('', [DevRequestController::class, 'store']);
         Route::put('{devRequest}', [DevRequestController::class, 'update']);
         Route::post('{devRequest}/vote', [DevRequestController::class, 'vote']);
