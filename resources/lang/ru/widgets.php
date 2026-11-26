@@ -17,6 +17,8 @@ return [
     // Check-in widget
     'check_in_title'       => 'Ежедневный опрос',
     'check_in_empty'       => 'Не выбран ни один показатель.',
+    'check_in_section_today' => 'Оценки',
+    'check_in_section_own'   => 'Свои показатели',
     'tracker_mood'         => 'Настроение',
     'tracker_sleep'        => 'Сон',
     'tracker_dreams'       => 'Сновидения',

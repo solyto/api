@@ -7,11 +7,16 @@ use App\Api\HandlesApiAuth;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
 use App\Api\TimeTracking\Models\TimeTrackingProject;
 use App\Api\Todos\Models\Todo;
+use App\Api\Users\Services\NotificationService;
+use App\Api\Widgets\Requests\AddCheckInRequest;
+use App\Api\Widgets\Requests\ListDeviceNotificationsRequest;
+use App\Api\Widgets\Requests\RegisterNotificationDeviceRequest;
 use App\Api\Widgets\Requests\SetCheckInRequest;
 use App\Api\Widgets\Resources\CheckInWidgetResource;
 use App\Api\Widgets\Resources\TimeTrackingWidgetResource;
 use App\Api\Widgets\Resources\YourDayResource;
 use App\Api\Widgets\Services\WidgetService;
+use App\Shared\Helpers\ClientVersionHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +24,10 @@ class WidgetController
 {
     use HandlesApiAuth;
 
-    public function __construct(private readonly WidgetService $widgetService) {}
+    public function __construct(
+        private readonly WidgetService $widgetService,
+        private readonly NotificationService $notificationService,
+    ) {}
 
     /**
      * @OA\Get(
@@ -228,7 +236,7 @@ class WidgetController
      * @OA\Get(
      *     path="/widgets/check-in",
      *     operationId="widgetsCheckIn",
-     *     summary="Check-in widget data: today's check-in for the enabled trackers with the values to tap, in the user's language and timezone",
+     *     summary="Check-in widget data: today's check-in for the enabled trackers with the values to tap, in the user's language and timezone. Clients from 1.2.0 (X-Client-Version) also get own trackers: own 1-5 ratings in section today, yes/no (toggle) and count (counter) trackers in section own; older clients get the built-in trackers only",
      *     tags={"Widgets"},
      *     security={{"sanctum": {}}},
      *
@@ -251,7 +259,10 @@ class WidgetController
     public function checkIn(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            new CheckInWidgetResource($this->widgetService->checkIn($request->user())),
+            new CheckInWidgetResource($this->widgetService->checkIn(
+                $request->user(),
+                ClientVersionHelper::isAtLeast($request, WidgetService::OWN_TRACKERS_SINCE)
+            )),
             'Widget data retrieved successfully.'
         );
     }
@@ -267,10 +278,10 @@ class WidgetController
      *     @OA\Parameter(
      *         name="tracker",
      *         in="path",
-     *         description="Tracker key",
+     *         description="Built-in tracker key, or own_<id> for an own tracker",
      *         required=true,
      *
-     *         @OA\Schema(type="string", enum={"mood","sleep","dreams","food_quality","food_amount","water","sports","work","menstruation","alcohol","smoking","social_life"})
+     *         @OA\Schema(type="string", pattern="^(mood|sleep|dreams|food_quality|food_amount|water|sports|work|menstruation|alcohol|smoking|social_life|own_[0-9]+)$")
      *     ),
      *
      *     @OA\RequestBody(
@@ -279,7 +290,7 @@ class WidgetController
      *         @OA\JsonContent(
      *             required={"value"},
      *
-     *             @OA\Property(property="value", type="integer", nullable=true, minimum=1, maximum=6, description="1-5 (sports: sport id 1-6), or null to clear", example=4)
+     *             @OA\Property(property="value", type="integer", nullable=true, minimum=1, maximum=6, description="1-5 (sports: sport id 1-6; own yes/no: 1), or null to clear", example=4)
      *         )
      *     ),
      *
@@ -308,5 +319,190 @@ class WidgetController
         $this->widgetService->setCheckIn($request->user(), $tracker, $value === null ? null : (int) $value);
 
         return ApiResponse::success(null, 'Check-in saved successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/widgets/actions/check_in.add/{tracker}",
+     *     operationId="widgetsCheckInAdd",
+     *     summary="Count an own count tracker of today's check-in (user's timezone) up or down by one; never below 0",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(
+     *         name="tracker",
+     *         in="path",
+     *         description="own_<id> of an own count tracker",
+     *         required=true,
+     *
+     *         @OA\Schema(type="string", pattern="^own_[0-9]+$")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"value"},
+     *
+     *             @OA\Property(property="value", type="integer", enum={-1, 1}, example=1)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Check-in saved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="object", nullable=true, example=null)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Unknown tracker", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Invalid value, or not a count tracker", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse")),
+     *     @OA\Response(response=426, description="Client version too old", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=429, description="Too many requests", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function addCheckIn(AddCheckInRequest $request, string $tracker): JsonResponse
+    {
+        $this->widgetService->addCheckIn($request->user(), $tracker, (int) $request->validated('value'));
+
+        return ApiResponse::success(null, 'Check-in saved successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/widgets/notifications/devices",
+     *     operationId="widgetsNotificationDeviceStore",
+     *     summary="Register this phone for notifications (types with push on); returns the cursor to poll from",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"device_id"},
+     *
+     *             @OA\Property(property="device_id", type="string", maxLength=64, pattern="^[A-Za-z0-9-]+$", description="Generated by the app once per installation")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Device registered successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="object", @OA\Property(property="cursor", type="integer"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     * )
+     */
+    public function registerDevice(RegisterNotificationDeviceRequest $request): JsonResponse
+    {
+        $cursor = $this->notificationService->registerDevice($request->user(), $request->validated('device_id'));
+
+        return ApiResponse::success(['cursor' => $cursor], 'Device registered successfully.');
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/widgets/notifications/devices/{deviceId}",
+     *     operationId="widgetsNotificationDeviceDestroy",
+     *     summary="Stop notifications for this phone",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(name="deviceId", in="path", required=true, @OA\Schema(type="string", pattern="^[A-Za-z0-9-]{1,64}$")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Device unregistered successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(property="data", type="object", nullable=true, example=null)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function unregisterDevice(Request $request, string $deviceId): JsonResponse
+    {
+        $this->notificationService->unregisterDevice($request->user(), $deviceId);
+
+        return ApiResponse::success(null, 'Device unregistered successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/widgets/notifications",
+     *     operationId="widgetsNotifications",
+     *     summary="Notifications for a registered phone after the cursor, oldest first; leaves out ones already read in the app",
+     *     tags={"Widgets"},
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Parameter(name="device_id", in="query", required=true, @OA\Schema(type="string", pattern="^[A-Za-z0-9-]{1,64}$")),
+     *     @OA\Parameter(name="after", in="query", required=true, @OA\Schema(type="integer", minimum=0)),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Notifications retrieved successfully",
+     *
+     *         @OA\JsonContent(
+     *             allOf={@OA\Schema(ref="#/components/schemas/SuccessResponse")},
+     *
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="cursor", type="integer"),
+     *                 @OA\Property(
+     *                     property="items",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="title", type="string"),
+     *                         @OA\Property(property="body", type="string", nullable=true),
+     *                         @OA\Property(property="url", type="string", nullable=true),
+     *                         @OA\Property(property="created_at", type="string", format="date-time")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=404, description="Device not registered", @OA\JsonContent(ref="#/components/schemas/ErrorResponse")),
+     *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationErrorResponse"))
+     * )
+     */
+    public function deviceNotifications(ListDeviceNotificationsRequest $request): JsonResponse
+    {
+        ['items' => $items, 'cursor' => $cursor] = $this->notificationService->deviceNotifications(
+            $request->user(),
+            $request->validated('device_id'),
+            (int) $request->validated('after')
+        );
+
+        return ApiResponse::success([
+            'cursor' => $cursor,
+            'items' => $items->map(fn ($item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'body' => $item->body,
+                'url' => $item->url,
+                'created_at' => $item->created_at->toIso8601String(),
+            ])->values()->all(),
+        ], 'Notifications retrieved successfully.');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Api\CheckIn\Services;
 
+use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\DTOs\CheckInDayDTO;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
 use App\Api\CheckIn\Models\CheckInTracker;
@@ -137,6 +138,27 @@ class CheckInService
         }
 
         return $this->days($user)->firstWhere('date', $date) ?? new CheckInDayDTO($date, [], now(), now());
+    }
+
+    public function addToCount(User $user, CheckInTracker $tracker, string $date, int $step): void
+    {
+        if ($tracker->type !== CheckInTrackerType::Count) {
+            throw ValidationException::withMessages(['value' => 'Only count trackers can be counted up or down.']);
+        }
+
+        $date = Carbon::parse($date)->toDateString();
+
+        DB::transaction(function () use ($tracker, $date, $step) {
+            $existing = CheckInValue::where('check_in_tracker_id', $tracker->id)->whereDate('date', $date)->lockForUpdate()->first();
+
+            if ($existing) {
+                $existing->update(['value' => min(max(0, $existing->value + $step), CheckInTrackerType::MAX_COUNT)]);
+            } elseif ($step > 0) {
+                $this->createValue($tracker, $date, $step);
+            }
+        });
+
+        $this->forgetCache($user);
     }
 
     public function setBuiltInValue(User $user, string $date, string $key, ?int $value): void

@@ -4,6 +4,7 @@ namespace App\Shared\Notifications;
 
 use App\Api\Users\Models\User;
 use App\Api\Users\Models\UserNotificationSettings;
+use App\Shared\Notifications\Channels\DeviceChannel;
 use App\Shared\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
@@ -72,6 +73,10 @@ abstract class BaseNotification extends Notification
             if ($connection && $connection->is_confirmed) {
                 $channels[] = TelegramChannel::class;
             }
+        }
+
+        if (($settings->$pushKey ?? false) && $notifiable->notificationDevices()->active()->exists()) {
+            $channels[] = DeviceChannel::class;
         }
 
         return $channels;

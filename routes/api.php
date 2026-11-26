@@ -302,8 +302,16 @@ Route::prefix('v1')->middleware(['auth:sanctum', TrackApiTraffic::class])->group
         Route::post('actions/time_tracking.stop/{entry}', [WidgetController::class, 'stopTimeTracking'])->name('actions.time-tracking-stop');
         Route::get('check-in', [WidgetController::class, 'checkIn'])->name('check-in');
         Route::post('actions/check_in.set/{tracker}', [WidgetController::class, 'setCheckIn'])
-            ->whereIn('tracker', CheckInBuiltInTracker::keys())
+            ->where('tracker', '('.implode('|', CheckInBuiltInTracker::keys()).'|own_[0-9]+)')
             ->name('actions.check-in-set');
+        Route::post('actions/check_in.add/{tracker}', [WidgetController::class, 'addCheckIn'])
+            ->where('tracker', 'own_[0-9]+')
+            ->name('actions.check-in-add');
+        Route::get('notifications', [WidgetController::class, 'deviceNotifications'])->name('notifications');
+        Route::post('notifications/devices', [WidgetController::class, 'registerDevice'])->name('notifications.devices.store');
+        Route::delete('notifications/devices/{deviceId}', [WidgetController::class, 'unregisterDevice'])
+            ->where('deviceId', '[A-Za-z0-9-]{1,64}')
+            ->name('notifications.devices.destroy');
     });
 
     Route::prefix('weather')->group(function () {

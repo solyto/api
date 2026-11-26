@@ -103,6 +103,12 @@ class User extends Authenticatable
         return $this->hasOne(UserSettings::class);
     }
 
+    /** @return HasMany<NotificationDevice, $this> */
+    public function notificationDevices(): HasMany
+    {
+        return $this->hasMany(NotificationDevice::class);
+    }
+
     /** @return HasOne<UserNotificationSettings, $this> */
     public function notificationSettings(): HasOne
     {

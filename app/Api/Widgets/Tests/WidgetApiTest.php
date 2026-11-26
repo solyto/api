@@ -2,6 +2,9 @@
 
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\DTOs\CheckInDayDTO;
+use App\Api\CheckIn\Enums\CheckInTrackerType;
+use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\CheckIn\Models\CheckInValue;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
@@ -772,6 +775,143 @@ describe('POST /widgets/actions/check_in.set/{tracker}', function () {
 
         expect(userCheckIns($other)->sole()->values['mood'])->toBe(1)
             ->and(userCheckIns($user)->sole()->values['mood'])->toBe(5);
+    });
+});
+
+function newAppCheckInWidget($test, User $user, string $version = '1.2.0'): array
+{
+    $response = bearer($test, sanctumToken($user))->withHeader('X-Client-Version', $version)->getJson('/api/v1/widgets/check-in');
+    expectApiSuccess($response);
+
+    return $response->json('data');
+}
+
+function ownWidgetTracker(User $user, CheckInTrackerType $type, string $name, int $position, bool $enabled = true): CheckInTracker
+{
+    return CheckInTracker::factory()->forUser($user)->ofType($type)->create(['name' => $name, 'icon' => 'droplet', 'position' => $position, 'enabled' => $enabled]);
+}
+
+function addCheckIn($test, User $user, string $tracker, mixed $body, ?string $token = null)
+{
+    return bearer($test, $token ?? sanctumToken($user))->postJson('/api/v1/widgets/actions/check_in.add/'.$tracker, $body);
+}
+
+function trackerValueToday(CheckInTracker $tracker): ?int
+{
+    return CheckInValue::where('check_in_tracker_id', $tracker->id)->whereDate('date', today())->value('value');
+}
+
+describe('Own trackers in the check-in widget', function () {
+    it('gives apps before 1.2.0 the built-in trackers only, as before', function (?string $version) {
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => ['mood'], 'selected_sports' => []]]);
+        ownWidgetTracker($user, CheckInTrackerType::Scale, 'Focus', 200);
+        ownWidgetTracker($user, CheckInTrackerType::YesNo, 'Meditated', 201);
+
+        $response = bearer($this, sanctumToken($user));
+        if ($version !== null) {
+            $response = $response->withHeader('X-Client-Version', $version);
+        }
+        $data = $response->getJson('/api/v1/widgets/check-in')->json('data');
+
+        expect($data['sections'])->toBe([['key' => 'today', 'rows' => [checkInRow($data, 'mood')]]])
+            ->and(checkInRow($data, 'mood'))->not->toBeNull();
+    })->with([null, '1.1.4']);
+
+    it('gives apps from 1.2.0 the ratings and the own yes/no and count trackers in the tracker order', function () {
+        Carbon::setTestNow('2026-08-14 10:00:00');
+        $user = widgetUser(['check_in_settings' => ['enabled_trackers' => ['mood'], 'selected_sports' => []]]);
+        $focus = ownWidgetTracker($user, CheckInTrackerType::Scale, 'Focus', 200);
+        $meditated = ownWidgetTracker($user, CheckInTrackerType::YesNo, 'Meditated', 201);
+        $water = ownWidgetTracker($user, CheckInTrackerType::Count, 'Glasses of water', 202);
+        ownWidgetTracker($user, CheckInTrackerType::Count, 'Switched off', 203, enabled: false);
+        app(CheckInService::class)->setValues($user, '2026-08-14', [
+            ['tracker_id' => $focus->id, 'value' => 4],
+            ['tracker_id' => $water->id, 'value' => 3],
+        ]);
+
+        $data = newAppCheckInWidget($this, $user);
+        $today = widgetSection($data, 'today');
+        $own = widgetSection($data, 'own');
+
+        expect(array_column($data['sections'], 'key'))->toBe(['today', 'own'])
+            ->and($today['title'])->toBe('Ratings')
+            ->and($own['title'])->toBe('Own trackers')
+            ->and(array_column($today['rows'], 'id'))->toBe(['mood', 'own_'.$focus->id])
+            ->and($today['rows'][1])->toMatchArray(['title' => 'Focus', 'icon' => 'lucide:droplet'])
+            ->and($today['rows'][1]['action'])->toMatchArray(['type' => 'scale', 'key' => 'check_in.set', 'value' => 4])
+            ->and(array_column($today['rows'][1]['action']['options'], 'value'))->toBe([1, 2, 3, 4, 5])
+            ->and(array_column($own['rows'], 'id'))->toBe(['own_'.$meditated->id, 'own_'.$water->id])
+            ->and($own['rows'][0]['action'])->toBe(['type' => 'toggle', 'key' => 'check_in.set', 'value' => null])
+            ->and($own['rows'][1]['action'])->toBe(['type' => 'counter', 'key' => 'check_in.add', 'value' => 3]);
+    });
+
+    it('sets and clears an own rating and yes/no tracker', function () {
+        $user = widgetUser();
+        $focus = ownWidgetTracker($user, CheckInTrackerType::Scale, 'Focus', 200);
+        $meditated = ownWidgetTracker($user, CheckInTrackerType::YesNo, 'Meditated', 201);
+
+        expectApiSuccess(setCheckIn($this, $user, 'own_'.$focus->id, ['value' => 5]));
+        expectApiSuccess(setCheckIn($this, $user, 'own_'.$meditated->id, ['value' => 1]));
+        expect(trackerValueToday($focus))->toBe(5)->and(trackerValueToday($meditated))->toBe(1);
+
+        expectApiSuccess(setCheckIn($this, $user, 'own_'.$meditated->id, ['value' => null]));
+        expect(trackerValueToday($meditated))->toBeNull();
+    });
+
+    it('refuses a value that does not fit the tracker', function () {
+        $user = widgetUser();
+        $focus = ownWidgetTracker($user, CheckInTrackerType::Scale, 'Focus', 200);
+        $meditated = ownWidgetTracker($user, CheckInTrackerType::YesNo, 'Meditated', 201);
+
+        expectApiError(setCheckIn($this, $user, 'own_'.$focus->id, ['value' => 6]), 422);
+        expectApiError(setCheckIn($this, $user, 'own_'.$meditated->id, ['value' => 2]), 422);
+    });
+
+    it('answers 404 for another user\'s tracker and for a built-in tracker addressed by id', function () {
+        $user = widgetUser();
+        $other = ownWidgetTracker(widgetUser(), CheckInTrackerType::Scale, 'Theirs', 200);
+        $builtIn = CheckInTracker::forUser($user->id)->where('key', 'mood')->firstOrFail();
+
+        expectApiError(setCheckIn($this, $user, 'own_'.$other->id, ['value' => 3]), 404);
+        expectApiError(setCheckIn($this, $user, 'own_'.$builtIn->id, ['value' => 3]), 404);
+        expectApiError(addCheckIn($this, $user, 'own_'.$other->id, ['value' => 1]), 404);
+        expect(trackerValueToday($other))->toBeNull();
+    });
+
+    it('counts a count tracker up and down, never below 0', function () {
+        $user = widgetUser();
+        $water = ownWidgetTracker($user, CheckInTrackerType::Count, 'Glasses of water', 200);
+
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
+        expect(trackerValueToday($water))->toBeNull();
+
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => 1]));
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => 1]));
+        expect(trackerValueToday($water))->toBe(2);
+
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => -1]));
+        expect(trackerValueToday($water))->toBe(0);
+    });
+
+    it('only counts count trackers, by one', function () {
+        $user = widgetUser();
+        $meditated = ownWidgetTracker($user, CheckInTrackerType::YesNo, 'Meditated', 200);
+        $water = ownWidgetTracker($user, CheckInTrackerType::Count, 'Glasses of water', 201);
+
+        expectApiError(addCheckIn($this, $user, 'own_'.$meditated->id, ['value' => 1]), 422);
+        expectApiError(addCheckIn($this, $user, 'own_'.$water->id, ['value' => 2]), 422);
+        expect(trackerValueToday($meditated))->toBeNull()->and(trackerValueToday($water))->toBeNull();
+    });
+
+    it('works with a widget token', function () {
+        $user = widgetUser();
+        $water = ownWidgetTracker($user, CheckInTrackerType::Count, 'Glasses of water', 200);
+        $token = issueWidgetToken($this, sessionToken($user));
+
+        expectApiSuccess(addCheckIn($this, $user, 'own_'.$water->id, ['value' => 1], $token));
+        expect(trackerValueToday($water))->toBe(1);
     });
 });
 

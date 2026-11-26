@@ -4,6 +4,8 @@ namespace App\Api\Widgets\Services;
 
 use App\Api\Calendars\Services\CalendarService;
 use App\Api\CheckIn\Enums\CheckInBuiltInTracker;
+use App\Api\CheckIn\Enums\CheckInTrackerType;
+use App\Api\CheckIn\Models\CheckInTracker;
 use App\Api\CheckIn\Services\CheckInService;
 use App\Api\CheckIn\Services\CheckInTrackerService;
 use App\Api\TimeTracking\Models\TimeTrackingEntry;
@@ -29,6 +31,9 @@ class WidgetService
     private const array CHECK_IN_COLORS = [1 => '#EF4444', 2 => '#F97316', 3 => '#3B82F6', 4 => '#86EFAC', 5 => '#22C55E'];
     private const string CHECK_IN_SPORTS_COLOR = '#1DBDA5';
     private const string CHECK_IN_MENSTRUATION_COLOR = '#FB7185';
+    private const string OWN_TRACKER_PREFIX = 'own_';
+    // APKs from this version draw own trackers; older ones get the built-in trackers only.
+    public const string OWN_TRACKERS_SINCE = '1.2.0';
 
     public function __construct(
         private readonly CalendarService $calendarService,
@@ -126,17 +131,22 @@ class WidgetService
         $this->timeTrackingService->stopTimer($entry);
     }
 
-    public function checkIn(User $user): array
+    public function checkIn(User $user, bool $withOwnTrackers = false): array
     {
         $format = $this->format($user);
         $sports = $user->settings->check_in_settings['selected_sports'] ?? CheckInBuiltInTracker::DEFAULT_SPORTS;
 
         $now = CarbonImmutable::now($format->timezone);
         $today = $now->startOfDay();
-        $values = $this->checkInService->builtInValuesOn($user, $today->toDateString());
 
-        $rows = collect($this->checkInTrackerService->enabledBuiltInKeys($user))
-            ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $format->locale));
+        if ($withOwnTrackers) {
+            $sections = $this->checkInSections($user, $today->toDateString(), $sports, $format->locale);
+        } else {
+            $values = $this->checkInService->builtInValuesOn($user, $today->toDateString());
+            $rows = collect($this->checkInTrackerService->enabledBuiltInKeys($user))
+                ->map(fn (string $tracker) => $this->checkInRow($tracker, $values[$tracker] ?? null, $sports, $format->locale));
+            $sections = $rows->isEmpty() ? [] : [['key' => 'today', 'rows' => $rows->values()->all()]];
+        }
 
         return [
             'kind' => 'check-in',
@@ -147,13 +157,91 @@ class WidgetService
                 'title' => __('widgets.check_in_title', [], $format->locale),
                 'empty' => __('widgets.check_in_empty', [], $format->locale),
             ],
-            'sections' => $rows->isEmpty() ? [] : [['key' => 'today', 'rows' => $rows->values()->all()]],
+            'sections' => $sections,
         ];
     }
 
     public function setCheckIn(User $user, string $tracker, ?int $value): void
     {
-        $this->checkInService->setBuiltInValue($user, CarbonImmutable::now($user->timezone())->toDateString(), $tracker, $value);
+        $today = CarbonImmutable::now($user->timezone())->toDateString();
+
+        if (str_starts_with($tracker, self::OWN_TRACKER_PREFIX)) {
+            $this->checkInService->setValue($user, $this->ownTracker($user, $tracker), $today, $value);
+
+            return;
+        }
+
+        $this->checkInService->setBuiltInValue($user, $today, $tracker, $value);
+    }
+
+    public function addCheckIn(User $user, string $tracker, int $step): void
+    {
+        $this->checkInService->addToCount($user, $this->ownTracker($user, $tracker), CarbonImmutable::now($user->timezone())->toDateString(), $step);
+    }
+
+    // Ratings (built-in and own 1-5) first, then own yes/no and count trackers, each in the tracker list's order.
+    private function checkInSections(User $user, string $date, array $sports, string $locale): array
+    {
+        $trackers = $this->checkInTrackerService->list($user)->filter(fn (CheckInTracker $tracker) => $tracker->enabled);
+        $values = $this->checkInService->values($user, $date, $date)->pluck('value', 'check_in_tracker_id');
+        [$ratings, $logs] = $trackers->partition(fn (CheckInTracker $tracker) => in_array($tracker->type, [CheckInTrackerType::Scale, CheckInTrackerType::Sport], true));
+
+        return collect([
+            'today' => $ratings->map(fn (CheckInTracker $tracker) => $tracker->key !== null
+                ? $this->checkInRow($tracker->key, $values[$tracker->id] ?? null, $sports, $locale)
+                : $this->ownRatingRow($tracker, $values[$tracker->id] ?? null)),
+            'own' => $logs->map(fn (CheckInTracker $tracker) => $this->ownLogRow($tracker, $values[$tracker->id] ?? null)),
+        ])
+            ->filter(fn ($rows) => $rows->isNotEmpty())
+            ->map(fn ($rows, string $key) => [
+                'key' => $key,
+                'title' => __('widgets.check_in_section_' . $key, [], $locale),
+                'rows' => $rows->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function ownRatingRow(CheckInTracker $tracker, ?int $value): array
+    {
+        return [
+            'id' => self::OWN_TRACKER_PREFIX . $tracker->id,
+            'title' => $tracker->name,
+            'icon' => 'lucide:' . $tracker->icon,
+            'all_day' => true,
+            'action' => [
+                'type' => 'scale',
+                'key' => 'check_in.set',
+                'value' => $value,
+                'options' => array_map(fn (int $option) => [
+                    'value' => $option,
+                    'icon' => 'level',
+                    'color' => self::CHECK_IN_COLORS[$option],
+                ], range(1, 5)),
+            ],
+        ];
+    }
+
+    private function ownLogRow(CheckInTracker $tracker, ?int $value): array
+    {
+        $action = $tracker->type === CheckInTrackerType::YesNo
+            ? ['type' => 'toggle', 'key' => 'check_in.set', 'value' => $value]
+            : ['type' => 'counter', 'key' => 'check_in.add', 'value' => $value ?? 0];
+
+        return [
+            'id' => self::OWN_TRACKER_PREFIX . $tracker->id,
+            'title' => $tracker->name,
+            'icon' => 'lucide:' . $tracker->icon,
+            'all_day' => true,
+            'action' => $action,
+        ];
+    }
+
+    private function ownTracker(User $user, string $tracker): CheckInTracker
+    {
+        return CheckInTracker::forUser($user->id)
+            ->whereNull('key')
+            ->findOrFail((int) substr($tracker, strlen(self::OWN_TRACKER_PREFIX)));
     }
 
     private function checkInRow(string $tracker, ?int $value, array $selectedSports, string $locale): array
