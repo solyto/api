@@ -30,6 +30,7 @@ class FeedService
     private const string CACHE_KEY_FEED_ITEMS = 'feed_items_v2';
     private const int CACHE_TTL_USER_FEEDS = 86400;
     private const int CACHE_TTL_FEED_ITEMS = 86400;
+    private const int CACHE_TTL_PROVISIONAL_FEED_ITEMS = 3600;
     private const int MAX_ERROR_LENGTH = 500;
     private const int MAX_DESCRIPTION_LENGTH = 1000;
     private const int MAX_ITEM_ID_LENGTH = 255;
@@ -181,8 +182,15 @@ class FeedService
             throw new FeedSubscriptionLimitException('Feed subscription limit reached');
         }
 
+        $fetchedItems = null;
+
         if (!$feed) {
-            $feed = $this->feedForFetchedData($userId, $title, $url, $fetchFeedData());
+            $feedData = $fetchFeedData();
+            $feed = $this->feedForFetchedData($userId, $title, $url, $feedData);
+
+            if ($feed->wasRecentlyCreated && $feedData) {
+                $fetchedItems = $feedData['items'];
+            }
         }
 
         $subscription = FeedSubscription::create([
@@ -196,9 +204,41 @@ class FeedService
 
         $this->cache->forget([self::CACHE_KEY_USER_FEEDS, $userId]);
 
+        if ($fetchedItems !== null) {
+            $this->cacheProvisionalFeedItems($feed->id, $fetchedItems);
+        }
+
         SyncFeed::dispatch($feed->id);
 
         return $subscription;
+    }
+
+    /** @param  array<int, \SimplePie\Item>  $items */
+    private function cacheProvisionalFeedItems(string $feedId, array $items): void
+    {
+        $now = Carbon::now()->toDateTimeString();
+
+        $rows = collect($items)
+            ->filter(fn (\SimplePie\Item $item) => !empty($item->get_link()))
+            ->unique(fn (\SimplePie\Item $item) => $item->get_id(false, false) === null
+                ? 'link:'.$item->get_link()
+                : 'id:'.$this->storedItemId($item->get_id()))
+            ->map(fn (\SimplePie\Item $item) => (object) [
+                'id'           => (string) Str::uuid(),
+                'title'        => $this->plainTitle($item->get_title()),
+                'link'         => $item->get_link(),
+                'description'  => $this->truncateDescription($item->get_description()),
+                'image_url'    => null,
+                'published_at' => $this->resolvePublishedAt($item)->toDateTimeString(),
+                'feed_item_id' => $this->storedItemId($item->get_id()),
+                'feed_id'      => $feedId,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ])
+            ->sortByDesc('published_at')
+            ->values();
+
+        $this->cache->store([self::CACHE_KEY_FEED_ITEMS, $feedId], self::CACHE_TTL_PROVISIONAL_FEED_ITEMS, $rows);
     }
 
     // $url may be a website; the Feed row is stored under the feed URL it resolved to ($feedData's 'url'), and an
@@ -582,9 +622,12 @@ class FeedService
         }
 
         $changed = false;
+        $itemIdsByLink = FeedItem::where('feed_id', $feedId)->pluck('id', 'link')->all();
 
         foreach ($items as $item) {
-            if (empty($item->get_link())) {
+            $link = $item->get_link();
+
+            if (empty($link)) {
                 continue;
             }
 
@@ -592,6 +635,19 @@ class FeedService
                 'feed_id'      => $feedId,
                 'feed_item_id' => $this->storedItemId($item->get_id()),
             ]);
+
+            if (!$feedItem->exists && $item->get_id(false, false) === null && isset($itemIdsByLink[$link])) {
+                $feedItem = FeedItem::find($itemIdsByLink[$link]) ?? $feedItem;
+
+                if ($feedItem->exists) {
+                    $feedItem->title = $this->plainTitle($item->get_title());
+
+                    if ($feedItem->isDirty()) {
+                        $feedItem->save();
+                        $changed = true;
+                    }
+                }
+            }
 
             if (!$feedItem->exists) {
                 try {
@@ -607,6 +663,7 @@ class FeedService
                     // already have been rebuilt without it, so still invalidate.
                 }
 
+                $itemIdsByLink[$link] = $feedItem->id;
                 $changed = true;
 
                 continue;

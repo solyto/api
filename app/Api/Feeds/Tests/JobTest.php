@@ -182,6 +182,21 @@ describe('ImportFeedSubscriptions', function () {
         ));
     });
 
+    it('lists an imported new feed\'s items right after the import, before the sync stored them', function () {
+        Queue::fake();
+        $user = makeUser();
+        Http::fake(['https://ok.example/*' => Http::response(file_get_contents(base_path('tests/Fixtures/feed.rss')), 200)]);
+        runningFeedImport($user, ['https://ok.example/feed']);
+
+        runFeedImportJob($user);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items');
+        expectApiSuccess($response);
+
+        expect(FeedItem::count())->toBe(0);
+        expect(collect($response->json('data'))->pluck('title')->sort()->values()->all())->toBe(['First Post', 'Second Post']);
+    });
+
     it('subscribes an existing feed without fetching it', function () {
         Queue::fake();
         Http::fake();

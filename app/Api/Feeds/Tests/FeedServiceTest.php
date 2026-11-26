@@ -123,7 +123,7 @@ describe('FeedService', function () {
         $reader = $this->mock(FeedReader::class);
         $reader->shouldReceive('getFeedData')->once()->andReturn([
             'title' => 'Tom &amp; Jerry\'s Blog',
-            'items' => ['fake-item'],
+            'items' => [feedItemDouble(null)],
         ]);
 
         app(FeedService::class)->createSubscription($user, 'My title', 'https://example.com/feed.xml', null, null);
@@ -136,7 +136,7 @@ describe('FeedService', function () {
 
         app(FeedService::class)->createImportedSubscription(makeUser(), 'Imported', 'https://example.com/feed.xml', [
             'title' => 'Example Feed',
-            'items' => ['fake-item'],
+            'items' => [feedItemDouble(null)],
         ]);
 
         expect(Feed::sole()->url)->toBe('https://example.com/feed.xml');
@@ -149,7 +149,7 @@ describe('FeedService', function () {
         $reader = $this->mock(FeedReader::class);
         $reader->shouldReceive('getFeedData')->once()->andReturn([
             'title' => str_repeat('ä', 300),
-            'items' => ['fake-item'],
+            'items' => [feedItemDouble(null)],
         ]);
 
         app(FeedService::class)->createSubscription($user, 'My title', 'https://example.com/feed.xml', null, null);
@@ -206,5 +206,67 @@ describe('FeedService sync cache invalidation', function () {
 
         expect(Cache::store('user_data')->has('feed_items_v2_'.$feed->id))->toBeFalse();
         expect(FeedItem::sole()->image_url)->toBe('https://cdn.example/new.jpg');
+    });
+});
+
+describe('FeedService sync: items without an id of their own', function () {
+    it('keeps a retitled item as one item with the new title and forgets the cache', function () {
+        $feed = Feed::factory()->create();
+        $first = feedItems('<item><title>Old title</title><link>https://news.example/1</link></item>');
+        $retitled = feedItems('<item><title>Old title (2020)</title><link>https://news.example/1</link></item>');
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->twice()->andReturn($first, $retitled);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        app(FeedService::class)->syncFeed($feed->id);
+        expect(seedFeedItemsCache($feed))->toBeTrue();
+        app(FeedService::class)->syncFeed($feed->id);
+
+        expect(FeedItem::sole()->title)->toBe('Old title (2020)');
+        expect(Cache::store('user_data')->has('feed_items_v2_'.$feed->id))->toBeFalse();
+    });
+
+    it('matches an item stored under an older hash id by its link', function () {
+        $feed = Feed::factory()->create();
+        $stored = FeedItem::factory()->forFeed($feed)->create(['feed_item_id' => 'old-hash', 'link' => 'https://news.example/1', 'title' => 'Old title']);
+        $items = feedItems('<item><title>Old title (2020)</title><link>https://news.example/1</link></item>');
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn($items);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        app(FeedService::class)->syncFeed($feed->id);
+
+        expect(FeedItem::sole()->id)->toBe($stored->id);
+        expect(FeedItem::sole()->title)->toBe('Old title (2020)');
+    });
+
+    it('keeps items without ids apart when their links differ', function () {
+        $feed = Feed::factory()->create();
+        $items = feedItems(
+            '<item><title>One</title><link>https://news.example/1</link></item>',
+            '<item><title>Two</title><link>https://news.example/2</link></item>',
+        );
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn($items);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        app(FeedService::class)->syncFeed($feed->id);
+
+        expect(FeedItem::orderBy('title')->pluck('title')->all())->toBe(['One', 'Two']);
+    });
+
+    it('keeps items with their own ids apart even when they share a link', function () {
+        $feed = Feed::factory()->create();
+        $items = feedItems(
+            '<item><guid>post-1</guid><title>One</title><link>https://news.example/</link></item>',
+            '<item><guid>post-2</guid><title>Two</title><link>https://news.example/</link></item>',
+        );
+        $reader = $this->mock(FeedReader::class);
+        $reader->shouldReceive('getItems')->once()->andReturn($items);
+        $reader->shouldReceive('extractImageUrl')->andReturn(null);
+
+        app(FeedService::class)->syncFeed($feed->id);
+
+        expect(FeedItem::orderBy('title')->pluck('title')->all())->toBe(['One', 'Two']);
     });
 });

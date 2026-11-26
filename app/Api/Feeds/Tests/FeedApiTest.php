@@ -3,6 +3,8 @@
 use App\Api\Feeds\Models\Feed;
 use App\Api\Feeds\Models\FeedItem;
 use App\Api\Feeds\Models\FeedSubscription;
+use App\Api\Feeds\Jobs\SyncFeed;
+use App\Api\Feeds\Services\FeedService;
 use App\Api\Feeds\Services\FeedReader;
 use App\Api\Libraries\Models\LibraryLink;
 use App\Api\Users\Models\Friend;
@@ -19,6 +21,12 @@ function feedItemAt(Feed $feed, string $publishedAt, string $title = 'Post', str
     ]);
 }
 
+/** @return array<int, \SimplePie\Item> */
+function fixtureFeedItems(): array
+{
+    return app(FeedReader::class)->parseFeedData(file_get_contents(base_path('tests/Fixtures/feed.rss')))['items'];
+}
+
 /** @param  array<string, mixed>  $feedData */
 function fakeFeedData(array $feedData)
 {
@@ -30,9 +38,9 @@ function fakeFeedData(array $feedData)
 
 // What FeedReader::getFeedData() returns for the angak.fr news page, a website whose own feed is under its path.
 /** @param  array<int, mixed>  $items */
-function angakFeedData(array $items = ['fake-item']): array
+function angakFeedData(?array $items = null): array
 {
-    return ['url' => 'https://angak.fr/actualites/feed/', 'title' => 'Actualités', 'items' => $items];
+    return ['url' => 'https://angak.fr/actualites/feed/', 'title' => 'Actualités', 'items' => $items ?? fixtureFeedItems()];
 }
 
 describe('Feed subscriptions CRUD', function () {
@@ -81,7 +89,7 @@ describe('Feed subscriptions CRUD', function () {
         Queue::fake();
         $user = makeUser();
 
-        fakeFeedData(['title' => 'Example Feed', 'items' => ['fake-item']]);
+        fakeFeedData(['title' => 'Example Feed', 'items' => fixtureFeedItems()]);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/feeds/subscriptions', [
@@ -96,6 +104,80 @@ describe('Feed subscriptions CRUD', function () {
         expect(Feed::where('url', 'https://example.com/feed.xml')->exists())->toBeTrue();
 
         Queue::assertPushed(\App\Api\Feeds\Jobs\SyncFeed::class);
+    });
+
+    it('lists a new feed\'s items right after subscribing, before the sync stored them', function () {
+        Queue::fake();
+        $user = makeUser();
+        fakeFeedData(['title' => 'Fixture Feed', 'items' => fixtureFeedItems()]);
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/subscriptions', ['title' => 'Fixture', 'url' => 'https://fixture.example/feed.xml']), 201);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items');
+        expectApiSuccess($response);
+
+        expect(FeedItem::count())->toBe(0);
+        expect(collect($response->json('data'))->pluck('title')->sort()->values()->all())->toBe(['First Post', 'Second Post']);
+        expect($response->json('meta.feed_counts'))->toBe([Feed::sole()->id => 2]);
+    });
+
+    it('sorts a new feed\'s items among the stored items of other feeds by date', function () {
+        Queue::fake();
+        $user = makeUser();
+        $stored = Feed::factory()->create();
+        FeedSubscription::factory()->forUser($user)->forFeed($stored)->create();
+        feedItemAt($stored, '2026-11-15 12:00:00', 'Stored');
+        fakeFeedData(['title' => 'Dated', 'items' => feedItems(
+            '<item><title>Newer</title><link>https://dated.example/newer</link><pubDate>Fri, 20 Nov 2026 12:00:00 +0000</pubDate></item>',
+            '<item><title>Older</title><link>https://dated.example/older</link><pubDate>Tue, 10 Nov 2026 12:00:00 +0000</pubDate></item>',
+        )]);
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/subscriptions', ['title' => 'Dated', 'url' => 'https://dated.example/feed.xml']), 201);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items');
+        expectApiSuccess($response);
+
+        expect(array_column($response->json('data'), 'title'))->toBe(['Newer', 'Stored', 'Older']);
+    });
+
+    it('lists a new feed\'s items without ids of their own once per link right after subscribing', function () {
+        Queue::fake();
+        $user = makeUser();
+        fakeFeedData(['title' => 'News', 'items' => feedItems(
+            '<item><title>Old title</title><link>https://news.example/1</link></item>',
+            '<item><title>Old title (2020)</title><link>https://news.example/1</link></item>',
+            '<item><title>Other</title><link>https://news.example/2</link></item>',
+        )]);
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/subscriptions', ['title' => 'News', 'url' => 'https://news.example/rss']), 201);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items');
+        expectApiSuccess($response);
+
+        expect(collect($response->json('data'))->pluck('link')->sort()->values()->all())->toBe(['https://news.example/1', 'https://news.example/2']);
+    });
+
+    it('lists the stored items instead of the stand-ins once the feed is synced', function () {
+        Queue::fake();
+        $user = makeUser();
+        $items = fixtureFeedItems();
+        $reader = Mockery::mock(FeedReader::class);
+        app()->instance(FeedReader::class, $reader);
+        $reader->shouldReceive('getFeedData')->once()->andReturn(['title' => 'Fixture Feed', 'items' => $items]);
+        $reader->shouldReceive('getItems')->once()->andReturn($items);
+        $reader->shouldReceive('extractImageUrl')->andReturn('https://cdn.example/thumb.jpg');
+
+        expectApiSuccess($this->actingAs($user, 'sanctum')->postJson('/api/v1/feeds/subscriptions', ['title' => 'Fixture', 'url' => 'https://fixture.example/feed.xml']), 201);
+        expectApiSuccess($this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items'));
+
+        app(SyncFeed::class, ['feedId' => Feed::sole()->id])->handle(app(FeedService::class));
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/feeds/items');
+        expectApiSuccess($response);
+
+        expect(collect($response->json('data'))->pluck('id')->sort()->values()->all())
+            ->toBe(FeedItem::pluck('id')->sort()->values()->all());
+        expect(array_unique(array_column($response->json('data'), 'image_url')))->toBe(['https://cdn.example/thumb.jpg']);
     });
 
     it('stores the feed URL a website URL resolves to', function () {
@@ -187,7 +269,7 @@ describe('Feed subscriptions CRUD', function () {
         $other = makeUser();
         FeedSubscription::factory()->forUser($user)->create();
         FeedSubscription::factory()->forUser(makeUser())->count(3)->create();
-        fakeFeedData(['title' => 'Example Feed', 'items' => ['fake-item']]);
+        fakeFeedData(['title' => 'Example Feed', 'items' => fixtureFeedItems()]);
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/feeds/subscriptions', ['title' => 'One more', 'url' => 'https://example.com/feed.xml']);

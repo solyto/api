@@ -4,6 +4,7 @@ use App\Api\Calendars\Models\ExternalCalendar;
 use App\Api\Calendars\Models\ExternalCalendarAccount;
 use App\Api\CheckIn\Enums\CheckInTrackerType;
 use App\Api\CheckIn\Models\CheckInTracker;
+use App\Api\Feeds\Services\FeedReader;
 use App\Api\Users\Models\User;
 use App\Dav\DTOs\CalendarDTO;
 use App\Dav\Factories\DavServerFactory;
@@ -285,4 +286,10 @@ function builtInTracker(User $user, string $key): CheckInTracker
 function ownTracker(User $user, CheckInTrackerType $type = CheckInTrackerType::YesNo): CheckInTracker
 {
     return CheckInTracker::factory()->forUser($user)->ofType($type)->create();
+}
+
+/** @return array<int, \SimplePie\Item> */
+function feedItems(string ...$items): array
+{
+    return app(FeedReader::class)->parseFeedData('<?xml version="1.0"?><rss version="2.0"><channel><title>Feed</title>'.implode('', $items).'</channel></rss>')['items'];
 }
