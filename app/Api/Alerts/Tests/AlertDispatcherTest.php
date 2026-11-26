@@ -333,3 +333,15 @@ describe('AlertNotification', function () {
         'de entries' => ['de', AlertRule::EntryDays, 'Coffee: 1 Tag in Folge eingetragen.', 'Coffee: 7 Tage in Folge eingetragen.'],
     ]);
 });
+
+describe('AlertNotification links', function () {
+    // /check-in exists in every app since 1.0.15; /check-in/goals only since 1.2.0.
+    it('links a reached goal to the check-in page and other alerts to the trends', function () {
+        $user = makeUser();
+        $goal = new AlertNotification(AlertRule::GoalReached, 'sports', null, goalComparison: GoalComparison::AtLeast, goalPeriod: GoalPeriod::Week);
+        $average = new AlertNotification(AlertRule::AverageBelow, 'mood', null, days: 7, threshold: 3.0, average: 2.4);
+
+        expect($goal->toDatabase($user)['link'])->toBe('/check-in');
+        expect($average->toDatabase($user)['link'])->toBe('/check-in/trends');
+    });
+});
